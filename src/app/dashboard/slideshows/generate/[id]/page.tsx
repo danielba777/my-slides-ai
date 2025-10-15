@@ -28,7 +28,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
 
-export const PRESENTATION_GENERATION_COOKIE = "slideshows_generation_pending";
+export const PRESENTATION_GENERATION_COOKIE = "presentation_generation_pending";
 
 export default function PresentationGenerateWithIdPage() {
   const router = useRouter();
@@ -54,16 +54,16 @@ export default function PresentationGenerateWithIdPage() {
   const initialLoadComplete = useRef(false);
   const generationStarted = useRef(false);
 
-  // Use React Query to fetch slideshows data
-  const { data: slideshowsData, isLoading: isLoadingPresentation } = useQuery(
+  // Use React Query to fetch presentation data
+  const { data: presentationData, isLoading: isLoadingPresentation } = useQuery(
     {
-      queryKey: ["slideshows", id],
+      queryKey: ["presentation", id],
       queryFn: async () => {
         const result = await getPresentation(id);
         if (!result.success) {
-          throw new Error(result.message ?? "Failed to load slideshows");
+          throw new Error(result.message ?? "Failed to load presentation");
         }
-        return result.slideshows;
+        return result.presentation;
       },
       enabled: !!id,
     },
@@ -105,26 +105,28 @@ export default function PresentationGenerateWithIdPage() {
     }
   }, [isGeneratingOutline, setShouldStartOutlineGeneration]);
 
-  // Update slideshows state when data is fetched
+  // Update presentation state when data is fetched
   useEffect(() => {
-    if (slideshowsData && !isLoadingPresentation && !isGeneratingOutline) {
-      setCurrentPresentation(slideshowsData.id, slideshowsData.title);
+    if (presentationData && !isLoadingPresentation && !isGeneratingOutline) {
+      setCurrentPresentation(presentationData.id, presentationData.title);
       setPresentationInput(
-        slideshowsData.slideshows?.prompt ?? slideshowsData.title,
+        presentationData.presentation?.prompt ?? presentationData.title,
       );
 
-      if (slideshowsData.slideshows?.outline) {
-        setOutline(slideshowsData.slideshows.outline);
+      if (presentationData.presentation?.outline) {
+        setOutline(presentationData.presentation.outline);
       }
 
       // Load search results if available
-      if (slideshowsData.slideshows?.searchResults) {
+      if (presentationData.presentation?.searchResults) {
         try {
           const searchResults = Array.isArray(
-            slideshowsData.slideshows.searchResults,
+            presentationData.presentation.searchResults,
           )
-            ? slideshowsData.slideshows.searchResults
-            : JSON.parse(slideshowsData.slideshows.searchResults as string);
+            ? presentationData.presentation.searchResults
+            : JSON.parse(
+                presentationData.presentation.searchResults as string,
+              );
           setWebSearchEnabled(true);
           setSearchResults(searchResults);
         } catch (error) {
@@ -134,8 +136,8 @@ export default function PresentationGenerateWithIdPage() {
       }
 
       // Set theme if available
-      if (slideshowsData?.slideshows?.theme) {
-        const themeId = slideshowsData.slideshows.theme;
+      if (presentationData.presentation?.theme) {
+        const themeId = presentationData.presentation.theme;
 
         // Check if this is a predefined theme
         if (themeId in themes) {
@@ -164,24 +166,24 @@ export default function PresentationGenerateWithIdPage() {
         }
       }
 
-      // Set slideshowsStyle if available
-      if (slideshowsData?.slideshows?.slideshowsStyle) {
-        setPresentationStyle(slideshowsData.slideshows.slideshowsStyle);
+      // Set presentationStyle if available
+      if (presentationData.presentation?.presentationStyle) {
+        setPresentationStyle(presentationData.presentation.presentationStyle);
       }
 
-      if (slideshowsData?.slideshows?.imageSource) {
+      if (presentationData.presentation?.imageSource) {
         setImageSource(
-          slideshowsData.slideshows.imageSource as "ai" | "stock",
+          presentationData.presentation.imageSource as "ai" | "stock",
         );
       }
 
       // Set language if available
-      if (slideshowsData.slideshows?.language) {
-        setLanguage(slideshowsData.slideshows.language);
+      if (presentationData.presentation?.language) {
+        setLanguage(presentationData.presentation.language);
       }
     }
   }, [
-    slideshowsData,
+    presentationData,
     isLoadingPresentation,
     setCurrentPresentation,
     setPresentationInput,
@@ -221,11 +223,11 @@ export default function PresentationGenerateWithIdPage() {
 
     state.setSlides(slides);
 
-    const slideshowsTitle =
+    const presentationTitle =
       state.currentPresentationTitle?.trim().length
         ? state.currentPresentationTitle
-      : state.slideshowsInput?.trim().length
-        ? state.slideshowsInput
+      : state.presentationInput?.trim().length
+        ? state.presentationInput
         : "Untitled Presentation";
 
     try {
@@ -233,16 +235,16 @@ export default function PresentationGenerateWithIdPage() {
         id,
         content: { slides, config: state.config ?? {} },
         outline: state.outline,
-        prompt: state.slideshowsInput,
-        title: slideshowsTitle,
+        prompt: state.presentationInput,
+        title: presentationTitle,
         theme: state.theme,
         imageSource: state.imageSource,
-        slideshowsStyle: state.slideshowsStyle,
+        presentationStyle: state.presentationStyle,
         language: state.language,
         searchResults: state.searchResults,
       });
     } catch (error) {
-      console.error("Failed to store slideshows slides:", error);
+      console.error("Failed to store presentation slides:", error);
       toast.error("Slides saved locally, but storing them failed.");
     } finally {
       state.setIsGeneratingPresentation(false);

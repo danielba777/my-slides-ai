@@ -267,7 +267,9 @@ export function PresentationGenerationManager() {
 
       const numberedMatches = Array.from(
         cleanContent.matchAll(/^\s*\d+[\.\)]\s+(.*\S)\s*$/gm),
-      ).map((match) => match[1].trim());
+      )
+        .map((match) => match[1]?.trim())
+        .filter((value): value is string => Boolean(value && value.length > 0));
 
       let outlineItems: string[] = [];
 
