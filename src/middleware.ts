@@ -4,9 +4,10 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function middleware(request: NextRequest) {
   const session = await auth();
   const isAuthPage = request.nextUrl.pathname.startsWith("/auth");
+  const path = request.nextUrl.pathname;
 
-  // Always redirect from root to /presentation
-  if (request.nextUrl.pathname === "/") {
+  // If user hits the landing page while authenticated, send them to the app
+  if (session && path === "/") {
     return NextResponse.redirect(new URL("/presentation", request.url));
   }
 
@@ -15,8 +16,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/presentation", request.url));
   }
 
+  const isPublicPath = path === "/";
+
   // If user is not authenticated and trying to access a protected route, redirect to sign-in
-  if (!session && !isAuthPage && !request.nextUrl.pathname.startsWith("/api")) {
+  if (
+    !session &&
+    !isAuthPage &&
+    !isPublicPath &&
+    !request.nextUrl.pathname.startsWith("/api")
+  ) {
     return NextResponse.redirect(
       new URL(
         `/auth/signin?callbackUrl=${encodeURIComponent(request.url)}`,
