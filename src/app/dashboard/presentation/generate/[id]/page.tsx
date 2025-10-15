@@ -246,7 +246,7 @@ export default function PresentationGenerateWithIdPage() {
       toast.error("Slides saved locally, but storing them failed.");
     } finally {
       state.setIsGeneratingPresentation(false);
-      router.push(`/presentation/${id}`);
+      router.push(`/dashboard/presentation/${id}`);
     }
   };
 

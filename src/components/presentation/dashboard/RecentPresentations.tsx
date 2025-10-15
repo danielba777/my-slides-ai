@@ -146,9 +146,9 @@ export function RecentPresentations() {
         (response?.presentation?.content as { slides: unknown[] })?.slides
           ?.length > 0
       ) {
-        router.push(`/presentation/${presentation.id}`);
+        router.push(`/dashboard/presentation/${presentation.id}`);
       } else {
-        router.push(`/presentation/generate/${presentation.id}`);
+        router.push(`/dashboard/presentation/generate/${presentation.id}`);
       }
     } catch (error) {
       console.error("Failed to navigate:", error);

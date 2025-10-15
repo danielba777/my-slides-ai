@@ -6,14 +6,20 @@ export async function middleware(request: NextRequest) {
   const isAuthPage = request.nextUrl.pathname.startsWith("/auth");
   const path = request.nextUrl.pathname;
 
+  if (path === "/presentation" || path.startsWith("/presentation/")) {
+    const suffix = path.slice("/presentation".length);
+    const targetPath = `/dashboard/presentation${suffix}`;
+    return NextResponse.redirect(new URL(targetPath, request.url));
+  }
+
   // If user hits the landing page while authenticated, send them to the app
   if (session && path === "/") {
-    return NextResponse.redirect(new URL("/presentation", request.url));
+    return NextResponse.redirect(new URL("/dashboard/home", request.url));
   }
 
   // If user is on auth page but already signed in, redirect to home page
   if (isAuthPage && session) {
-    return NextResponse.redirect(new URL("/presentation", request.url));
+    return NextResponse.redirect(new URL("/dashboard/home", request.url));
   }
 
   const isPublicPath = path === "/";
