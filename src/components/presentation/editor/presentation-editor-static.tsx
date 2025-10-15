@@ -66,9 +66,7 @@ const PresentationEditorStaticView = React.memo(
           "relative text-foreground",
           "focus-within:ring-2 focus-within:ring-primary focus-within:ring-opacity-50",
           className,
-          !hasRootImage &&
-            initialContent?.layoutType === "right" &&
-            "flex-row",
+          !hasRootImage && initialContent?.layoutType === "right" && "flex-row",
           !hasRootImage &&
             initialContent?.layoutType === "vertical" &&
             "flex-col-reverse",

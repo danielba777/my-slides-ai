@@ -1,5 +1,6 @@
 "use client";
 
+import type { CanvasDoc } from "@/canvas/types";
 import { SlideContainer } from "@/components/presentation/presentation-page/SlideContainer";
 import { usePresentationSlides } from "@/hooks/presentation/usePresentationSlides";
 import { useSlideChangeWatcher } from "@/hooks/presentation/useSlideChangeWatcher";
@@ -10,12 +11,14 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { PlateController } from "platejs/react";
+import dynamic from "next/dynamic";
 import { useEffect } from "react";
 import { PresentModeHeader } from "../dashboard/PresentModeHeader";
 import { ThinkingDisplay } from "../dashboard/ThinkingDisplay";
-import PresentationEditor from "../editor/presentation-editor";
-import { GlobalUndoRedoHandler } from "./GlobalUndoRedoHandler";
+import { SortableSlide } from "./SortableSlide";
+const SlideCanvas = dynamic(() => import("@/canvas/SlideCanvasAdapter"), {
+  ssr: false,
+});
 
 interface PresentationSlidesViewProps {
   isGeneratingPresentation: boolean;
@@ -79,7 +82,10 @@ export const PresentationSlidesView = ({
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
     >
-      <SortableContext items={items} strategy={verticalListSortingStrategy}>
+      <SortableContext
+        items={items.map((s) => s.id)}
+        strategy={verticalListSortingStrategy}
+      >
         <PresentModeHeader
           presentationTitle={currentPresentationTitle}
           showHeader={isPresenting && shouldShowExitHeader}
@@ -91,18 +97,13 @@ export const PresentationSlidesView = ({
           title="AI is thinking about your presentation..."
         />
 
-        <PlateController>
-          <GlobalUndoRedoHandler />
-
-          {items.map((slide, index) => (
-            <div
-              key={slide.id}
-              className={`slide-wrapper slide-wrapper-${index} w-full`}
-            >
+        {items.map((slide, index) => (
+          <SortableSlide id={slide.id} key={slide.id}>
+            <div className={`slide-wrapper slide-wrapper-${index} w-full`}>
               <SlideContainer
                 index={index}
                 id={slide.id}
-                slideWidth={slide.width}
+                slideWidth={undefined}
                 slidesCount={items.length}
               >
                 <div
@@ -111,23 +112,23 @@ export const PresentationSlidesView = ({
                     isPresenting && "h-screen w-screen",
                   )}
                 >
-                  <PresentationEditor
-                    initialContent={slide}
-                    className={cn(
-                      "min-h-[300px] rounded-md border",
-                      isPresenting && "h-screen w-screen",
-                    )}
-                    id={slide.id}
-                    autoFocus={index === currentSlideIndex}
-                    slideIndex={index}
-                    isGenerating={isGeneratingPresentation}
-                    readOnly={isPresenting}
+                  <SlideCanvas
+                    doc={slide.canvas as CanvasDoc}
+                    onChange={(next: CanvasDoc) => {
+                      // Slides im State aktualisieren
+                      const s = usePresentationState.getState().slides.slice();
+                      const i = s.findIndex((x) => x.id === slide.id);
+                      if (i >= 0) {
+                        s[i] = { ...s[i], canvas: next };
+                        usePresentationState.getState().setSlides(s);
+                      }
+                    }}
                   />
                 </div>
               </SlideContainer>
             </div>
-          ))}
-        </PlateController>
+          </SortableSlide>
+        ))}
       </SortableContext>
     </DndContext>
   );

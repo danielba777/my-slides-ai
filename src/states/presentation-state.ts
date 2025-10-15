@@ -1,5 +1,5 @@
 import { type ImageModelList } from "@/app/_actions/image/generate";
-import { type PlateSlide } from "@/components/presentation/utils/parser";
+import type { CanvasDoc } from "@/canvas/types";
 import { type ThemeProperties, type Themes } from "@/lib/presentation/themes";
 import { type TElement } from "platejs";
 import { create } from "zustand";
@@ -38,7 +38,7 @@ interface PresentationState {
   outline: string[];
   searchResults: Array<{ query: string; results: unknown[] }>; // Store search results for context
   webSearchEnabled: boolean; // Toggle for web search in outline generation
-  slides: PlateSlide[]; // This now holds the new object structure
+  slides: { id: string; canvas: CanvasDoc }[]; // Canvas-only Slides
 
   // Thinking content from AI responses
   outlineThinking: string; // Thinking content from outline generation
@@ -59,7 +59,7 @@ interface PresentationState {
   setIsSidebarCollapsed: (update: boolean) => void;
   isRightPanelCollapsed: boolean;
   setIsRightPanelCollapsed: (update: boolean) => void;
-  setSlides: (slides: PlateSlide[]) => void;
+  setSlides: (slides: { id: string; canvas: CanvasDoc }[]) => void;
   startRootImageGeneration: (slideId: string, query: string) => void;
   completeRootImageGeneration: (slideId: string, url: string) => void;
   failRootImageGeneration: (slideId: string, error: string) => void;
@@ -171,9 +171,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
   isGeneratingOutline: false,
   isGeneratingPresentation: false,
 
-  setSlides: (slides) => {
-    set({ slides });
-  },
+  setSlides: (slides) => set({ slides }),
   setPendingInsertNode: (node) => set({ pendingInsertNode: node }),
   setConfig: (config) => set({ config }),
   startRootImageGeneration: (slideId, query) =>
