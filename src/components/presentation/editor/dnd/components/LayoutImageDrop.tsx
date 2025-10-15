@@ -29,7 +29,7 @@ export default function LayoutImageDrop({
 
   const handleImageDrop = (
     item: { element: TElement },
-    _layoutType: LayoutType,
+    layoutType: LayoutType,
   ) => {
     // Only handle image elements
     if (item?.element?.type !== ImagePlugin.key) return;
@@ -55,8 +55,9 @@ export default function LayoutImageDrop({
           rootImage: {
             url: imageUrl,
             query: imageQuery,
+            layoutType,
           },
-          layoutType: "background",
+          layoutType,
         };
       }
       return slide;
