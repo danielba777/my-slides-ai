@@ -16,13 +16,14 @@ interface SlidesRequest {
 }
 // TODO: Add table and chart to the available layouts
 const slidesTemplate = `
-You are an expert presentation designer.Your task is to create an engaging presentation in XML format.
+You are an expert presentation writer. Your task is to create a clear, text-only presentation in XML format.
+
 ## CORE REQUIREMENTS
 
-1. FORMAT: Use <SECTION> tags for each slide
-2. CONTENT: DO NOT copy outline verbatim - expand with examples, data, and context
-3. VARIETY: Each slide must use a DIFFERENT layout component
-4. VISUALS: Include detailed image queries (10+ words) on every slide
+1. FORMAT: Use <SECTION> tags for each slide.
+2. CONTENT: Expand on the outline topics with cohesive paragraphs of text.
+3. SIMPLICITY: Do NOT use any layout components (BOXES, BULLETS, ICONS, TABLE, CHART, etc.).
+4. TEXT ONLY: Each slide must contain exactly one <H1> heading and one or more <P> paragraphs. No images or visual elements.
 
 ## PRESENTATION DETAILS
 - Title: {TITLE}
@@ -36,199 +37,33 @@ You are an expert presentation designer.Your task is to create an engaging prese
 ## RESEARCH CONTEXT
 {SEARCH_RESULTS}
 
-## PRESENTATION STRUCTURE
+## OUTPUT TEMPLATE
 \`\`\`xml
 <PRESENTATION>
+  <SECTION>
+    <H1>Slide Title</H1>
+    <P>Paragraph text that expands on the outline topic with clear, informative prose.</P>
+    <P>Optional supporting paragraph providing additional context or examples.</P>
+  </SECTION>
 
-<!--Every slide must follow this structure (layout determines where the image appears) -->
-<SECTION layout="left" | "right" | "vertical">
-  <!-- Required: include ONE layout component per slide -->
-  <!-- Required: include at least one detailed image query -->
-</SECTION>
-
-<!-- Other Slides in the SECTION tag-->
-
+  <!-- Additional SECTION blocks, one per slide -->
 </PRESENTATION>
 \`\`\`
 
-## SECTION LAYOUTS
-Vary the layout attribute in each SECTION tag to control image placement:
-- layout="left" - Root image appears on the left side
-- layout="right" - Root image appears on the right side
-- layout="vertical" - Root image appears at the top
-
-Use all three layouts throughout the presentation for visual variety.
-
-## AVAILABLE LAYOUTS
-Choose ONE different layout for each slide (use these exact XML tags so our parser recognizes them):
-
-1. COLUMNS: For comparisons
-\`\`\`xml
-<COLUMNS>
-  <DIV><H3>First Concept</H3><P>Description</P></DIV>
-  <DIV><H3>Second Concept</H3><P>Description</P></DIV>
-</COLUMNS>
-\`\`\`
-
-2. BULLETS: For key points
-\`\`\`xml
-<BULLETS>
-  <DIV><H3>Main Point 1 </H3><P>Description</P></DIV>
-  <DIV><H3>Main Point 2 </H3><P>Second point with details</P></DIV>
-</BULLETS>
-\`\`\`
-
-3. ICONS: For concepts with symbols
-\`\`\`xml
-<ICONS>
-  <DIV><ICON query="rocket" /><H3>Innovation</H3><P>Description</P></DIV>
-  <DIV><ICON query="shield" /><H3>Security</H3><P>Description</P></DIV>
-</ICONS>
-\`\`\`
-
-4. CYCLE: For processes and workflows
-\`\`\`xml
-<CYCLE>
-  <DIV><H3>Research</H3><P>Initial exploration phase</P></DIV>
-  <DIV><H3>Design</H3><P>Solution creation phase</P></DIV>
-  <DIV><H3>Implement</H3><P>Execution phase</P></DIV>
-  <DIV><H3>Evaluate</H3><P>Assessment phase</P></DIV>
-</CYCLE>
-\`\`\`
-
-5. ARROWS: For cause-effect or flows
-\`\`\`xml
-<ARROWS>
-  <DIV><H3>Challenge</H3><P>Current market problem</P></DIV>
-  <DIV><H3>Solution</H3><P>Our innovative approach</P></DIV>
-  <DIV><H3>Result</H3><P>Measurable outcomes</P></DIV>
-</ARROWS>
-\`\`\`
-
-5b. ARROW-VERTICAL: For vertical step-by-step flows (preferred for linear phases)
-\`\`\`xml
-<ARROW-VERTICAL>
-  <DIV><H3>Discover</H3><P>Research & requirements.</P></DIV>
-  <DIV><H3>Design</H3><P>UX & architecture.</P></DIV>
-  <DIV><H3>Deliver</H3><P>Build, test, deploy.</P></DIV>
-</ARROW-VERTICAL>
-\`\`\`
-
-6. TIMELINE: For chronological progression
-\`\`\`xml
-<TIMELINE>
-  <DIV><H3>2022</H3><P>Market research completed</P></DIV>
-  <DIV><H3>2023</H3><P>Product development phase</P></DIV>
-  <DIV><H3>2024</H3><P>Global market expansion</P></DIV>
-</TIMELINE>
-\`\`\`
-
-7. PYRAMID: For hierarchical importance
-\`\`\`xml
-<PYRAMID>
-  <DIV><H3>Vision</H3><P>Our aspirational goal</P></DIV>
-  <DIV><H3>Strategy</H3><P>Key approaches to achieve vision</P></DIV>
-  <DIV><H3>Tactics</H3><P>Specific implementation steps</P></DIV>
-</PYRAMID>
-\`\`\`
-
-8. STAIRCASE: For progressive advancement
-\`\`\`xml
-<STAIRCASE>
-  <DIV><H3>Basic</H3><P>Foundational capabilities</P></DIV>
-  <DIV><H3>Advanced</H3><P>Enhanced features and benefits</P></DIV>
-  <DIV><H3>Expert</H3><P>Premium capabilities and results</P></DIV>
-</STAIRCASE>
-\`\`\`
-
-
-9. IMAGES: Most slides needs at least one
-\`\`\`xml
-<!-- Good image queries (detailed, specific): -->
-<IMG query="futuristic smart city with renewable energy infrastructure and autonomous vehicles in morning light" />
-<IMG query="close-up of microchip with circuit board patterns in blue and gold tones" />
-<IMG query="diverse team of professionals collaborating in modern office with data visualizations" />
-
-<!-- NOT just: "city", "microchip", "team meeting" -->
-\`\`\`
-
-10. BOXES: For simple information tiles
-\`\`\`xml
-<BOXES>
-  <DIV><H3>Speed</H3> <P>Faster delivery cycles.</P></DIV>
-  <DIV><H3>Quality</H3> <P>Automated testing & reviews.</P></DIV>
-  <DIV><H3>Security</H3> <P>Shift-left security practices.</P></DIV>
-</BOXES>
-\`\`\`
-
-11. COMPARE: For side-by-side comparison
-\`\`\`xml
-<COMPARE>
-  <DIV><H3>Solution A</H3> <LI>Features 1</LI> <LI>Features 2</LI></DIV>
-  <DIV><H3>Solution B</H3> <LI>Features 3</LI> <LI>Features 4</LI></DIV>
-</COMPARE>
-\`\`\`
-
-12. BEFORE-AFTER: For transformation snapshots
-\`\`\`xml
-<BEFORE-AFTER>
-  <DIV><H3>Before</H3> <P>Manual processes, scattered data.</P></DIV>
-  <DIV><H3>After</H3> <P>Automated workflows, unified insights.</P></DIV>
-</BEFORE-AFTER>
-\`\`\`
-
-13. PROS-CONS: For trade-offs
-\`\`\`xml
-<PROS-CONS>
-  <PROS><H3>Pros</H3> <LI>Pros 1</LI> <LI>Pros 2</LI>  </PROS>
-  <CONS><H3>Cons</H3> <LI>Cons 1</LI> <LI>Cons 2</LI></CONS>
-</PROS-CONS>
-\`\`\`
-
-14. TABLE: For tabular data. Preferred over other layouts for tabular data. It can also be used to do comparisons.
-\`\`\`xml
-<TABLE>
-  <TR><TH>Header 1</TH><TH>Header 2</TH></TR>
-  <TR><TD>Data 1</TD><TD>Data 2</TD></TR>
-</TABLE>
-\`\`\`
-
-15. CHARTS: Use compact DATA rows (no TABLEs). The AI must emit \`<DATA>\` items inside \`<CHART>\`.
-\`\`\`xml
-<!-- Label/Value charts: bar, pie, line, area, radar -->
-<CHART charttype="bar|pie|line|area|radar">
-  <DATA><LABEL>Q1</LABEL><VALUE>24</VALUE></DATA>
-  <DATA><LABEL>Q2</LABEL><VALUE>36</VALUE></DATA>
-</CHART>
-
-<!-- Scatter charts: provide numeric X and Y per DATA point -->
-<CHART charttype="scatter">
-  <DATA><X>1</X><Y>2</Y></DATA>
-  <DATA><X>3</X><Y>5</Y></DATA>
-</CHART>
-\`\`\`
-
-
-## CONTENT EXPANSION STRATEGY
-For each outline point:
-- Add supporting data/statistics
-- Include real-world examples
-- Reference industry trends
-- Add thought-provoking questions
+## WRITING GUIDELINES
+- Begin each slide with a descriptive title inside <H1>.
+- Follow with 1-3 paragraphs (2-4 sentences each) that fully develop the idea.
+- Avoid bullet lists, numbered lists, tables, charts, or any other structural tags.
+- Do not include images, IMG tags, or layout attributes.
+- Reference research findings when relevant, keeping the tone professional and consistent.
 
 ## CRITICAL RULES
-1. Generate exactly {TOTAL_SLIDES} slides. NOT MORE NOT LESS ! EXACTLY {TOTAL_SLIDES}
-2. NEVER repeat layouts in consecutive slides
-3. DO NOT copy outline verbatim - expand and enhance
-4. Include at least one detailed image query in most of the slides
-5. Use appropriate heading hierarchy
-6. Vary the SECTION layout attribute (left/right/vertical) throughout the presentation
-   - Use each layout (left, right, vertical) at least twice
-   - Don't use the same layout more than twice in a row
+1. Generate exactly {TOTAL_SLIDES} slides. Not more, not less.
+2. Do not copy the outline verbatim; elaborate in complete sentences.
+3. Ensure every slide is self-contained yet flows logically with the presentation.
+4. Use only the XML tags shown above. Do not invent new tags or attributes.
 
-7. Use only the XML tags shown above. Do not invent new tags or attributes.
-
-Now create a complete XML presentation with {TOTAL_SLIDES} slides that significantly expands on the outline.
+Now create a complete XML presentation with {TOTAL_SLIDES} slides using this text-only structure.
 `;
 
 export async function POST(req: Request) {
