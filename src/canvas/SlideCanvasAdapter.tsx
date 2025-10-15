@@ -81,6 +81,9 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
   const layout = useMemo<SlideTextElement[]>(() => {
     const texts = doc.nodes.filter((n) => (n as any).type === "text") as any[];
     return texts.map((t, i) => {
+      // accept both legacy "text" and newer "content" fields for text nodes
+      const rawContent: string =
+        (t as any).content ?? (t as any).text ?? "";
       // Positionslogik: nx/ny (normiert) > x/y (px)
       const xPx = normToPxX(t.nx ?? t.x) ?? Math.round(W * 0.5);
       const yPx = normToPxY(t.ny ?? t.y) ?? Math.round(H * 0.5);
@@ -100,7 +103,7 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
             : "regular";
 
       return {
-        content: t.content ?? "",
+        content: rawContent,
         x: xPx / W,
         y: yPx / H,
         rotation: t.rotation ?? 0,
@@ -161,7 +164,9 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
             : src.weight === "semibold"
               ? "semibold"
               : "regular";
+        // write both fields for compatibility across canvas implementations
         n.content = src.content ?? n.content ?? "";
+        n.text = src.content ?? n.text ?? "";
 
         // Extras
         if ((src as any).italic !== undefined) n.italic = (src as any).italic;
