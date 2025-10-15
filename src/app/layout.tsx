@@ -2,11 +2,45 @@ import NextAuthProvider from "@/provider/NextAuthProvider";
 import TanStackQueryProvider from "@/provider/TanstackProvider";
 import { ThemeProvider } from "@/provider/theme-provider";
 import "@/styles/globals.css";
+import localFont from "next/font/local";
 import { type Metadata } from "next";
-import { Inter } from "next/font/google";
 
-// If loading a variable font, you don't need to specify the font weight
-const inter = Inter({ subsets: ["latin"] });
+const tiktokSans = localFont({
+  variable: "--font-sans",
+  display: "swap",
+  src: [
+    {
+      path: "../fonts/tiktok/TikTokDisplayRegular.otf",
+      weight: "300",
+      style: "normal",
+    },
+    {
+      path: "../fonts/tiktok/TikTokTextRegular.otf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../fonts/tiktok/TikTokTextMedium.otf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../fonts/tiktok/TikTokDisplayMedium.otf",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "../fonts/tiktok/TikTokDisplayBold.otf",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "../fonts/tiktok/TikTokTextBold.otf",
+      weight: "800",
+      style: "normal",
+    },
+  ],
+});
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -22,7 +56,7 @@ export default async function RootLayout({
     <TanStackQueryProvider>
       <NextAuthProvider>
         <html lang="en">
-          <body className={`${inter.className} antialiased`}>
+          <body className={`${tiktokSans.variable} font-sans antialiased`}>
             <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
               {children}
             </ThemeProvider>

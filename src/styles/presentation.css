@@ -13,8 +13,8 @@
   --presentation-muted: #6b7280;
 
   /* Fonts */
-  --presentation-heading-font: "Inter", sans-serif;
-  --presentation-body-font: "Inter", sans-serif;
+  --presentation-heading-font: var(--font-sans), sans-serif;
+  --presentation-body-font: var(--font-sans), sans-serif;
 
   /* Transitions */
   --presentation-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);

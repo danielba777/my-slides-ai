@@ -1,3 +1,51 @@
+@font-face {
+  font-family: "TikTok Sans";
+  src: url("../fonts/tiktok/TikTokDisplayRegular.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TikTok Sans";
+  src: url("../fonts/tiktok/TikTokTextRegular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TikTok Sans";
+  src: url("../fonts/tiktok/TikTokTextMedium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TikTok Sans";
+  src: url("../fonts/tiktok/TikTokDisplayMedium.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TikTok Sans";
+  src: url("../fonts/tiktok/TikTokDisplayBold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TikTok Sans";
+  src: url("../fonts/tiktok/TikTokTextBold.otf") format("opentype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -85,6 +133,6 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
   }
 }

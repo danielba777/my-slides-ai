@@ -138,8 +138,8 @@ export class PlateJSToPPTXConverter {
   private setupPresentation() {
     this.pptx.layout = "LAYOUT_16x9";
     this.pptx.theme = {
-      headFontFace: "Inter",
-      bodyFontFace: "Inter",
+      headFontFace: "TikTok Sans",
+      bodyFontFace: "TikTok Sans",
     };
   }
 
@@ -1484,7 +1484,7 @@ export class PlateJSToPPTXConverter {
         </clipPath>
       </defs>
       <rect width="100%" height="100%" fill="#${fillColor}" clip-path="url(#pyramidClip)" />
-      <text x="20" y="${height / 2 + 5}" fill="white" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="bold">${number}</text>
+      <text x="20" y="${height / 2 + 5}" fill="white" font-family="TikTok Sans, Arial, sans-serif" font-size="16" font-weight="bold">${number}</text>
     </svg>`;
   }
 
@@ -1588,8 +1588,8 @@ export class PlateJSToPPTXConverter {
       }
     }
 
-    // Ensure default Inter fallback if not set via marks
-    if (!options.fontFace) options.fontFace = "Inter";
+    // Ensure default TikTok Sans fallback if not set via marks
+    if (!options.fontFace) options.fontFace = "TikTok Sans";
 
     return options;
   }
