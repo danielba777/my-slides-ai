@@ -127,7 +127,7 @@ export default function SideBarDropdown({
                     document.cookie = `${name.trim()}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
                   }
                 });
-                await signOut();
+                await signOut({ callbackUrl: "/" });
               }}
             >
               <LogOut className="mr-2 h-4 w-4" />

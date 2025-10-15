@@ -17,7 +17,7 @@ export default function SignOut() {
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl });
+    await signOut({ callbackUrl: "/" });
   };
 
   const handleCancel = () => {
