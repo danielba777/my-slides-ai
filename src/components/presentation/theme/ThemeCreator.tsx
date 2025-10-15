@@ -91,8 +91,8 @@ export function ThemeCreator({ children }: { children?: ReactNode }) {
         },
       });
       setValue("fonts", {
-        heading: "Inter, sans-serif",
-        body: "Inter, sans-serif",
+        heading: "TikTok Sans, var(--font-sans), sans-serif",
+        body: "TikTok Sans, var(--font-sans), sans-serif",
       });
       setValue("borderRadius", "0.5rem");
       setValue("transitions", { default: "all 0.2s ease-in-out" });

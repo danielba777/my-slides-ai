@@ -76,8 +76,8 @@ export const themes: Record<ThemeName, ThemeProperties> = {
       },
     },
     fonts: {
-      heading: "Inter",
-      body: "Inter",
+      heading: "TikTok Sans, var(--font-sans), sans-serif",
+      body: "TikTok Sans, var(--font-sans), sans-serif",
     },
     borderRadius: "0.5rem",
     transitions: {
@@ -119,8 +119,8 @@ export const themes: Record<ThemeName, ThemeProperties> = {
       },
     },
     fonts: {
-      heading: "Poppins",
-      body: "Source Sans Pro",
+      heading: "TikTok Sans, var(--font-sans), sans-serif",
+      body: "TikTok Sans, var(--font-sans), sans-serif",
     },
     borderRadius: "0.75rem",
     transitions: {
@@ -162,8 +162,8 @@ export const themes: Record<ThemeName, ThemeProperties> = {
       },
     },
     fonts: {
-      heading: "Space Grotesk",
-      body: "IBM Plex Sans",
+      heading: "TikTok Sans, var(--font-sans), sans-serif",
+      body: "TikTok Sans, var(--font-sans), sans-serif",
     },
     borderRadius: "1rem",
     transitions: {
@@ -205,8 +205,8 @@ export const themes: Record<ThemeName, ThemeProperties> = {
       },
     },
     fonts: {
-      heading: "Playfair Display",
-      body: "Lora",
+      heading: "TikTok Sans, var(--font-sans), sans-serif",
+      body: "TikTok Sans, var(--font-sans), sans-serif",
     },
     borderRadius: "0.25rem",
     transitions: {
@@ -248,8 +248,8 @@ export const themes: Record<ThemeName, ThemeProperties> = {
       },
     },
     fonts: {
-      heading: "Montserrat",
-      body: "Raleway",
+      heading: "TikTok Sans, var(--font-sans), sans-serif",
+      body: "TikTok Sans, var(--font-sans), sans-serif",
     },
     borderRadius: "0.5rem",
     transitions: {
@@ -291,8 +291,8 @@ export const themes: Record<ThemeName, ThemeProperties> = {
       },
     },
     fonts: {
-      heading: "JetBrains Mono",
-      body: "Inter",
+      heading: "TikTok Sans, var(--font-sans), sans-serif",
+      body: "TikTok Sans, var(--font-sans), sans-serif",
     },
     borderRadius: "0.375rem",
     transitions: {
@@ -334,8 +334,8 @@ export const themes: Record<ThemeName, ThemeProperties> = {
       },
     },
     fonts: {
-      heading: "Merriweather",
-      body: "Source Sans Pro",
+      heading: "TikTok Sans, var(--font-sans), sans-serif",
+      body: "TikTok Sans, var(--font-sans), sans-serif",
     },
     borderRadius: "0.5rem",
     transitions: {
@@ -377,8 +377,8 @@ export const themes: Record<ThemeName, ThemeProperties> = {
       },
     },
     fonts: {
-      heading: "DM Serif Display",
-      body: "DM Sans",
+      heading: "TikTok Sans, var(--font-sans), sans-serif",
+      body: "TikTok Sans, var(--font-sans), sans-serif",
     },
     borderRadius: "0.625rem",
     transitions: {
@@ -420,8 +420,8 @@ export const themes: Record<ThemeName, ThemeProperties> = {
       },
     },
     fonts: {
-      heading: "Bitter",
-      body: "Source Sans Pro",
+      heading: "TikTok Sans, var(--font-sans), sans-serif",
+      body: "TikTok Sans, var(--font-sans), sans-serif",
     },
     borderRadius: "0.75rem",
     transitions: {
