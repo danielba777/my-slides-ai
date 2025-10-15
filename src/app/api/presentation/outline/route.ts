@@ -11,43 +11,27 @@ interface OutlineRequest {
   modelId?: string;
 }
 
-const outlineTemplate = `Given the following presentation topic and requirements, generate a structured outline with {numberOfCards} main topics in markdown format.
-The outline should be in {language} language and it very important.
+const outlineTemplate = `Given the following topic and requirements, generate a TikTok slideshow script with exactly {numberOfCards} slides in {language}.
 
 Current Date: {currentDate}
-Topic: {prompt}
+Topic (may include tone/style directives you MUST follow): {prompt}
 
-First, generate an appropriate title for the presentation, then create exactly {numberOfCards} main topics that would make for an engaging and well-structured presentation.
+Rules:
+1) Each slide is ONE short sentence only (max 12 words, ≤60 characters).
+2) No paragraphs. No extra commentary. No hashtags. No emojis. No quotes.
+3) Do NOT include a title unless the topic explicitly asks for one.
+4) Keep wording punchy, conversational, and easy to read (≈ Grade 6–8).
+5) Avoid repeating the same words across multiple slides where possible.
+6) Respect any sequencing in the topic (e.g., progression from A to B to C).
+7) No numbering inside the sentence itself.
+8) Start every line with "<index>. " (number, period, space) and continue numbering sequentially.
 
-Format the response starting with the title in XML tags, followed by markdown content with each topic as a heading and 2-3 bullet points.
-
-Example format:
-<TITLE>Your Generated Presentation Title Here</TITLE>
-
-# First Main Topic
-- Key point about this topic
-- Another important aspect
-- Brief conclusion or impact
-
-# Second Main Topic
-- Main insight for this section
-- Supporting detail or example
-- Practical application or takeaway
-
-# Third Main Topic 
-- Primary concept to understand
-- Evidence or data point
-- Conclusion or future direction
-
-Make sure the topics:
-1. Flow logically from one to another
-2. Cover the key aspects of the main topic
-3. Are clear and concise
-4. Are engaging for the audience
-5. ALWAYS use bullet points (not paragraphs) and format each point as "- point text"
-6. Do not use bold, italic or underline
-7. Keep each bullet point brief - just one sentence per point
-8. Include exactly 2-3 bullet points per topic (not more, not less)`;
+Output format (return ONLY this numbered list, nothing else):
+1. <slide 1 sentence>
+2. <slide 2 sentence>
+...
+{numberOfCards}. <slide {numberOfCards} sentence>
+`;
 
 export async function POST(req: Request) {
   try {

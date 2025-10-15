@@ -249,32 +249,41 @@ export function PresentationGenerationManager() {
         ? thinkingExtract.content
         : lastMessage.content;
 
-      // Only extract title if we haven't done it yet
+      // Extract title once if provided, otherwise keep existing title
       if (!titleExtractedRef.current) {
         const { title, cleanContent: extractedCleanContent } =
           extractTitle(cleanContent);
 
         cleanContent = extractedCleanContent;
 
-        // Set the title if found and mark as extracted
-        if (title) {
+        if (title && title.trim().length > 0) {
           setCurrentPresentation(currentPresentationId, title);
-          titleExtractedRef.current = true;
-        } else {
-          // Title not found yet, don't process outline
-          return;
         }
+        // mark as processed even if no explicit title was provided
+        titleExtractedRef.current = true;
       } else {
-        // Title already extracted, just remove it from content if it exists
         cleanContent = cleanContent.replace(/<TITLE>.*?<\/TITLE>/i, "").trim();
       }
 
-      // Parse the outline into sections
-      const sections = cleanContent.split(/^# /gm).filter(Boolean);
-      const outlineItems: string[] =
-        sections.length > 0
-          ? sections.map((section) => `# ${section}`.trim())
-          : [];
+      const numberedMatches = Array.from(
+        cleanContent.matchAll(/^\s*\d+[\.\)]\s+(.*\S)\s*$/gm),
+      ).map((match) => match[1].trim());
+
+      let outlineItems: string[] = [];
+
+      if (numberedMatches.length > 0) {
+        outlineItems = numberedMatches;
+      } else {
+        // Fallback to legacy markdown heading format
+        const sections = cleanContent.split(/^#\s+/gm).filter(Boolean);
+        outlineItems =
+          sections.length > 0
+            ? sections.map((section) => {
+                const trimmed = section.trim();
+                return trimmed.startsWith("#") ? trimmed : `# ${trimmed}`;
+              })
+            : [];
+      }
 
       if (outlineItems.length > 0) {
         outlineBufferRef.current = outlineItems;

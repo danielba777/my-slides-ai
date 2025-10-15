@@ -1,6 +1,9 @@
 "use client";
 
-import { getPresentation } from "@/app/_actions/presentation/presentationActions";
+import {
+  getPresentation,
+  updatePresentation,
+} from "@/app/_actions/presentation/presentationActions";
 import { getCustomThemeById } from "@/app/_actions/presentation/theme-actions";
 import { ThinkingDisplay } from "@/components/presentation/dashboard/ThinkingDisplay";
 import { Header } from "@/components/presentation/outline/Header";
@@ -11,6 +14,7 @@ import { ThemeBackground } from "@/components/presentation/theme/ThemeBackground
 import { ThemeSettings } from "@/components/presentation/theme/ThemeSettings";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { type PlateSlide } from "@/components/presentation/utils/parser";
 import {
   themes,
   type ThemeProperties,
@@ -21,6 +25,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Wand2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
+import { toast } from "sonner";
+import { nanoid } from "nanoid";
 
 export const PRESENTATION_GENERATION_COOKIE = "presentation_generation_pending";
 
@@ -31,7 +37,6 @@ export default function PresentationGenerateWithIdPage() {
   const {
     setCurrentPresentation,
     setPresentationInput,
-    startPresentationGeneration,
     isGeneratingPresentation,
     isGeneratingOutline,
     outlineThinking,
@@ -187,9 +192,62 @@ export default function PresentationGenerateWithIdPage() {
     setLanguage,
   ]);
 
-  const handleGenerate = () => {
-    router.push(`/presentation/${id}`);
-    startPresentationGeneration();
+  const handleGenerate = async () => {
+    const state = usePresentationState.getState();
+    if (state.isGeneratingPresentation) return;
+
+    if (!state.outline || state.outline.length === 0) {
+      toast.error("Outline is empty. Please add at least one slide.");
+      return;
+    }
+
+    state.setIsGeneratingPresentation(true);
+    state.setPresentationThinking("");
+    state.setShouldStartPresentationGeneration(false);
+
+    const slides: PlateSlide[] = state.outline.map((item, index) => {
+      const normalized = item.replace(/^#\s+/, "").trim();
+      return {
+        id: nanoid(),
+        content: [
+          {
+            type: "p",
+            children: [{ text: `${index + 1}. ${normalized}` }],
+          },
+        ],
+        alignment: "center",
+      };
+    });
+
+    state.setSlides(slides);
+
+    const presentationTitle =
+      state.currentPresentationTitle?.trim().length
+        ? state.currentPresentationTitle
+      : state.presentationInput?.trim().length
+        ? state.presentationInput
+        : "Untitled Presentation";
+
+    try {
+      await updatePresentation({
+        id,
+        content: { slides, config: state.config ?? {} },
+        outline: state.outline,
+        prompt: state.presentationInput,
+        title: presentationTitle,
+        theme: state.theme,
+        imageSource: state.imageSource,
+        presentationStyle: state.presentationStyle,
+        language: state.language,
+        searchResults: state.searchResults,
+      });
+    } catch (error) {
+      console.error("Failed to store presentation slides:", error);
+      toast.error("Slides saved locally, but storing them failed.");
+    } finally {
+      state.setIsGeneratingPresentation(false);
+      router.push(`/presentation/${id}`);
+    }
   };
 
   if (isLoadingPresentation) {
