@@ -137,7 +137,6 @@ export type PlateSlide = {
   alignment?: "start" | "center" | "end";
   bgColor?: string;
   width?: "S" | "M" | "L";
-  position?: { x: number; y: number };
 };
 
 // Simple XML node interface for our parser
