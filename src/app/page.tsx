@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/server/auth";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { auth } from "@/server/auth";
+import { redirect } from "next/navigation";
 
 export default async function Home() {
   const session = await auth();
@@ -13,7 +13,7 @@ export default async function Home() {
       <header className="border-b border-border/60">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
           <span className="text-lg font-semibold tracking-tight text-foreground">
-            My Slides AI
+            SlidesCockpit
           </span>
           <GoogleSignInButton />
         </div>
