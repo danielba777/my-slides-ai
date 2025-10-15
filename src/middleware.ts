@@ -1,35 +1,26 @@
+import { auth } from "@/server/auth";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  const session = await auth();
   const isAuthPage = request.nextUrl.pathname.startsWith("/auth");
   const path = request.nextUrl.pathname;
-  const sessionToken =
-    request.cookies.get("next-auth.session-token") ??
-    request.cookies.get("__Secure-next-auth.session-token") ??
-    request.cookies.get("__Host-next-auth.session-token");
-  const isLoggedIn = Boolean(sessionToken);
-
-  if (path === "/presentation" || path.startsWith("/presentation/")) {
-    const suffix = path.slice("/presentation".length);
-    const targetPath = `/dashboard/slideshows${suffix}`;
-    return NextResponse.redirect(new URL(targetPath, request.url));
-  }
 
   // If user hits the landing page while authenticated, send them to the app
-  if (isLoggedIn && path === "/") {
-    return NextResponse.redirect(new URL("/dashboard/home", request.url));
+  if (session && path === "/") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   // If user is on auth page but already signed in, redirect to home page
-  if (isAuthPage && isLoggedIn) {
-    return NextResponse.redirect(new URL("/dashboard/home", request.url));
+  if (isAuthPage && session) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   const isPublicPath = path === "/";
 
   // If user is not authenticated and trying to access a protected route, redirect to sign-in
   if (
-    !isLoggedIn &&
+    !session &&
     !isAuthPage &&
     !isPublicPath &&
     !request.nextUrl.pathname.startsWith("/api")
