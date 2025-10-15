@@ -20,7 +20,7 @@ const items = [
   },
   {
     title: "Slideshows",
-    url: "/dashboard/presentation",
+    url: "/dashboard/slideshows",
     icon: IoImagesOutline,
   },
 ];

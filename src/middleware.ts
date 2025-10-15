@@ -8,7 +8,7 @@ export async function middleware(request: NextRequest) {
 
   if (path === "/presentation" || path.startsWith("/presentation/")) {
     const suffix = path.slice("/presentation".length);
-    const targetPath = `/dashboard/presentation${suffix}`;
+    const targetPath = `/dashboard/slideshows${suffix}`;
     return NextResponse.redirect(new URL(targetPath, request.url));
   }
 

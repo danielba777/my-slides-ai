@@ -60,7 +60,7 @@ export function PresentationDashboard({
           result.presentation.title,
         );
         router.push(
-          `/dashboard/presentation/generate/${result.presentation.id}`,
+          `/dashboard/slideshows/generate/${result.presentation.id}`,
         );
       } else {
         setIsGeneratingOutline(false);

@@ -1,10 +1,9 @@
 export default function DashboardHome() {
   return (
-    <div className="space-y-6 p-6">
-      <h1 className="text-3xl font-semibold">Dashboard Home</h1>
-      <p className="text-sm text-muted-foreground">
-        Welcome to your dashboard overview.
-      </p>
+    <div className="w-full h-full space-y-6 px-10 py-12 flex flex-col justify-start">
+      <h1 className="text-3xl font-semibold text-center">
+        What are you creating today?
+      </h1>
     </div>
   );
 }
