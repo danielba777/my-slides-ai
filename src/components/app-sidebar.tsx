@@ -1,3 +1,5 @@
+"use client";
+import { useTheme } from "next-themes";
 import { IoHomeOutline, IoImagesOutline } from "react-icons/io5";
 
 import {
@@ -12,6 +14,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { SidebarAccountSection } from "./app-sidebar-account";
+import { AppLogo } from "./logo/AppLogo";
 
 const startItems = [
   {
@@ -31,9 +34,16 @@ const playgroundItems = [
 ];
 
 export function AppSidebar() {
+  const { resolvedTheme } = useTheme();
+
   return (
     <Sidebar>
       <SidebarContent>
+        <div className="flex justify-center gap-2 py-4">
+          <AppLogo size={24} dark={resolvedTheme === "dark"} />
+          <p className="text-base font-bold">SlidesCockpit</p>
+        </div>
+
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
