@@ -1,47 +1,28 @@
 "use client";
 
 import LegacySlideCanvas from "@/canvas/legacy/SlideCanvasLegacy";
+import type { CanvasDoc, CanvasTextNode } from "@/canvas/types";
 import type { SlideTextElement } from "@/lib/types";
 import { useCallback, useMemo } from "react";
 
-// Falls du einen eigenen Typ hast, importiere ihn hier:
-// import type { CanvasDoc } from "@/lib/canvasTypes";
-
-type CanvasDoc = {
-  nodes: Array<
-    | {
-        id?: string;
-        type: "image";
-        url?: string;
-        // optional weitere Felder...
-      }
-    | {
-        id?: string;
-        type: "text";
-        x?: number; // absolute px oder normiert? → wir behandeln beides robust
-        y?: number;
-        width?: number; // px
-        height?: number; // px
-        rotation?: number;
-        fontFamily?: string;
-        fontSize?: number; // px (Basis 72 im Legacy)
-        lineHeight?: number; // z. B. 1.12
-        letterSpacing?: number; // px
-        weight?: "regular" | "semibold" | "bold" | "normal";
-        align?: "left" | "center" | "right";
-        color?: string;
-        italic?: boolean;
-        outlineEnabled?: boolean;
-        outlineWidth?: number;
-        outlineColor?: string;
-        content?: string;
-        zIndex?: number;
-        // Falls normiert gespeichert:
-        nx?: number; // 0..1
-        ny?: number; // 0..1
-        nmaxWidth?: number; // normiert auf W?
-      }
-  >;
+type ExtendedCanvasTextNode = CanvasTextNode & {
+  fontSize?: number;
+  lineHeight?: number;
+  letterSpacing?: number;
+  weight?: "regular" | "semibold" | "bold" | "normal";
+  color?: string;
+  italic?: boolean;
+  outlineEnabled?: boolean;
+  outlineWidth?: number;
+  outlineColor?: string;
+  content?: string;
+  zIndex?: number;
+  width?: number;
+  height?: number;
+  scale?: number;
+  nx?: number;
+  ny?: number;
+  nmaxWidth?: number;
 };
 
 const W = 1080;
@@ -72,18 +53,20 @@ type Props = {
 
 export default function SlideCanvasAdapter({ doc, onChange }: Props) {
   const imageUrl = useMemo(() => {
-    const img = doc.nodes.find((n) => (n as any).type === "image") as
-      | any
-      | undefined;
-    return img?.url || "";
+    const img = doc.nodes.find(
+      (n): n is Extract<CanvasDoc["nodes"][number], { type: "image" }> =>
+        n.type === "image",
+    );
+    return img?.url ?? "";
   }, [doc]);
 
   const layout = useMemo<SlideTextElement[]>(() => {
-    const texts = doc.nodes.filter((n) => (n as any).type === "text") as any[];
+    const texts = doc.nodes.filter(
+      (n): n is ExtendedCanvasTextNode => n.type === "text",
+    );
     return texts.map((t, i) => {
       // accept both legacy "text" and newer "content" fields for text nodes
-      const rawContent: string =
-        (t as any).content ?? (t as any).text ?? "";
+      const rawContent: string = t.content ?? t.text ?? "";
       // Positionslogik: nx/ny (normiert) > x/y (px)
       const xPx = normToPxX(t.nx ?? t.x) ?? Math.round(W * 0.5);
       const yPx = normToPxY(t.ny ?? t.y) ?? Math.round(H * 0.5);
@@ -103,6 +86,7 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
             : "regular";
 
       return {
+        id: t.id,
         content: rawContent,
         x: xPx / W,
         y: yPx / H,
@@ -137,46 +121,49 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
       const newNodes = doc.nodes.map((n) => ({ ...n }));
       let ti = 0;
       for (let i = 0; i < newNodes.length; i++) {
-        const n: any = newNodes[i];
-        if (n.type !== "text") continue;
+        const node = newNodes[i];
+        if (!node || node.type !== "text") continue;
         const src = next[ti++];
         if (!src) break;
 
         const pxX = Math.round((src.x ?? 0.5) * W);
         const pxY = Math.round((src.y ?? 0.5) * H);
 
-        n.x = pxX;
-        n.y = pxY;
-        n.nx = pxToNormX(pxX);
-        n.ny = pxToNormY(pxY);
-        n.rotation = src.rotation ?? 0;
-        n.scale = src.scale ?? 1;
-        n.fontSize = Math.round(BASE_FONT_PX * (src.scale ?? 1));
-        n.width = src.maxWidth ?? n.width ?? 400;
-        n.height = (src as any).maxHeight ?? n.height; // wenn autoHeight, bleibt evtl. undefined
-        n.lineHeight = src.lineHeight ?? 1.12;
-        n.letterSpacing = src.letterSpacing ?? 0;
-        n.zIndex = src.zIndex ?? n.zIndex ?? 0;
-        n.align = src.align ?? "left";
-        n.weight =
+        const target = node as ExtendedCanvasTextNode;
+        target.x = pxX;
+        target.y = pxY;
+        target.nx = pxToNormX(pxX);
+        target.ny = pxToNormY(pxY);
+        target.rotation = src.rotation ?? 0;
+        target.scale = src.scale ?? 1;
+        target.fontSize = Math.round(BASE_FONT_PX * (src.scale ?? 1));
+        target.width = src.maxWidth ?? target.width ?? 400;
+        target.height = (src as any).maxHeight ?? target.height;
+        target.lineHeight = src.lineHeight ?? 1.12;
+        target.letterSpacing = src.letterSpacing ?? 0;
+        target.zIndex = src.zIndex ?? target.zIndex ?? i;
+        target.align = src.align ?? "left";
+        target.weight =
           src.weight === "bold"
             ? "bold"
             : src.weight === "semibold"
               ? "semibold"
               : "regular";
         // write both fields for compatibility across canvas implementations
-        n.content = src.content ?? n.content ?? "";
-        n.text = src.content ?? n.text ?? "";
+        target.content = src.content ?? target.content ?? "";
+        target.text = src.content ?? target.text ?? "";
 
         // Extras
-        if ((src as any).italic !== undefined) n.italic = (src as any).italic;
+        if ((src as any).italic !== undefined)
+          target.italic = (src as any).italic;
         if ((src as any).outlineEnabled !== undefined)
-          n.outlineEnabled = (src as any).outlineEnabled;
+          target.outlineEnabled = (src as any).outlineEnabled;
         if ((src as any).outlineWidth !== undefined)
-          n.outlineWidth = (src as any).outlineWidth;
+          target.outlineWidth = (src as any).outlineWidth;
         if ((src as any).outlineColor !== undefined)
-          n.outlineColor = (src as any).outlineColor;
-        if ((src as any).color !== undefined) n.color = (src as any).color;
+          target.outlineColor = (src as any).outlineColor;
+        if ((src as any).color !== undefined)
+          target.color = (src as any).color;
       }
       onChange({ ...doc, nodes: newNodes });
     },

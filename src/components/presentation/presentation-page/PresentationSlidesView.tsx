@@ -115,13 +115,17 @@ export const PresentationSlidesView = ({
                   <SlideCanvas
                     doc={slide.canvas as CanvasDoc}
                     onChange={(next: CanvasDoc) => {
-                      // Slides im State aktualisieren
-                      const s = usePresentationState.getState().slides.slice();
-                      const i = s.findIndex((x) => x.id === slide.id);
-                      if (i >= 0) {
-                        s[i] = { ...s[i], canvas: next };
-                        usePresentationState.getState().setSlides(s);
-                      }
+                      const { slides, setSlides } =
+                        usePresentationState.getState();
+                      const updated = slides.slice();
+                      const indexToUpdate = updated.findIndex(
+                        (x) => x.id === slide.id,
+                      );
+                      if (indexToUpdate < 0) return;
+                      const current = updated[indexToUpdate];
+                      if (!current) return;
+                      updated[indexToUpdate] = { ...current, canvas: next };
+                      setSlides(updated);
                     }}
                   />
                 </div>

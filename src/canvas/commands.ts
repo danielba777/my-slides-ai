@@ -1,5 +1,10 @@
 "use client";
-import { CanvasDoc, CanvasNode } from "./types";
+import {
+  CanvasDoc,
+  CanvasNode,
+  CanvasImageNode,
+  CanvasTextNode,
+} from "./types";
 
 export const withDefaults = (c?: CanvasDoc): CanvasDoc => ({
   version: 1,
@@ -29,7 +34,7 @@ export const addText = (c: CanvasDoc, text = "Neuer Text"): CanvasDoc => ({
       padding: 8,
       textBg: null,
       align: "left",
-    } as CanvasNode,
+    } satisfies CanvasTextNode,
   ],
   selection: [],
 });
@@ -46,7 +51,7 @@ export const addImage = (c: CanvasDoc, url: string): CanvasDoc => ({
       width: c.width,
       height: c.height,
       url,
-    } as CanvasNode,
+    } satisfies CanvasImageNode,
   ],
   selection: [],
 });
@@ -57,7 +62,9 @@ export const updateNode = (
   patch: Partial<CanvasNode>,
 ): CanvasDoc => ({
   ...c,
-  nodes: c.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)),
+  nodes: c.nodes.map((n) =>
+    n.id === id ? ({ ...n, ...patch } as CanvasNode) : n,
+  ),
 });
 
 export const selectOnly = (c: CanvasDoc, ids: string[]): CanvasDoc => ({

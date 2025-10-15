@@ -1,11 +1,11 @@
 // apps/dashboard/src/app/(components)/SlideCanvas.tsx
 "use client";
 
+import type { SlideTextElement } from "@/lib/types";
 import {
   computeAutoHeight as computeAutoHeightFromUtil,
   measureWrappedText,
 } from "@/lib/textMetrics";
-import type { SlideTextElement, TextLayer } from "@/lib/types";
 import React, {
   forwardRef,
   useCallback,
@@ -15,6 +15,25 @@ import React, {
   useRef,
   useState,
 } from "react";
+
+type TextLayer = {
+  id: string;
+  content?: string;
+  fontFamily?: string;
+  fontSize?: number;
+  weight: "regular" | "semibold" | "bold";
+  scale: number;
+  lineHeight: number;
+  letterSpacing: number;
+  align: "left" | "center" | "right";
+  x: number;
+  y: number;
+  rotation: number;
+  width: number;
+  height?: number;
+  zIndex: number;
+  color: string;
+};
 
 export type SlideCanvasHandle = {
   getLayout: () => SlideTextElement[];
@@ -39,7 +58,7 @@ export const ASPECT_RATIO = 9 / 16;
 function buildOuterTextShadow(px: number, color: string): string {
   const r = Math.max(0, Math.round(px));
   if (r <= 0) return "none";
-  const steps = [];
+  const steps: string[] = [];
   // ring aus Offsets (Manhattan-Kreis + Diagonalen)
   for (let y = -r; y <= r; y++) {
     for (let x = -r; x <= r; x++) {
@@ -106,7 +125,7 @@ function computeWrappedLinesWithDOM(
 
   const result = measureWrappedText({
     text: String(layer.content ?? ""),
-    fontFamily: layer.fontFamily,
+    fontFamily: layer.fontFamily ?? "Inter",
     fontWeight: weight,
     fontStyle: (layer as any).italic ? "italic" : "normal",
     fontSizePx: scaledFontPx,
@@ -136,7 +155,7 @@ function computeAutoHeightForLayer(
   const lineHeightPx = scaledFontPx * (layerBase.lineHeight ?? 1.12);
   return computeAutoHeightFromUtil({
     text: String(layerBase.content ?? ""),
-    fontFamily: layerBase.fontFamily,
+    fontFamily: layerBase.fontFamily ?? "Inter",
     fontWeight: weight,
     fontStyle: (layerBase as any).italic ? "italic" : "normal",
     fontSizePx: scaledFontPx,
@@ -159,7 +178,7 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
   outlineColor?: string;
 })[] {
   return layout.map((el, i) => {
-    const id = `layer-${i}`;
+    const id = el.id ?? `layer-${i}`;
     const tmp: TextLayer & {
       autoHeight?: boolean;
       italic?: boolean;
@@ -170,11 +189,11 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
       id,
       x: (el.x ?? 0.5) * W,
       y: (el.y ?? 0.5) * H,
-      width: el.maxWidth ?? 400,
+      width: el.maxWidth ?? el.width ?? 400,
       height: (el as any).maxHeight ?? 0, // 0 = auto
       rotation: el.rotation ?? 0,
       scale: el.scale ?? 1,
-      fontFamily: "Inter, system-ui, sans-serif",
+      fontFamily: el.fontFamily ?? "Inter, system-ui, sans-serif",
       fontSize: BASE_FONT_PX * (el.scale ?? 1),
       lineHeight: el.lineHeight ?? 1.12,
       letterSpacing: el.letterSpacing ?? 0,
@@ -183,7 +202,7 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
           ? "bold"
           : el.weight === "semibold"
             ? "semibold"
-            : "normal",
+            : "regular",
       align: el.align ?? "left",
       color: (el as any).color ?? "#ffffff",
       content: el.content ?? "",
@@ -215,11 +234,14 @@ function mapLayersToLayout(
   })[],
 ): SlideTextElement[] {
   return textLayers.map((layer) => ({
+    id: layer.id,
     content: layer.content,
+    fontFamily: layer.fontFamily,
     x: layer.x / W,
     y: layer.y / H,
     rotation: layer.rotation,
     scale: layer.scale,
+    width: layer.width,
     maxWidth: layer.width,
     ...(layer.height ? { maxHeight: layer.height } : {}),
     lineHeight: layer.lineHeight,
@@ -473,8 +495,31 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     const start = pixelToCanvas(e.clientX, e.clientY);
     const layerStart = structuredClone(
       textLayers.find((l) => l.id === layerId)!,
-    );
-    const aspect = layerStart.width / layerStart.height;
+    ) as TextLayer & {
+      autoHeight?: boolean;
+      italic?: boolean;
+      outlineEnabled?: boolean;
+      outlineWidth?: number;
+      outlineColor?: string;
+    };
+
+    if (!layerStart.height || layerStart.height <= 0) {
+      const lines = computeWrappedLinesWithDOM({
+        ...layerStart,
+        italic: (layerStart as any).italic,
+      });
+      layerStart.height = Math.max(
+        1,
+        Math.ceil(
+          computeAutoHeightForLayer(
+            { ...layerStart, italic: (layerStart as any).italic },
+            lines,
+          ),
+        ),
+      );
+    }
+
+    const aspect = layerStart.width / Math.max(layerStart.height ?? 0, 1);
     interactionStart.current = { start, layerStart, aspect, mode };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
@@ -548,7 +593,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
           const measureResult = measureWrappedText({
             text: String(l.content ?? ""),
-            fontFamily: l.fontFamily,
+            fontFamily: l.fontFamily ?? "Inter",
             fontWeight: weight,
             fontStyle: (l as any).italic ? "italic" : "normal",
             fontSizePx: scaledFontPx,
@@ -759,6 +804,18 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         layer.weight === "bold" ? 700 : layer.weight === "semibold" ? 600 : 400;
       const scaledFontPx = BASE_FONT_PX * layer.scale;
       const italic = (layer as any).italic;
+      const layerHeight =
+        layer.height && layer.height > 0
+          ? layer.height
+          : Math.max(
+              1,
+              Math.ceil(
+                computeAutoHeightForLayer(
+                  { ...layer, italic: (layer as any).italic },
+                  lines,
+                ),
+              ),
+            );
 
       ctx.save();
       ctx.translate(layer.x, layer.y);
@@ -766,13 +823,13 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       // Clip exakt auf die Box inkl. Padding
       const boxLeft = -layer.width / 2;
-      const boxTop = -layer.height / 2;
+      const boxTop = -layerHeight / 2;
       ctx.beginPath();
-      ctx.rect(boxLeft, boxTop, layer.width, layer.height);
+      ctx.rect(boxLeft, boxTop, layer.width, layerHeight);
       ctx.clip();
 
       const contentWidth = Math.max(0, layer.width - 2 * PADDING);
-      const contentHeight = Math.max(0, layer.height - 2 * PADDING);
+      const contentHeight = Math.max(0, layerHeight - 2 * PADDING);
 
       ctx.font = `${italic ? "italic " : ""}${weight} ${scaledFontPx}px ${layer.fontFamily}`;
       (ctx as any).fontKerning = "normal";
@@ -806,7 +863,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         // Offscreen in Größe der Textbox (inkl. Padding-Content-Bereich)
         const off = document.createElement("canvas");
         off.width = Math.max(1, Math.ceil(layer.width));
-        off.height = Math.max(1, Math.ceil(layer.height));
+        off.height = Math.max(1, Math.ceil(layerHeight));
         const ox = off.getContext("2d")!;
         ox.font = ctx.font;
         ox.textBaseline = "alphabetic";
@@ -814,7 +871,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
         // Lokale Koordinaten (Offscreen-Canvas hat Ursprung an der BOX-Links-/Oberkante)
         const baseLeft = -layer.width / 2;
-        const baseTop = -layer.height / 2;
+        const baseTop = -layerHeight / 2;
         const textW = Math.max(0, layer.width - 2 * PADDING);
         // Start an Contentkante inkl. PADDING ausrichten (wie im Preview)
         let startX = baseLeft + PADDING;
@@ -829,7 +886,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         ox.strokeStyle = outlineColor;
         // Canvas-Stroke entspricht außen effektiv ~lineWidth/2.
         // Für Parität zum CSS-Preview (Radius r) setzen wir 2*r:
-        ox.lineWidth = 2 * (outlineWidth * (layer.scale ?? 1));
+        ox.lineWidth = 2 * (outlineWidth * layer.scale);
 
         if (layer.letterSpacing === 0) {
           // ganze Zeile
@@ -870,7 +927,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         ox.globalCompositeOperation = "source-over";
 
         // 3) Offscreen auf Main einblenden (an Box-Position)
-        ctx.drawImage(off, -layer.width / 2, -layer.height / 2);
+        ctx.drawImage(off, -layer.width / 2, -layerHeight / 2);
       };
 
       const drawFillLine = (raw: string, yPos: number) => {
@@ -994,7 +1051,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                   l.id === active.id
                     ? ({
                         ...l,
-                        weight: l.weight === "bold" ? "normal" : "bold",
+                        weight: l.weight === "bold" ? "regular" : "bold",
                       } as any)
                     : l,
                 ),
@@ -1276,7 +1333,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         background: "transparent",
                         color: layer.color,
                         fontSize: `${BASE_FONT_PX}px`,
-                        fontFamily: layer.fontFamily,
+                        fontFamily: layer.fontFamily ?? "Inter",
                         fontWeight: cssFontWeight as any,
                         fontStyle: (layer as any).italic ? "italic" : "normal",
                         lineHeight: layer.lineHeight,
@@ -1287,8 +1344,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         overflowWrap: "normal",
                         boxSizing: "border-box",
                         fontKerning: "normal" as any,
-                        boxSizing: "border-box",
-                        fontKerning: "normal" as any,
                         /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
                         textShadow:
                           (layer as any).outlineEnabled &&
@@ -1296,7 +1351,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                             ? buildOuterTextShadow(
                                 Math.round(
                                   ((layer as any).outlineWidth || 6) *
-                                    (layer.scale ?? 1),
+                                    layer.scale,
                                 ),
                                 (layer as any).outlineColor || "#000",
                               ) + ", 0 2px 8px rgba(0,0,0,0.8)"
@@ -1309,7 +1364,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                       style={{
                         color: layer.color,
                         fontSize: `${BASE_FONT_PX}px`,
-                        fontFamily: layer.fontFamily,
+                        fontFamily: layer.fontFamily ?? "Inter",
                         fontWeight: cssFontWeight,
                         fontStyle: (layer as any).italic ? "italic" : "normal",
                         textAlign: layer.align,
@@ -1318,7 +1373,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         whiteSpace: "pre-wrap",
                         wordBreak: "normal",
                         overflowWrap: "normal",
-                        textShadow: "0 2px 8px rgba(0,0,0,0.8)",
                         boxSizing: "border-box",
                         fontKerning: "normal" as any,
                         /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
@@ -1328,7 +1382,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                             ? buildOuterTextShadow(
                                 Math.round(
                                   ((layer as any).outlineWidth || 6) *
-                                    (layer.scale ?? 1),
+                                    layer.scale,
                                 ),
                                 (layer as any).outlineColor || "#000",
                               ) + ", 0 2px 8px rgba(0,0,0,0.8)"

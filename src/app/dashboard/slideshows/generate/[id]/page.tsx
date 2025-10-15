@@ -5,7 +5,11 @@ import {
   updatePresentation,
 } from "@/app/_actions/presentation/presentationActions";
 import { getCustomThemeById } from "@/app/_actions/presentation/theme-actions";
-import type { CanvasDoc } from "@/canvas/types";
+import type { CanvasDoc, CanvasTextNode } from "@/canvas/types";
+import {
+  type PlateNode,
+  type PlateSlide,
+} from "@/components/presentation/utils/parser";
 import { ThinkingDisplay } from "@/components/presentation/dashboard/ThinkingDisplay";
 import { Header } from "@/components/presentation/outline/Header";
 import { OutlineList } from "@/components/presentation/outline/OutlineList";
@@ -38,7 +42,7 @@ function makeCanvasFromText(text: string, w = 1080, h = 1920): CanvasDoc {
     bg: "#ffffff",
     nodes: [
       {
-        id: crypto.randomUUID(),
+        id: nanoid(),
         type: "text",
         x: 120,
         y: 160,
@@ -232,15 +236,32 @@ export default function PresentationGenerateWithIdPage() {
     // Canvas-only: jedes Outline-Item wird ein Canvas-Slide
     const chosenWidth = 1080; // TODO: aus Preset/Wizard holen
     const chosenHeight = 1920; // TODO: aus Preset/Wizard holen
-    const slides: { id: string; canvas: CanvasDoc }[] = state.outline.map(
-      (item) => {
-        const normalized = item.replace(/^#\s+/, "").trim();
-        return {
-          id: nanoid(),
-          canvas: makeCanvasFromText(normalized, chosenWidth, chosenHeight),
-        };
-      },
-    );
+    const slides: PlateSlide[] = state.outline.map((item) => {
+      const normalized = item.replace(/^#\s+/, "").trim();
+      const canvasDoc = makeCanvasFromText(
+        normalized,
+        chosenWidth,
+        chosenHeight,
+      );
+      const firstTextNode = canvasDoc.nodes.find(
+        (node) => node.type === "text",
+      ) as CanvasTextNode | undefined;
+
+      const paragraph = {
+        type: "p",
+        children: [{ text: normalized }],
+      } as unknown as PlateNode;
+
+      return {
+        id: nanoid(),
+        content: [paragraph],
+        bgColor: canvasDoc.bg ?? undefined,
+        position: firstTextNode
+          ? { x: firstTextNode.x, y: firstTextNode.y }
+          : undefined,
+        canvas: canvasDoc,
+      };
+    });
 
     state.setSlides(slides);
 
