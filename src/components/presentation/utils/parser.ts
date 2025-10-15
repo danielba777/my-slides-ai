@@ -1,3 +1,4 @@
+import type { CanvasDoc } from "@/canvas/types";
 import { ColumnItemPlugin, ColumnPlugin } from "@platejs/layout/react";
 import { nanoid } from "nanoid"; // Import nanoid for unique ID generation
 import {
@@ -137,6 +138,8 @@ export type PlateSlide = {
   alignment?: "start" | "center" | "end";
   bgColor?: string;
   width?: "S" | "M" | "L";
+  position?: { x: number; y: number };
+  canvas?: CanvasDoc;
 };
 
 // Simple XML node interface for our parser

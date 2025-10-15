@@ -82,10 +82,11 @@ export function measureWrappedText(
   const spans: HTMLSpanElement[] = [];
 
   for (let p = 0; p < paragraphs.length; p++) {
-    const words = paragraphs[p].length ? paragraphs[p].split(/\s+/) : [""];
+    const paragraph = paragraphs[p] ?? "";
+    const words = paragraph.length ? paragraph.split(/\s+/) : [""];
     for (let i = 0; i < words.length; i++) {
       const span = document.createElement("span");
-      span.textContent = words[i];
+      span.textContent = words[i] ?? "";
       container.appendChild(span);
       spans.push(span);
       if (i < words.length - 1) {
@@ -104,18 +105,19 @@ export function measureWrappedText(
   if (spans.length === 0) {
     lines.push("");
   } else {
-    let currentTop = spans[0].offsetTop;
-    let bucket: string[] = [spans[0].textContent || ""];
+    const firstSpan = spans[0]!;
+    let currentTop = firstSpan.offsetTop;
+    let bucket: string[] = [firstSpan.textContent ?? ""];
 
     for (let i = 1; i < spans.length; i++) {
-      const s = spans[i];
+      const s = spans[i]!;
       const top = s.offsetTop;
       if (top > currentTop) {
         lines.push(bucket.join(" ").trimEnd());
-        bucket = [s.textContent || ""];
+        bucket = [s.textContent ?? ""];
         currentTop = top;
       } else {
-        bucket.push(s.textContent || "");
+        bucket.push(s.textContent ?? "");
       }
     }
     lines.push(bucket.join(" ").trimEnd());

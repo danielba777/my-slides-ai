@@ -5,7 +5,7 @@ import debounce from "lodash.debounce";
 import { type Value } from "platejs";
 import { Plate } from "platejs/react";
 import React, { useCallback, useEffect, useState } from "react";
-import type { PlateNode } from "./utils/parser";
+import type { PlateNode } from "../utils/parser";
 
 import { usePlateEditor } from "@/components/plate/hooks/usePlateEditor";
 import { TooltipProvider } from "@/components/plate/ui/tooltip";
@@ -174,7 +174,7 @@ const PresentationEditor = React.memo(
           >
             {/* Canvas */}
             <SlideCanvas
-              doc={initialContent.canvas as CanvasDoc}
+              value={initialContent.canvas as CanvasDoc}
               onChange={(next: CanvasDoc) => {
                 // Slides im globalen State aktualisieren (inkl. optionalem Preview)
                 const { slides, setSlides } = usePresentationState.getState();
@@ -237,7 +237,6 @@ const PresentationEditor = React.memo(
             />
           ) : (
             <Plate
-              id="presentation"
               editor={editor}
               onValueChange={({ value }) => {
                 if (readOnly || isGenerating || isPresenting) return;
