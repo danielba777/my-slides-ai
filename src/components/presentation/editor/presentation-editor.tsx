@@ -5,6 +5,7 @@ import debounce from "lodash.debounce";
 import { type Value } from "platejs";
 import { Plate } from "platejs/react";
 import React, { useCallback, useEffect, useState } from "react";
+import type { PlateNode } from "./utils/parser";
 
 import { usePlateEditor } from "@/components/plate/hooks/usePlateEditor";
 import { TooltipProvider } from "@/components/plate/ui/tooltip";
@@ -14,12 +15,15 @@ import { cn } from "@/lib/utils";
 import { usePresentationState } from "@/states/presentation-state";
 import "@/styles/presentation.css";
 import { type TElement } from "platejs";
-import { type PlateNode, type PlateSlide } from "../utils/parser";
+import { type PlateSlide } from "../utils/parser";
 import ImageGenerationModel from "./custom-elements/image-generation-model";
 import RootImage from "./custom-elements/root-image";
 import LayoutImageDrop from "./dnd/components/LayoutImageDrop";
 import { presentationPlugins } from "./plugins";
 import PresentationEditorStaticView from "./presentation-editor-static";
+// Canvas (Polotno-like)
+import SlideCanvas from "@/canvas/SlideCanvas";
+import type { CanvasDoc } from "@/canvas/types";
 
 function slideSignature(slide?: PlateSlide): string {
   try {
@@ -37,7 +41,7 @@ function slideSignature(slide?: PlateSlide): string {
   }
 }
 interface PresentationEditorProps {
-  initialContent?: PlateSlide;
+  initialContent?: PlateSlide & { canvas?: CanvasDoc | null };
   className?: string;
   id?: string;
   autoFocus?: boolean;
@@ -62,26 +66,39 @@ const PresentationEditor = React.memo(
     const setCurrentSlideIndex = usePresentationState(
       (s) => s.setCurrentSlideIndex,
     );
+    // ✅ Immer gültiges Array als Fallback übergeben
+    const DEFAULT_VALUE: PlateNode[] = [
+      { type: "p", children: [{ text: "" }] },
+    ];
+
+    // ⚠️ WICHTIG: ID setzen, damit überall derselbe Editor-Store verwendet wird
     const editor = usePlateEditor({
+      id: "presentation",
       plugins: presentationPlugins,
-      value: initialContent?.content ?? ({} as Value),
+      value:
+        (initialContent?.content as Value) ??
+        (DEFAULT_VALUE as unknown as Value),
     });
     const [fontsToLoad, setFontsToLoad] = useState<string[]>([]);
 
     useEffect(() => {
-      if (initialContent) {
-        requestAnimationFrame(() => {
-          editor.tf.setValue(initialContent.content);
-        });
-      }
+      if (!initialContent) return;
+      const next = Array.isArray(initialContent.content)
+        ? initialContent.content
+        : [{ type: "p", children: [{ text: "" }] }];
+      requestAnimationFrame(() => {
+        editor.tf.setValue(next);
+      });
     }, []);
 
     useEffect(() => {
-      if (isGenerating) {
-        requestAnimationFrame(() => {
-          editor.tf.setValue(initialContent?.content);
-        });
-      }
+      if (!isGenerating) return;
+      const next = Array.isArray(initialContent?.content)
+        ? initialContent!.content
+        : [{ type: "p", children: [{ text: "" }] }];
+      requestAnimationFrame(() => {
+        editor.tf.setValue(next);
+      });
     }, [initialContent, isGenerating]);
 
     const handleSlideChange = useCallback(
@@ -125,6 +142,64 @@ const PresentationEditor = React.memo(
     const editorPaddingClass =
       hasRootImage || readOnly || isGenerating ? "px-16" : undefined;
 
+    // === Canvas-Variante (Polotno-like) ===
+    // Wenn das Slide bereits ein CanvasDoc hat, rendere SlideCanvas (frei verschieb-/skalierbar).
+    if (initialContent?.canvas) {
+      return (
+        <TooltipProvider>
+          <div
+            className={cn(
+              "relative flex min-h-[500px]",
+              "scrollbar-thumb-muted-foreground/20 hover:scrollbar-thumb-muted-foreground/30 overflow-hidden p-0 scrollbar-thin scrollbar-track-transparent",
+              "relative text-foreground",
+              "focus-within:ring-2 focus-within:ring-primary focus-within:ring-opacity-50",
+              className,
+              !initialContent?.rootImage &&
+                initialContent?.layoutType === "right" &&
+                "flex-row",
+              !initialContent?.rootImage &&
+                initialContent?.layoutType === "vertical" &&
+                "flex-col-reverse",
+              !initialContent?.rootImage &&
+                initialContent?.layoutType === "left" &&
+                "flex-row-reverse",
+              "presentation-slide",
+            )}
+            style={{
+              borderRadius: "var(--presentation-border-radius, 0.5rem)",
+              backgroundColor: initialContent?.bgColor || undefined,
+            }}
+            data-is-presenting={readOnly && isPresenting ? "true" : "false"}
+            data-slide-content="true"
+          >
+            {/* Canvas */}
+            <SlideCanvas
+              doc={initialContent.canvas as CanvasDoc}
+              onChange={(next: CanvasDoc) => {
+                // Slides im globalen State aktualisieren (inkl. optionalem Preview)
+                const { slides, setSlides } = usePresentationState.getState();
+                const updated = [...slides];
+                if (updated[slideIndex]) {
+                  updated[slideIndex] = {
+                    ...updated[slideIndex],
+                    canvas: {
+                      ...next,
+                      // optional: aktualisiertes Snapshot-Bild für Sidebar
+                      previewDataUrl:
+                        next.previewDataUrl ??
+                        updated[slideIndex]?.canvas?.previewDataUrl,
+                    },
+                  };
+                  setSlides(updated);
+                }
+              }}
+            />
+          </div>
+        </TooltipProvider>
+      );
+    }
+
+    // === Fallback: Plate-Editor (nur wenn noch kein CanvasDoc existiert) ===
     return (
       <TooltipProvider>
         <div
@@ -162,6 +237,7 @@ const PresentationEditor = React.memo(
             />
           ) : (
             <Plate
+              id="presentation"
               editor={editor}
               onValueChange={({ value }) => {
                 if (readOnly || isGenerating || isPresenting) return;

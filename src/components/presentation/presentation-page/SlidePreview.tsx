@@ -6,11 +6,10 @@ import { GripVertical, PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import { Resizable } from "re-resizable";
 import React, { useCallback, useState } from "react";
 
+import type { CanvasDoc } from "@/canvas/types";
 import { Button } from "@/components/ui/button";
 import { usePresentationSlides } from "@/hooks/presentation/usePresentationSlides";
 import { usePresentationState } from "@/states/presentation-state";
-import PresentationEditorStaticView from "../editor/presentation-editor-static";
-import { type PlateSlide } from "../utils/parser";
 import { SlidePreviewCard } from "./SlidePreviewCard";
 
 interface SlidePreviewProps {
@@ -176,16 +175,24 @@ const MemoPreviewItem = React.memo(
     isActive: boolean;
     onClick: (index: number) => void;
     slideId: string;
-    slide: PlateSlide;
+    slide: { id: string; canvas?: CanvasDoc | null };
   }) {
     const handleClick = useCallback(() => onClick(index), [onClick, index]);
     return (
       <SlidePreviewCard index={index} isActive={isActive} onClick={handleClick}>
-        <PresentationEditorStaticView
-          initialContent={slide}
-          className="min-h-[300px] border"
-          id={`preview-${slideId}`}
-        />
+        {slide.canvas?.previewDataUrl ? (
+          // vorhandenes Snapshot-Bild anzeigen
+          <img
+            src={slide.canvas.previewDataUrl}
+            alt={`Slide ${index + 1}`}
+            className="block w-full"
+          />
+        ) : (
+          // Fallback: schmaler Platzhalter
+          <div className="flex h-[180px] w-full items-center justify-center border text-xs text-muted-foreground">
+            Kein Vorschaubild
+          </div>
+        )}
       </SlidePreviewCard>
     );
   },

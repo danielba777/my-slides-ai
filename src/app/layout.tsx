@@ -48,17 +48,28 @@ export const metadata: Metadata = {
     "Automated slideshows that drive traffic to your website, app, or business. Generate AI TikToks and create your own gen z marketing team.",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <TanStackQueryProvider>
       <NextAuthProvider>
-        <html lang="en">
-          <body className={`${tiktokSans.variable} font-sans antialiased`}>
-            <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <html lang="en" suppressHydrationWarning>
+          <head>
+            {/* sorgt dafür, dass Browser das richtige Farbschema kennt */}
+            <meta name="color-scheme" content="light dark" />
+          </head>
+          <body
+            className={`${tiktokSans.variable} font-sans antialiased`}
+            suppressHydrationWarning
+          >
+            {/* next-themes setzt die Klasse ("dark"/"light") auf <html> clientseitig */}
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
               {children}
             </ThemeProvider>
           </body>

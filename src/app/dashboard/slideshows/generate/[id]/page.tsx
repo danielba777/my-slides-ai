@@ -5,6 +5,7 @@ import {
   updatePresentation,
 } from "@/app/_actions/presentation/presentationActions";
 import { getCustomThemeById } from "@/app/_actions/presentation/theme-actions";
+import type { CanvasDoc } from "@/canvas/types";
 import { ThinkingDisplay } from "@/components/presentation/dashboard/ThinkingDisplay";
 import { Header } from "@/components/presentation/outline/Header";
 import { OutlineList } from "@/components/presentation/outline/OutlineList";
@@ -14,7 +15,6 @@ import { ThemeBackground } from "@/components/presentation/theme/ThemeBackground
 import { ThemeSettings } from "@/components/presentation/theme/ThemeSettings";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { type PlateSlide } from "@/components/presentation/utils/parser";
 import {
   themes,
   type ThemeProperties,
@@ -23,12 +23,34 @@ import {
 import { usePresentationState } from "@/states/presentation-state";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Wand2 } from "lucide-react";
+import { nanoid } from "nanoid";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { nanoid } from "nanoid";
 
 export const PRESENTATION_GENERATION_COOKIE = "presentation_generation_pending";
+
+function makeCanvasFromText(text: string, w = 1080, h = 1920): CanvasDoc {
+  return {
+    version: 1,
+    width: w,
+    height: h,
+    bg: "#ffffff",
+    nodes: [
+      {
+        id: crypto.randomUUID(),
+        type: "text",
+        x: 120,
+        y: 160,
+        text,
+        fontFamily: "Inter",
+        fontSize: 72,
+        fill: "#111",
+      },
+    ],
+    selection: [],
+  };
+}
 
 export default function PresentationGenerateWithIdPage() {
   const router = useRouter();
@@ -207,25 +229,23 @@ export default function PresentationGenerateWithIdPage() {
     state.setPresentationThinking("");
     state.setShouldStartPresentationGeneration(false);
 
-    const slides: PlateSlide[] = state.outline.map((item, index) => {
-      const normalized = item.replace(/^#\s+/, "").trim();
-      return {
-        id: nanoid(),
-        content: [
-          {
-            type: "p",
-            children: [{ text: `${index + 1}. ${normalized}` }],
-          },
-        ],
-        alignment: "center",
-      };
-    });
+    // Canvas-only: jedes Outline-Item wird ein Canvas-Slide
+    const chosenWidth = 1080; // TODO: aus Preset/Wizard holen
+    const chosenHeight = 1920; // TODO: aus Preset/Wizard holen
+    const slides: { id: string; canvas: CanvasDoc }[] = state.outline.map(
+      (item) => {
+        const normalized = item.replace(/^#\s+/, "").trim();
+        return {
+          id: nanoid(),
+          canvas: makeCanvasFromText(normalized, chosenWidth, chosenHeight),
+        };
+      },
+    );
 
     state.setSlides(slides);
 
-    const presentationTitle =
-      state.currentPresentationTitle?.trim().length
-        ? state.currentPresentationTitle
+    const presentationTitle = state.currentPresentationTitle?.trim().length
+      ? state.currentPresentationTitle
       : state.presentationInput?.trim().length
         ? state.presentationInput
         : "Untitled Presentation";
