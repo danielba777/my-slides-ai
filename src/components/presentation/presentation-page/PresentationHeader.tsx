@@ -33,7 +33,8 @@ export default function PresentationHeader({ title }: PresentationHeaderProps) {
   const pathname = usePathname();
   // Check if we're on the generate/outline page
   const isPresentationPage =
-    pathname.startsWith("/presentation/") && !pathname.includes("generate");
+    pathname.startsWith("/dashboard/slideshows/") &&
+    !pathname.includes("generate");
 
   // Update title when it changes in the state
   useEffect(() => {
@@ -44,13 +45,13 @@ export default function PresentationHeader({ title }: PresentationHeaderProps) {
     }
   }, [currentPresentationTitle, title]);
 
-  if (pathname === "/presentation/create")
+  if (pathname === "/dashboard/slideshows/create")
     return (
       <header className="flex h-12 max-w-[100vw]  items-center justify-between overflow-clip border-accent px-2 py-2">
         <div className="flex items-center gap-2">
           {/* This component is suppose to be logo but for now its is actually hamburger menu */}
 
-          <Link href={"/presentation/create"}>
+          <Link href={"/dashboard/slideshows/create"}>
             <Button size={"icon"} className="rounded-full" variant={"ghost"}>
               <Brain></Brain>
             </Button>

@@ -8,7 +8,7 @@ interface GoogleSignInButtonProps {
 }
 
 export function GoogleSignInButton({
-  callbackUrl = "/presentation",
+  callbackUrl = "/dashboard/home",
 }: GoogleSignInButtonProps) {
   const handleClick = useCallback(() => {
     void signIn("google", { callbackUrl });
