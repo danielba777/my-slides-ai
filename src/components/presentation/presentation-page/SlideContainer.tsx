@@ -114,27 +114,53 @@ export function SlideContainer({
           className,
         )}
       >
-        {!isPresenting && (
-          <div className="absolute left-4 top-4 z-[100] opacity-0 transition-opacity duration-200 group-hover/card-container:opacity-100">
-            <div className="flex items-center gap-1 rounded-full border border-border/60 bg-background/95 px-2 py-1 shadow-lg backdrop-blur">
+        {/* Linke, vertikale Toolbar (immer sichtbar, stört nicht den Editor) */}
+        {!isPresenting && !isReadOnly && (
+          <div
+            className={cn(
+              "absolute top-1/2 -translate-y-1/2 -left-14 z-[1001]",
+            )}
+            aria-label="Slide toolbar"
+          >
+            <div className="flex flex-col items-center gap-2">
+              {/* Drag-Handle */}
+              <button
+                ref={setActivatorNodeRef as React.Ref<HTMLButtonElement>}
+                {...listeners}
+                {...attributes}
+                className="flex h-9 w-9 items-center justify-center rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground focus:outline-none focus-visible:outline-none"
+                aria-label="Folienposition ziehen"
+                title="Verschieben"
+              >
+                <GripVertical className="h-4 w-4" />
+              </button>
+
+              {/* Slide-Einstellungen */}
+              <div className="rounded-md bg-background/95 shadow-sm backdrop-blur">
+                <SlideEditPopover index={index} />
+              </div>
+
+              {/* Neues Canvas unter aktueller Folie */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 cursor-grab rounded-full border border-border/70 text-muted-foreground hover:text-foreground"
-                ref={setActivatorNodeRef}
-                {...listeners}
+                className="h-9 w-9 rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground focus:outline-none focus-visible:outline-none"
+                onClick={() => addSlide("after", index)}
+                aria-label="Neue Folie darunter"
+                title="Neue Folie darunter"
               >
-                <GripVertical className="h-4 w-4" />
+                <Plus className="h-4 w-4" />
               </Button>
 
-              <SlideEditPopover index={index} />
-
+              {/* Löschen */}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full border border-border/70 text-muted-foreground hover:text-destructive"
+                    className="h-9 w-9 rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-destructive focus:outline-none focus-visible:outline-none"
+                    aria-label="Folie löschen"
+                    title="Folie löschen"
                   >
                     <Trash className="h-4 w-4" />
                   </Button>
@@ -143,8 +169,7 @@ export function SlideContainer({
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete Slide</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete slide {index + 1}? This
-                      action cannot be undone.
+                      Are you sure you want to delete slide {index + 1}? This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -161,34 +186,10 @@ export function SlideContainer({
           </div>
         )}
 
+        {/* Hinweis: die früheren schwebenden + Buttons oben/unten wurden entfernt */}
+
         {children}
       </div>
-
-      {!isPresenting && !isReadOnly && (
-        <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-200 group-hover/card-container:opacity-100">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-full border border-border/70 bg-background/95 text-muted-foreground shadow-lg backdrop-blur hover:text-foreground"
-            onClick={() => addSlide("before", index)}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
-
-      {!isPresenting && !isReadOnly && (
-        <div className="absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2 opacity-0 transition-opacity duration-200 group-hover/card-container:opacity-100">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-full border border-border/70 bg-background/95 text-muted-foreground shadow-lg backdrop-blur hover:text-foreground"
-            onClick={() => addSlide("after", index)}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
 
       {isPresenting && (
         <div className="absolute bottom-0.5 left-1 right-1 z-[1001]">

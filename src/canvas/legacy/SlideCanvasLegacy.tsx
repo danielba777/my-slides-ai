@@ -1,11 +1,11 @@
 // apps/dashboard/src/app/(components)/SlideCanvas.tsx
 "use client";
 
-import type { SlideTextElement } from "@/lib/types";
 import {
   computeAutoHeight as computeAutoHeightFromUtil,
   measureWrappedText,
 } from "@/lib/textMetrics";
+import type { SlideTextElement } from "@/lib/types";
 import React, {
   forwardRef,
   useCallback,
@@ -15,6 +15,8 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { GripVertical } from "lucide-react";
+import LegacyEditorToolbar from "@/canvas/LegacyEditorToolbar";
 
 type TextLayer = {
   id: string;
@@ -276,6 +278,92 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const wrapRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // === Helpers: aktives/editiertes Layer finden & patchen ===
+  const getActiveId = () => isEditingRef.current ?? activeLayerId;
+  const applyToActive = (updater: (l: TextLayer) => TextLayer) => {
+    const id = getActiveId();
+    if (!id) return;
+    setTextLayers(prev => prev.map(l => (l.id === id ? updater(l) : l)));
+  };
+
+  const toggleBold = () => {
+    applyToActive(l => ({ ...l, weight: l.weight === "bold" ? "regular" : "bold" }));
+  };
+  const toggleItalic = () => {
+    applyToActive(l => ({ ...l, italic: !(l as any).italic }));
+  };
+  const setAlign = (align: "left" | "center" | "right") => {
+    applyToActive(l => ({ ...l, align }));
+  };
+  // Wir koppeln Schriftgröße an scale → BASE_FONT_PX \* scale
+  const setFontScale = (scale: number) => {
+    const s = Math.max(0.2, Math.min(4, Number.isFinite(scale) ? scale : 1));
+    applyToActive(l => ({ ...l, scale: s }));
+  };
+  const setTextColor = (color: string) => {
+    applyToActive(l => ({ ...l, color }));
+  };
+  const setOutlineColor = (color: string) => {
+    applyToActive(l => ({ ...l, outlineEnabled: true, outlineColor: color }));
+  };
+
+// --- SAFE event handlers (avoid reading from pooled event inside updater) ---
+const handleLineHeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const v = parseFloat(e.currentTarget.value);
+  if (!Number.isFinite(v)) return;
+  applyToActive(l => ({ ...l, lineHeight: v }));
+};
+// Optional: falls ein Outline-Breiten-Slider existiert, denselben Fix nutzen.
+const handleOutlineWidthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const v = parseFloat(e.currentTarget.value);
+  if (!Number.isFinite(v)) return;
+  applyToActive(l => ({ ...l, outlineEnabled: v > 0, outlineWidth: v }));
+};
+
+  // === Text hinzufügen ===
+  const addNewTextLayer = () => {
+    const id = (typeof crypto !== "undefined" && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `txt-${Date.now()}`;
+    const centerX = W / 2;
+    const centerY = H / 2;
+    const initial: TextLayer & { autoHeight?: boolean } = {
+      id,
+      content: "Neuer Text",
+      fontFamily: "Inter, system-ui, sans-serif",
+      fontSize: BASE_FONT_PX,
+      weight: "semibold",
+      scale: 1,
+      lineHeight: 1.12,
+      letterSpacing: 0,
+      align: "center",
+      x: centerX,
+      y: centerY,
+      rotation: 0,
+      width: 600,
+      height: 0, // auto
+      zIndex: (textLayers.at(-1)?.zIndex ?? 0) + 1,
+      color: "#ffffff",
+      autoHeight: true,
+    };
+    const lines = computeWrappedLinesWithDOM(initial);
+    initial.height = Math.ceil(computeAutoHeightForLayer(initial, lines));
+    setTextLayers(prev => [...prev, initial]);
+    setActiveLayerId(id);
+    setIsEditing(id);
+    // Cursor zurück in den Editor
+    setTimeout(() => editorActiveRef.current?.focus(), 0);
+  };
+
+  // Reagiert auf globales "Text +"
+  useEffect(() => {
+  const handler = () => {
+      addNewTextLayer();
+       };
+       window.addEventListener("canvas:add-text", handler);
+       return () => window.removeEventListener("canvas:add-text", handler);
+  }, []);
 
   // BG pan/zoom state (Canvas-Einheiten)
   const [scale, setScale] = useState(1);
@@ -1005,209 +1093,90 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     | undefined;
   const toolbarActive = !!isEditing;
 
-  return (
-    <div className="space-y-2">
-      {/* Toolbar direkt ÜBER dem Bild, zentriert und „dran“ */}
-      <div
-        className="w-full flex justify-center"
-        style={{ pointerEvents: "none", width: previewSize.w }}
-      >
-        <div
-          className={`z-50 flex items-center gap-2 rounded-xl border px-2 py-1 backdrop-blur ${
-            toolbarActive
-              ? "bg-white/95 text-black"
-              : "bg-white/60 text-gray-500 opacity-60"
-          }`}
-          onMouseDown={(e) => {
-            // Toolbar-Interaktion → Blur der Textarea ignorieren
-            toolbarMouseDownRef.current = true;
-            e.stopPropagation();
-          }}
-          onMouseUp={() => {
-            // nach Eventloop zurücksetzen (damit onBlur zuerst läuft)
-            setTimeout(() => (toolbarMouseDownRef.current = false), 0);
-          }}
-          style={{
-            pointerEvents: "auto",
-            width: "max-content", // Hintergrund passt sich dem Inhalt an
-            maxWidth: previewSize.w, // nie breiter als der Canvas
-            flexWrap: "wrap", // bricht um, wenn zu breit
-            justifyContent: "center",
-            margin: "0 auto -6px auto" /* direkt an die Bildkante andocken */,
-          }}
-        >
-          {/* Bold */}
-          <button
-            className={`px-2 py-1 rounded ${
-              active?.weight === "bold" && toolbarActive
-                ? "bg-black text-white"
-                : "bg-black/5"
-            }`}
-            onClick={() =>
-              toolbarActive &&
-              active &&
-              setTextLayers((prev) =>
-                prev.map((l) =>
-                  l.id === active.id
-                    ? ({
-                        ...l,
-                        weight: l.weight === "bold" ? "regular" : "bold",
-                      } as any)
-                    : l,
-                ),
-              )
-            }
-            title="Fett"
-          >
-            B
-          </button>
+  const handleAddText = useCallback(() => {
+    addNewTextLayer();
+  }, [textLayers]);
 
-          {/* Italic */}
+  return (
+    <>
+      {/* Obere Toolbar (immer sichtbar) */}
+      <div
+        className="sticky top-0 z-50 w-full bg-transparent"
+        onPointerDownCapture={() => { toolbarMouseDownRef.current = true; }}
+        onPointerUpCapture={() => { setTimeout(() => (toolbarMouseDownRef.current = false), 0); }}
+      >
+         <LegacyEditorToolbar onAddText={handleAddText} className="py-1">
+
+        {/* === BEGIN: LEGACY CONTROLS (JETZT VERDRAHTET) === */}
+
+        {/* Typo-Gruppe: Fett, Kursiv, etc. */}
+        <div className="flex items-center gap-2">
           <button
-            className={`px-2 py-1 rounded italic ${
-              active?.italic && toolbarActive
-                ? "bg-black text-white"
-                : "bg-black/5"
-            }`}
-            onClick={() =>
-              toolbarActive &&
-              active &&
-              setTextLayers((prev) =>
-                prev.map((l) =>
-                  l.id === active.id
-                    ? ({ ...l, italic: !(l as any).italic } as any)
-                    : l,
-                ),
-              )
-            }
+            onClick={toggleBold}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background/90 text-sm font-medium shadow-sm transition-colors hover:bg-muted"
+            aria-label="Fett"
+            title="Fett"
+          >B</button>
+          <button
+            onClick={toggleItalic}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background/90 text-sm font-medium shadow-sm transition-colors hover:bg-muted"
+            aria-label="Kursiv"
             title="Kursiv"
           >
-            I
+            <span className="italic">I</span>
           </button>
-
-          {/* Align */}
-          <div className="h-5 w-px bg-black/10 mx-1" />
-          {(["left", "center", "right"] as const).map((al) => (
-            <button
-              key={al}
-              className={`px-2 py-1 rounded ${
-                active?.align === al && toolbarActive
-                  ? "bg-black text-white"
-                  : "bg-black/5"
-              }`}
-              onClick={() =>
-                toolbarActive &&
-                active &&
-                setTextLayers((prev) =>
-                  prev.map((l) =>
-                    l.id === active.id ? ({ ...l, align: al } as any) : l,
-                  ),
-                )
-              }
-              title={`Ausrichtung: ${al}`}
-            >
-              {al === "left" ? "⟸" : al === "center" ? "⟷" : "⟹"}
-            </button>
-          ))}
-
-          {/* Outline */}
-          <div className="h-5 w-px bg-black/10 mx-1" />
-          <button
-            className={`px-2 py-1 rounded ${
-              active?.outlineEnabled && toolbarActive
-                ? "bg-black text-white"
-                : "bg-black/5"
-            }`}
-            onClick={() =>
-              toolbarActive &&
-              active &&
-              setTextLayers((prev) =>
-                prev.map((l) =>
-                  l.id === active.id
-                    ? ({
-                        ...l,
-                        outlineEnabled: !(l as any).outlineEnabled,
-                      } as any)
-                    : l,
-                ),
-              )
-            }
-            title="Outline an/aus"
-          >
-            O
-          </button>
-          <div
-            className={`flex items-center gap-1 ${
-              toolbarActive && active?.outlineEnabled
-                ? ""
-                : "opacity-40 pointer-events-none"
-            }`}
-          >
-            <input
-              type="range"
-              min={0}
-              max={40}
-              step={1}
-              value={Math.round((active?.outlineWidth as any) ?? 6)}
-              onChange={(e) =>
-                active &&
-                setTextLayers((prev) =>
-                  prev.map((l) =>
-                    l.id === active.id
-                      ? ({
-                          ...l,
-                          outlineWidth: Math.max(
-                            0,
-                            Math.min(40, Number(e.target.value)),
-                          ),
-                        } as any)
-                      : l,
-                  ),
-                )
-              }
-              title="Outline-Dicke"
-            />
-            <input
-              type="color"
-              className="w-7 h-6 rounded border"
-              value={(active?.outlineColor as any) ?? "#000000"}
-              onChange={(e) =>
-                active &&
-                setTextLayers((prev) =>
-                  prev.map((l) =>
-                    l.id === active.id
-                      ? ({ ...l, outlineColor: e.target.value } as any)
-                      : l,
-                  ),
-                )
-              }
-              title="Outline-Farbe"
-            />
-          </div>
-          {/* Textfarbe */}
-          <div className="h-5 w-px bg-black/10 mx-1" />
-          <label className={`text-xs ${toolbarActive ? "" : "opacity-60"}`}>
-            Text
-          </label>
-          <input
-            type="color"
-            className="w-7 h-6 rounded border"
-            value={(active?.color as any) ?? "#ffffff"}
-            onChange={(e) =>
-              active &&
-              setTextLayers((prev) =>
-                prev.map((l) =>
-                  l.id === active.id
-                    ? ({ ...l, color: e.target.value } as any)
-                    : l,
-                ),
-              )
-            }
-            title="Textfarbe"
-          />
         </div>
+
+        <div className="flex items-center gap-2">
+          <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background/90 shadow-sm hover:bg-muted"
+            aria-label="Links ausrichten" title="Links ausrichten"
+            onClick={() => setAlign("left")}>↤</button>
+          <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background/90 shadow-sm hover:bg-muted"
+            aria-label="Zentrieren" title="Zentrieren"
+            onClick={() => setAlign("center")}>⎯</button>
+          <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background/90 shadow-sm hover:bg-muted"
+            aria-label="Rechts ausrichten" title="Rechts ausrichten"
+            onClick={() => setAlign("right")}>↦</button>
+        </div>
+
+        {/* Font-Scale (beeinflusst FontSize = BASE_FONT_PX * scale) */}
+        <input
+          type="number"
+          step="0.05"
+          min="0.2"
+          max="4"
+          onChange={(e) => setFontScale(parseFloat(e.currentTarget.value))}
+          className="h-8 w-16 rounded-md border border-border bg-background px-2 text-sm" />
+
+        {/* Slider: Zeilenhöhe */}
+        <input
+          type="range"
+          min="0.8"
+          max="2"
+          step="0.02"
+          onChange={handleLineHeightChange}
+          className="h-1.5 w-28 accent-primary" />
+
+        {/* Farbe 1 (Text) */}
+        <div className="flex items-center gap-2">
+           <label className="text-xs text-muted-foreground">Text</label>
+           <input
+             type="color"
+            onChange={(e) => setTextColor(e.currentTarget.value)}
+            className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5" />
+         </div>
+
+        {/* Farbe 2 (Outline) */}
+        <input
+          type="color"
+          onChange={(e) => setOutlineColor(e.currentTarget.value)}
+          className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5" />
+
+        {/* === END: LEGACY CONTROLS === */}
+        </LegacyEditorToolbar>
       </div>
 
+      {/* Canvas-Shell */}
       <div
         ref={wrapRef}
         className="slide-shell relative mx-auto overflow-hidden border shadow-lg select-none bg-[#00B140]"
@@ -1242,12 +1211,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               style={{
                 transform: `translate(-50%,-50%) translate(${offset.x}px, ${offset.y}px) scale(${Math.max(
                   0.001,
-                  scale,
+                  scale
                 )})`,
                 transformOrigin: "center",
               }}
-              draggable={false}
-            />
+              draggable={false} />
           ) : (
             <div className="absolute inset-0 bg-black" />
           )}
@@ -1255,21 +1223,18 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           {textLayers.map((layer) => {
             const isActive = activeLayerId === layer.id;
             const isCurrentEditing = isEditing === layer.id;
-            const cssFontWeight =
-              layer.weight === "bold"
-                ? 700
-                : layer.weight === "semibold"
-                  ? 600
-                  : 400;
+            const cssFontWeight = layer.weight === "bold"
+              ? 700
+              : layer.weight === "semibold"
+                ? 600
+                : 400;
 
             return (
               <div key={layer.id}>
                 {/* TEXT-BOX (border-box) */}
                 <div
                   data-role="text-layer"
-                  className={`absolute rounded-lg ${
-                    isActive ? "ring-2 ring-blue-500/80" : ""
-                  } ${isCurrentEditing ? "ring-2 ring-green-500/90" : ""} shadow-sm`}
+                  className={`absolute rounded-lg ${isActive ? "ring-2 ring-blue-500/80" : ""} ${isCurrentEditing ? "ring-2 ring-green-500/90" : ""} shadow-sm`}
                   style={{
                     left: layer.x,
                     top: layer.y,
@@ -1289,7 +1254,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                     // Im Editor-Modus keine Pointer-Blockade → Mausplatzierung/Markieren funktioniert
                     if (isCurrentEditing) return;
                     selectLayer(layer.id, e);
-                  }}
+                  } }
                   onDoubleClick={() => onDoubleClick(layer.id)}
                 >
                   {/* === Edge guide lines that follow the box (inside the same transform) === */}
@@ -1297,20 +1262,16 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                     <>
                       <div
                         className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-blue-400/70"
-                        style={{ transform: "translateY(-0.5px)" }}
-                      />
+                        style={{ transform: "translateY(-0.5px)" }} />
                       <div
                         className="pointer-events-none absolute left-0 right-0 bottom-0 h-px bg-blue-400/70"
-                        style={{ transform: "translateY(0.5px)" }}
-                      />
+                        style={{ transform: "translateY(0.5px)" }} />
                       <div
                         className="pointer-events-none absolute top-0 bottom-0 left-0 w-px bg-blue-400/70"
-                        style={{ transform: "translateX(-0.5px)" }}
-                      />
+                        style={{ transform: "translateX(-0.5px)" }} />
                       <div
                         className="pointer-events-none absolute top-0 bottom-0 right-0 w-px bg-blue-400/70"
-                        style={{ transform: "translateX(0.5px)" }}
-                      />
+                        style={{ transform: "translateX(0.5px)" }} />
                     </>
                   )}
 
@@ -1318,7 +1279,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                     <textarea
                       ref={(el) => {
                         if (isCurrentEditing) editorActiveRef.current = el;
-                      }}
+                      } }
                       autoFocus
                       value={layer.content}
                       onChange={(e) => onTextareaChange(layer.id, e)}
@@ -1345,19 +1306,17 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         boxSizing: "border-box",
                         fontKerning: "normal" as any,
                         /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
-                        textShadow:
-                          (layer as any).outlineEnabled &&
+                        textShadow: (layer as any).outlineEnabled &&
                           ((layer as any).outlineWidth || 0) > 0
-                            ? buildOuterTextShadow(
-                                Math.round(
-                                  ((layer as any).outlineWidth || 6) *
-                                    layer.scale,
-                                ),
-                                (layer as any).outlineColor || "#000",
-                              ) + ", 0 2px 8px rgba(0,0,0,0.8)"
-                            : "0 2px 8px rgba(0,0,0,0.8)",
-                      }}
-                    />
+                          ? buildOuterTextShadow(
+                            Math.round(
+                              ((layer as any).outlineWidth || 6) *
+                              layer.scale
+                            ),
+                            (layer as any).outlineColor || "#000"
+                          ) + ", 0 2px 8px rgba(0,0,0,0.8)"
+                          : "0 2px 8px rgba(0,0,0,0.8)",
+                      }} />
                   ) : (
                     <div
                       className="w-full h-full"
@@ -1376,17 +1335,16 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         boxSizing: "border-box",
                         fontKerning: "normal" as any,
                         /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
-                        textShadow:
-                          (layer as any).outlineEnabled &&
+                        textShadow: (layer as any).outlineEnabled &&
                           ((layer as any).outlineWidth || 0) > 0
-                            ? buildOuterTextShadow(
-                                Math.round(
-                                  ((layer as any).outlineWidth || 6) *
-                                    layer.scale,
-                                ),
-                                (layer as any).outlineColor || "#000",
-                              ) + ", 0 2px 8px rgba(0,0,0,0.8)"
-                            : "0 2px 8px rgba(0,0,0,0.8)",
+                          ? buildOuterTextShadow(
+                            Math.round(
+                              ((layer as any).outlineWidth || 6) *
+                              layer.scale
+                            ),
+                            (layer as any).outlineColor || "#000"
+                          ) + ", 0 2px 8px rgba(0,0,0,0.8)"
+                          : "0 2px 8px rgba(0,0,0,0.8)",
                       }}
                     >
                       {layer.content}
@@ -1405,9 +1363,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Größe (proportional + Text)"
                         className="absolute top-0 left-0 w-5 h-5 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-nw", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-nw", e)}
                       >
                         <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1416,9 +1372,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Größe (proportional + Text)"
                         className="absolute top-0 right-0 w-5 h-5 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-ne", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-ne", e)}
                       >
                         <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1427,9 +1381,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Größe (proportional + Text)"
                         className="absolute bottom-0 left-0 w-5 h-5 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-sw", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-sw", e)}
                       >
                         <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1438,9 +1390,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Größe (proportional + Text)"
                         className="absolute bottom-0 right-0 w-5 h-5 translate-x-1/2 translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-se", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-se", e)}
                       >
                         <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1451,9 +1401,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Breite (links)"
                         className="absolute left-0 top-1/2 w-5 h-8 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-left", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-left", e)}
                       >
                         <div className="h-6 w-2 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1462,9 +1410,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Breite (rechts)"
                         className="absolute right-0 top-1/2 w-5 h-8 translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-right", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-right", e)}
                       >
                         <div className="h-6 w-2 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1473,9 +1419,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Höhe (oben)"
                         className="absolute top-0 left-1/2 w-8 h-5 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-top", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-top", e)}
                       >
                         <div className="h-2 w-6 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1484,9 +1428,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Höhe (unten)"
                         className="absolute bottom-0 left-1/2 w-8 h-5 -translate-x-1/2 translate-y-1/2 cursor-ns-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-bottom", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-bottom", e)}
                       >
                         <div className="h-2 w-6 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1504,11 +1446,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             width={W}
             height={H}
             className="h-full w-full block"
-            style={{ display: "none" }}
-          />
+            style={{ display: "none" }} />
         </div>
       </div>
-    </div>
+      {/* ^ obere Canvas-Hülle */}
+      </>
   );
 });
 

@@ -365,6 +365,59 @@ Thank you for contributing to make ALLWEONE Presentation Generator better for ev
 
 ```
 
+# diff_prompt.md
+
+```md
+Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
+
+**_ Begin Patch
+_** Update File: src/canvas/legacy/SlideCanvasLegacy.tsx
+@@
+const setOutlineColor = (color: string) => {
+
+- applyToActive(l => ({ ...l, outlineEnabled: true, outlineColor: color }));
+
+* applyToActive(l => ({ ...l, outlineEnabled: true, outlineColor: color }));
+  };
+
++// --- SAFE event handlers (avoid reading from pooled event inside updater) ---
++const handleLineHeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+- const v = parseFloat(e.currentTarget.value);
+- if (!Number.isFinite(v)) return;
+- applyToActive(l => ({ ...l, lineHeight: v }));
+  +};
+- +// Optional: falls ein Outline-Breiten-Slider existiert, denselben Fix nutzen.
+  +const handleOutlineWidthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+- const v = parseFloat(e.currentTarget.value);
+- if (!Number.isFinite(v)) return;
+- applyToActive(l => ({ ...l, outlineEnabled: v > 0, outlineWidth: v }));
+  +};
+- @@
+
+*        {/* Slider: Zeilenhöhe */}
+*        <input
+*          type="range"
+*          min="0.8"
+*          max="2"
+*          step="0.02"
+*          onChange={(e) =>
+*            applyToActive(l => ({ ...l, lineHeight: parseFloat(e.currentTarget.value) }))
+*          }
+*          className="h-1.5 w-28 accent-primary" />
+
+-        {/* Slider: Zeilenhöhe */}
+-        <input
+-          type="range"
+-          min="0.8"
+-          max="2"
+-          step="0.02"
+-          onChange={handleLineHeightChange}
+-          className="h-1.5 w-28 accent-primary" />
+  \*\*\* End Patch
+
+```
+
 # next-env.d.ts
 
 ```ts
@@ -3841,17 +3894,38 @@ export default function CanvasToolbar({
     <TooltipProvider delayDuration={150} skipDelayDuration={0}>
       <div
         className={cn(
-          "flex w-[320px] flex-col gap-3 rounded-2xl border border-border/80 bg-background/95 px-4 py-3 shadow-xl backdrop-blur",
+          // Container wie Side-Menü: Card-Optik, Blur, Theme-Variablen
+          "grid grid-cols-[auto,1fr] items-start gap-3 rounded-2xl border border-border/80 bg-background/95 p-3 shadow-xl backdrop-blur",
+          // Breite etwas größer, da jetzt 2 Spalten
+          "w-[420px]",
           className,
         )}
       >
-        <div className="flex items-center gap-2">
-          <ToolbarIconButton
-            icon={Plus}
-            label="Textfeld hinzufuegen"
+        {/* Linke Spalte: Immer sichtbarer Add-Text Button */}
+        <div className="flex flex-col">
+          <button
+            type="button"
             onClick={onAddText}
-          />
+            className={cn(
+              // groß, klar, wie im Side-Menü
+              "inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-medium",
+              "bg-primary text-primary-foreground hover:opacity-90 transition",
+              // keine Ringe/Outlines
+              "focus-visible:outline-none focus-visible:ring-0",
+              // volle Breite der linken Spalte
+              "w-[90px]"
+            )}
+            aria-label="Neues Textfeld"
+            title="Neues Textfeld"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Text +
+          </button>
+        </div>
 
+        {/* Rechte Spalte: Alle weiteren Controls, sauber gestapelt */}
+        <div className="flex flex-col gap-3">
+          {/* Datei-Eingabe unsichtbar halten */}
           <input
             ref={fileInputRef}
             type="file"
@@ -3859,182 +3933,152 @@ export default function CanvasToolbar({
             className="hidden"
             onChange={handleFileChange}
           />
-          <ToolbarIconButton
-            icon={ImagePlus}
-            label="Bild einfuegen"
-            onClick={triggerImagePicker}
-          />
 
-          <ToolbarIconButton
-            icon={Copy}
-            label="Auswahl duplizieren"
-            onClick={onDuplicate}
-            disabled={!selected}
-          />
+          {/* Obere Aktionsleiste: Bild einfügen, Duplizieren, Snapshot, Löschen */}
+          <div className="flex flex-wrap items-center gap-2">
+            <ToolbarIconButton
+              icon={ImagePlus}
+              label="Bild einfuegen"
+              onClick={triggerImagePicker}
+            />
+            <ToolbarIconButton
+              icon={Copy}
+              label="Auswahl duplizieren"
+              onClick={onDuplicate}
+              disabled={!selected}
+            />
+            <ToolbarIconButton
+              icon={Camera}
+              label="Snapshot speichern"
+              onClick={onSnapshot}
+            />
+            <ToolbarIconButton
+              icon={Trash2}
+              label="Auswahl entfernen"
+              onClick={onDelete}
+              disabled={!selected}
+            />
+          </div>
 
-          <ToolbarIconButton
-            icon={Camera}
-            label="Snapshot speichern"
-            onClick={onSnapshot}
-          />
+          {/* Text-Formatierung (nur aktiv, wenn Text selektiert) */}
+          <div className="flex items-center gap-2">
+            <ToolbarIconButton
+              icon={Bold}
+              label="Fett"
+              onClick={() => toggleFontWeight("bold")}
+              disabled={!selectedIsText}
+              active={selectedIsText && (selected?.fontStyle ?? "normal").includes("bold")}
+            />
+            <ToolbarIconButton
+              icon={Italic}
+              label="Kursiv"
+              onClick={() => toggleFontWeight("italic")}
+              disabled={!selectedIsText}
+              active={selectedIsText && (selected?.fontStyle ?? "normal").includes("italic")}
+            />
+            <ToolbarIconButton
+              icon={AlignLeft}
+              label="Linksbuendig"
+              onClick={() => handleAlign("left")}
+              disabled={!selectedIsText}
+            />
+            <ToolbarIconButton
+              icon={AlignCenter}
+              label="Zentriert"
+              onClick={() => handleAlign("center")}
+              disabled={!selectedIsText}
+            />
+            <ToolbarIconButton
+              icon={AlignRight}
+              label="Rechtsbuendig"
+              onClick={() => handleAlign("right")}
+              disabled={!selectedIsText}
+            />
+          </div>
 
-          <ToolbarIconButton
-            icon={Trash2}
-            label="Auswahl entfernen"
-            onClick={onDelete}
-            disabled={!selected}
-          />
+          {/* Farben & Ebenen */}
+          <div className="flex items-center gap-2">
+            <Label htmlFor={colorInputId} className="text-xs text-muted-foreground">
+              Textfarbe
+            </Label>
+            <input
+              id={colorInputId}
+              type="color"
+              onChange={(e) => handleFillChange(e.target.value)}
+              value={(selectedIsText ? (selected?.fill as string) : canvas.bg) ?? "#111111"}
+              disabled={!selectedIsText}
+              className="h-8 w-10 cursor-pointer rounded-md border border-border bg-background p-1"
+              aria-label="Textfarbe"
+              title="Textfarbe"
+            />
+
+            <Separator orientation="vertical" className="h-6" />
+
+            <ToolbarIconButton
+              icon={BringToFront}
+              label="Nach vorne"
+              onClick={onFront}
+              disabled={!selected}
+            />
+            <ToolbarIconButton
+              icon={SendToBack}
+              label="Nach hinten"
+              onClick={onBack}
+              disabled={!selected}
+            />
+            <ToolbarIconButton
+              icon={selected?.locked ? Unlock : Lock}
+              label={selected?.locked ? "Entsperren" : "Sperren"}
+              onClick={() => onLock(!(selected?.locked ?? false))}
+              disabled={!selected}
+            />
+          </div>
+
+          {/* Typografie & Maße */}
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground">Größe</Label>
+            <Input
+              type="number"
+              min={8}
+              step={1}
+              value={selectedIsText ? (selected?.fontSize ?? 64) : 64}
+              onChange={(e) => handleNumberChange("fontSize", Number(e.target.value))}
+              disabled={!selectedIsText}
+              className="h-8 w-20"
+            />
+
+            <Label className="text-xs text-muted-foreground">Breite</Label>
+            <Input
+              type="number"
+              min={50}
+              step={10}
+              value={selectedIsText ? (selected?.width ?? 400) : 400}
+              onChange={(e) => handleNumberChange("width", Number(e.target.value))}
+              disabled={!selectedIsText}
+              className="h-8 w-24"
+            />
+
+            <Label className="text-xs text-muted-foreground">Zeilenh.</Label>
+            <Input
+              type="number"
+              step={0.05}
+              value={selectedIsText ? (selected?.lineHeight ?? 1.2) : 1.2}
+              onChange={(e) => handleNumberChange("lineHeight", Number(e.target.value))}
+              disabled={!selectedIsText}
+              className="h-8 w-20"
+            />
+
+            <Label className="text-xs text-muted-foreground">Buchst.</Label>
+            <Input
+              type="number"
+              step={0.5}
+              value={selectedIsText ? (selected?.letterSpacing ?? 0) : 0}
+              onChange={(e) => handleNumberChange("letterSpacing", Number(e.target.value))}
+              disabled={!selectedIsText}
+              className="h-8 w-20"
+            />
+          </div>
         </div>
-
-        <Separator />
-
-        <div className="flex items-center gap-3">
-          <Label
-            htmlFor={colorInputId}
-            className="text-xs font-medium text-muted-foreground"
-          >
-            Hintergrund
-          </Label>
-          <input
-            id={colorInputId}
-            type="color"
-            className="h-9 w-9 cursor-pointer rounded-full border border-border bg-transparent p-1"
-            value={canvas.bg ?? "#ffffff"}
-            onChange={(event) => onPatch({ bg: event.target.value })}
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <ToolbarIconButton
-            icon={BringToFront}
-            label="In den Vordergrund"
-            onClick={onFront}
-            disabled={!selected}
-          />
-          <ToolbarIconButton
-            icon={SendToBack}
-            label="In den Hintergrund"
-            onClick={onBack}
-            disabled={!selected}
-          />
-          <ToolbarIconButton
-            icon={Lock}
-            label="Auswahl sperren"
-            onClick={() => onLock(true)}
-            disabled={!selected}
-          />
-          <ToolbarIconButton
-            icon={Unlock}
-            label="Auswahl entsperren"
-            onClick={() => onLock(false)}
-            disabled={!selected}
-          />
-        </div>
-
-        {selectedIsText && (
-          <>
-            <Separator />
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-medium text-muted-foreground">
-                  Textinhalt
-                </Label>
-                <Input
-                  value={(selected as any).text ?? ""}
-                  onChange={(event) => handleTextChange(event.target.value)}
-                  placeholder="Hier schreiben..."
-                  className="h-9"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Schriftgroesse
-                  </Label>
-                  <Input
-                    type="number"
-                    className="h-9"
-                    value={(selected as any).fontSize ?? 72}
-                    onChange={(event) =>
-                      handleNumberChange("fontSize", Number(event.target.value))
-                    }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Breite
-                  </Label>
-                  <Input
-                    type="number"
-                    className="h-9"
-                    value={(selected as any).width ?? 400}
-                    onChange={(event) =>
-                      handleNumberChange("width", Number(event.target.value))
-                    }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Zeilenhoehe
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.05"
-                    className="h-9"
-                    value={(selected as any).lineHeight ?? 1.12}
-                    onChange={(event) =>
-                      handleNumberChange("lineHeight", Number(event.target.value))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <ToolbarIconButton
-                  icon={Bold}
-                  label="Fett"
-                  onClick={() => toggleFontWeight("bold")}
-                  active={(selected as any).fontStyle?.includes("bold")}
-                />
-                <ToolbarIconButton
-                  icon={Italic}
-                  label="Kursiv"
-                  onClick={() => toggleFontWeight("italic")}
-                  active={(selected as any).fontStyle?.includes("italic")}
-                />
-                <ToolbarIconButton
-                  icon={AlignLeft}
-                  label="Linksbundig"
-                  onClick={() => handleAlign("left")}
-                  active={(selected as any).align === "left"}
-                />
-                <ToolbarIconButton
-                  icon={AlignCenter}
-                  label="Zentriert"
-                  onClick={() => handleAlign("center")}
-                  active={(selected as any).align === "center"}
-                />
-                <ToolbarIconButton
-                  icon={AlignRight}
-                  label="Rechtsbundig"
-                  onClick={() => handleAlign("right")}
-                  active={(selected as any).align === "right"}
-                />
-
-                <div className="flex items-center gap-2 rounded-full border border-border/80 bg-background/60 px-2 py-1">
-                  <Palette className="h-4 w-4 text-muted-foreground" />
-                  <input
-                    type="color"
-                    className="h-6 w-6 cursor-pointer rounded-full border border-border"
-                    value={(selected as any).fill ?? "#111111"}
-                    onChange={(event) => handleFillChange(event.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-          </>
-        )}
       </div>
     </TooltipProvider>
   );
@@ -4196,11 +4240,11 @@ export function getSnap(x: number, y: number, grid = 5) {
 // apps/dashboard/src/app/(components)/SlideCanvas.tsx
 "use client";
 
-import type { SlideTextElement } from "@/lib/types";
 import {
   computeAutoHeight as computeAutoHeightFromUtil,
   measureWrappedText,
 } from "@/lib/textMetrics";
+import type { SlideTextElement } from "@/lib/types";
 import React, {
   forwardRef,
   useCallback,
@@ -4210,6 +4254,8 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { GripVertical } from "lucide-react";
+import LegacyEditorToolbar from "@/canvas/LegacyEditorToolbar";
 
 type TextLayer = {
   id: string;
@@ -4471,6 +4517,92 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const wrapRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // === Helpers: aktives/editiertes Layer finden & patchen ===
+  const getActiveId = () => isEditingRef.current ?? activeLayerId;
+  const applyToActive = (updater: (l: TextLayer) => TextLayer) => {
+    const id = getActiveId();
+    if (!id) return;
+    setTextLayers(prev => prev.map(l => (l.id === id ? updater(l) : l)));
+  };
+
+  const toggleBold = () => {
+    applyToActive(l => ({ ...l, weight: l.weight === "bold" ? "regular" : "bold" }));
+  };
+  const toggleItalic = () => {
+    applyToActive(l => ({ ...l, italic: !(l as any).italic }));
+  };
+  const setAlign = (align: "left" | "center" | "right") => {
+    applyToActive(l => ({ ...l, align }));
+  };
+  // Wir koppeln Schriftgröße an scale → BASE_FONT_PX \* scale
+  const setFontScale = (scale: number) => {
+    const s = Math.max(0.2, Math.min(4, Number.isFinite(scale) ? scale : 1));
+    applyToActive(l => ({ ...l, scale: s }));
+  };
+  const setTextColor = (color: string) => {
+    applyToActive(l => ({ ...l, color }));
+  };
+  const setOutlineColor = (color: string) => {
+    applyToActive(l => ({ ...l, outlineEnabled: true, outlineColor: color }));
+  };
+
+// --- SAFE event handlers (avoid reading from pooled event inside updater) ---
+const handleLineHeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const v = parseFloat(e.currentTarget.value);
+  if (!Number.isFinite(v)) return;
+  applyToActive(l => ({ ...l, lineHeight: v }));
+};
+// Optional: falls ein Outline-Breiten-Slider existiert, denselben Fix nutzen.
+const handleOutlineWidthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const v = parseFloat(e.currentTarget.value);
+  if (!Number.isFinite(v)) return;
+  applyToActive(l => ({ ...l, outlineEnabled: v > 0, outlineWidth: v }));
+};
+
+  // === Text hinzufügen ===
+  const addNewTextLayer = () => {
+    const id = (typeof crypto !== "undefined" && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `txt-${Date.now()}`;
+    const centerX = W / 2;
+    const centerY = H / 2;
+    const initial: TextLayer & { autoHeight?: boolean } = {
+      id,
+      content: "Neuer Text",
+      fontFamily: "Inter, system-ui, sans-serif",
+      fontSize: BASE_FONT_PX,
+      weight: "semibold",
+      scale: 1,
+      lineHeight: 1.12,
+      letterSpacing: 0,
+      align: "center",
+      x: centerX,
+      y: centerY,
+      rotation: 0,
+      width: 600,
+      height: 0, // auto
+      zIndex: (textLayers.at(-1)?.zIndex ?? 0) + 1,
+      color: "#ffffff",
+      autoHeight: true,
+    };
+    const lines = computeWrappedLinesWithDOM(initial);
+    initial.height = Math.ceil(computeAutoHeightForLayer(initial, lines));
+    setTextLayers(prev => [...prev, initial]);
+    setActiveLayerId(id);
+    setIsEditing(id);
+    // Cursor zurück in den Editor
+    setTimeout(() => editorActiveRef.current?.focus(), 0);
+  };
+
+  // Reagiert auf globales "Text +"
+  useEffect(() => {
+  const handler = () => {
+      addNewTextLayer();
+       };
+       window.addEventListener("canvas:add-text", handler);
+       return () => window.removeEventListener("canvas:add-text", handler);
+  }, []);
 
   // BG pan/zoom state (Canvas-Einheiten)
   const [scale, setScale] = useState(1);
@@ -5200,209 +5332,90 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     | undefined;
   const toolbarActive = !!isEditing;
 
-  return (
-    <div className="space-y-2">
-      {/* Toolbar direkt ÜBER dem Bild, zentriert und „dran“ */}
-      <div
-        className="w-full flex justify-center"
-        style={{ pointerEvents: "none", width: previewSize.w }}
-      >
-        <div
-          className={`z-50 flex items-center gap-2 rounded-xl border px-2 py-1 backdrop-blur ${
-            toolbarActive
-              ? "bg-white/95 text-black"
-              : "bg-white/60 text-gray-500 opacity-60"
-          }`}
-          onMouseDown={(e) => {
-            // Toolbar-Interaktion → Blur der Textarea ignorieren
-            toolbarMouseDownRef.current = true;
-            e.stopPropagation();
-          }}
-          onMouseUp={() => {
-            // nach Eventloop zurücksetzen (damit onBlur zuerst läuft)
-            setTimeout(() => (toolbarMouseDownRef.current = false), 0);
-          }}
-          style={{
-            pointerEvents: "auto",
-            width: "max-content", // Hintergrund passt sich dem Inhalt an
-            maxWidth: previewSize.w, // nie breiter als der Canvas
-            flexWrap: "wrap", // bricht um, wenn zu breit
-            justifyContent: "center",
-            margin: "0 auto -6px auto" /* direkt an die Bildkante andocken */,
-          }}
-        >
-          {/* Bold */}
-          <button
-            className={`px-2 py-1 rounded ${
-              active?.weight === "bold" && toolbarActive
-                ? "bg-black text-white"
-                : "bg-black/5"
-            }`}
-            onClick={() =>
-              toolbarActive &&
-              active &&
-              setTextLayers((prev) =>
-                prev.map((l) =>
-                  l.id === active.id
-                    ? ({
-                        ...l,
-                        weight: l.weight === "bold" ? "regular" : "bold",
-                      } as any)
-                    : l,
-                ),
-              )
-            }
-            title="Fett"
-          >
-            B
-          </button>
+  const handleAddText = useCallback(() => {
+    addNewTextLayer();
+  }, [textLayers]);
 
-          {/* Italic */}
+  return (
+    <>
+      {/* Obere Toolbar (immer sichtbar) */}
+      <div
+        className="sticky top-0 z-50 w-full bg-transparent"
+        onPointerDownCapture={() => { toolbarMouseDownRef.current = true; }}
+        onPointerUpCapture={() => { setTimeout(() => (toolbarMouseDownRef.current = false), 0); }}
+      >
+         <LegacyEditorToolbar onAddText={handleAddText} className="py-1">
+
+        {/* === BEGIN: LEGACY CONTROLS (JETZT VERDRAHTET) === */}
+
+        {/* Typo-Gruppe: Fett, Kursiv, etc. */}
+        <div className="flex items-center gap-2">
           <button
-            className={`px-2 py-1 rounded italic ${
-              active?.italic && toolbarActive
-                ? "bg-black text-white"
-                : "bg-black/5"
-            }`}
-            onClick={() =>
-              toolbarActive &&
-              active &&
-              setTextLayers((prev) =>
-                prev.map((l) =>
-                  l.id === active.id
-                    ? ({ ...l, italic: !(l as any).italic } as any)
-                    : l,
-                ),
-              )
-            }
+            onClick={toggleBold}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background/90 text-sm font-medium shadow-sm transition-colors hover:bg-muted"
+            aria-label="Fett"
+            title="Fett"
+          >B</button>
+          <button
+            onClick={toggleItalic}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background/90 text-sm font-medium shadow-sm transition-colors hover:bg-muted"
+            aria-label="Kursiv"
             title="Kursiv"
           >
-            I
+            <span className="italic">I</span>
           </button>
-
-          {/* Align */}
-          <div className="h-5 w-px bg-black/10 mx-1" />
-          {(["left", "center", "right"] as const).map((al) => (
-            <button
-              key={al}
-              className={`px-2 py-1 rounded ${
-                active?.align === al && toolbarActive
-                  ? "bg-black text-white"
-                  : "bg-black/5"
-              }`}
-              onClick={() =>
-                toolbarActive &&
-                active &&
-                setTextLayers((prev) =>
-                  prev.map((l) =>
-                    l.id === active.id ? ({ ...l, align: al } as any) : l,
-                  ),
-                )
-              }
-              title={`Ausrichtung: ${al}`}
-            >
-              {al === "left" ? "⟸" : al === "center" ? "⟷" : "⟹"}
-            </button>
-          ))}
-
-          {/* Outline */}
-          <div className="h-5 w-px bg-black/10 mx-1" />
-          <button
-            className={`px-2 py-1 rounded ${
-              active?.outlineEnabled && toolbarActive
-                ? "bg-black text-white"
-                : "bg-black/5"
-            }`}
-            onClick={() =>
-              toolbarActive &&
-              active &&
-              setTextLayers((prev) =>
-                prev.map((l) =>
-                  l.id === active.id
-                    ? ({
-                        ...l,
-                        outlineEnabled: !(l as any).outlineEnabled,
-                      } as any)
-                    : l,
-                ),
-              )
-            }
-            title="Outline an/aus"
-          >
-            O
-          </button>
-          <div
-            className={`flex items-center gap-1 ${
-              toolbarActive && active?.outlineEnabled
-                ? ""
-                : "opacity-40 pointer-events-none"
-            }`}
-          >
-            <input
-              type="range"
-              min={0}
-              max={40}
-              step={1}
-              value={Math.round((active?.outlineWidth as any) ?? 6)}
-              onChange={(e) =>
-                active &&
-                setTextLayers((prev) =>
-                  prev.map((l) =>
-                    l.id === active.id
-                      ? ({
-                          ...l,
-                          outlineWidth: Math.max(
-                            0,
-                            Math.min(40, Number(e.target.value)),
-                          ),
-                        } as any)
-                      : l,
-                  ),
-                )
-              }
-              title="Outline-Dicke"
-            />
-            <input
-              type="color"
-              className="w-7 h-6 rounded border"
-              value={(active?.outlineColor as any) ?? "#000000"}
-              onChange={(e) =>
-                active &&
-                setTextLayers((prev) =>
-                  prev.map((l) =>
-                    l.id === active.id
-                      ? ({ ...l, outlineColor: e.target.value } as any)
-                      : l,
-                  ),
-                )
-              }
-              title="Outline-Farbe"
-            />
-          </div>
-          {/* Textfarbe */}
-          <div className="h-5 w-px bg-black/10 mx-1" />
-          <label className={`text-xs ${toolbarActive ? "" : "opacity-60"}`}>
-            Text
-          </label>
-          <input
-            type="color"
-            className="w-7 h-6 rounded border"
-            value={(active?.color as any) ?? "#ffffff"}
-            onChange={(e) =>
-              active &&
-              setTextLayers((prev) =>
-                prev.map((l) =>
-                  l.id === active.id
-                    ? ({ ...l, color: e.target.value } as any)
-                    : l,
-                ),
-              )
-            }
-            title="Textfarbe"
-          />
         </div>
+
+        <div className="flex items-center gap-2">
+          <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background/90 shadow-sm hover:bg-muted"
+            aria-label="Links ausrichten" title="Links ausrichten"
+            onClick={() => setAlign("left")}>↤</button>
+          <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background/90 shadow-sm hover:bg-muted"
+            aria-label="Zentrieren" title="Zentrieren"
+            onClick={() => setAlign("center")}>⎯</button>
+          <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background/90 shadow-sm hover:bg-muted"
+            aria-label="Rechts ausrichten" title="Rechts ausrichten"
+            onClick={() => setAlign("right")}>↦</button>
+        </div>
+
+        {/* Font-Scale (beeinflusst FontSize = BASE_FONT_PX * scale) */}
+        <input
+          type="number"
+          step="0.05"
+          min="0.2"
+          max="4"
+          onChange={(e) => setFontScale(parseFloat(e.currentTarget.value))}
+          className="h-8 w-16 rounded-md border border-border bg-background px-2 text-sm" />
+
+        {/* Slider: Zeilenhöhe */}
+        <input
+          type="range"
+          min="0.8"
+          max="2"
+          step="0.02"
+          onChange={handleLineHeightChange}
+          className="h-1.5 w-28 accent-primary" />
+
+        {/* Farbe 1 (Text) */}
+        <div className="flex items-center gap-2">
+           <label className="text-xs text-muted-foreground">Text</label>
+           <input
+             type="color"
+            onChange={(e) => setTextColor(e.currentTarget.value)}
+            className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5" />
+         </div>
+
+        {/* Farbe 2 (Outline) */}
+        <input
+          type="color"
+          onChange={(e) => setOutlineColor(e.currentTarget.value)}
+          className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5" />
+
+        {/* === END: LEGACY CONTROLS === */}
+        </LegacyEditorToolbar>
       </div>
 
+      {/* Canvas-Shell */}
       <div
         ref={wrapRef}
         className="slide-shell relative mx-auto overflow-hidden border shadow-lg select-none bg-[#00B140]"
@@ -5437,12 +5450,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               style={{
                 transform: `translate(-50%,-50%) translate(${offset.x}px, ${offset.y}px) scale(${Math.max(
                   0.001,
-                  scale,
+                  scale
                 )})`,
                 transformOrigin: "center",
               }}
-              draggable={false}
-            />
+              draggable={false} />
           ) : (
             <div className="absolute inset-0 bg-black" />
           )}
@@ -5450,21 +5462,18 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           {textLayers.map((layer) => {
             const isActive = activeLayerId === layer.id;
             const isCurrentEditing = isEditing === layer.id;
-            const cssFontWeight =
-              layer.weight === "bold"
-                ? 700
-                : layer.weight === "semibold"
-                  ? 600
-                  : 400;
+            const cssFontWeight = layer.weight === "bold"
+              ? 700
+              : layer.weight === "semibold"
+                ? 600
+                : 400;
 
             return (
               <div key={layer.id}>
                 {/* TEXT-BOX (border-box) */}
                 <div
                   data-role="text-layer"
-                  className={`absolute rounded-lg ${
-                    isActive ? "ring-2 ring-blue-500/80" : ""
-                  } ${isCurrentEditing ? "ring-2 ring-green-500/90" : ""} shadow-sm`}
+                  className={`absolute rounded-lg ${isActive ? "ring-2 ring-blue-500/80" : ""} ${isCurrentEditing ? "ring-2 ring-green-500/90" : ""} shadow-sm`}
                   style={{
                     left: layer.x,
                     top: layer.y,
@@ -5484,7 +5493,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                     // Im Editor-Modus keine Pointer-Blockade → Mausplatzierung/Markieren funktioniert
                     if (isCurrentEditing) return;
                     selectLayer(layer.id, e);
-                  }}
+                  } }
                   onDoubleClick={() => onDoubleClick(layer.id)}
                 >
                   {/* === Edge guide lines that follow the box (inside the same transform) === */}
@@ -5492,20 +5501,16 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                     <>
                       <div
                         className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-blue-400/70"
-                        style={{ transform: "translateY(-0.5px)" }}
-                      />
+                        style={{ transform: "translateY(-0.5px)" }} />
                       <div
                         className="pointer-events-none absolute left-0 right-0 bottom-0 h-px bg-blue-400/70"
-                        style={{ transform: "translateY(0.5px)" }}
-                      />
+                        style={{ transform: "translateY(0.5px)" }} />
                       <div
                         className="pointer-events-none absolute top-0 bottom-0 left-0 w-px bg-blue-400/70"
-                        style={{ transform: "translateX(-0.5px)" }}
-                      />
+                        style={{ transform: "translateX(-0.5px)" }} />
                       <div
                         className="pointer-events-none absolute top-0 bottom-0 right-0 w-px bg-blue-400/70"
-                        style={{ transform: "translateX(0.5px)" }}
-                      />
+                        style={{ transform: "translateX(0.5px)" }} />
                     </>
                   )}
 
@@ -5513,7 +5518,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                     <textarea
                       ref={(el) => {
                         if (isCurrentEditing) editorActiveRef.current = el;
-                      }}
+                      } }
                       autoFocus
                       value={layer.content}
                       onChange={(e) => onTextareaChange(layer.id, e)}
@@ -5540,19 +5545,17 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         boxSizing: "border-box",
                         fontKerning: "normal" as any,
                         /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
-                        textShadow:
-                          (layer as any).outlineEnabled &&
+                        textShadow: (layer as any).outlineEnabled &&
                           ((layer as any).outlineWidth || 0) > 0
-                            ? buildOuterTextShadow(
-                                Math.round(
-                                  ((layer as any).outlineWidth || 6) *
-                                    layer.scale,
-                                ),
-                                (layer as any).outlineColor || "#000",
-                              ) + ", 0 2px 8px rgba(0,0,0,0.8)"
-                            : "0 2px 8px rgba(0,0,0,0.8)",
-                      }}
-                    />
+                          ? buildOuterTextShadow(
+                            Math.round(
+                              ((layer as any).outlineWidth || 6) *
+                              layer.scale
+                            ),
+                            (layer as any).outlineColor || "#000"
+                          ) + ", 0 2px 8px rgba(0,0,0,0.8)"
+                          : "0 2px 8px rgba(0,0,0,0.8)",
+                      }} />
                   ) : (
                     <div
                       className="w-full h-full"
@@ -5571,17 +5574,16 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         boxSizing: "border-box",
                         fontKerning: "normal" as any,
                         /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
-                        textShadow:
-                          (layer as any).outlineEnabled &&
+                        textShadow: (layer as any).outlineEnabled &&
                           ((layer as any).outlineWidth || 0) > 0
-                            ? buildOuterTextShadow(
-                                Math.round(
-                                  ((layer as any).outlineWidth || 6) *
-                                    layer.scale,
-                                ),
-                                (layer as any).outlineColor || "#000",
-                              ) + ", 0 2px 8px rgba(0,0,0,0.8)"
-                            : "0 2px 8px rgba(0,0,0,0.8)",
+                          ? buildOuterTextShadow(
+                            Math.round(
+                              ((layer as any).outlineWidth || 6) *
+                              layer.scale
+                            ),
+                            (layer as any).outlineColor || "#000"
+                          ) + ", 0 2px 8px rgba(0,0,0,0.8)"
+                          : "0 2px 8px rgba(0,0,0,0.8)",
                       }}
                     >
                       {layer.content}
@@ -5600,9 +5602,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Größe (proportional + Text)"
                         className="absolute top-0 left-0 w-5 h-5 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-nw", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-nw", e)}
                       >
                         <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -5611,9 +5611,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Größe (proportional + Text)"
                         className="absolute top-0 right-0 w-5 h-5 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-ne", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-ne", e)}
                       >
                         <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -5622,9 +5620,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Größe (proportional + Text)"
                         className="absolute bottom-0 left-0 w-5 h-5 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-sw", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-sw", e)}
                       >
                         <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -5633,9 +5629,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Größe (proportional + Text)"
                         className="absolute bottom-0 right-0 w-5 h-5 translate-x-1/2 translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-se", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-se", e)}
                       >
                         <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -5646,9 +5640,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Breite (links)"
                         className="absolute left-0 top-1/2 w-5 h-8 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-left", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-left", e)}
                       >
                         <div className="h-6 w-2 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -5657,9 +5649,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Breite (rechts)"
                         className="absolute right-0 top-1/2 w-5 h-8 translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-right", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-right", e)}
                       >
                         <div className="h-6 w-2 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -5668,9 +5658,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Höhe (oben)"
                         className="absolute top-0 left-1/2 w-8 h-5 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-top", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-top", e)}
                       >
                         <div className="h-2 w-6 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -5679,9 +5667,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Höhe (unten)"
                         className="absolute bottom-0 left-1/2 w-8 h-5 -translate-x-1/2 translate-y-1/2 cursor-ns-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) =>
-                          startResize(layer.id, "resize-bottom", e)
-                        }
+                        onPointerDown={(e) => startResize(layer.id, "resize-bottom", e)}
                       >
                         <div className="h-2 w-6 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -5699,15 +5685,98 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             width={W}
             height={H}
             className="h-full w-full block"
-            style={{ display: "none" }}
-          />
+            style={{ display: "none" }} />
         </div>
       </div>
-    </div>
+      {/* ^ obere Canvas-Hülle */}
+      </>
   );
 });
 
 export default SlideCanvas;
+
+```
+
+# src\canvas\LegacyEditorToolbar.tsx
+
+```tsx
+"use client";
+import { cn } from "@/lib/utils";
+import { Plus } from "lucide-react";
+import * as React from "react";
+
+type LegacyEditorToolbarProps = {
+  /** Wird beim Klick auf „Text +“ aufgerufen */
+  onAddText?: () => void;
+  /** Rechte Seite: hier werden die bestehenden Legacy-Controls (B, I, Slider, Farben, …) reingereicht */
+  children: React.ReactNode;
+  className?: string;
+};
+
+/**
+ * Präsentations-/Layout-Komponente für die Legacy-Canvas-Toolbar.
+ * - Immer sichtbar
+ * - An Side-Menü angelehnt: Border, bg-background/95, shadow, rounded-xl, backdrop-blur
+ * - 2 Spalten: links „Text +“, rechts vorhandene Controls (als children)
+ * - Keine Logikänderung an den Controls selbst – nur Aussehen/Struktur.
+ */
+export function LegacyEditorToolbar({
+  onAddText,
+  children,
+  className,
+}: LegacyEditorToolbarProps) {
+  const handleAdd = React.useCallback(() => {
+    if (onAddText) {
+      onAddText();
+      return;
+    }
+    // Fallback: feuert ein globales Event, das (falls verdrahtet) ein Textfeld im Canvas erzeugt.
+    window.dispatchEvent(new CustomEvent("canvas:add-text"));
+  }, [onAddText]);
+
+  return (
+    <div
+      className={cn(
+        "mx-auto w-full max-w-[980px]",
+        // Der Wrapper erhält keine sticky, das macht weiterhin der umgebende Container (Legacy-Datei).
+        className,
+      )}
+    >
+      <div
+        className={cn(
+          "grid grid-cols-[auto,1fr] items-center gap-3 rounded-2xl border border-border/80",
+          "bg-background/95 p-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80",
+        )}
+      >
+        {/* Linke Spalte: „Text +“ */}
+        <div className="pl-1">
+          <button
+            type="button"
+            onClick={handleAdd}
+            className={cn(
+              // wie im Side-Menü: klare Fläche, Primary-Kontrast
+              "inline-flex h-9 items-center justify-center rounded-xl px-3 text-sm font-medium",
+              "bg-primary text-primary-foreground hover:opacity-90 transition",
+              "focus-visible:outline-none focus-visible:ring-0",
+            )}
+            aria-label="Text hinzufügen"
+            title="Text hinzufügen"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Text
+          </button>
+        </div>
+
+        {/* Rechte Spalte: alle bisherigen Legacy-Controls (B, I, Ausrichtung, Slider, Farben, …) */}
+        <div className={cn("flex flex-wrap items-center gap-2")}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default LegacyEditorToolbar;
 
 ```
 
@@ -5914,7 +5983,7 @@ export default function SlideCanvas({ value, onChange }: Props) {
           onBack={onBack}
           onLock={onLock}
           selected={selectedNode}
-          className="absolute left-4 top-4 z-20 pointer-events-none opacity-0 transition-opacity duration-150 group-hover/card-container:pointer-events-auto group-hover/card-container:opacity-100"
+          className="absolute left-4 top-1/2 -translate-y-1/2 z-20"
         />
         <Stage
           width={canvas.width}
@@ -17454,6 +17523,7 @@ import {
   HighlighterIcon,
   ItalicIcon,
   PaintBucketIcon,
+  Plus,
   StrikethroughIcon,
   UnderlineIcon,
   WandSparklesIcon,
@@ -17494,8 +17564,25 @@ import { TurnIntoToolbarButton } from "./turn-into-toolbar-button";
 export function FixedToolbarButtons() {
   const readOnly = useEditorReadOnly();
 
+  const handleAddText = () => {
+    // Triggert im Canvas das Hinzufügen eines Textfeldes
+    window.dispatchEvent(new CustomEvent("canvas:add-text"));
+  };
+
   return (
     <div className="flex w-full">
+      {/* Linke Sektion: immer sichtbarer "Text +" Button */}
+      <ToolbarGroup>
+        <button
+          onClick={handleAddText}
+          aria-label="Text hinzufügen"
+          title="Text hinzufügen"
+          className="inline-flex items-center justify-center whitespace-nowrap rounded-xl border border-border/80 bg-background/90 text-sm font-medium shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-0 h-9 w-9"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </ToolbarGroup>
+
       {!readOnly && (
         <>
           <ToolbarGroup>
@@ -17628,7 +17715,7 @@ export function FixedToolbar(props: React.ComponentProps<typeof Toolbar>) {
     <Toolbar
       {...props}
       className={cn(
-        "supports-backdrop-blur:bg-background/60 fixed-toolbar sticky left-0 top-0 z-50 w-full justify-between overflow-x-auto rounded-t-lg border-b border-b-border bg-background/95 p-1 backdrop-blur-sm scrollbar-hide",
+        "supports-backdrop-blur:bg-background/60 fixed-toolbar sticky left-0 top-0 z-50 w-full justify-between overflow-x-auto rounded-t-lg border-b border-b-border bg-background/95 p-1 backdrop-blur-sm scrollbar-hide shadow-sm",
         props.className,
       )}
     />
@@ -25813,22 +25900,27 @@ export function ToolbarSeparator({
 
 // From toggleVariants
 const toolbarButtonVariants = cva(
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-[color,box-shadow] outline-none hover:bg-muted hover:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-checked:bg-accent aria-checked:text-accent-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  // Angleichen an Side-Menü: klare Kanten, Border, leichte Card-Optik
+  "inline-flex items-center justify-center whitespace-nowrap rounded-xl border border-border/80 bg-background/90 text-sm font-medium shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-0 disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-muted data-[state=open]:text-foreground",
   {
     defaultVariants: {
-      size: "default",
-      variant: "default",
+      size: "icon",
+      variant: "outline",
     },
     variants: {
       size: {
-        default: "h-9 min-w-9 px-2",
-        lg: "h-10 min-w-10 px-2.5",
-        sm: "h-8 min-w-8 px-1.5",
+        default: "h-9 px-3",
+        sm: "h-8 rounded-xl px-2",
+        lg: "h-10 rounded-xl px-4",
+        icon: "h-9 w-9 rounded-xl",
       },
       variant: {
-        default: "bg-transparent",
-        outline:
-          "border border-input bg-transparent shadow-xs hover:bg-accent hover:text-accent-foreground",
+        default: "bg-background",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        outline: "border border-border/80 bg-background hover:bg-muted",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "bg-transparent hover:bg-muted",
+        link: "text-primary underline-offset-4 hover:underline",
       },
     },
   },
@@ -26840,6 +26932,7 @@ import {
   type PlateSlide,
 } from "@/components/presentation/utils/parser";
 import { Button } from "@/components/ui/button";
+import { withDefaults, addText } from "@/canvas/commands";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Layer, Rect, Stage, Text, Image as KonvaImage } from "react-konva";
 
@@ -26899,8 +26992,8 @@ function useCanvasImage(src?: string): [HTMLImageElement | null] {
 export default function SlideCanvasBase({
   slide,
   slideIndex,
-  width = 600,
-  height = 900,
+  width = 420,
+  height = 700,
   disableDrag = false,
   showExportButton = true,
 }: SlideCanvasProps) {
@@ -26912,6 +27005,25 @@ export default function SlideCanvasBase({
 
   const stageRef = useRef<any>(null);
   const [image] = useCanvasImage(slide.rootImage?.url ?? "");
+
+  // Globaler Listener für den "Text +" Button in der Plate FixedToolbar
+  useEffect(() => {
+    const handler = () => {
+      const { slides, setSlides } = usePresentationState.getState();
+      setSlides(
+        slides.map((s, i) =>
+          i === slideIndex
+            ? {
+                ...s,
+                canvas: addText(withDefaults(s.canvas)),
+              }
+            : s,
+        ),
+      );
+    };
+    window.addEventListener("canvas:add-text", handler);
+    return () => window.removeEventListener("canvas:add-text", handler);
+  }, [slideIndex]);
 
   const canvasDoc = slideWithExtras.canvas;
   const activeTextNode = useMemo(() => {
@@ -42752,27 +42864,53 @@ export function SlideContainer({
           className,
         )}
       >
-        {!isPresenting && (
-          <div className="absolute left-4 top-4 z-[100] opacity-0 transition-opacity duration-200 group-hover/card-container:opacity-100">
-            <div className="flex items-center gap-1 rounded-full border border-border/60 bg-background/95 px-2 py-1 shadow-lg backdrop-blur">
+        {/* Linke, vertikale Toolbar (immer sichtbar, stört nicht den Editor) */}
+        {!isPresenting && !isReadOnly && (
+          <div
+            className={cn(
+              "absolute top-1/2 -translate-y-1/2 -left-14 z-[1001]",
+            )}
+            aria-label="Slide toolbar"
+          >
+            <div className="flex flex-col items-center gap-2">
+              {/* Drag-Handle */}
+              <button
+                ref={setActivatorNodeRef as React.Ref<HTMLButtonElement>}
+                {...listeners}
+                {...attributes}
+                className="flex h-9 w-9 items-center justify-center rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground focus:outline-none focus-visible:outline-none"
+                aria-label="Folienposition ziehen"
+                title="Verschieben"
+              >
+                <GripVertical className="h-4 w-4" />
+              </button>
+
+              {/* Slide-Einstellungen */}
+              <div className="rounded-md bg-background/95 shadow-sm backdrop-blur">
+                <SlideEditPopover index={index} />
+              </div>
+
+              {/* Neues Canvas unter aktueller Folie */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 cursor-grab rounded-full border border-border/70 text-muted-foreground hover:text-foreground"
-                ref={setActivatorNodeRef}
-                {...listeners}
+                className="h-9 w-9 rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground focus:outline-none focus-visible:outline-none"
+                onClick={() => addSlide("after", index)}
+                aria-label="Neue Folie darunter"
+                title="Neue Folie darunter"
               >
-                <GripVertical className="h-4 w-4" />
+                <Plus className="h-4 w-4" />
               </Button>
 
-              <SlideEditPopover index={index} />
-
+              {/* Löschen */}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full border border-border/70 text-muted-foreground hover:text-destructive"
+                    className="h-9 w-9 rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-destructive focus:outline-none focus-visible:outline-none"
+                    aria-label="Folie löschen"
+                    title="Folie löschen"
                   >
                     <Trash className="h-4 w-4" />
                   </Button>
@@ -42781,8 +42919,7 @@ export function SlideContainer({
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete Slide</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete slide {index + 1}? This
-                      action cannot be undone.
+                      Are you sure you want to delete slide {index + 1}? This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -42799,34 +42936,10 @@ export function SlideContainer({
           </div>
         )}
 
+        {/* Hinweis: die früheren schwebenden + Buttons oben/unten wurden entfernt */}
+
         {children}
       </div>
-
-      {!isPresenting && !isReadOnly && (
-        <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-200 group-hover/card-container:opacity-100">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-full border border-border/70 bg-background/95 text-muted-foreground shadow-lg backdrop-blur hover:text-foreground"
-            onClick={() => addSlide("before", index)}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
-
-      {!isPresenting && !isReadOnly && (
-        <div className="absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2 opacity-0 transition-opacity duration-200 group-hover/card-container:opacity-100">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-full border border-border/70 bg-background/95 text-muted-foreground shadow-lg backdrop-blur hover:text-foreground"
-            onClick={() => addSlide("after", index)}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
 
       {isPresenting && (
         <div className="absolute bottom-0.5 left-1 right-1 z-[1001]">
@@ -42934,7 +43047,7 @@ export function SlideEditPopover({ index }: SlideEditPopoverProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 rounded-full border border-border/70 text-muted-foreground hover:text-foreground"
+          className="h-9 w-9 rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground focus:outline-none focus-visible:outline-none"
         >
           <Edit className="h-4 w-4" />
         </Button>
@@ -43411,8 +43524,6 @@ export function SlidePreviewCard({
 ```tsx
 "use client";
 
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import React from "react";
 
 type Props = {
@@ -43420,29 +43531,11 @@ type Props = {
   children: React.ReactNode;
 };
 
-export function SortableSlide({ id, children }: Props) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
-
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.85 : 1,
-    // optional: kleine Hover-Hand
-    cursor: "grab",
-  };
-
-  return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      {children}
-    </div>
-  );
+// Wichtig: Kein useSortable hier.
+// Damit ist die Slide NICHT mehr als Ganzes draggable.
+// Dragging erfolgt ausschließlich über den Handle in SlideContainer (setActivatorNodeRef).
+export function SortableSlide({ children }: Props) {
+  return <div>{children}</div>;
 }
 
 ```
@@ -80547,14 +80640,16 @@ const ResizableHandle = ({
 }) => (
   <ResizablePrimitive.PanelResizeHandle
     className={cn(
-      "relative flex w-px items-center justify-center bg-border after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full data-[panel-group-direction=vertical]:after:left-0 data-[panel-group-direction=vertical]:after:h-1 data-[panel-group-direction=vertical]:after:w-full data-[panel-group-direction=vertical]:after:-translate-y-1/2 data-[panel-group-direction=vertical]:after:translate-x-0 [&[data-panel-group-direction=vertical]>div]:rotate-90",
+      "group relative flex w-px items-center justify-center bg-border after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full data-[panel-group-direction=vertical]:after:left-0 data-[panel-group-direction=vertical]:after:h-1 data-[panel-group-direction=vertical]:after:w-full data-[panel-group-direction=vertical]:after:-translate-y-1/2 data-[panel-group-direction=vertical]:after:translate-x-0 [&[data-panel-group-direction=vertical]>div]:rotate-90",
       className,
     )}
     {...props}
   >
     {withHandle && (
-      <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm border bg-border">
-        <GripVertical className="h-2.5 w-2.5" />
+      <div
+        className="z-10 flex h-9 w-9 items-center justify-center rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur transition-colors group-hover:text-foreground focus:outline-none focus-visible:outline-none"
+      >
+        <GripVertical className="h-4 w-4" />
       </div>
     )}
   </ResizablePrimitive.PanelResizeHandle>

@@ -198,7 +198,7 @@ export default function SlideCanvas({ value, onChange }: Props) {
           onBack={onBack}
           onLock={onLock}
           selected={selectedNode}
-          className="absolute left-4 top-4 z-20 pointer-events-none opacity-0 transition-opacity duration-150 group-hover/card-container:pointer-events-auto group-hover/card-container:opacity-100"
+          className="absolute left-4 top-1/2 -translate-y-1/2 z-20"
         />
         <Stage
           width={canvas.width}

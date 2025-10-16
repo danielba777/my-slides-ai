@@ -77,7 +77,7 @@ export function SlideEditPopover({ index }: SlideEditPopoverProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 rounded-full border border-border/70 text-muted-foreground hover:text-foreground"
+          className="h-9 w-9 rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground focus:outline-none focus-visible:outline-none"
         >
           <Edit className="h-4 w-4" />
         </Button>
