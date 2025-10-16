@@ -1,7 +1,11 @@
 "use client";
 
 import { type PlateSlide } from "@/components/presentation/utils/parser";
-import { DEFAULT_CANVAS } from "@/canvas/types";
+import {
+  DEFAULT_CANVAS,
+  type CanvasDoc,
+  type CanvasTextNode,
+} from "@/canvas/types";
 import { usePresentationState } from "@/states/presentation-state";
 import { nanoid } from "nanoid";
 
@@ -13,7 +17,7 @@ export function useSlideOperations() {
     (s) => s.setCurrentSlideIndex,
   );
 
-  const createDefaultCanvasDoc = () => ({
+  const createDefaultCanvasDoc = (): CanvasDoc => ({
     ...DEFAULT_CANVAS,
     nodes: [
       {
@@ -26,7 +30,7 @@ export function useSlideOperations() {
         fontSize: 72,
         fill: "#111",
       },
-    ],
+    ] satisfies CanvasTextNode[],
     selection: [],
   });
 
