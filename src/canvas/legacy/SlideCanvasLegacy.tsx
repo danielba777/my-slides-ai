@@ -1084,56 +1084,121 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     addNewTextLayer();
   }, [textLayers]);
 
+  // --- UI Highlight States (lokal, robust) ---
+  const [uiBold, setUiBold] = useState(false);
+  const [uiItalic, setUiItalic] = useState(false);
+  const [uiAlign, setUiAlign] = useState<"left" | "center" | "right">("left");
+  const [uiOutlineOn, setUiOutlineOn] = useState(true);
+
+  const toggleBoldUI = () => { setUiBold(v => !v); toggleBold(); };
+  const toggleItalicUI = () => { setUiItalic(v => !v); toggleItalic(); };
+  const setAlignUI = (a: "left" | "center" | "right") => { setUiAlign(a); setAlign(a); };
+
+  const handleToggleOutlineOn = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const on = e.currentTarget.checked;
+    setUiOutlineOn(on);
+    applyToActive((l: any) => ({
+      ...l,
+      outlineEnabled: on,
+      // Falls eingeschaltet aber Breite 0, kleinen Default setzen:
+      outlineWidth: on ? (l.outlineWidth && l.outlineWidth > 0 ? l.outlineWidth : 4) : 0,
+    }));
+  };
+
+  const handleLineHeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseFloat(e.currentTarget.value);
+    if (!Number.isFinite(v)) return;
+    applyToActive(l => ({ ...l, lineHeight: v }));
+  };
+
+  const handleOutlineWidthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseFloat(e.currentTarget.value);
+    if (!Number.isFinite(v)) return;
+    applyToActive(l => ({ ...l, outlineEnabled: v > 0, outlineWidth: v }));
+  };
+
   return (
     <>
       {/* Obere Toolbar (immer sichtbar) */}
       <div
-        className="sticky top-0 z-50 w-full bg-transparent"
-        onPointerDownCapture={() => { toolbarMouseDownRef.current = true; }}
-        onPointerUpCapture={() => { setTimeout(() => (toolbarMouseDownRef.current = false), 0); }}
+        className="sticky top-0 z-50 w-full bg-transparent flex justify-center"
       >
-         <LegacyEditorToolbar onAddText={handleAddText} className="py-1">
+        {/* Die Toolbar-Box selbst: auto-breit, mittig */}
+        <LegacyEditorToolbar
+          onAddText={handleAddText}
+          className="py-1 px-2 inline-flex w-auto max-w-[calc(100vw-16px)] items-center justify-center gap-2 rounded-2xl border border-border/80 bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/70"
+        >
 
         {/* === BEGIN: LEGACY CONTROLS (NEU ANGERICHTET) === */}
 
         {/* --- ZEILE 1: Typo & Ausrichtung & Größe --- */}
         <div className="flex items-center gap-2">
            <button
-             onClick={toggleBold}
-             className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background/90 text-sm font-medium shadow-sm transition-colors hover:bg-muted"
+             onClick={toggleBoldUI}
+             aria-pressed={uiBold}
+             className={
+               "inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-medium shadow-sm transition-colors " +
+               (uiBold
+                 ? "border-primary bg-primary text-primary-foreground"
+                 : "border-border/80 bg-background/90 hover:bg-muted")
+             }
              aria-label="Fett"
              title="Fett"
            >B</button>
            <button
-             onClick={toggleItalic}
-             className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background/90 text-sm font-medium shadow-sm transition-colors hover:bg-muted"
-             aria-label="Kursiv"
-             title="Kursiv"
-           >
-             <span className="italic">I</span>
-           </button>
+             onClick={toggleItalicUI}
+             aria-pressed={uiItalic}
+             className={
+               "inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-medium shadow-sm transition-colors " +
+               (uiItalic
+                 ? "border-primary bg-primary text-primary-foreground"
+                 : "border-border/80 bg-background/90 hover:bg-muted")
+             }
+               aria-label="Kursiv"
+               title="Kursiv"
+             >
+               <span className="italic">I</span>
+             </button>
          </div>
 
         {/* Ausrichtung mit "mehrzeiligen" Icons */}
         <div className="flex items-center gap-2" aria-label="Textausrichtung">
           <button
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background/90 shadow-sm hover:bg-muted"
+            aria-pressed={uiAlign === "left"}
+            className={
+              "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
+              (uiAlign === "left"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border/80 bg-background/90 hover:bg-muted")
+            }
             aria-label="Links ausrichten" title="Links ausrichten"
-            onClick={() => setAlign("left")}
+            onClick={() => setAlignUI("left")}
           >
             <AlignLeft className="h-4 w-4" />
           </button>
           <button
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background/90 shadow-sm hover:bg-muted"
+            aria-pressed={uiAlign === "center"}
+            className={
+              "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
+              (uiAlign === "center"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border/80 bg-background/90 hover:bg-muted")
+            }
             aria-label="Zentrieren" title="Zentrieren"
-            onClick={() => setAlign("center")}
+            onClick={() => setAlignUI("center")}
           >
             <AlignCenter className="h-4 w-4" />
           </button>
           <button
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background/90 shadow-sm hover:bg-muted"
+            aria-pressed={uiAlign === "right"}
+            className={
+              "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
+              (uiAlign === "right"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border/80 bg-background/90 hover:bg-muted")
+            }
             aria-label="Rechts ausrichten" title="Rechts ausrichten"
-            onClick={() => setAlign("right")}
+            onClick={() => setAlignUI("right")}
           >
             <AlignRight className="h-4 w-4" />
           </button>
@@ -1164,12 +1229,19 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             min="0.8"
             max="2"
             step="0.02"
-            onChange={(e) => {
-              const v = parseFloat(e.currentTarget.value);
-              if (!Number.isFinite(v)) return;
-              applyToActive(l => ({ ...l, lineHeight: v }));
-            }}
+            onChange={handleLineHeightChange}
             className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
+          />
+        </div>
+
+        {/* Kontur-Schalter */}
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-muted-foreground">Kontur an</label>
+          <input
+            type="checkbox"
+            checked={uiOutlineOn}
+            onChange={handleToggleOutlineOn}
+            className="h-4 w-4 accent-primary"
           />
         </div>
 
@@ -1181,12 +1253,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             min="0"
             max="12"
             step="0.5"
-            onChange={(e) => {
-              const v = parseFloat(e.currentTarget.value);
-              if (!Number.isFinite(v)) return;
-              applyToActive(l => ({ ...l, outlineEnabled: v > 0, outlineWidth: v }));
-            }}
-            className="h-1.5 w-32 accent-primary"
+            onChange={handleOutlineWidthChange}
+            disabled={!uiOutlineOn}
+            className="h-1.5 w-32 accent-primary disabled:opacity-40"
           />
         </div>
 
@@ -1206,7 +1275,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           <input
             type="color"
             onChange={(e) => setOutlineColor(e.currentTarget.value)}
-            className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
+            disabled={!uiOutlineOn}
+            className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5 disabled:opacity-40"
           />
         </div>
 
