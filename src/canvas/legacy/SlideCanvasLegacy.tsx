@@ -429,8 +429,17 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const parent = wrapRef.current?.parentElement;
       if (!parent) return;
       const containerWidth = parent.clientWidth;
-      const w = Math.max(420, Math.min(containerWidth - 8, 540));
-      setPreviewSize({ w, h: Math.round(w * (H / W)) });
+      // Grundbreite begrenzen
+      let w = Math.max(420, Math.min(containerWidth - 8, 540));
+      let h = Math.round(w * (H / W));
+      // Zusätzlich: nie höher als 72% der Fensterhöhe
+      const MAX_VH = 0.76;
+      const maxH = Math.floor(window.innerHeight * MAX_VH);
+      if (h > maxH) {
+        h = maxH;
+        w = Math.round(h * (W / H)); // Seitenverhältnis 9:16 beibehalten
+      }
+      setPreviewSize({ w, h });
     }
     fit();
     window.addEventListener("resize", fit);
