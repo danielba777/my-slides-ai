@@ -52,6 +52,7 @@ export function SlideContainer({
     attributes,
     listeners,
     setNodeRef,
+    setActivatorNodeRef,
     transform,
     transition,
     isDragging,
@@ -114,46 +115,49 @@ export function SlideContainer({
         )}
       >
         {!isPresenting && (
-          <div className="absolute left-4 top-2 z-[100] flex opacity-0 transition-opacity duration-200 group-hover/card-container:opacity-100">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="!size-8 cursor-grab rounded-full"
-              {...listeners}
-            >
-              <GripVertical className="h-4 w-4" />
-            </Button>
+          <div className="absolute left-4 top-4 z-[100] opacity-0 transition-opacity duration-200 group-hover/card-container:opacity-100">
+            <div className="flex items-center gap-1 rounded-full border border-border/60 bg-background/95 px-2 py-1 shadow-lg backdrop-blur">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 cursor-grab rounded-full border border-border/70 text-muted-foreground hover:text-foreground"
+                ref={setActivatorNodeRef}
+                {...listeners}
+              >
+                <GripVertical className="h-4 w-4" />
+              </Button>
 
-            <SlideEditPopover index={index} />
+              <SlideEditPopover index={index} />
 
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="!size-8 rounded-full shadow-sm hover:text-destructive"
-                >
-                  <Trash className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Slide</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete slide {index + 1}? This
-                    action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction asChild>
-                    <Button variant="destructive" onClick={deleteSlide}>
-                      Delete
-                    </Button>
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-full border border-border/70 text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Slide</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete slide {index + 1}? This
+                      action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction asChild>
+                      <Button variant="destructive" onClick={deleteSlide}>
+                        Delete
+                      </Button>
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         )}
 
@@ -163,9 +167,9 @@ export function SlideContainer({
       {!isPresenting && !isReadOnly && (
         <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-200 group-hover/card-container:opacity-100">
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-full bg-background shadow-md"
+            className="h-9 w-9 rounded-full border border-border/70 bg-background/95 text-muted-foreground shadow-lg backdrop-blur hover:text-foreground"
             onClick={() => addSlide("before", index)}
           >
             <Plus className="h-4 w-4" />
@@ -176,9 +180,9 @@ export function SlideContainer({
       {!isPresenting && !isReadOnly && (
         <div className="absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2 opacity-0 transition-opacity duration-200 group-hover/card-container:opacity-100">
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-full bg-background shadow-md"
+            className="h-9 w-9 rounded-full border border-border/70 bg-background/95 text-muted-foreground shadow-lg backdrop-blur hover:text-foreground"
             onClick={() => addSlide("after", index)}
           >
             <Plus className="h-4 w-4" />

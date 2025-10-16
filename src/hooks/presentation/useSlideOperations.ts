@@ -1,6 +1,7 @@
 "use client";
 
 import { type PlateSlide } from "@/components/presentation/utils/parser";
+import { DEFAULT_CANVAS } from "@/canvas/types";
 import { usePresentationState } from "@/states/presentation-state";
 import { nanoid } from "nanoid";
 
@@ -12,6 +13,23 @@ export function useSlideOperations() {
     (s) => s.setCurrentSlideIndex,
   );
 
+  const createDefaultCanvasDoc = () => ({
+    ...DEFAULT_CANVAS,
+    nodes: [
+      {
+        id: nanoid(),
+        type: "text",
+        x: 160,
+        y: 180,
+        text: "Neuer Text",
+        fontFamily: "Inter",
+        fontSize: 72,
+        fill: "#111",
+      },
+    ],
+    selection: [],
+  });
+
   const addSlide = (position: InsertPosition, index: number) => {
     const newSlide: PlateSlide = {
       content: [
@@ -22,6 +40,7 @@ export function useSlideOperations() {
       ],
       id: nanoid(),
       alignment: "center",
+      canvas: createDefaultCanvasDoc(),
     };
     const { slides } = usePresentationState.getState();
     const updatedSlides = [...slides];
