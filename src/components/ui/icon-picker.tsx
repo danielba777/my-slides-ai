@@ -234,11 +234,6 @@ const IconPicker = ({
           iconModule = mod as unknown as IconModule;
           break;
         }
-        case "io": {
-          const mod = await import("react-icons/io");
-          iconModule = mod as unknown as IconModule;
-          break;
-        }
         case "md": {
           const mod = await import("react-icons/md");
           iconModule = mod as unknown as IconModule;
