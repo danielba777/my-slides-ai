@@ -35,39 +35,36 @@ export function LegacyEditorToolbar({
   return (
     <div
       className={cn(
-        // kompakt & mittig – keine unnötige Breite
-        "mx-auto w-auto",
+        // mittig & auf sinnvolle Breite begrenzt
+        "mx-auto w-full max-w-[960px]",
         className,
       )}
     >
       <div
         className={cn(
-          // rechte Spalte nicht strecken: nur so breit wie Inhalt
-          "grid grid-cols-[auto,auto] items-center justify-center gap-3 rounded-2xl border border-border/80",
-          "bg-background/95 p-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80",
+          // Desktop: eine Zeile; Mobile: darf umbrechen
+          "flex md:flex-nowrap flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border/80",
+          "bg-background/95 p-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80 w-full min-w-0",
         )}
       >
-        {/* Linke Spalte: „Text +“ */}
-        <div className="pl-1">
-          <button
-            type="button"
-            onClick={handleAdd}
-            className={cn(
-              // wie im Side-Menü: klare Fläche, Primary-Kontrast
-              "inline-flex h-9 items-center justify-center rounded-xl px-3 text-sm font-medium",
-              "bg-primary text-primary-foreground hover:opacity-90 transition",
-              "focus-visible:outline-none focus-visible:ring-0",
-            )}
-            aria-label="Text hinzufügen"
-            title="Text hinzufügen"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Text
-          </button>
-        </div>
+        {/* „Text +“ ganz links in derselben oberen Zeile */}
+        <button
+          type="button"
+          onClick={handleAdd}
+          className={cn(
+            "inline-flex h-9 items-center justify-center rounded-xl px-3 text-sm font-medium shrink-0",
+            "bg-primary text-primary-foreground hover:opacity-90 transition",
+            "focus-visible:outline-none focus-visible:ring-0",
+          )}
+          aria-label="Text hinzufügen"
+          title="Text hinzufügen"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Text
+        </button>
 
-        {/* Rechte Spalte: Controls zentriert, keine Restbreite */}
-        <div className={cn("flex flex-wrap items-center justify-center gap-2")}>
+        {/* Controls */}
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           {children}
         </div>
       </div>

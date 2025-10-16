@@ -1,11 +1,13 @@
 // apps/dashboard/src/app/(components)/SlideCanvas.tsx
 "use client";
 
+import LegacyEditorToolbar from "@/canvas/LegacyEditorToolbar";
 import {
   computeAutoHeight as computeAutoHeightFromUtil,
   measureWrappedText,
 } from "@/lib/textMetrics";
 import type { SlideTextElement } from "@/lib/types";
+import { AlignCenter, AlignLeft, AlignRight } from "lucide-react";
 import React, {
   forwardRef,
   useCallback,
@@ -15,8 +17,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { GripVertical, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
-import LegacyEditorToolbar from "@/canvas/LegacyEditorToolbar";
 
 type TextLayer = {
   id: string;
@@ -284,35 +284,39 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const applyToActive = (updater: (l: TextLayer) => TextLayer) => {
     const id = getActiveId();
     if (!id) return;
-    setTextLayers(prev => prev.map(l => (l.id === id ? updater(l) : l)));
+    setTextLayers((prev) => prev.map((l) => (l.id === id ? updater(l) : l)));
   };
 
   const toggleBold = () => {
-    applyToActive(l => ({ ...l, weight: l.weight === "bold" ? "regular" : "bold" }));
+    applyToActive((l) => ({
+      ...l,
+      weight: l.weight === "bold" ? "regular" : "bold",
+    }));
   };
   const toggleItalic = () => {
-    applyToActive(l => ({ ...l, italic: !(l as any).italic }));
+    applyToActive((l) => ({ ...l, italic: !(l as any).italic }));
   };
   const setAlign = (align: "left" | "center" | "right") => {
-    applyToActive(l => ({ ...l, align }));
+    applyToActive((l) => ({ ...l, align }));
   };
   // Wir koppeln Schriftgröße an scale → BASE_FONT_PX \* scale
   const setFontScale = (scale: number) => {
     const s = Math.max(0.2, Math.min(4, Number.isFinite(scale) ? scale : 1));
-    applyToActive(l => ({ ...l, scale: s }));
+    applyToActive((l) => ({ ...l, scale: s }));
   };
   const setTextColor = (color: string) => {
-    applyToActive(l => ({ ...l, color }));
+    applyToActive((l) => ({ ...l, color }));
   };
   const setOutlineColor = (color: string) => {
-    applyToActive(l => ({ ...l, outlineEnabled: true, outlineColor: color }));
+    applyToActive((l) => ({ ...l, outlineEnabled: true, outlineColor: color }));
   };
 
   // === Text hinzufügen ===
   const addNewTextLayer = () => {
-    const id = (typeof crypto !== "undefined" && crypto.randomUUID)
-      ? crypto.randomUUID()
-      : `txt-${Date.now()}`;
+    const id =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `txt-${Date.now()}`;
     const centerX = W / 2;
     const centerY = H / 2;
     const initial: TextLayer & { autoHeight?: boolean } = {
@@ -336,7 +340,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     };
     const lines = computeWrappedLinesWithDOM(initial);
     initial.height = Math.ceil(computeAutoHeightForLayer(initial, lines));
-    setTextLayers(prev => [...prev, initial]);
+    setTextLayers((prev) => [...prev, initial]);
     setActiveLayerId(id);
     setIsEditing(id);
     // Cursor zurück in den Editor
@@ -345,11 +349,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
   // Reagiert auf globales "Text +"
   useEffect(() => {
-  const handler = () => {
+    const handler = () => {
       addNewTextLayer();
-       };
-       window.addEventListener("canvas:add-text", handler);
-       return () => window.removeEventListener("canvas:add-text", handler);
+    };
+    window.addEventListener("canvas:add-text", handler);
+    return () => window.removeEventListener("canvas:add-text", handler);
   }, []);
 
   // BG pan/zoom state (Canvas-Einheiten)
@@ -1095,9 +1099,18 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const [uiTextColor, setUiTextColor] = useState<string>("#ffffff");
   const [uiOutlineColor, setUiOutlineColor] = useState<string>("#000000");
 
-  const toggleBoldUI = () => { setUiBold(v => !v); toggleBold(); };
-  const toggleItalicUI = () => { setUiItalic(v => !v); toggleItalic(); };
-  const setAlignUI = (a: "left" | "center" | "right") => { setUiAlign(a); setAlign(a); };
+  const toggleBoldUI = () => {
+    setUiBold((v) => !v);
+    toggleBold();
+  };
+  const toggleItalicUI = () => {
+    setUiItalic((v) => !v);
+    toggleItalic();
+  };
+  const setAlignUI = (a: "left" | "center" | "right") => {
+    setUiAlign(a);
+    setAlign(a);
+  };
 
   const handleToggleOutlineOn = (e: React.ChangeEvent<HTMLInputElement>) => {
     const on = e.currentTarget.checked;
@@ -1106,7 +1119,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       ...l,
       outlineEnabled: on,
       // Falls eingeschaltet aber Breite 0, kleinen Default setzen:
-      outlineWidth: on ? (l.outlineWidth && l.outlineWidth > 0 ? l.outlineWidth : 4) : 0,
+      outlineWidth: on
+        ? l.outlineWidth && l.outlineWidth > 0
+          ? l.outlineWidth
+          : 4
+        : 0,
     }));
   };
 
@@ -1120,12 +1137,25 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     setUiAlign(active.align ?? "left");
     setUiScale(Number.isFinite(active.scale) ? active.scale : 1);
     setUiLineHeight(active.lineHeight ?? 1.12);
-    const outlineEnabled = (active as any).outlineEnabled ?? ((active as any).outlineWidth ?? 0) > 0;
+    const outlineEnabled =
+      (active as any).outlineEnabled ?? ((active as any).outlineWidth ?? 0) > 0;
     setUiOutlineOn(!!outlineEnabled);
     setUiOutlineWidth((active as any).outlineWidth ?? 0);
     setUiTextColor((active as any).color ?? "#ffffff");
     setUiOutlineColor((active as any).outlineColor ?? "#000000");
-  }, [active?.id, active?.weight, (active as any)?.italic, active?.align, active?.scale, active?.lineHeight, (active as any)?.outlineEnabled, (active as any)?.outlineWidth, (active as any)?.color, (active as any)?.outlineColor, textLayers]);
+  }, [
+    active?.id,
+    active?.weight,
+    (active as any)?.italic,
+    active?.align,
+    active?.scale,
+    active?.lineHeight,
+    (active as any)?.outlineEnabled,
+    (active as any)?.outlineWidth,
+    (active as any)?.color,
+    (active as any)?.outlineColor,
+    textLayers,
+  ]);
 
   // Änderungen aus Inputs -> Layer + UI-State spiegeln
   const handleScaleChange = (value: number) => {
@@ -1138,193 +1168,203 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     const v = parseFloat(e.currentTarget.value);
     if (!Number.isFinite(v)) return;
     setUiLineHeight(v);
-    applyToActive(l => ({ ...l, lineHeight: v }));
+    applyToActive((l) => ({ ...l, lineHeight: v }));
   };
   const handleOutlineWidthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = parseFloat(e.currentTarget.value);
     if (!Number.isFinite(v)) return;
     setUiOutlineWidth(v);
-    applyToActive(l => ({ ...l, outlineEnabled: v > 0, outlineWidth: v }));
+    applyToActive((l) => ({ ...l, outlineEnabled: v > 0, outlineWidth: v }));
   };
   // UI-Handler klar benennen, um Namenskollisionen mit den Canvas-Actions zu vermeiden
   const setTextColorUI = (color: string) => {
     setUiTextColor(color);
-    applyToActive(l => ({ ...(l as any), color }));
+    applyToActive((l) => ({ ...(l as any), color }));
   };
   const setOutlineColorUI = (color: string) => {
     setUiOutlineColor(color);
-    applyToActive(l => ({ ...(l as any), outlineEnabled: true, outlineColor: color }));
+    applyToActive((l) => ({
+      ...(l as any),
+      outlineEnabled: true,
+      outlineColor: color,
+    }));
   };
 
   return (
     <>
       {/* Obere Toolbar (immer sichtbar) */}
-      <div
-        className="sticky top-0 z-50 w-full bg-transparent flex justify-center"
-      >
+      <div className="sticky mb-2 top-0 z-50 w-full bg-transparent flex justify-center">
         {/* Die Toolbar-Box selbst: auto-breit, mittig */}
         <LegacyEditorToolbar
           onAddText={handleAddText}
-          className="py-1 px-2 inline-flex w-fit max-w-full items-center justify-center gap-2 rounded-2xl border border-border/80 bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/70 flex-wrap mx-auto"
+          className="py-1 px-2 mx-auto w-full max-w-[960px] flex justify-center"
         >
+          {/* === BEGIN: LEGACY CONTROLS (NEU ANGERICHTET) === */}
 
-        {/* === BEGIN: LEGACY CONTROLS (NEU ANGERICHTET) === */}
+          {/* --- ZEILE 1: Typo & Ausrichtung & Größe --- */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleBoldUI}
+              aria-pressed={uiBold}
+              className={
+                "inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-medium shadow-sm transition-colors " +
+                (uiBold
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border/80 bg-background/90 hover:bg-muted")
+              }
+              aria-label="Fett"
+              title="Fett"
+            >
+              B
+            </button>
+            <button
+              onClick={toggleItalicUI}
+              aria-pressed={uiItalic}
+              className={
+                "inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-medium shadow-sm transition-colors " +
+                (uiItalic
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border/80 bg-background/90 hover:bg-muted")
+              }
+              aria-label="Kursiv"
+              title="Kursiv"
+            >
+              <span className="italic">I</span>
+            </button>
+          </div>
 
-        {/* --- ZEILE 1: Typo & Ausrichtung & Größe --- */}
-        <div className="flex items-center gap-2">
-           <button
-             onClick={toggleBoldUI}
-             aria-pressed={uiBold}
-             className={
-               "inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-medium shadow-sm transition-colors " +
-               (uiBold
-                 ? "border-primary bg-primary text-primary-foreground"
-                 : "border-border/80 bg-background/90 hover:bg-muted")
-             }
-             aria-label="Fett"
-             title="Fett"
-           >B</button>
-           <button
-             onClick={toggleItalicUI}
-             aria-pressed={uiItalic}
-             className={
-               "inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-medium shadow-sm transition-colors " +
-               (uiItalic
-                 ? "border-primary bg-primary text-primary-foreground"
-                 : "border-border/80 bg-background/90 hover:bg-muted")
-             }
-               aria-label="Kursiv"
-               title="Kursiv"
-             >
-               <span className="italic">I</span>
-             </button>
-         </div>
+          {/* Ausrichtung mit "mehrzeiligen" Icons */}
+          <div className="flex items-center gap-2" aria-label="Textausrichtung">
+            <button
+              aria-pressed={uiAlign === "left"}
+              className={
+                "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
+                (uiAlign === "left"
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border/80 bg-background/90 hover:bg-muted")
+              }
+              aria-label="Links ausrichten"
+              title="Links ausrichten"
+              onClick={() => setAlignUI("left")}
+            >
+              <AlignLeft className="h-4 w-4" />
+            </button>
+            <button
+              aria-pressed={uiAlign === "center"}
+              className={
+                "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
+                (uiAlign === "center"
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border/80 bg-background/90 hover:bg-muted")
+              }
+              aria-label="Zentrieren"
+              title="Zentrieren"
+              onClick={() => setAlignUI("center")}
+            >
+              <AlignCenter className="h-4 w-4" />
+            </button>
+            <button
+              aria-pressed={uiAlign === "right"}
+              className={
+                "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
+                (uiAlign === "right"
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border/80 bg-background/90 hover:bg-muted")
+              }
+              aria-label="Rechts ausrichten"
+              title="Rechts ausrichten"
+              onClick={() => setAlignUI("right")}
+            >
+              <AlignRight className="h-4 w-4" />
+            </button>
+          </div>
 
-        {/* Ausrichtung mit "mehrzeiligen" Icons */}
-        <div className="flex items-center gap-2" aria-label="Textausrichtung">
-          <button
-            aria-pressed={uiAlign === "left"}
-            className={
-              "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
-              (uiAlign === "left"
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border/80 bg-background/90 hover:bg-muted")
-            }
-            aria-label="Links ausrichten" title="Links ausrichten"
-            onClick={() => setAlignUI("left")}
-          >
-            <AlignLeft className="h-4 w-4" />
-          </button>
-          <button
-            aria-pressed={uiAlign === "center"}
-            className={
-              "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
-              (uiAlign === "center"
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border/80 bg-background/90 hover:bg-muted")
-            }
-            aria-label="Zentrieren" title="Zentrieren"
-            onClick={() => setAlignUI("center")}
-          >
-            <AlignCenter className="h-4 w-4" />
-          </button>
-          <button
-            aria-pressed={uiAlign === "right"}
-            className={
-              "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
-              (uiAlign === "right"
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border/80 bg-background/90 hover:bg-muted")
-            }
-            aria-label="Rechts ausrichten" title="Rechts ausrichten"
-            onClick={() => setAlignUI("right")}
-          >
-            <AlignRight className="h-4 w-4" />
-          </button>
-        </div>
+          {/* Größe × (Scale) */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-muted-foreground">Größe ×</label>
+            <input
+              type="number"
+              step="0.05"
+              min="0.2"
+              max="4"
+              value={uiScale}
+              onChange={(e) =>
+                handleScaleChange(parseFloat(e.currentTarget.value))
+              }
+              className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
+            />
+          </div>
 
-        {/* Größe × (Scale) */}
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-muted-foreground">Größe ×</label>
-          <input
-            type="number"
-            step="0.05"
-            min="0.2"
-            max="4"
-            value={uiScale}
-            onChange={(e) => handleScaleChange(parseFloat(e.currentTarget.value))}
-            className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
-          />
-        </div>
+          {/* Zeilenumbruch zu Zeile 2 */}
+          <div className="basis-full h-0" />
 
-        {/* Zeilenumbruch zu Zeile 2 */}
-        <div className="basis-full h-0" />
+          {/* --- ZEILE 2: Abstände & Farben --- */}
+          {/* Zeilenhöhe (Input) */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-muted-foreground">Zeilenhöhe</label>
+            <input
+              type="number"
+              min="0.8"
+              max="2"
+              step="0.02"
+              value={uiLineHeight}
+              onChange={handleLineHeightChange}
+              className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
+            />
+          </div>
 
-        {/* --- ZEILE 2: Abstände & Farben --- */}
-        {/* Zeilenhöhe (Input) */}
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-muted-foreground">Zeilenhöhe</label>
-          <input
-            type="number"
-            min="0.8"
-            max="2"
-            step="0.02"
-            value={uiLineHeight}
-            onChange={handleLineHeightChange}
-            className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
-          />
-        </div>
+          {/* Kontur-Schalter */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-muted-foreground">Kontur an</label>
+            <input
+              type="checkbox"
+              checked={uiOutlineOn}
+              onChange={handleToggleOutlineOn}
+              className="h-4 w-4 accent-primary"
+            />
+          </div>
 
-        {/* Kontur-Schalter */}
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-muted-foreground">Kontur an</label>
-          <input
-            type="checkbox"
-            checked={uiOutlineOn}
-            onChange={handleToggleOutlineOn}
-            className="h-4 w-4 accent-primary"
-          />
-        </div>
+          {/* Konturbreite (Slider) */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-muted-foreground">
+              Konturbreite
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="12"
+              step="0.5"
+              value={uiOutlineWidth}
+              onChange={handleOutlineWidthChange}
+              disabled={!uiOutlineOn}
+              className="h-1.5 w-32 accent-primary disabled:opacity-40"
+            />
+          </div>
 
-        {/* Konturbreite (Slider) */}
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-muted-foreground">Konturbreite</label>
-          <input
-            type="range"
-            min="0"
-            max="12"
-            step="0.5"
-            value={uiOutlineWidth}
-            onChange={handleOutlineWidthChange}
-            disabled={!uiOutlineOn}
-            className="h-1.5 w-32 accent-primary disabled:opacity-40"
-          />
-        </div>
+          {/* Textfarbe */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-muted-foreground">Text</label>
+            <input
+              type="color"
+              value={uiTextColor}
+              onChange={(e) => setTextColorUI(e.currentTarget.value)}
+              className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
+            />
+          </div>
 
-        {/* Textfarbe */}
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-muted-foreground">Text</label>
-          <input
-            type="color"
-            value={uiTextColor}
-            onChange={(e) => setTextColorUI(e.currentTarget.value)}
-            className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
-          />
-        </div>
+          {/* Konturfarbe */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-muted-foreground">Kontur</label>
+            <input
+              type="color"
+              value={uiOutlineColor}
+              onChange={(e) => setOutlineColorUI(e.currentTarget.value)}
+              disabled={!uiOutlineOn}
+              className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5 disabled:opacity-40"
+            />
+          </div>
 
-        {/* Konturfarbe */}
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-muted-foreground">Kontur</label>
-          <input
-            type="color"
-            value={uiOutlineColor}
-            onChange={(e) => setOutlineColorUI(e.currentTarget.value)}
-            disabled={!uiOutlineOn}
-            className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5 disabled:opacity-40"
-          />
-        </div>
-
-        {/* === END: LEGACY CONTROLS === */}
+          {/* === END: LEGACY CONTROLS === */}
         </LegacyEditorToolbar>
       </div>
 
@@ -1363,11 +1403,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               style={{
                 transform: `translate(-50%,-50%) translate(${offset.x}px, ${offset.y}px) scale(${Math.max(
                   0.001,
-                  scale
+                  scale,
                 )})`,
                 transformOrigin: "center",
               }}
-              draggable={false} />
+              draggable={false}
+            />
           ) : (
             <div className="absolute inset-0 bg-black" />
           )}
@@ -1375,11 +1416,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           {textLayers.map((layer) => {
             const isActive = activeLayerId === layer.id;
             const isCurrentEditing = isEditing === layer.id;
-            const cssFontWeight = layer.weight === "bold"
-              ? 700
-              : layer.weight === "semibold"
-                ? 600
-                : 400;
+            const cssFontWeight =
+              layer.weight === "bold"
+                ? 700
+                : layer.weight === "semibold"
+                  ? 600
+                  : 400;
 
             return (
               <div key={layer.id}>
@@ -1406,7 +1448,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                     // Im Editor-Modus keine Pointer-Blockade → Mausplatzierung/Markieren funktioniert
                     if (isCurrentEditing) return;
                     selectLayer(layer.id, e);
-                  } }
+                  }}
                   onDoubleClick={() => onDoubleClick(layer.id)}
                 >
                   {/* === Edge guide lines that follow the box (inside the same transform) === */}
@@ -1414,16 +1456,20 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                     <>
                       <div
                         className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-blue-400/70"
-                        style={{ transform: "translateY(-0.5px)" }} />
+                        style={{ transform: "translateY(-0.5px)" }}
+                      />
                       <div
                         className="pointer-events-none absolute left-0 right-0 bottom-0 h-px bg-blue-400/70"
-                        style={{ transform: "translateY(0.5px)" }} />
+                        style={{ transform: "translateY(0.5px)" }}
+                      />
                       <div
                         className="pointer-events-none absolute top-0 bottom-0 left-0 w-px bg-blue-400/70"
-                        style={{ transform: "translateX(-0.5px)" }} />
+                        style={{ transform: "translateX(-0.5px)" }}
+                      />
                       <div
                         className="pointer-events-none absolute top-0 bottom-0 right-0 w-px bg-blue-400/70"
-                        style={{ transform: "translateX(0.5px)" }} />
+                        style={{ transform: "translateX(0.5px)" }}
+                      />
                     </>
                   )}
 
@@ -1431,7 +1477,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                     <textarea
                       ref={(el) => {
                         if (isCurrentEditing) editorActiveRef.current = el;
-                      } }
+                      }}
                       autoFocus
                       value={layer.content}
                       onChange={(e) => onTextareaChange(layer.id, e)}
@@ -1458,17 +1504,19 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         boxSizing: "border-box",
                         fontKerning: "normal" as any,
                         /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
-                        textShadow: (layer as any).outlineEnabled &&
+                        textShadow:
+                          (layer as any).outlineEnabled &&
                           ((layer as any).outlineWidth || 0) > 0
-                          ? buildOuterTextShadow(
-                            Math.round(
-                              ((layer as any).outlineWidth || 6) *
-                              layer.scale
-                            ),
-                            (layer as any).outlineColor || "#000"
-                          ) + ", 0 2px 8px rgba(0,0,0,0.8)"
-                          : "0 2px 8px rgba(0,0,0,0.8)",
-                      }} />
+                            ? buildOuterTextShadow(
+                                Math.round(
+                                  ((layer as any).outlineWidth || 6) *
+                                    layer.scale,
+                                ),
+                                (layer as any).outlineColor || "#000",
+                              ) + ", 0 2px 8px rgba(0,0,0,0.8)"
+                            : "0 2px 8px rgba(0,0,0,0.8)",
+                      }}
+                    />
                   ) : (
                     <div
                       className="w-full h-full"
@@ -1487,16 +1535,17 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         boxSizing: "border-box",
                         fontKerning: "normal" as any,
                         /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
-                        textShadow: (layer as any).outlineEnabled &&
+                        textShadow:
+                          (layer as any).outlineEnabled &&
                           ((layer as any).outlineWidth || 0) > 0
-                          ? buildOuterTextShadow(
-                            Math.round(
-                              ((layer as any).outlineWidth || 6) *
-                              layer.scale
-                            ),
-                            (layer as any).outlineColor || "#000"
-                          ) + ", 0 2px 8px rgba(0,0,0,0.8)"
-                          : "0 2px 8px rgba(0,0,0,0.8)",
+                            ? buildOuterTextShadow(
+                                Math.round(
+                                  ((layer as any).outlineWidth || 6) *
+                                    layer.scale,
+                                ),
+                                (layer as any).outlineColor || "#000",
+                              ) + ", 0 2px 8px rgba(0,0,0,0.8)"
+                            : "0 2px 8px rgba(0,0,0,0.8)",
                       }}
                     >
                       {layer.content}
@@ -1515,7 +1564,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Größe (proportional + Text)"
                         className="absolute top-0 left-0 w-5 h-5 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) => startResize(layer.id, "resize-nw", e)}
+                        onPointerDown={(e) =>
+                          startResize(layer.id, "resize-nw", e)
+                        }
                       >
                         <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1524,7 +1575,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Größe (proportional + Text)"
                         className="absolute top-0 right-0 w-5 h-5 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) => startResize(layer.id, "resize-ne", e)}
+                        onPointerDown={(e) =>
+                          startResize(layer.id, "resize-ne", e)
+                        }
                       >
                         <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1533,7 +1586,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Größe (proportional + Text)"
                         className="absolute bottom-0 left-0 w-5 h-5 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) => startResize(layer.id, "resize-sw", e)}
+                        onPointerDown={(e) =>
+                          startResize(layer.id, "resize-sw", e)
+                        }
                       >
                         <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1542,7 +1597,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Größe (proportional + Text)"
                         className="absolute bottom-0 right-0 w-5 h-5 translate-x-1/2 translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) => startResize(layer.id, "resize-se", e)}
+                        onPointerDown={(e) =>
+                          startResize(layer.id, "resize-se", e)
+                        }
                       >
                         <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1553,7 +1610,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Breite (links)"
                         className="absolute left-0 top-1/2 w-5 h-8 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) => startResize(layer.id, "resize-left", e)}
+                        onPointerDown={(e) =>
+                          startResize(layer.id, "resize-left", e)
+                        }
                       >
                         <div className="h-6 w-2 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1562,7 +1621,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Breite (rechts)"
                         className="absolute right-0 top-1/2 w-5 h-8 translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) => startResize(layer.id, "resize-right", e)}
+                        onPointerDown={(e) =>
+                          startResize(layer.id, "resize-right", e)
+                        }
                       >
                         <div className="h-6 w-2 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1571,7 +1632,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Höhe (oben)"
                         className="absolute top-0 left-1/2 w-8 h-5 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) => startResize(layer.id, "resize-top", e)}
+                        onPointerDown={(e) =>
+                          startResize(layer.id, "resize-top", e)
+                        }
                       >
                         <div className="h-2 w-6 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1580,7 +1643,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         title="Höhe (unten)"
                         className="absolute bottom-0 left-1/2 w-8 h-5 -translate-x-1/2 translate-y-1/2 cursor-ns-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
-                        onPointerDown={(e) => startResize(layer.id, "resize-bottom", e)}
+                        onPointerDown={(e) =>
+                          startResize(layer.id, "resize-bottom", e)
+                        }
                       >
                         <div className="h-2 w-6 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
@@ -1598,11 +1663,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             width={W}
             height={H}
             className="h-full w-full block"
-            style={{ display: "none" }} />
+            style={{ display: "none" }}
+          />
         </div>
       </div>
       {/* ^ obere Canvas-Hülle */}
-      </>
+    </>
   );
 });
 
