@@ -20,6 +20,10 @@ const config = {
         protocol: "https",
         hostname: "*.ufs.sh",
       },
+      {
+        protocol: "https",
+        hostname: "placehold.co",
+      },
     ],
   },
 };

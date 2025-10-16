@@ -1,6 +1,6 @@
 "use client";
 import { useTheme } from "next-themes";
-import { IoHomeOutline, IoImagesOutline } from "react-icons/io5";
+import { Home, Images, type LucideIcon } from "lucide-react";
 
 import {
   Sidebar,
@@ -16,20 +16,26 @@ import {
 import { SidebarAccountSection } from "./app-sidebar-account";
 import { AppLogo } from "./logo/AppLogo";
 
-const startItems = [
+interface SidebarItem {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+}
+
+const startItems: SidebarItem[] = [
   {
     title: "Home",
     url: "/dashboard/home",
-    icon: IoHomeOutline,
+    icon: Home,
   },
 ];
 
 // Menu items.
-const playgroundItems = [
+const playgroundItems: SidebarItem[] = [
   {
     title: "Slideshows",
     url: "/dashboard/slideshows",
-    icon: IoImagesOutline,
+    icon: Images,
   },
 ];
 
