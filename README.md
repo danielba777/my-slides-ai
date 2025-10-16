@@ -1,342 +1,104 @@
-# ALLWEONE® AI Presentation Generator
+# My Slides AI
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Next.js](https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Plate JS](https://img.shields.io/badge/Plate.js-3B82F6?logoColor=white)](https://platejs.org)
-
-> ⭐ **Help us reach more developers and grow the ALLWEONE community. Star this repo!**
-
-An open-source, AI-powered presentation generator inspired by Gamma.app that creates beautiful, customizable slides in minutes. This tool is part of the broader ALLWEONE AI platform.
-
-<https://github.com/user-attachments/assets/a21dbd49-75b8-4822-bcec-a75b581d9c60>
-
-## 🔗 Quick Links
-
-- [Live Demo](http://presentation.allweone.com)
-- [Video Tutorial](https://www.youtube.com/watch?v=UUePLJeFqVQ)
-- [Discord Community](https://discord.gg/fsMHMhAHRV)
-- [Contributing Guidelines](CONTRIBUTING.md)
-
-## 📋 Table of Contents
-
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [Getting Started](#-getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [Database Setup](#database-setup)
-- [Usage](#-usage)
-  - [Creating a Presentation](#creating-a-presentation)
-  - [Custom Themes](#custom-themes)
-- [Local Models Guide](#-local-models-guide)
-- [Project Structure](#-project-structure)
-- [Roadmap](#️-roadmap)
-- [Contributing](#-contributing)
-- [License](#-license)
-- [Acknowledgements](#-acknowledgements)
-- [Support](#-support)
-
-## 🌟 Features
-
-### Core Functionality
-
-- **AI-Powered Content Generation**: Create complete presentations on any topic with AI
-- **Customizable Slides**: Choose the number of slides, language, and page style
-- **Editable Outlines**: Review and modify AI-generated outlines before finalizing
-- **Real-Time Generation**: Watch your presentation build live as content is created
-- **Auto-Save**: Everything saves automatically as you work
-
-### Design & Customization
-
-- **Multiple Themes**: 9 built-in themes with more coming soon
-- **Custom Theme Creation**: Create and save your own themes from scratch
-- **Full Editability**: Modify text, fonts, and design elements as needed
-- **Image Generation**: Choose different AI image generation models for your slides
-- **Audience-Focused Styles**: Select between professional and casual presentation styles
-
-### Presentation Tools
-
-- **Presentation Mode**: Present directly from the application
-- **Rich Text Editing**: Powered by Plate Editor for comprehensive text and image handling
-- **Drag and Drop**: Intuitive slide reordering and element manipulation
-
-## 🧰 Tech Stack
-
-| Category           | Technologies               |
-| ------------------ | -------------------------- |
-| **Framework**      | Next.js, React, TypeScript |
-| **Styling**        | Tailwind CSS               |
-| **Database**       | PostgreSQL with Prisma ORM |
-| **AI Integration** | OpenAI API, Together AI    |
-| **Authentication** | NextAuth.js                |
-| **UI Components**  | Radix UI                   |
-| **Text Editor**    | Plate Editor               |
-| **File Uploads**   | UploadThing                |
-| **Drag & Drop**    | DND Kit                    |
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-Before you begin, ensure you have the following installed:
-
-- Node.js 18.x or higher
-- npm, yarn, or pnpm package manager
-- PostgreSQL database
-- Required API keys:
-  - OpenAI API key (for AI generation features)
-  - Together AI API key (for image generation)
-  - Google Client ID and Secret (for authentication)
-
-### Installation
-
-1. **Clone the repository**
-
-   ```bash
-   git clone git@github.com:allweonedev/presentation-ai.git
-   cd presentation-ai
-   ```
-
-2. **Install dependencies**
-
-   ```bash
-   pnpm install
-   ```
-
-3. **Set up environment variables**
-
-   Create a `.env` file in the root directory with the following variables:
-
-   ```env
-   # AI Providers
-   OPENAI_API_KEY=""
-   TOGETHER_AI_API_KEY=""
-
-   # Next Auth Configuration
-   NEXTAUTH_SECRET=""
-   NEXTAUTH_URL="http://localhost:3000"
-
-   # Google OAuth Provider
-   GOOGLE_CLIENT_ID=""
-   GOOGLE_CLIENT_SECRET=""
-
-   # File Upload Service
-   UPLOADTHING_TOKEN=""
-
-   UNSPLASH_ACCESS_KEY=""
-   TAVILY_API_KEY=""
-
-   # PostgreSQL Database
-   DATABASE_URL="postgresql://username:password@localhost:5432/presentation_ai"
-   ```
-
-   > 💡 **Tip**: Copy `.env.example` to `.env` and fill in your actual values.
-
-### Database Setup
-
-1. **Initialize the database**
-
-   ```bash
-   pnpm db:push
-   ```
-
-1. **Start the development server**
-
-   ```bash
-   pnpm dev
-   ```
-
-1. **Open the application**
-
-   Navigate to [http://localhost:3000](http://localhost:3000) in your browser.
-
-## 💻 Usage
-
-### Creating a Presentation
-
-Follow these steps to create your first AI-generated presentation:
-
-1. Login the website
-1. Navigate to the dashboard
-1. Enter your presentation topic
-1. Choose the number of slides (recommended: 5-10)
-1. Select your preferred language
-1. Choose a page style
-1. Toggle web search (if you want)
-1. Click **"Generate Outline"**
-1. Review and edit the AI-generated outline
-1. Select a theme for your presentation
-1. Choose an image source (ai / stock)
-1. Select your presentation style (Professional/Casual)
-1. Click **"Generate Presentation"**
-1. Wait for the AI to create your slides in real-time
-1. Preview, edit, and refine your presentation as needed
-1. Present directly from the app or export your presentation
-
-### Custom Themes
-
-Create personalized themes to match your brand or style:
-
-1. Click **"Create New Theme"**
-2. Start from scratch or derive from an existing theme
-3. Customize colors, fonts, and layout
-4. Save your theme for future use
-
-## 🧠 Local Models Guide
-You can use either Ollama or LM Studio for using local models in ALLWEONE presentation ai. 
-
-### LM Studio
-
-1. Install [LM Studio](https://lmstudio.ai).
-2. In the LM Studio app, turn the Server ON and enable CORS.
-3. Download any model you want to use inside LM Studio.
-
-### Ollama
-
-1. Install [Ollama](https://ollama.com).
-2. Download whichever model you want to use (for example: `ollama pull llama3.1`).
-
-### Using Local Models in the App
-
-1. Open the app and open the text model selector.
-2. Chose the model you want to use (it must be downloaded in lm studio or ollama)
-3. Enjoy the generation
-
-Notes:
-
-- Models will automatically appear in the Model Selector when the LM Studio server or the Ollama daemon is running.
-- Make sure LM Studio has CORS enabled so the browser can connect.
-
-## 📁 Project Structure
-
-```text
-presentation/
-├── .next/                      # Next.js build output
-├── node_modules/               # Dependencies
-├── prisma/                     # Database schema and migrations
-│   └── schema.prisma          # Prisma database model
-├── src/                        # Source code
-│   ├── app/                   # Next.js app router
-│   ├── components/            # Reusable UI components
-│   │   ├── auth/             # Authentication components
-│   │   ├── presentation/     # Presentation-related components
-│   │   │   ├── dashboard/   # Dashboard UI
-│   │   │   ├── editor/      # Presentation editor
-│   │   │   │   ├── custom-elements/   # Custom editor elements
-│   │   │   │   ├── dnd/              # Drag and drop functionality
-│   │   │   │   └── native-elements/  # Native editor elements
-│   │   │   ├── outline/     # Presentation outline components
-│   │   │   ├── theme/       # Theme-related components
-│   │   │   └── utils/       # Presentation utilities
-│   │   ├── prose-mirror/    # ProseMirror editor for outlines
-│   │   ├── plate/           # Text editor components
-│   │   │   ├── hooks/       # Editor hooks
-│   │   │   ├── lib/         # Editor libraries
-│   │   │   ├── ui/          # Plate editor UI components
-│   │   │   ├── utils/       # Functions necessary for platejs
-│   │   │   └── plugins/     # Editor plugins
-│   │   └── ui/              # Shared UI components
-│   ├── hooks/                # Custom React hooks
-│   ├── lib/                  # Utility functions and shared code
-│   ├── provider/             # Context providers
-│   ├── server/               # Server-side code
-│   ├── states/               # State management
-│   ├── styles/               # Styles required in the project
-│   ├── middleware.ts         # Next.js middleware
-│   └── env.js                # Environment configuration
-├── .env                       # Environment variables (not in git)
-├── .env.example              # Example environment variables
-├── next.config.js            # Next.js configuration
-├── package.json              # Project dependencies and scripts
-├── tailwind.config.ts        # Tailwind CSS configuration
-└── tsconfig.json             # TypeScript configuration
-```
-
-## 🗺️ Roadmap
-
-| Feature                      | Status            | Notes                                                                                       |
-| ---------------------------- | ----------------- | ------------------------------------------------------------------------------------------- |
-| Export to PowerPoint (.pptx) | 🟡 Partially Done | Works but the images and other component do not translate one to one                        |
-| Media embedding              | 🟡 Partially Done | Functionality is there, but ui/ux need improvement                                          |
-| Additional built-in themes   | 🟡 In Progress    | Currently have 9 themes, planning to add 15+ more                                           |
-| Mobile responsiveness        | 🟡 In Progress    | Improving layout and interactions for mobile devices                                        |
-| Advanced charts              | 🟡 Started        | Support for AI generated charts                                                             |
-| Write e2e tests              | 🔴 Not Started    | Writing test to check the core features, so that we can catch if any changes break anything |
-| Real-time collaboration      | 🔴 Not Started    | Multiple users editing the same presentation simultaneously                                 |
-| Export to PDF                | 🔴 Not Started    | High priority - allow users to download presentations as PDFs                               |
-| Template library             | 🔴 Not Started    | Pre-built templates for common presentation types (pitch decks, reports, etc.)              |
-| Animation and transitions    | 🔴 Not Started    | Add slide transitions and element animations                                                |
-| Voice-over recording         | 🔴 Not Started    | Record and attach voice narration to slides                                                 |
-| Cloud storage integration    | 🔴 Not Started    | Connect with Google Drive, Dropbox, OneDrive                                                |
-| Presentation analytics       | 🔴 Not Started    | Track views, engagement, and presentation performance                                       |
-| AI presenter notes           | 🔴 Not Started    | Auto-generate speaker notes for each slide                                                  |
-| Custom font uploads          | 🔴 Not Started    | Allow users to upload and use their own fonts                                               |
-| Plugin system                | 🔴 Not Started    | Allow community to build and share extensions
-| API                          | 🔴 Not Started    | Allow developers to use the allweone presentation to generate content in their own applications. 
-
-> 📝 **Note**: This roadmap is subject to change based on community feedback and priorities. Want to contribute to any of these features? Check out our [Contributing Guidelines](CONTRIBUTING.md)!
-
-## 🤝 Contributing
-
-We welcome contributions from the community! Here's how you can help:
-
-### How to Contribute
-
-1. **Fork the repository**
-2. **Create a feature branch**
-
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-
-3. **Commit your changes**
-
-   ```bash
-   git commit -m 'Add some amazing feature'
-   ```
-
-4. **Push to the branch**
-
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-
-5. **Open a Pull Request**
-
-### Contribution Guidelines
-
-- Follow the existing code style and conventions
-- Write clear commit messages
-- Be respectful and constructive in discussions
-
-For more details, please read our [Contributing Guidelines](CONTRIBUTING.md).
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgements
-
-Special thanks to the following projects and organizations:
-
-- [OpenAI](https://openai.com/) for AI generation capabilities
-- [Plate Editor](https://plate.udecode.io/) for rich text editing
-- [Radix UI](https://www.radix-ui.com/) for accessible UI components
-- [Next.js](https://nextjs.org/) for the React framework
-- All our open-source [contributors](https://github.com/allweonedev/presentation-ai/graphs/contributors)
-
-## 💬 Support
-
-Need help or have questions?
-
-- 💬 [Discord Community](https://discord.gg/wSVNudUBdY)
-- 🐛 [Report a Bug](https://github.com/allweonedev/presentation-ai/issues)
-- 💡 [Request a Feature](https://github.com/allweonedev/presentation-ai/issues)
-- 📧 Contact us via GitHub Issues or Discord
+This repository powers the **My Slides AI** application. The most important part of this document is the branching workflow, so that we can collaborate without stepping on each other’s changes.
 
 ---
 
-**Built with ❤️ by the ALLWEONE™ Team**
+## Branch Strategy
 
-**[⭐ Star us on GitHub](https://github.com/allweonedev/presentation-ai)**
+| Branch | Purpose | Who pushes |
+|--------|---------|------------|
+| `main` | Production-ready code. This branch must always be deployable. | **Nobody pushes directly.** Only reviewed PRs are merged. |
+| `daniel` | Daniel’s integration branch. Draft and feature work starts here. | Daniel only. |
+| `artur` | Artur’s integration branch. Draft and feature work starts here. | Artur only. |
+
+Both personal branches are long-lived and track `main`. Any spike branches (feature, bugfix) should branch off your personal branch and merge back into it.
+
+---
+
+## Daily Workflow
+
+1. **Sync `main` locally**
+   ```bash
+   git checkout main
+   git pull origin main
+   ```
+2. **Sync your personal branch (`daniel` or `artur`)**
+   ```bash
+   git checkout <personal-branch>
+   git pull origin <personal-branch>
+   git merge main   # or git rebase main if you prefer a linear history
+   ```
+3. **Create a short-lived feature branch (optional but recommended)**
+   ```bash
+   git checkout -b feature/<topic>
+   ```
+4. **Commit changes frequently**
+   ```bash
+   git add .
+   git commit -m "Describe the change"
+   ```
+5. **Push the feature branch**
+   ```bash
+   git push origin feature/<topic>
+   ```
+6. **Open a Pull Request targeting your personal branch**
+   - Assign yourself as the owner and request review if needed.
+   - Once approved, merge into your personal branch.
+
+7. **When ready to promote work to production**
+   - Open a PR from your personal branch (`daniel` or `artur`) into `main`.
+   - Tag the other teammate for review.
+   - Only merge when CI passes and both agree the code is production-ready.
+
+---
+
+## Keeping Personal Branches Up to Date
+
+- **At least once per day**, merge `main` into your personal branch to minimize divergence.
+- Resolve conflicts locally before pushing.
+- If a change on `main` breaks your work-in-progress, coordinate early so we can fix it quickly.
+
+---
+
+## Pull Request Expectations
+
+1. **Clear description** of what changed and why.
+2. **Testing notes** (commands run, screenshots, etc.).
+3. **No direct pushes to `main`**. Every change must flow through a PR.
+4. **Use squash merge** for feature branches into personal branches to keep history tidy.
+5. **Use merge commits** (not squash) when promoting `daniel`/`artur` into `main` so we preserve the branch structure and deployment history.
+
+---
+
+## Handling Production Hotfixes
+
+1. Branch off `main` (`hotfix/<issue>`).
+2. Fix, test, and open a PR directly into `main`.
+3. After merging, immediately merge `main` back into both `daniel` and `artur` to keep them current.
+
+---
+
+## Local Development Tips
+
+- Install dependencies with `pnpm install`.
+- Common scripts:
+  ```bash
+  pnpm dev    # start Next.js locally
+  pnpm type   # run TypeScript checks
+  pnpm lint   # run lint (if configured)
+  ```
+- Follow the existing ESLint/Prettier setup so that diffs stay clean.
+
+---
+
+## Release Checklist
+
+1. Confirm `main` has the commits you want to release.
+2. Tag the release (optional) – `git tag -a vX.Y.Z -m "Release notes"`.
+3. Deploy using the production pipeline.
+4. Announce the release and archive the associated work items.
+
+---
+
+By sticking to this workflow, we keep `main` stable, ensure both `daniel` and `artur` stay in sync, and make it easy to understand who is responsible for each change. Happy shipping! 👍
