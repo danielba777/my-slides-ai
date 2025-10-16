@@ -1084,11 +1084,16 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     addNewTextLayer();
   }, [textLayers]);
 
-  // --- UI Highlight States (lokal, robust) ---
+  // --- UI-States: werden aus dem aktiven Layer gespiegelt ---
   const [uiBold, setUiBold] = useState(false);
   const [uiItalic, setUiItalic] = useState(false);
   const [uiAlign, setUiAlign] = useState<"left" | "center" | "right">("left");
   const [uiOutlineOn, setUiOutlineOn] = useState(true);
+  const [uiScale, setUiScale] = useState<number>(1);
+  const [uiLineHeight, setUiLineHeight] = useState<number>(1.12);
+  const [uiOutlineWidth, setUiOutlineWidth] = useState<number>(6);
+  const [uiTextColor, setUiTextColor] = useState<string>("#ffffff");
+  const [uiOutlineColor, setUiOutlineColor] = useState<string>("#000000");
 
   const toggleBoldUI = () => { setUiBold(v => !v); toggleBold(); };
   const toggleItalicUI = () => { setUiItalic(v => !v); toggleItalic(); };
@@ -1105,16 +1110,50 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     }));
   };
 
+  // Werte synchronisieren, wenn aktiver Layer wechselt oder verändert wird
+  useEffect(() => {
+    if (!active) return;
+    const isBold = active.weight === "bold";
+    const isItalic = !!(active as any).italic;
+    setUiBold(isBold);
+    setUiItalic(isItalic);
+    setUiAlign(active.align ?? "left");
+    setUiScale(Number.isFinite(active.scale) ? active.scale : 1);
+    setUiLineHeight(active.lineHeight ?? 1.12);
+    const outlineEnabled = (active as any).outlineEnabled ?? ((active as any).outlineWidth ?? 0) > 0;
+    setUiOutlineOn(!!outlineEnabled);
+    setUiOutlineWidth((active as any).outlineWidth ?? 0);
+    setUiTextColor((active as any).color ?? "#ffffff");
+    setUiOutlineColor((active as any).outlineColor ?? "#000000");
+  }, [active?.id, active?.weight, (active as any)?.italic, active?.align, active?.scale, active?.lineHeight, (active as any)?.outlineEnabled, (active as any)?.outlineWidth, (active as any)?.color, (active as any)?.outlineColor, textLayers]);
+
+  // Änderungen aus Inputs -> Layer + UI-State spiegeln
+  const handleScaleChange = (value: number) => {
+    if (!Number.isFinite(value)) return;
+    const s = Math.max(0.2, Math.min(4, value));
+    setUiScale(s);
+    setFontScale(s);
+  };
   const handleLineHeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = parseFloat(e.currentTarget.value);
     if (!Number.isFinite(v)) return;
+    setUiLineHeight(v);
     applyToActive(l => ({ ...l, lineHeight: v }));
   };
-
   const handleOutlineWidthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = parseFloat(e.currentTarget.value);
     if (!Number.isFinite(v)) return;
+    setUiOutlineWidth(v);
     applyToActive(l => ({ ...l, outlineEnabled: v > 0, outlineWidth: v }));
+  };
+  // UI-Handler klar benennen, um Namenskollisionen mit den Canvas-Actions zu vermeiden
+  const setTextColorUI = (color: string) => {
+    setUiTextColor(color);
+    applyToActive(l => ({ ...(l as any), color }));
+  };
+  const setOutlineColorUI = (color: string) => {
+    setUiOutlineColor(color);
+    applyToActive(l => ({ ...(l as any), outlineEnabled: true, outlineColor: color }));
   };
 
   return (
@@ -1126,7 +1165,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         {/* Die Toolbar-Box selbst: auto-breit, mittig */}
         <LegacyEditorToolbar
           onAddText={handleAddText}
-          className="py-1 px-2 inline-flex w-auto max-w-[calc(100vw-16px)] items-center justify-center gap-2 rounded-2xl border border-border/80 bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/70"
+          className="py-1 px-2 inline-flex w-fit max-w-full items-center justify-center gap-2 rounded-2xl border border-border/80 bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/70 flex-wrap mx-auto"
         >
 
         {/* === BEGIN: LEGACY CONTROLS (NEU ANGERICHTET) === */}
@@ -1212,7 +1251,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             step="0.05"
             min="0.2"
             max="4"
-            onChange={(e) => setFontScale(parseFloat(e.currentTarget.value))}
+            value={uiScale}
+            onChange={(e) => handleScaleChange(parseFloat(e.currentTarget.value))}
             className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
           />
         </div>
@@ -1229,6 +1269,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             min="0.8"
             max="2"
             step="0.02"
+            value={uiLineHeight}
             onChange={handleLineHeightChange}
             className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
           />
@@ -1253,6 +1294,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             min="0"
             max="12"
             step="0.5"
+            value={uiOutlineWidth}
             onChange={handleOutlineWidthChange}
             disabled={!uiOutlineOn}
             className="h-1.5 w-32 accent-primary disabled:opacity-40"
@@ -1264,7 +1306,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           <label className="text-xs text-muted-foreground">Text</label>
           <input
             type="color"
-            onChange={(e) => setTextColor(e.currentTarget.value)}
+            value={uiTextColor}
+            onChange={(e) => setTextColorUI(e.currentTarget.value)}
             className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
           />
         </div>
@@ -1274,7 +1317,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           <label className="text-xs text-muted-foreground">Kontur</label>
           <input
             type="color"
-            onChange={(e) => setOutlineColor(e.currentTarget.value)}
+            value={uiOutlineColor}
+            onChange={(e) => setOutlineColorUI(e.currentTarget.value)}
             disabled={!uiOutlineOn}
             className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5 disabled:opacity-40"
           />

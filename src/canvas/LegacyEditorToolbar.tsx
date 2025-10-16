@@ -35,14 +35,15 @@ export function LegacyEditorToolbar({
   return (
     <div
       className={cn(
-        "mx-auto w-full max-w-[980px]",
-        // Der Wrapper erhält keine sticky, das macht weiterhin der umgebende Container (Legacy-Datei).
+        // kompakt & mittig – keine unnötige Breite
+        "mx-auto w-auto",
         className,
       )}
     >
       <div
         className={cn(
-          "grid grid-cols-[auto,1fr] items-center gap-3 rounded-2xl border border-border/80",
+          // rechte Spalte nicht strecken: nur so breit wie Inhalt
+          "grid grid-cols-[auto,auto] items-center justify-center gap-3 rounded-2xl border border-border/80",
           "bg-background/95 p-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80",
         )}
       >
@@ -65,8 +66,8 @@ export function LegacyEditorToolbar({
           </button>
         </div>
 
-        {/* Rechte Spalte: alle bisherigen Legacy-Controls (B, I, Ausrichtung, Slider, Farben, …) */}
-        <div className={cn("flex flex-wrap items-center gap-2")}>
+        {/* Rechte Spalte: Controls zentriert, keine Restbreite */}
+        <div className={cn("flex flex-wrap items-center justify-center gap-2")}>
           {children}
         </div>
       </div>
