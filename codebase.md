@@ -402,6 +402,11 @@ const config = {
         protocol: "https",
         hostname: "*.ufs.sh",
       },
+      // Placeholder-Bilder (wird in der Slideshows-Ansicht genutzt)
+      {
+        protocol: "https",
+        hostname: "placehold.co",
+      },
     ],
   },
 };
@@ -3088,7 +3093,11 @@ import {
   updatePresentation,
 } from "@/app/_actions/presentation/presentationActions";
 import { getCustomThemeById } from "@/app/_actions/presentation/theme-actions";
-import type { CanvasDoc } from "@/canvas/types";
+import type { CanvasDoc, CanvasTextNode } from "@/canvas/types";
+import {
+  type PlateNode,
+  type PlateSlide,
+} from "@/components/presentation/utils/parser";
 import { ThinkingDisplay } from "@/components/presentation/dashboard/ThinkingDisplay";
 import { Header } from "@/components/presentation/outline/Header";
 import { OutlineList } from "@/components/presentation/outline/OutlineList";
@@ -3121,7 +3130,7 @@ function makeCanvasFromText(text: string, w = 1080, h = 1920): CanvasDoc {
     bg: "#ffffff",
     nodes: [
       {
-        id: crypto.randomUUID(),
+        id: nanoid(),
         type: "text",
         x: 120,
         y: 160,
@@ -3315,15 +3324,32 @@ export default function PresentationGenerateWithIdPage() {
     // Canvas-only: jedes Outline-Item wird ein Canvas-Slide
     const chosenWidth = 1080; // TODO: aus Preset/Wizard holen
     const chosenHeight = 1920; // TODO: aus Preset/Wizard holen
-    const slides: { id: string; canvas: CanvasDoc }[] = state.outline.map(
-      (item) => {
-        const normalized = item.replace(/^#\s+/, "").trim();
-        return {
-          id: nanoid(),
-          canvas: makeCanvasFromText(normalized, chosenWidth, chosenHeight),
-        };
-      },
-    );
+    const slides: PlateSlide[] = state.outline.map((item) => {
+      const normalized = item.replace(/^#\s+/, "").trim();
+      const canvasDoc = makeCanvasFromText(
+        normalized,
+        chosenWidth,
+        chosenHeight,
+      );
+      const firstTextNode = canvasDoc.nodes.find(
+        (node) => node.type === "text",
+      ) as CanvasTextNode | undefined;
+
+      const paragraph = {
+        type: "p",
+        children: [{ text: normalized }],
+      } as unknown as PlateNode;
+
+      return {
+        id: nanoid(),
+        content: [paragraph],
+        bgColor: canvasDoc.bg ?? undefined,
+        position: firstTextNode
+          ? { x: firstTextNode.x, y: firstTextNode.y }
+          : undefined,
+        canvas: canvasDoc,
+      };
+    });
 
     state.setSlides(slides);
 
@@ -3617,6 +3643,37 @@ This is a binary file of the type: Image
 
 ```tsx
 "use client";
+
+import { useMemo, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  Bold,
+  BringToFront,
+  Camera,
+  Copy,
+  ImagePlus,
+  Italic,
+  Lock,
+  Palette,
+  Plus,
+  SendToBack,
+  Trash2,
+  Unlock,
+  type LucideIcon,
+} from "lucide-react";
 import type { CanvasDoc, CanvasNode } from "./types";
 
 type Props = {
@@ -3631,7 +3688,45 @@ type Props = {
   onBack: () => void;
   onLock: (lock: boolean) => void;
   selected?: CanvasNode;
+  className?: string;
 };
+
+type ToolbarIconButtonProps = {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  active?: boolean;
+};
+
+function ToolbarIconButton({
+  icon: Icon,
+  label,
+  onClick,
+  disabled,
+  active,
+}: ToolbarIconButtonProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "h-9 w-9 rounded-full border border-border bg-background/90 text-muted-foreground shadow-sm transition-colors hover:text-foreground",
+            active && "border-primary/70 bg-primary/10 text-primary",
+          )}
+          onClick={onClick}
+          disabled={disabled}
+        >
+          <Icon className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top">{label}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 export default function CanvasToolbar({
   canvas,
@@ -3645,277 +3740,303 @@ export default function CanvasToolbar({
   onBack,
   onLock,
   selected,
+  className,
 }: Props) {
-  return (
-    <div className="w-72 shrink-0 space-y-3">
-      <div className="rounded-md border p-3 space-y-2">
-        <div className="text-sm font-medium">Canvas</div>
-        <div className="flex items-center gap-2">
-          <label className="text-xs">BG</label>
-          <input
-            type="color"
-            value={canvas.bg ?? "#ffffff"}
-            onChange={(e) => onPatch({ bg: e.target.value })}
-          />
-        </div>
-        <div className="flex gap-2">
-          <button
-            className="rounded border px-2 py-1 text-sm"
-            onClick={onAddText}
-          >
-            Text
-          </button>
-          <label className="rounded border px-2 py-1 text-sm cursor-pointer">
-            Bild
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) onAddImageFile(f);
-              }}
-            />
-          </label>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            className="rounded border px-2 py-1 text-sm"
-            onClick={onDuplicate}
-          >
-            Duplicate
-          </button>
-          <button
-            className="rounded border px-2 py-1 text-sm"
-            onClick={onDelete}
-          >
-            Delete
-          </button>
-          <button
-            className="rounded border px-2 py-1 text-sm"
-            onClick={onFront}
-          >
-            Front
-          </button>
-          <button className="rounded border px-2 py-1 text-sm" onClick={onBack}>
-            Back
-          </button>
-          <button
-            className="rounded border px-2 py-1 text-sm"
-            onClick={() => onLock(true)}
-          >
-            Lock
-          </button>
-          <button
-            className="rounded border px-2 py-1 text-sm"
-            onClick={() => onLock(false)}
-          >
-            Unlock
-          </button>
-        </div>
-        <button
-          className="rounded border px-2 py-1 text-sm"
-          onClick={onSnapshot}
-        >
-          Snapshot speichern
-        </button>
-      </div>
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const colorInputId = useMemo(
+    () => `canvas-bg-${Math.random().toString(36).slice(2, 8)}`,
+    [],
+  );
 
-      {selected && selected.type === "text" && (
-        <div className="rounded-md border p-3 space-y-2">
-          <div className="text-sm font-medium">Text</div>
-          <input
-            className="w-full rounded border px-2 py-1 text-sm"
-            value={selected.text}
-            onChange={(e) =>
-              onPatch({
-                nodes: canvas.nodes.map((n) =>
-                  n.id === selected.id ? { ...n, text: e.target.value } : n,
-                ),
-              })
-            }
+  const selectedIsText = selected?.type === "text";
+
+  const applyToSelected = (updater: (node: CanvasNode) => CanvasNode) => {
+    if (!selected) return;
+    onPatch({
+      nodes: canvas.nodes.map((node) =>
+        node.id === selected.id ? updater(node) : node,
+      ),
+    });
+  };
+
+  const handleTextChange = (value: string) => {
+    applyToSelected((node) => {
+      if (node.type !== "text") return node;
+      return {
+        ...node,
+        text: value,
+        content: value,
+      };
+    });
+  };
+
+  const handleNumberChange = (
+    key: "fontSize" | "width" | "lineHeight" | "letterSpacing",
+    value: number,
+  ) => {
+    applyToSelected((node) => {
+      if (node.type !== "text") return node;
+      return {
+        ...node,
+        [key]: value,
+      };
+    });
+  };
+
+  const handleAlign = (align: "left" | "center" | "right") => {
+    applyToSelected((node) => {
+      if (node.type !== "text") return node;
+      return {
+        ...node,
+        align,
+      };
+    });
+  };
+
+  const toggleFontWeight = (style: "bold" | "italic") => {
+    applyToSelected((node) => {
+      if (node.type !== "text") return node;
+      const current = node.fontStyle ?? "normal";
+      const hasBold = current.includes("bold");
+      const hasItalic = current.includes("italic");
+
+      const nextBold = style === "bold" ? !hasBold : hasBold;
+      const nextItalic = style === "italic" ? !hasItalic : hasItalic;
+
+      let next: "normal" | "bold" | "italic" | "bold italic" = "normal";
+      if (nextBold && nextItalic) next = "bold italic";
+      else if (nextBold) next = "bold";
+      else if (nextItalic) next = "italic";
+
+      return {
+        ...node,
+        fontStyle: next,
+      };
+    });
+  };
+
+  const handleFillChange = (value: string) => {
+    applyToSelected((node) => {
+      if (node.type !== "text") return node;
+      return {
+        ...node,
+        fill: value,
+      };
+    });
+  };
+
+  const triggerImagePicker = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      onAddImageFile(file);
+      event.target.value = "";
+    }
+  };
+
+  return (
+    <TooltipProvider delayDuration={150} skipDelayDuration={0}>
+      <div
+        className={cn(
+          "flex w-[320px] flex-col gap-3 rounded-2xl border border-border/80 bg-background/95 px-4 py-3 shadow-xl backdrop-blur",
+          className,
+        )}
+      >
+        <div className="flex items-center gap-2">
+          <ToolbarIconButton
+            icon={Plus}
+            label="Textfeld hinzufuegen"
+            onClick={onAddText}
           />
-          <div className="flex items-center justify-between gap-2">
-            <label className="text-xs">Font</label>
-            <input
-              className="w-40 rounded border px-2 py-1 text-sm"
-              value={selected.fontFamily ?? ""}
-              onChange={(e) =>
-                onPatch({
-                  nodes: canvas.nodes.map((n) =>
-                    n.id === selected.id
-                      ? { ...n, fontFamily: e.target.value }
-                      : n,
-                  ),
-                })
-              }
-              placeholder="Inter, Roboto, ..."
-            />
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <label className="text-xs">Size</label>
-            <input
-              type="number"
-              className="w-24 rounded border px-2 py-1 text-sm"
-              value={selected.fontSize ?? 64}
-              onChange={(e) =>
-                onPatch({
-                  nodes: canvas.nodes.map((n) =>
-                    n.id === selected.id
-                      ? { ...n, fontSize: Number(e.target.value) }
-                      : n,
-                  ),
-                })
-              }
-            />
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <label className="text-xs">Farbe</label>
-            <input
-              type="color"
-              value={selected.fill ?? "#111111"}
-              onChange={(e) =>
-                onPatch({
-                  nodes: canvas.nodes.map((n) =>
-                    n.id === selected.id ? { ...n, fill: e.target.value } : n,
-                  ),
-                })
-              }
-            />
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <label className="text-xs">Outline</label>
-            <input
-              type="color"
-              value={selected.stroke ?? "#000000"}
-              onChange={(e) =>
-                onPatch({
-                  nodes: canvas.nodes.map((n) =>
-                    n.id === selected.id ? { ...n, stroke: e.target.value } : n,
-                  ),
-                })
-              }
-            />
-            <input
-              type="number"
-              className="w-16 rounded border px-2 py-1 text-sm"
-              value={selected.strokeWidth ?? 0}
-              onChange={(e) =>
-                onPatch({
-                  nodes: canvas.nodes.map((n) =>
-                    n.id === selected.id
-                      ? { ...n, strokeWidth: Number(e.target.value) }
-                      : n,
-                  ),
-                })
-              }
-            />
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <label className="text-xs">Text-BG</label>
-            <input
-              type="color"
-              value={selected.textBg ?? "#ffffff"}
-              onChange={(e) =>
-                onPatch({
-                  nodes: canvas.nodes.map((n) =>
-                    n.id === selected.id ? { ...n, textBg: e.target.value } : n,
-                  ),
-                })
-              }
-            />
-            <button
-              className="rounded border px-2 py-1 text-xs"
-              onClick={() =>
-                onPatch({
-                  nodes: canvas.nodes.map((n) =>
-                    n.id === selected.id ? { ...n, textBg: null } : n,
-                  ),
-                })
-              }
-            >
-              BG aus
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              className="rounded border px-2 py-1 text-xs"
-              onClick={() =>
-                onPatch({
-                  nodes: canvas.nodes.map((n) =>
-                    n.id === selected.id ? { ...n, fontStyle: "bold" } : n,
-                  ),
-                })
-              }
-            >
-              B
-            </button>
-            <button
-              className="rounded border px-2 py-1 text-xs"
-              onClick={() =>
-                onPatch({
-                  nodes: canvas.nodes.map((n) =>
-                    n.id === selected.id ? { ...n, fontStyle: "italic" } : n,
-                  ),
-                })
-              }
-            >
-              I
-            </button>
-            <button
-              className="rounded border px-2 py-1 text-xs"
-              onClick={() =>
-                onPatch({
-                  nodes: canvas.nodes.map((n) =>
-                    n.id === selected.id ? { ...n, align: "left" } : n,
-                  ),
-                })
-              }
-            >
-              ⟸
-            </button>
-            <button
-              className="rounded border px-2 py-1 text-xs"
-              onClick={() =>
-                onPatch({
-                  nodes: canvas.nodes.map((n) =>
-                    n.id === selected.id ? { ...n, align: "center" } : n,
-                  ),
-                })
-              }
-            >
-              ≡
-            </button>
-            <button
-              className="rounded border px-2 py-1 text-xs"
-              onClick={() =>
-                onPatch({
-                  nodes: canvas.nodes.map((n) =>
-                    n.id === selected.id ? { ...n, align: "right" } : n,
-                  ),
-                })
-              }
-            >
-              ⟹
-            </button>
-          </div>
+
           <input
-            className="w-full rounded border px-2 py-1 text-sm"
-            placeholder="https://link..."
-            value={selected.link ?? ""}
-            onChange={(e) =>
-              onPatch({
-                nodes: canvas.nodes.map((n) =>
-                  n.id === selected.id
-                    ? { ...n, link: e.target.value || null }
-                    : n,
-                ),
-              })
-            }
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <ToolbarIconButton
+            icon={ImagePlus}
+            label="Bild einfuegen"
+            onClick={triggerImagePicker}
+          />
+
+          <ToolbarIconButton
+            icon={Copy}
+            label="Auswahl duplizieren"
+            onClick={onDuplicate}
+            disabled={!selected}
+          />
+
+          <ToolbarIconButton
+            icon={Camera}
+            label="Snapshot speichern"
+            onClick={onSnapshot}
+          />
+
+          <ToolbarIconButton
+            icon={Trash2}
+            label="Auswahl entfernen"
+            onClick={onDelete}
+            disabled={!selected}
           />
         </div>
-      )}
-    </div>
+
+        <Separator />
+
+        <div className="flex items-center gap-3">
+          <Label
+            htmlFor={colorInputId}
+            className="text-xs font-medium text-muted-foreground"
+          >
+            Hintergrund
+          </Label>
+          <input
+            id={colorInputId}
+            type="color"
+            className="h-9 w-9 cursor-pointer rounded-full border border-border bg-transparent p-1"
+            value={canvas.bg ?? "#ffffff"}
+            onChange={(event) => onPatch({ bg: event.target.value })}
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <ToolbarIconButton
+            icon={BringToFront}
+            label="In den Vordergrund"
+            onClick={onFront}
+            disabled={!selected}
+          />
+          <ToolbarIconButton
+            icon={SendToBack}
+            label="In den Hintergrund"
+            onClick={onBack}
+            disabled={!selected}
+          />
+          <ToolbarIconButton
+            icon={Lock}
+            label="Auswahl sperren"
+            onClick={() => onLock(true)}
+            disabled={!selected}
+          />
+          <ToolbarIconButton
+            icon={Unlock}
+            label="Auswahl entsperren"
+            onClick={() => onLock(false)}
+            disabled={!selected}
+          />
+        </div>
+
+        {selectedIsText && (
+          <>
+            <Separator />
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-muted-foreground">
+                  Textinhalt
+                </Label>
+                <Input
+                  value={(selected as any).text ?? ""}
+                  onChange={(event) => handleTextChange(event.target.value)}
+                  placeholder="Hier schreiben..."
+                  className="h-9"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Schriftgroesse
+                  </Label>
+                  <Input
+                    type="number"
+                    className="h-9"
+                    value={(selected as any).fontSize ?? 72}
+                    onChange={(event) =>
+                      handleNumberChange("fontSize", Number(event.target.value))
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Breite
+                  </Label>
+                  <Input
+                    type="number"
+                    className="h-9"
+                    value={(selected as any).width ?? 400}
+                    onChange={(event) =>
+                      handleNumberChange("width", Number(event.target.value))
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Zeilenhoehe
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.05"
+                    className="h-9"
+                    value={(selected as any).lineHeight ?? 1.12}
+                    onChange={(event) =>
+                      handleNumberChange("lineHeight", Number(event.target.value))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <ToolbarIconButton
+                  icon={Bold}
+                  label="Fett"
+                  onClick={() => toggleFontWeight("bold")}
+                  active={(selected as any).fontStyle?.includes("bold")}
+                />
+                <ToolbarIconButton
+                  icon={Italic}
+                  label="Kursiv"
+                  onClick={() => toggleFontWeight("italic")}
+                  active={(selected as any).fontStyle?.includes("italic")}
+                />
+                <ToolbarIconButton
+                  icon={AlignLeft}
+                  label="Linksbundig"
+                  onClick={() => handleAlign("left")}
+                  active={(selected as any).align === "left"}
+                />
+                <ToolbarIconButton
+                  icon={AlignCenter}
+                  label="Zentriert"
+                  onClick={() => handleAlign("center")}
+                  active={(selected as any).align === "center"}
+                />
+                <ToolbarIconButton
+                  icon={AlignRight}
+                  label="Rechtsbundig"
+                  onClick={() => handleAlign("right")}
+                  active={(selected as any).align === "right"}
+                />
+
+                <div className="flex items-center gap-2 rounded-full border border-border/80 bg-background/60 px-2 py-1">
+                  <Palette className="h-4 w-4 text-muted-foreground" />
+                  <input
+                    type="color"
+                    className="h-6 w-6 cursor-pointer rounded-full border border-border"
+                    value={(selected as any).fill ?? "#111111"}
+                    onChange={(event) => handleFillChange(event.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }
 
@@ -3925,7 +4046,12 @@ export default function CanvasToolbar({
 
 ```ts
 "use client";
-import { CanvasDoc, CanvasNode } from "./types";
+import {
+  CanvasDoc,
+  CanvasNode,
+  CanvasImageNode,
+  CanvasTextNode,
+} from "./types";
 
 export const withDefaults = (c?: CanvasDoc): CanvasDoc => ({
   version: 1,
@@ -3955,7 +4081,7 @@ export const addText = (c: CanvasDoc, text = "Neuer Text"): CanvasDoc => ({
       padding: 8,
       textBg: null,
       align: "left",
-    } as CanvasNode,
+    } satisfies CanvasTextNode,
   ],
   selection: [],
 });
@@ -3972,7 +4098,7 @@ export const addImage = (c: CanvasDoc, url: string): CanvasDoc => ({
       width: c.width,
       height: c.height,
       url,
-    } as CanvasNode,
+    } satisfies CanvasImageNode,
   ],
   selection: [],
 });
@@ -3983,7 +4109,9 @@ export const updateNode = (
   patch: Partial<CanvasNode>,
 ): CanvasDoc => ({
   ...c,
-  nodes: c.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)),
+  nodes: c.nodes.map((n) =>
+    n.id === id ? ({ ...n, ...patch } as CanvasNode) : n,
+  ),
 });
 
 export const selectOnly = (c: CanvasDoc, ids: string[]): CanvasDoc => ({
@@ -4068,11 +4196,11 @@ export function getSnap(x: number, y: number, grid = 5) {
 // apps/dashboard/src/app/(components)/SlideCanvas.tsx
 "use client";
 
+import type { SlideTextElement } from "@/lib/types";
 import {
   computeAutoHeight as computeAutoHeightFromUtil,
   measureWrappedText,
 } from "@/lib/textMetrics";
-import type { SlideTextElement, TextLayer } from "@/lib/types";
 import React, {
   forwardRef,
   useCallback,
@@ -4082,6 +4210,25 @@ import React, {
   useRef,
   useState,
 } from "react";
+
+type TextLayer = {
+  id: string;
+  content?: string;
+  fontFamily?: string;
+  fontSize?: number;
+  weight: "regular" | "semibold" | "bold";
+  scale: number;
+  lineHeight: number;
+  letterSpacing: number;
+  align: "left" | "center" | "right";
+  x: number;
+  y: number;
+  rotation: number;
+  width: number;
+  height?: number;
+  zIndex: number;
+  color: string;
+};
 
 export type SlideCanvasHandle = {
   getLayout: () => SlideTextElement[];
@@ -4106,7 +4253,7 @@ export const ASPECT_RATIO = 9 / 16;
 function buildOuterTextShadow(px: number, color: string): string {
   const r = Math.max(0, Math.round(px));
   if (r <= 0) return "none";
-  const steps = [];
+  const steps: string[] = [];
   // ring aus Offsets (Manhattan-Kreis + Diagonalen)
   for (let y = -r; y <= r; y++) {
     for (let x = -r; x <= r; x++) {
@@ -4173,7 +4320,7 @@ function computeWrappedLinesWithDOM(
 
   const result = measureWrappedText({
     text: String(layer.content ?? ""),
-    fontFamily: layer.fontFamily,
+    fontFamily: layer.fontFamily ?? "Inter",
     fontWeight: weight,
     fontStyle: (layer as any).italic ? "italic" : "normal",
     fontSizePx: scaledFontPx,
@@ -4203,7 +4350,7 @@ function computeAutoHeightForLayer(
   const lineHeightPx = scaledFontPx * (layerBase.lineHeight ?? 1.12);
   return computeAutoHeightFromUtil({
     text: String(layerBase.content ?? ""),
-    fontFamily: layerBase.fontFamily,
+    fontFamily: layerBase.fontFamily ?? "Inter",
     fontWeight: weight,
     fontStyle: (layerBase as any).italic ? "italic" : "normal",
     fontSizePx: scaledFontPx,
@@ -4226,7 +4373,7 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
   outlineColor?: string;
 })[] {
   return layout.map((el, i) => {
-    const id = `layer-${i}`;
+    const id = el.id ?? `layer-${i}`;
     const tmp: TextLayer & {
       autoHeight?: boolean;
       italic?: boolean;
@@ -4237,11 +4384,11 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
       id,
       x: (el.x ?? 0.5) * W,
       y: (el.y ?? 0.5) * H,
-      width: el.maxWidth ?? 400,
+      width: el.maxWidth ?? el.width ?? 400,
       height: (el as any).maxHeight ?? 0, // 0 = auto
       rotation: el.rotation ?? 0,
       scale: el.scale ?? 1,
-      fontFamily: "Inter, system-ui, sans-serif",
+      fontFamily: el.fontFamily ?? "Inter, system-ui, sans-serif",
       fontSize: BASE_FONT_PX * (el.scale ?? 1),
       lineHeight: el.lineHeight ?? 1.12,
       letterSpacing: el.letterSpacing ?? 0,
@@ -4250,7 +4397,7 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
           ? "bold"
           : el.weight === "semibold"
             ? "semibold"
-            : "normal",
+            : "regular",
       align: el.align ?? "left",
       color: (el as any).color ?? "#ffffff",
       content: el.content ?? "",
@@ -4282,11 +4429,14 @@ function mapLayersToLayout(
   })[],
 ): SlideTextElement[] {
   return textLayers.map((layer) => ({
+    id: layer.id,
     content: layer.content,
+    fontFamily: layer.fontFamily,
     x: layer.x / W,
     y: layer.y / H,
     rotation: layer.rotation,
     scale: layer.scale,
+    width: layer.width,
     maxWidth: layer.width,
     ...(layer.height ? { maxHeight: layer.height } : {}),
     lineHeight: layer.lineHeight,
@@ -4540,8 +4690,31 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     const start = pixelToCanvas(e.clientX, e.clientY);
     const layerStart = structuredClone(
       textLayers.find((l) => l.id === layerId)!,
-    );
-    const aspect = layerStart.width / layerStart.height;
+    ) as TextLayer & {
+      autoHeight?: boolean;
+      italic?: boolean;
+      outlineEnabled?: boolean;
+      outlineWidth?: number;
+      outlineColor?: string;
+    };
+
+    if (!layerStart.height || layerStart.height <= 0) {
+      const lines = computeWrappedLinesWithDOM({
+        ...layerStart,
+        italic: (layerStart as any).italic,
+      });
+      layerStart.height = Math.max(
+        1,
+        Math.ceil(
+          computeAutoHeightForLayer(
+            { ...layerStart, italic: (layerStart as any).italic },
+            lines,
+          ),
+        ),
+      );
+    }
+
+    const aspect = layerStart.width / Math.max(layerStart.height ?? 0, 1);
     interactionStart.current = { start, layerStart, aspect, mode };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
@@ -4615,7 +4788,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
           const measureResult = measureWrappedText({
             text: String(l.content ?? ""),
-            fontFamily: l.fontFamily,
+            fontFamily: l.fontFamily ?? "Inter",
             fontWeight: weight,
             fontStyle: (l as any).italic ? "italic" : "normal",
             fontSizePx: scaledFontPx,
@@ -4826,6 +4999,18 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         layer.weight === "bold" ? 700 : layer.weight === "semibold" ? 600 : 400;
       const scaledFontPx = BASE_FONT_PX * layer.scale;
       const italic = (layer as any).italic;
+      const layerHeight =
+        layer.height && layer.height > 0
+          ? layer.height
+          : Math.max(
+              1,
+              Math.ceil(
+                computeAutoHeightForLayer(
+                  { ...layer, italic: (layer as any).italic },
+                  lines,
+                ),
+              ),
+            );
 
       ctx.save();
       ctx.translate(layer.x, layer.y);
@@ -4833,13 +5018,13 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       // Clip exakt auf die Box inkl. Padding
       const boxLeft = -layer.width / 2;
-      const boxTop = -layer.height / 2;
+      const boxTop = -layerHeight / 2;
       ctx.beginPath();
-      ctx.rect(boxLeft, boxTop, layer.width, layer.height);
+      ctx.rect(boxLeft, boxTop, layer.width, layerHeight);
       ctx.clip();
 
       const contentWidth = Math.max(0, layer.width - 2 * PADDING);
-      const contentHeight = Math.max(0, layer.height - 2 * PADDING);
+      const contentHeight = Math.max(0, layerHeight - 2 * PADDING);
 
       ctx.font = `${italic ? "italic " : ""}${weight} ${scaledFontPx}px ${layer.fontFamily}`;
       (ctx as any).fontKerning = "normal";
@@ -4873,7 +5058,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         // Offscreen in Größe der Textbox (inkl. Padding-Content-Bereich)
         const off = document.createElement("canvas");
         off.width = Math.max(1, Math.ceil(layer.width));
-        off.height = Math.max(1, Math.ceil(layer.height));
+        off.height = Math.max(1, Math.ceil(layerHeight));
         const ox = off.getContext("2d")!;
         ox.font = ctx.font;
         ox.textBaseline = "alphabetic";
@@ -4881,7 +5066,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
         // Lokale Koordinaten (Offscreen-Canvas hat Ursprung an der BOX-Links-/Oberkante)
         const baseLeft = -layer.width / 2;
-        const baseTop = -layer.height / 2;
+        const baseTop = -layerHeight / 2;
         const textW = Math.max(0, layer.width - 2 * PADDING);
         // Start an Contentkante inkl. PADDING ausrichten (wie im Preview)
         let startX = baseLeft + PADDING;
@@ -4896,7 +5081,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         ox.strokeStyle = outlineColor;
         // Canvas-Stroke entspricht außen effektiv ~lineWidth/2.
         // Für Parität zum CSS-Preview (Radius r) setzen wir 2*r:
-        ox.lineWidth = 2 * (outlineWidth * (layer.scale ?? 1));
+        ox.lineWidth = 2 * (outlineWidth * layer.scale);
 
         if (layer.letterSpacing === 0) {
           // ganze Zeile
@@ -4937,7 +5122,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         ox.globalCompositeOperation = "source-over";
 
         // 3) Offscreen auf Main einblenden (an Box-Position)
-        ctx.drawImage(off, -layer.width / 2, -layer.height / 2);
+        ctx.drawImage(off, -layer.width / 2, -layerHeight / 2);
       };
 
       const drawFillLine = (raw: string, yPos: number) => {
@@ -5061,7 +5246,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                   l.id === active.id
                     ? ({
                         ...l,
-                        weight: l.weight === "bold" ? "normal" : "bold",
+                        weight: l.weight === "bold" ? "regular" : "bold",
                       } as any)
                     : l,
                 ),
@@ -5343,7 +5528,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         background: "transparent",
                         color: layer.color,
                         fontSize: `${BASE_FONT_PX}px`,
-                        fontFamily: layer.fontFamily,
+                        fontFamily: layer.fontFamily ?? "Inter",
                         fontWeight: cssFontWeight as any,
                         fontStyle: (layer as any).italic ? "italic" : "normal",
                         lineHeight: layer.lineHeight,
@@ -5354,8 +5539,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         overflowWrap: "normal",
                         boxSizing: "border-box",
                         fontKerning: "normal" as any,
-                        boxSizing: "border-box",
-                        fontKerning: "normal" as any,
                         /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
                         textShadow:
                           (layer as any).outlineEnabled &&
@@ -5363,7 +5546,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                             ? buildOuterTextShadow(
                                 Math.round(
                                   ((layer as any).outlineWidth || 6) *
-                                    (layer.scale ?? 1),
+                                    layer.scale,
                                 ),
                                 (layer as any).outlineColor || "#000",
                               ) + ", 0 2px 8px rgba(0,0,0,0.8)"
@@ -5376,7 +5559,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                       style={{
                         color: layer.color,
                         fontSize: `${BASE_FONT_PX}px`,
-                        fontFamily: layer.fontFamily,
+                        fontFamily: layer.fontFamily ?? "Inter",
                         fontWeight: cssFontWeight,
                         fontStyle: (layer as any).italic ? "italic" : "normal",
                         textAlign: layer.align,
@@ -5385,7 +5568,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         whiteSpace: "pre-wrap",
                         wordBreak: "normal",
                         overflowWrap: "normal",
-                        textShadow: "0 2px 8px rgba(0,0,0,0.8)",
                         boxSizing: "border-box",
                         fontKerning: "normal" as any,
                         /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
@@ -5395,7 +5577,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                             ? buildOuterTextShadow(
                                 Math.round(
                                   ((layer as any).outlineWidth || 6) *
-                                    (layer.scale ?? 1),
+                                    layer.scale,
                                 ),
                                 (layer as any).outlineColor || "#000",
                               ) + ", 0 2px 8px rgba(0,0,0,0.8)"
@@ -5705,35 +5887,35 @@ export default function SlideCanvas({ value, onChange }: Props) {
   const onLock = (lock: boolean) => onChange(lockSelected(canvas, lock));
 
   return (
-    <div className="flex gap-4">
-      <CanvasToolbar
-        canvas={canvas}
-        onPatch={onPatch}
-        onSnapshot={makeSnapshot}
-        onAddText={onAddText}
-        onAddImageFile={onAddImageFile}
-        onDuplicate={onDuplicate}
-        onDelete={onDelete}
-        onFront={onFront}
-        onBack={onBack}
-        onLock={onLock}
-        selected={selectedNode}
-      />
-
+    <div className="relative w-full">
       <div
         ref={wrapperRef}
-        className="relative rounded-md border"
+        className="group/canvas relative rounded-xl border bg-background/40 shadow-sm"
         style={{
           width: "100%",
           height: "95vh", // fix: stabilisiert die Messung
           overflow: "hidden", // keine internen Scrollbars
-          // optional: sorgt dafür, dass bei sehr breiten Screens der Wrapper nicht zu hoch wirkt
+          // optional: sorgt dafuer, dass bei sehr breiten Screens der Wrapper nicht zu hoch wirkt
           // und die Stage mittig steht:
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
+        <CanvasToolbar
+          canvas={canvas}
+          onPatch={onPatch}
+          onSnapshot={makeSnapshot}
+          onAddText={onAddText}
+          onAddImageFile={onAddImageFile}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+          onFront={onFront}
+          onBack={onBack}
+          onLock={onLock}
+          selected={selectedNode}
+          className="absolute left-4 top-4 z-20 pointer-events-none opacity-0 transition-opacity duration-150 group-hover/card-container:pointer-events-auto group-hover/card-container:opacity-100"
+        />
         <Stage
           width={canvas.width}
           height={canvas.height}
@@ -5892,47 +6074,28 @@ export default function SlideCanvas({ value, onChange }: Props) {
 "use client";
 
 import LegacySlideCanvas from "@/canvas/legacy/SlideCanvasLegacy";
+import type { CanvasDoc, CanvasTextNode } from "@/canvas/types";
 import type { SlideTextElement } from "@/lib/types";
 import { useCallback, useMemo } from "react";
 
-// Falls du einen eigenen Typ hast, importiere ihn hier:
-// import type { CanvasDoc } from "@/lib/canvasTypes";
-
-type CanvasDoc = {
-  nodes: Array<
-    | {
-        id?: string;
-        type: "image";
-        url?: string;
-        // optional weitere Felder...
-      }
-    | {
-        id?: string;
-        type: "text";
-        x?: number; // absolute px oder normiert? → wir behandeln beides robust
-        y?: number;
-        width?: number; // px
-        height?: number; // px
-        rotation?: number;
-        fontFamily?: string;
-        fontSize?: number; // px (Basis 72 im Legacy)
-        lineHeight?: number; // z. B. 1.12
-        letterSpacing?: number; // px
-        weight?: "regular" | "semibold" | "bold" | "normal";
-        align?: "left" | "center" | "right";
-        color?: string;
-        italic?: boolean;
-        outlineEnabled?: boolean;
-        outlineWidth?: number;
-        outlineColor?: string;
-        content?: string;
-        zIndex?: number;
-        // Falls normiert gespeichert:
-        nx?: number; // 0..1
-        ny?: number; // 0..1
-        nmaxWidth?: number; // normiert auf W?
-      }
-  >;
+type ExtendedCanvasTextNode = CanvasTextNode & {
+  fontSize?: number;
+  lineHeight?: number;
+  letterSpacing?: number;
+  weight?: "regular" | "semibold" | "bold" | "normal";
+  color?: string;
+  italic?: boolean;
+  outlineEnabled?: boolean;
+  outlineWidth?: number;
+  outlineColor?: string;
+  content?: string;
+  zIndex?: number;
+  width?: number;
+  height?: number;
+  scale?: number;
+  nx?: number;
+  ny?: number;
+  nmaxWidth?: number;
 };
 
 const W = 1080;
@@ -5963,18 +6126,20 @@ type Props = {
 
 export default function SlideCanvasAdapter({ doc, onChange }: Props) {
   const imageUrl = useMemo(() => {
-    const img = doc.nodes.find((n) => (n as any).type === "image") as
-      | any
-      | undefined;
-    return img?.url || "";
+    const img = doc.nodes.find(
+      (n): n is Extract<CanvasDoc["nodes"][number], { type: "image" }> =>
+        n.type === "image",
+    );
+    return img?.url ?? "";
   }, [doc]);
 
   const layout = useMemo<SlideTextElement[]>(() => {
-    const texts = doc.nodes.filter((n) => (n as any).type === "text") as any[];
+    const texts = doc.nodes.filter(
+      (n): n is ExtendedCanvasTextNode => n.type === "text",
+    );
     return texts.map((t, i) => {
       // accept both legacy "text" and newer "content" fields for text nodes
-      const rawContent: string =
-        (t as any).content ?? (t as any).text ?? "";
+      const rawContent: string = t.content ?? t.text ?? "";
       // Positionslogik: nx/ny (normiert) > x/y (px)
       const xPx = normToPxX(t.nx ?? t.x) ?? Math.round(W * 0.5);
       const yPx = normToPxY(t.ny ?? t.y) ?? Math.round(H * 0.5);
@@ -5994,6 +6159,7 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
             : "regular";
 
       return {
+        id: t.id,
         content: rawContent,
         x: xPx / W,
         y: yPx / H,
@@ -6028,46 +6194,49 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
       const newNodes = doc.nodes.map((n) => ({ ...n }));
       let ti = 0;
       for (let i = 0; i < newNodes.length; i++) {
-        const n: any = newNodes[i];
-        if (n.type !== "text") continue;
+        const node = newNodes[i];
+        if (!node || node.type !== "text") continue;
         const src = next[ti++];
         if (!src) break;
 
         const pxX = Math.round((src.x ?? 0.5) * W);
         const pxY = Math.round((src.y ?? 0.5) * H);
 
-        n.x = pxX;
-        n.y = pxY;
-        n.nx = pxToNormX(pxX);
-        n.ny = pxToNormY(pxY);
-        n.rotation = src.rotation ?? 0;
-        n.scale = src.scale ?? 1;
-        n.fontSize = Math.round(BASE_FONT_PX * (src.scale ?? 1));
-        n.width = src.maxWidth ?? n.width ?? 400;
-        n.height = (src as any).maxHeight ?? n.height; // wenn autoHeight, bleibt evtl. undefined
-        n.lineHeight = src.lineHeight ?? 1.12;
-        n.letterSpacing = src.letterSpacing ?? 0;
-        n.zIndex = src.zIndex ?? n.zIndex ?? 0;
-        n.align = src.align ?? "left";
-        n.weight =
+        const target = node as ExtendedCanvasTextNode;
+        target.x = pxX;
+        target.y = pxY;
+        target.nx = pxToNormX(pxX);
+        target.ny = pxToNormY(pxY);
+        target.rotation = src.rotation ?? 0;
+        target.scale = src.scale ?? 1;
+        target.fontSize = Math.round(BASE_FONT_PX * (src.scale ?? 1));
+        target.width = src.maxWidth ?? target.width ?? 400;
+        target.height = (src as any).maxHeight ?? target.height;
+        target.lineHeight = src.lineHeight ?? 1.12;
+        target.letterSpacing = src.letterSpacing ?? 0;
+        target.zIndex = src.zIndex ?? target.zIndex ?? i;
+        target.align = src.align ?? "left";
+        target.weight =
           src.weight === "bold"
             ? "bold"
             : src.weight === "semibold"
               ? "semibold"
               : "regular";
         // write both fields for compatibility across canvas implementations
-        n.content = src.content ?? n.content ?? "";
-        n.text = src.content ?? n.text ?? "";
+        target.content = src.content ?? target.content ?? "";
+        target.text = src.content ?? target.text ?? "";
 
         // Extras
-        if ((src as any).italic !== undefined) n.italic = (src as any).italic;
+        if ((src as any).italic !== undefined)
+          target.italic = (src as any).italic;
         if ((src as any).outlineEnabled !== undefined)
-          n.outlineEnabled = (src as any).outlineEnabled;
+          target.outlineEnabled = (src as any).outlineEnabled;
         if ((src as any).outlineWidth !== undefined)
-          n.outlineWidth = (src as any).outlineWidth;
+          target.outlineWidth = (src as any).outlineWidth;
         if ((src as any).outlineColor !== undefined)
-          n.outlineColor = (src as any).outlineColor;
-        if ((src as any).color !== undefined) n.color = (src as any).color;
+          target.outlineColor = (src as any).outlineColor;
+        if ((src as any).color !== undefined)
+          target.color = (src as any).color;
       }
       onChange({ ...doc, nodes: newNodes });
     },
@@ -26646,6 +26815,242 @@ export const getBlockType = (block: TElement) => {
 
 ```
 
+# src\components\presentation\canvas\SlideCanvas.tsx
+
+```tsx
+import dynamic from "next/dynamic";
+
+const SlideCanvas = dynamic(() => import("./SlideCanvasBase"), {
+  ssr: false,
+});
+
+export default SlideCanvas;
+
+```
+
+# src\components\presentation\canvas\SlideCanvasBase.tsx
+
+```tsx
+"use client";
+
+import type { CanvasDoc, CanvasTextNode } from "@/canvas/types";
+import { usePresentationState } from "@/states/presentation-state";
+import {
+  type PlateNode,
+  type PlateSlide,
+} from "@/components/presentation/utils/parser";
+import { Button } from "@/components/ui/button";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Layer, Rect, Stage, Text, Image as KonvaImage } from "react-konva";
+
+interface SlideCanvasProps {
+  slide: PlateSlide;
+  slideIndex: number;
+  width?: number;
+  height?: number;
+  disableDrag?: boolean;
+  showExportButton?: boolean;
+}
+
+function extractPlainText(nodes: PlateNode[]): string {
+  const lines: string[] = [];
+
+  const traverse = (node: any, depth: number) => {
+    if (!node) return;
+    if (typeof node.text === "string") {
+      lines.push(node.text);
+    }
+    if (Array.isArray(node.children)) {
+      node.children.forEach((child: unknown) => traverse(child, depth + 1));
+      if (node.type === "p" && depth === 0) {
+        lines.push("\n");
+      }
+    }
+  };
+
+  nodes.forEach((node) => traverse(node, 0));
+
+  const text = lines.join("").replace(/\n{2,}/g, "\n").trim();
+  return text.length > 0 ? text : "Your slide text";
+}
+
+function useCanvasImage(src?: string): [HTMLImageElement | null] {
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    if (!src) {
+      setImage(null);
+      return;
+    }
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => setImage(img);
+    img.onerror = () => setImage(null);
+    img.src = src;
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+    };
+  }, [src]);
+
+  return [image];
+}
+
+export default function SlideCanvasBase({
+  slide,
+  slideIndex,
+  width = 600,
+  height = 900,
+  disableDrag = false,
+  showExportButton = true,
+}: SlideCanvasProps) {
+  type ExtendedSlide = PlateSlide & {
+    position?: { x: number; y: number };
+    canvas?: CanvasDoc;
+  };
+  const slideWithExtras = slide as ExtendedSlide;
+
+  const stageRef = useRef<any>(null);
+  const [image] = useCanvasImage(slide.rootImage?.url ?? "");
+
+  const canvasDoc = slideWithExtras.canvas;
+  const activeTextNode = useMemo(() => {
+    if (!canvasDoc) return undefined;
+    return canvasDoc.nodes.find(
+      (node): node is CanvasTextNode => node.type === "text",
+    );
+  }, [canvasDoc]);
+
+  const stageDimensions = useMemo(
+    () => ({
+      width: canvasDoc?.width ?? width,
+      height: canvasDoc?.height ?? height,
+    }),
+    [canvasDoc?.height, canvasDoc?.width, height, width],
+  );
+
+  const defaultPosition = useMemo(
+    () =>
+      activeTextNode
+        ? { x: activeTextNode.x, y: activeTextNode.y }
+        : {
+            x: stageDimensions.width / 2 - 150,
+            y: stageDimensions.height / 2 - 60,
+          },
+    [activeTextNode, stageDimensions.height, stageDimensions.width],
+  );
+
+  const [textPosition, setTextPosition] = useState(
+    slideWithExtras.position ?? defaultPosition,
+  );
+
+  useEffect(() => {
+    setTextPosition(slideWithExtras.position ?? defaultPosition);
+  }, [slideWithExtras.position?.x, slideWithExtras.position?.y, defaultPosition]);
+
+  const textContent = useMemo(() => {
+    if (activeTextNode?.text) {
+      return activeTextNode.text;
+    }
+    return extractPlainText(slide.content ?? []);
+  }, [activeTextNode?.text, slide.content]);
+
+  const handleDragEnd = useCallback(
+    (event: any) => {
+      const next = { x: event.target.x(), y: event.target.y() };
+      setTextPosition(next);
+      const { slides, setSlides } = usePresentationState.getState();
+      setSlides(
+        slides.map((s, index) => {
+          if (index !== slideIndex) return s;
+          const updatedCanvas = s.canvas
+            ? {
+                ...s.canvas,
+                nodes: s.canvas.nodes.map((node) =>
+                  node.type === "text" && node.id === (activeTextNode?.id ?? node.id)
+                    ? { ...node, x: next.x, y: next.y }
+                    : node,
+                ),
+              }
+            : s.canvas;
+          return {
+            ...s,
+            position: next,
+            canvas: updatedCanvas,
+          };
+        }),
+      );
+    },
+    [activeTextNode?.id, slideIndex],
+  );
+
+  const exportToImage = () => {
+    if (!stageRef.current) return;
+    const dataUrl = stageRef.current.toDataURL({ pixelRatio: 2 });
+    const link = document.createElement("a");
+    link.download = `slide-${slideIndex + 1}.png`;
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className="space-y-4">
+      {showExportButton && (
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={exportToImage}>
+            Export PNG
+          </Button>
+        </div>
+      )}
+      <div className="flex w-full justify-center">
+        <Stage
+          ref={stageRef}
+          width={stageDimensions.width}
+          height={stageDimensions.height}
+          className="shadow-lg"
+        >
+          <Layer>
+            <Rect
+              x={0}
+              y={0}
+              width={stageDimensions.width}
+              height={stageDimensions.height}
+              fill={canvasDoc?.bg ?? slide.bgColor ?? "#111827"}
+            />
+            {image && (
+              <KonvaImage
+                image={image}
+                x={0}
+                y={0}
+                width={stageDimensions.width}
+                height={stageDimensions.height}
+              />
+            )}
+            <Text
+              text={textContent}
+              fontSize={32}
+              fontFamily="TikTok Sans, sans-serif"
+              fill="#ffffff"
+              x={textPosition.x}
+              y={textPosition.y}
+              draggable={!disableDrag}
+              onDragEnd={handleDragEnd}
+              shadowColor="rgba(0,0,0,0.45)"
+              shadowBlur={8}
+              shadowOpacity={0.8}
+              shadowOffset={{ x: 0, y: 2 }}
+            />
+          </Layer>
+        </Stage>
+      </div>
+    </div>
+  );
+}
+
+```
+
 # src\components\presentation\dashboard\ModelPicker.tsx
 
 ```tsx
@@ -40170,7 +40575,7 @@ import debounce from "lodash.debounce";
 import { type Value } from "platejs";
 import { Plate } from "platejs/react";
 import React, { useCallback, useEffect, useState } from "react";
-import type { PlateNode } from "./utils/parser";
+import type { PlateNode } from "../utils/parser";
 
 import { usePlateEditor } from "@/components/plate/hooks/usePlateEditor";
 import { TooltipProvider } from "@/components/plate/ui/tooltip";
@@ -40339,7 +40744,7 @@ const PresentationEditor = React.memo(
           >
             {/* Canvas */}
             <SlideCanvas
-              doc={initialContent.canvas as CanvasDoc}
+              value={initialContent.canvas as CanvasDoc}
               onChange={(next: CanvasDoc) => {
                 // Slides im globalen State aktualisieren (inkl. optionalem Preview)
                 const { slides, setSlides } = usePresentationState.getState();
@@ -40402,7 +40807,6 @@ const PresentationEditor = React.memo(
             />
           ) : (
             <Plate
-              id="presentation"
               editor={editor}
               onValueChange={({ value }) => {
                 if (readOnly || isGenerating || isPresenting) return;
@@ -42081,7 +42485,7 @@ export function PresentationLayout({
 ```tsx
 "use client";
 
-import type { CanvasDoc } from "@/canvas/types";
+import { DEFAULT_CANVAS, type CanvasDoc } from "@/canvas/types";
 import { SlideContainer } from "@/components/presentation/presentation-page/SlideContainer";
 import { usePresentationSlides } from "@/hooks/presentation/usePresentationSlides";
 import { useSlideChangeWatcher } from "@/hooks/presentation/useSlideChangeWatcher";
@@ -42178,38 +42582,50 @@ export const PresentationSlidesView = ({
           title="AI is thinking about your presentation..."
         />
 
-        {items.map((slide, index) => (
-          <SortableSlide id={slide.id} key={slide.id}>
-            <div className={`slide-wrapper slide-wrapper-${index} w-full`}>
-              <SlideContainer
-                index={index}
-                id={slide.id}
-                slideWidth={undefined}
-                slidesCount={items.length}
-              >
-                <div
-                  className={cn(
-                    `slide-container-${index}`,
-                    isPresenting && "h-screen w-screen",
-                  )}
+        {items.map((slide, index) => {
+          const safeCanvas: CanvasDoc =
+            (slide.canvas as CanvasDoc | undefined) ?? {
+              ...DEFAULT_CANVAS,
+              nodes: [],
+              selection: [],
+            };
+          return (
+            <SortableSlide id={slide.id} key={slide.id}>
+              <div className={`slide-wrapper slide-wrapper-${index} w-full`}>
+                <SlideContainer
+                  index={index}
+                  id={slide.id}
+                  slideWidth={undefined}
+                  slidesCount={items.length}
+                >
+                  <div
+                    className={cn(
+                      `slide-container-${index}`,
+                      isPresenting && "h-screen w-screen",
+                    )}
                 >
                   <SlideCanvas
-                    doc={slide.canvas as CanvasDoc}
+                    doc={safeCanvas}
                     onChange={(next: CanvasDoc) => {
-                      // Slides im State aktualisieren
-                      const s = usePresentationState.getState().slides.slice();
-                      const i = s.findIndex((x) => x.id === slide.id);
-                      if (i >= 0) {
-                        s[i] = { ...s[i], canvas: next };
-                        usePresentationState.getState().setSlides(s);
-                      }
+                      const { slides, setSlides } =
+                        usePresentationState.getState();
+                      const updated = slides.slice();
+                      const indexToUpdate = updated.findIndex(
+                        (x) => x.id === slide.id,
+                      );
+                      if (indexToUpdate < 0) return;
+                      const current = updated[indexToUpdate];
+                      if (!current) return;
+                      updated[indexToUpdate] = { ...current, canvas: next };
+                      setSlides(updated);
                     }}
                   />
-                </div>
-              </SlideContainer>
-            </div>
-          </SortableSlide>
-        ))}
+                  </div>
+                </SlideContainer>
+              </div>
+            </SortableSlide>
+          );
+        })}
       </SortableContext>
     </DndContext>
   );
@@ -42274,6 +42690,7 @@ export function SlideContainer({
     attributes,
     listeners,
     setNodeRef,
+    setActivatorNodeRef,
     transform,
     transition,
     isDragging,
@@ -42336,46 +42753,49 @@ export function SlideContainer({
         )}
       >
         {!isPresenting && (
-          <div className="absolute left-4 top-2 z-[100] flex opacity-0 transition-opacity duration-200 group-hover/card-container:opacity-100">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="!size-8 cursor-grab rounded-full"
-              {...listeners}
-            >
-              <GripVertical className="h-4 w-4" />
-            </Button>
+          <div className="absolute left-4 top-4 z-[100] opacity-0 transition-opacity duration-200 group-hover/card-container:opacity-100">
+            <div className="flex items-center gap-1 rounded-full border border-border/60 bg-background/95 px-2 py-1 shadow-lg backdrop-blur">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 cursor-grab rounded-full border border-border/70 text-muted-foreground hover:text-foreground"
+                ref={setActivatorNodeRef}
+                {...listeners}
+              >
+                <GripVertical className="h-4 w-4" />
+              </Button>
 
-            <SlideEditPopover index={index} />
+              <SlideEditPopover index={index} />
 
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="!size-8 rounded-full shadow-sm hover:text-destructive"
-                >
-                  <Trash className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Slide</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete slide {index + 1}? This
-                    action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction asChild>
-                    <Button variant="destructive" onClick={deleteSlide}>
-                      Delete
-                    </Button>
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-full border border-border/70 text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Slide</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete slide {index + 1}? This
+                      action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction asChild>
+                      <Button variant="destructive" onClick={deleteSlide}>
+                        Delete
+                      </Button>
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         )}
 
@@ -42385,9 +42805,9 @@ export function SlideContainer({
       {!isPresenting && !isReadOnly && (
         <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-200 group-hover/card-container:opacity-100">
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-full bg-background shadow-md"
+            className="h-9 w-9 rounded-full border border-border/70 bg-background/95 text-muted-foreground shadow-lg backdrop-blur hover:text-foreground"
             onClick={() => addSlide("before", index)}
           >
             <Plus className="h-4 w-4" />
@@ -42398,9 +42818,9 @@ export function SlideContainer({
       {!isPresenting && !isReadOnly && (
         <div className="absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2 opacity-0 transition-opacity duration-200 group-hover/card-container:opacity-100">
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-full bg-background shadow-md"
+            className="h-9 w-9 rounded-full border border-border/70 bg-background/95 text-muted-foreground shadow-lg backdrop-blur hover:text-foreground"
             onClick={() => addSlide("after", index)}
           >
             <Plus className="h-4 w-4" />
@@ -42511,7 +42931,11 @@ export function SlideEditPopover({ index }: SlideEditPopoverProps) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="!size-8 rounded-full">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 rounded-full border border-border/70 text-muted-foreground hover:text-foreground"
+        >
           <Edit className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
@@ -46276,6 +46700,7 @@ export async function convertPlateJSToPPTX(
 # src\components\presentation\utils\parser.ts
 
 ```ts
+import type { CanvasDoc } from "@/canvas/types";
 import { ColumnItemPlugin, ColumnPlugin } from "@platejs/layout/react";
 import { nanoid } from "nanoid"; // Import nanoid for unique ID generation
 import {
@@ -46415,6 +46840,8 @@ export type PlateSlide = {
   alignment?: "start" | "center" | "end";
   bgColor?: string;
   width?: "S" | "M" | "L";
+  position?: { x: number; y: number };
+  canvas?: CanvasDoc | null;
 };
 
 // Simple XML node interface for our parser
@@ -83207,6 +83634,7 @@ export const useSlideChangeWatcher = (
 "use client";
 
 import { type PlateSlide } from "@/components/presentation/utils/parser";
+import { DEFAULT_CANVAS } from "@/canvas/types";
 import { usePresentationState } from "@/states/presentation-state";
 import { nanoid } from "nanoid";
 
@@ -83218,6 +83646,23 @@ export function useSlideOperations() {
     (s) => s.setCurrentSlideIndex,
   );
 
+  const createDefaultCanvasDoc = () => ({
+    ...DEFAULT_CANVAS,
+    nodes: [
+      {
+        id: nanoid(),
+        type: "text",
+        x: 160,
+        y: 180,
+        text: "Neuer Text",
+        fontFamily: "Inter",
+        fontSize: 72,
+        fill: "#111",
+      },
+    ],
+    selection: [],
+  });
+
   const addSlide = (position: InsertPosition, index: number) => {
     const newSlide: PlateSlide = {
       content: [
@@ -83228,6 +83673,7 @@ export function useSlideOperations() {
       ],
       id: nanoid(),
       alignment: "center",
+      canvas: createDefaultCanvasDoc(),
     };
     const { slides } = usePresentationState.getState();
     const updatedSlides = [...slides];
@@ -83908,10 +84354,11 @@ export function measureWrappedText(
   const spans: HTMLSpanElement[] = [];
 
   for (let p = 0; p < paragraphs.length; p++) {
-    const words = paragraphs[p].length ? paragraphs[p].split(/\s+/) : [""];
+    const paragraph = paragraphs[p] ?? "";
+    const words = paragraph.length ? paragraph.split(/\s+/) : [""];
     for (let i = 0; i < words.length; i++) {
       const span = document.createElement("span");
-      span.textContent = words[i];
+      span.textContent = words[i] ?? "";
       container.appendChild(span);
       spans.push(span);
       if (i < words.length - 1) {
@@ -83930,18 +84377,19 @@ export function measureWrappedText(
   if (spans.length === 0) {
     lines.push("");
   } else {
-    let currentTop = spans[0].offsetTop;
-    let bucket: string[] = [spans[0].textContent || ""];
+    const firstSpan = spans[0]!;
+    let currentTop = firstSpan.offsetTop;
+    let bucket: string[] = [firstSpan.textContent ?? ""];
 
     for (let i = 1; i < spans.length; i++) {
-      const s = spans[i];
+      const s = spans[i]!;
       const top = s.offsetTop;
       if (top > currentTop) {
         lines.push(bucket.join(" ").trimEnd());
-        bucket = [s.textContent || ""];
+        bucket = [s.textContent ?? ""];
         currentTop = top;
       } else {
-        bucket.push(s.textContent || "");
+        bucket.push(s.textContent ?? "");
       }
     }
     lines.push(bucket.join(" ").trimEnd());
@@ -84067,6 +84515,35 @@ export function removeThinkingTags(content: string): string {
 export function startsWithThinking(content: string): boolean {
   return /^<think>/i.test(content);
 }
+
+```
+
+# src\lib\types.ts
+
+```ts
+export type SlideTextElement = {
+  id?: string;
+  content?: string;
+  fontFamily?: string;
+  weight?: "regular" | "semibold" | "bold";
+  scale?: number;
+  lineHeight?: number;
+  letterSpacing?: number;
+  align?: "left" | "center" | "right";
+  x?: number;
+  y?: number;
+  rotation?: number;
+  maxWidth?: number;
+  maxHeight?: number;
+  width?: number;
+  height?: number;
+  zIndex?: number;
+  color?: string;
+  italic?: boolean;
+  outlineEnabled?: boolean;
+  outlineWidth?: number;
+  outlineColor?: string;
+};
 
 ```
 
@@ -84379,7 +84856,7 @@ if (env.NODE_ENV !== "production") globalForPrisma.prisma = db;
 
 ```ts
 import { type ImageModelList } from "@/app/_actions/image/generate";
-import type { CanvasDoc } from "@/canvas/types";
+import { type PlateSlide } from "@/components/presentation/utils/parser";
 import { type ThemeProperties, type Themes } from "@/lib/presentation/themes";
 import { type TElement } from "platejs";
 import { create } from "zustand";
@@ -84418,7 +84895,7 @@ interface PresentationState {
   outline: string[];
   searchResults: Array<{ query: string; results: unknown[] }>; // Store search results for context
   webSearchEnabled: boolean; // Toggle for web search in outline generation
-  slides: { id: string; canvas: CanvasDoc }[]; // Canvas-only Slides
+  slides: PlateSlide[];
 
   // Thinking content from AI responses
   outlineThinking: string; // Thinking content from outline generation
@@ -84439,7 +84916,7 @@ interface PresentationState {
   setIsSidebarCollapsed: (update: boolean) => void;
   isRightPanelCollapsed: boolean;
   setIsRightPanelCollapsed: (update: boolean) => void;
-  setSlides: (slides: { id: string; canvas: CanvasDoc }[]) => void;
+  setSlides: (slides: PlateSlide[]) => void;
   startRootImageGeneration: (slideId: string, query: string) => void;
   completeRootImageGeneration: (slideId: string, url: string) => void;
   failRootImageGeneration: (slideId: string, error: string) => void;
@@ -84528,7 +85005,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
   presentationStyle: "professional",
   modelProvider: "openai",
   modelId: "llama3.1:8b",
-  slides: [], // Now holds the new slide object structure
+  slides: [] as PlateSlide[],
   outlineThinking: "",
   presentationThinking: "",
   rootImageGeneration: {},
@@ -84551,7 +85028,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
   isGeneratingOutline: false,
   isGeneratingPresentation: false,
 
-  setSlides: (slides) => set({ slides }),
+  setSlides: (slides: PlateSlide[]) => set({ slides }),
   setPendingInsertNode: (node) => set({ pendingInsertNode: node }),
   setConfig: (config) => set({ config }),
   startRootImageGeneration: (slideId, query) =>
