@@ -66,8 +66,7 @@ export default function RootLayout({
             {/* next-themes setzt die Klasse ("dark"/"light") auf <html> clientseitig */}
             <ThemeProvider
               attribute="class"
-              defaultTheme="system"
-              enableSystem
+              defaultTheme="light"
               disableTransitionOnChange
             >
               {children}

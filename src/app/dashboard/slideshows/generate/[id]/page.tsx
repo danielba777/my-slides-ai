@@ -284,6 +284,7 @@ export default function PresentationGenerateWithIdPage() {
         language: state.language,
         searchResults: state.searchResults,
       });
+      state.setShouldStartPresentationGeneration(true);
     } catch (error) {
       console.error("Failed to store presentation slides:", error);
       toast.error("Slides saved locally, but storing them failed.");

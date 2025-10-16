@@ -286,13 +286,12 @@ export default function PresentationPage() {
     <PresentationLayout
       isLoading={isLoading}
       themeData={currentThemeData ?? undefined}
+      hideSidebar
     >
-      <div className="mx-auto max-w-[90%] space-y-8 pt-16">
-        <div className="space-y-8">
-          <PresentationSlidesView
-            isGeneratingPresentation={isGeneratingPresentation}
-          />
-        </div>
+      <div className="mx-auto w-full max-w-none px-8 pt-16">
+        <PresentationSlidesView
+          isGeneratingPresentation={isGeneratingPresentation}
+        />
       </div>
     </PresentationLayout>
   );

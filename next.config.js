@@ -20,7 +20,6 @@ const config = {
         protocol: "https",
         hostname: "*.ufs.sh",
       },
-      // Placeholder-Bilder (wird in der Slideshows-Ansicht genutzt)
       {
         protocol: "https",
         hostname: "placehold.co",

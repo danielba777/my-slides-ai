@@ -9,7 +9,7 @@ import { usePresentationState } from "@/states/presentation-state";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import {
   SortableContext,
-  verticalListSortingStrategy,
+  horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import dynamic from "next/dynamic";
 import { useEffect } from "react";
@@ -84,7 +84,7 @@ export const PresentationSlidesView = ({
     >
       <SortableContext
         items={items.map((s) => s.id)}
-        strategy={verticalListSortingStrategy}
+        strategy={horizontalListSortingStrategy}
       >
         <PresentModeHeader
           presentationTitle={currentPresentationTitle}
@@ -97,50 +97,57 @@ export const PresentationSlidesView = ({
           title="AI is thinking about your presentation..."
         />
 
-        {items.map((slide, index) => {
-          const safeCanvas: CanvasDoc =
-            (slide.canvas as CanvasDoc | undefined) ?? {
-              ...DEFAULT_CANVAS,
-              nodes: [],
-              selection: [],
-            };
-          return (
-            <SortableSlide id={slide.id} key={slide.id}>
-              <div className={`slide-wrapper slide-wrapper-${index} w-full`}>
-                <SlideContainer
-                  index={index}
-                  id={slide.id}
-                  slideWidth={undefined}
-                  slidesCount={items.length}
+        <div className="flex w-full items-start gap-8">
+          {items.map((slide, index) => {
+            const safeCanvas: CanvasDoc =
+              (slide.canvas as CanvasDoc | undefined) ?? {
+                ...DEFAULT_CANVAS,
+                nodes: [],
+                selection: [],
+              };
+            return (
+              <SortableSlide id={slide.id} key={slide.id}>
+                <div
+                  className={cn(
+                    `slide-wrapper slide-wrapper-${index} flex-shrink-0`,
+                    !isPresenting && "max-w-full",
+                  )}
                 >
-                  <div
-                    className={cn(
-                      `slide-container-${index}`,
-                      isPresenting && "h-screen w-screen",
-                    )}
-                >
-                  <SlideCanvas
-                    doc={safeCanvas}
-                    onChange={(next: CanvasDoc) => {
-                      const { slides, setSlides } =
-                        usePresentationState.getState();
-                      const updated = slides.slice();
-                      const indexToUpdate = updated.findIndex(
-                        (x) => x.id === slide.id,
-                      );
-                      if (indexToUpdate < 0) return;
-                      const current = updated[indexToUpdate];
-                      if (!current) return;
-                      updated[indexToUpdate] = { ...current, canvas: next };
-                      setSlides(updated);
-                    }}
-                  />
-                  </div>
-                </SlideContainer>
-              </div>
-            </SortableSlide>
-          );
-        })}
+                  <SlideContainer
+                    index={index}
+                    id={slide.id}
+                    slideWidth={undefined}
+                    slidesCount={items.length}
+                  >
+                    <div
+                      className={cn(
+                        `slide-container-${index}`,
+                        isPresenting && "h-screen w-screen",
+                      )}
+                    >
+                      <SlideCanvas
+                        doc={safeCanvas}
+                        onChange={(next: CanvasDoc) => {
+                          const { slides, setSlides } =
+                            usePresentationState.getState();
+                          const updated = slides.slice();
+                          const indexToUpdate = updated.findIndex(
+                            (x) => x.id === slide.id,
+                          );
+                          if (indexToUpdate < 0) return;
+                          const current = updated[indexToUpdate];
+                          if (!current) return;
+                          updated[indexToUpdate] = { ...current, canvas: next };
+                          setSlides(updated);
+                        }}
+                      />
+                    </div>
+                  </SlideContainer>
+                </div>
+              </SortableSlide>
+            );
+          })}
+        </div>
       </SortableContext>
     </DndContext>
   );
