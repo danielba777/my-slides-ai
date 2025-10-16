@@ -70,22 +70,31 @@ export function usePresentationSlides() {
   // Scroll to a slide by index
   const scrollToSlide = useCallback((index: number) => {
     // Target the slide wrapper instead of slide container
-    const slideElement = document.querySelector(`.slide-wrapper-${index}`);
+    const slideElement = document.querySelector(
+      `.slide-wrapper-${index}`,
+    ) as HTMLElement | null;
 
     if (slideElement) {
       // Find the scrollable container
-      const scrollContainer = document.querySelector(".presentation-slides");
+      const scrollContainer = document.querySelector(
+        ".presentation-slides",
+      ) as HTMLElement | null;
 
       if (scrollContainer) {
-        // Calculate the scroll position
+        const slideRect = slideElement.getBoundingClientRect();
+        const containerRect = scrollContainer.getBoundingClientRect();
+        // Calculate the horizontal scroll position with a small padding
+        const offsetLeft =
+          slideRect.left - containerRect.left + scrollContainer.scrollLeft - 30;
+
         scrollContainer.scrollTo({
-          top: (slideElement as HTMLElement).offsetTop - 30, // Add a small offset for better visibility
+          left: offsetLeft,
+          top: 0,
           behavior: "smooth",
         });
 
         setTimeout(() => {
           // Focus the editor after scrolling
-          // Try to find and focus the editor within the slide container
           const editorElement = slideElement.querySelector(
             "[contenteditable=true]",
           );

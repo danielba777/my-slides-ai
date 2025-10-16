@@ -15,6 +15,7 @@ interface PresentationLayoutProps {
   isLoading?: boolean;
   themeData?: ThemeProperties;
   isShared?: boolean;
+  hideSidebar?: boolean;
 }
 
 export function PresentationLayout({
@@ -22,6 +23,7 @@ export function PresentationLayout({
   isLoading = false,
   themeData,
   isShared = false,
+  hideSidebar = false,
 }: PresentationLayoutProps) {
   const isPresenting = usePresentationState((s) => s.isPresenting);
 
@@ -32,16 +34,16 @@ export function PresentationLayout({
   }
 
   // Hide sidebar in shared mode and when presenting
-  const showSidebar = !isShared && !isPresenting;
+  const showSidebar = !hideSidebar && !isShared && !isPresenting;
 
   return (
     <ThemeBackground className="h-full w-full">
       <DndProvider backend={HTML5Backend}>
         {themeData && <CustomThemeFontLoader themeData={themeData} />}
         <div className="flex h-full">
-          <SlidePreview showSidebar={showSidebar} />
+          {showSidebar && <SlidePreview showSidebar={showSidebar} />}
           {/* Main Presentation Content - Scrollable */}
-          <div className="presentation-slides flex max-h-full flex-1 overflow-auto pb-20">
+          <div className="presentation-slides flex max-h-full flex-1 items-start overflow-x-auto overflow-y-hidden pb-20">
             {children}
           </div>
         </div>
