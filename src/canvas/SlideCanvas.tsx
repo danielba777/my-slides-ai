@@ -171,35 +171,35 @@ export default function SlideCanvas({ value, onChange }: Props) {
   const onLock = (lock: boolean) => onChange(lockSelected(canvas, lock));
 
   return (
-    <div className="flex gap-4">
-      <CanvasToolbar
-        canvas={canvas}
-        onPatch={onPatch}
-        onSnapshot={makeSnapshot}
-        onAddText={onAddText}
-        onAddImageFile={onAddImageFile}
-        onDuplicate={onDuplicate}
-        onDelete={onDelete}
-        onFront={onFront}
-        onBack={onBack}
-        onLock={onLock}
-        selected={selectedNode}
-      />
-
+    <div className="relative w-full">
       <div
         ref={wrapperRef}
-        className="relative rounded-md border"
+        className="group/canvas relative rounded-xl border bg-background/40 shadow-sm"
         style={{
           width: "100%",
           height: "95vh", // fix: stabilisiert die Messung
           overflow: "hidden", // keine internen Scrollbars
-          // optional: sorgt dafür, dass bei sehr breiten Screens der Wrapper nicht zu hoch wirkt
+          // optional: sorgt dafuer, dass bei sehr breiten Screens der Wrapper nicht zu hoch wirkt
           // und die Stage mittig steht:
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
+        <CanvasToolbar
+          canvas={canvas}
+          onPatch={onPatch}
+          onSnapshot={makeSnapshot}
+          onAddText={onAddText}
+          onAddImageFile={onAddImageFile}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+          onFront={onFront}
+          onBack={onBack}
+          onLock={onLock}
+          selected={selectedNode}
+          className="absolute left-4 top-4 z-20 pointer-events-none opacity-0 transition-opacity duration-150 group-hover/card-container:pointer-events-auto group-hover/card-container:opacity-100"
+        />
         <Stage
           width={canvas.width}
           height={canvas.height}

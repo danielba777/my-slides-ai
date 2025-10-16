@@ -139,7 +139,7 @@ export type PlateSlide = {
   bgColor?: string;
   width?: "S" | "M" | "L";
   position?: { x: number; y: number };
-  canvas?: CanvasDoc;
+  canvas?: CanvasDoc | null;
 };
 
 // Simple XML node interface for our parser

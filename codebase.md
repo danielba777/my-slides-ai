@@ -106,6 +106,145 @@
 
 ```
 
+# CLAUDE.md
+
+```md
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Development Commands
+
+### Essential Commands
+- `pnpm dev` - Start development server with Turbo
+- `pnpm build` - Build for production with Turbo
+- `pnpm start` - Start production server
+- `pnpm lint` - Run Biome linter
+- `pnpm lint:fix` - Run Biome linter with auto-fix
+- `pnpm check` - Run Biome for all checks (lint + format)
+- `pnpm check:fix` - Run Biome checks with auto-fix
+- `pnpm type` - Run TypeScript type checking
+
+### Database Commands
+- `pnpm db:push` - Push Prisma schema changes to database
+- `pnpm db:studio` - Open Prisma Studio database browser
+
+## Architecture Overview
+
+### Core Technology Stack
+- **Framework**: Next.js 15 with App Router
+- **Database**: PostgreSQL with Prisma ORM
+- **Authentication**: NextAuth.js v5 (beta)
+- **AI Integration**: Multiple providers (OpenAI, Together AI, Ollama, LM Studio)
+- **Rich Text Editor**: Plate.js (ProseMirror-based)
+- **Styling**: Tailwind CSS
+- **State Management**: Zustand
+- **File Uploads**: UploadThing
+- **Drag & Drop**: DND Kit
+
+### Key Architectural Patterns
+
+#### Presentation System
+The application uses a **document-centric architecture** where:
+
+1. **BaseDocument** - Universal document entity with type discriminator
+2. **Presentation** - Specialized document type storing slide content as JSON
+3. **CustomTheme** - User-defined styling configurations
+4. **GeneratedImage** - AI-generated image registry
+
+#### Content Structure
+- Presentations store slide content as structured JSON in the database
+- Each slide contains Plate.js editor content with custom layout elements
+- Layout system uses custom element types (bullets, timelines, charts, etc.)
+- Themes are applied via CSS variables and comprehensive theme objects
+
+#### AI Generation Pipeline
+1. **Outline Generation**: Creates structured outline from user prompt
+2. **Web Search Integration**: Uses Tavily API for research context (optional)
+3. **Slide Content Generation**: Converts outline to slide content via streaming AI
+4. **Image Generation**: Creates relevant images using various AI models
+
+### Custom Element System
+
+#### Layout Elements (src/components/presentation/editor/lib.ts)
+- **Groups**: Bullet lists, timelines, cycles, comparisons, etc.
+- **Charts**: Pie, bar, area, radar, scatter, line charts
+- **Interactive**: Buttons, before/after comparisons, pros/cons
+
+#### Element Capabilities
+- **Orientation**: Vertical/horizontal for supported elements
+- **Sidedness**: Single/double layouts
+- **Numbering**: Automatic numbering support
+- **Chart Compatibility**: Charts can convert between compatible data structures
+
+### Database Schema
+- **User Authentication**: NextAuth integration with role-based access
+- **Document Management**: Unified document system with type polymorphism
+- **Theme System**: User-created themes with JSON configuration storage
+- **Content Relationships**: Proper foreign key relationships with cascade deletion
+
+### Environment Configuration
+Environment variables are validated through `@t3-oss/env-nextjs` with Zod schemas. Required variables include:
+- Database connection
+- AI provider API keys (OpenAI, Together AI)
+- Authentication secrets (NextAuth, Google OAuth)
+- File upload tokens (UploadThing)
+- External API keys (Unsplash, Tavily)
+
+## Development Guidelines
+
+### Code Organization
+- **App Router**: All routes in `src/app/` following Next.js 15 conventions
+- **Components**: Organized by feature (presentation, plate, ui, auth)
+- **Server Code**: Separate server-only utilities in `src/server/`
+- **Types**: Comprehensive TypeScript definitions throughout
+
+### State Management
+- **Global State**: Zustand stores for presentation state
+- **Form State**: React Hook Form with Zod validation
+- **Editor State**: Plate.js editor state management
+- **Auth State**: NextAuth session management
+
+### Styling Approach
+- **Component-First**: Tailwind utility classes for component styling
+- **Theme System**: CSS custom properties for dynamic theming
+- **Responsive Design**: Mobile-first responsive patterns
+- **Animation**: Framer Motion for complex animations
+
+### AI Integration
+- **Model Picker**: Unified interface for multiple AI providers
+- **Streaming Responses**: Real-time content generation
+- **Local Models**: Support for Ollama and LM Studio
+- **Error Handling**: Comprehensive error recovery for AI failures
+
+## Testing and Quality
+
+### Code Quality Tools
+- **Biome**: Linting and formatting (replaces ESLint/Prettier)
+- **TypeScript**: Strict type checking enabled
+- **Prisma**: Type-safe database operations
+
+### Development Workflow
+1. Use `pnpm dev` for local development with hot reload
+2. Run `pnpm check:fix` before committing changes
+3. Use `pnpm type` to verify type correctness
+4. Test with local AI models when possible (Ollama/LM Studio)
+
+## Key Files to Understand
+
+### Core Application Files
+- `src/app/api/presentation/generate/route.ts` - Main presentation generation endpoint
+- `src/components/presentation/editor/lib.ts` - Custom element definitions and utilities
+- `src/lib/presentation/themes.ts` - Theme system implementation
+- `prisma/schema.prisma` - Database schema definition
+- `src/env.js` - Environment variable validation
+
+### Configuration Files
+- `next.config.js` - Next.js configuration
+- `tailwind.config.ts` - Tailwind CSS configuration
+- `package.json` - Dependencies and scripts
+```
+
 # components.json
 
 ```json
@@ -116,7 +255,7 @@
   "tsx": true,
   "tailwind": {
     "config": "tailwind.config.ts",
-    "css": "src/app/globals.css",
+    "css": "src/styles/globals.css",
     "baseColor": "neutral",
     "cssVariables": true,
     "prefix": ""
@@ -2880,156 +3019,53 @@ export default function SignOut() {
 
 ```
 
-# src\app\favicon.ico
-
-This is a binary file of the type: Binary
-
-# src\app\fonts\GeistMonoVF.woff
-
-This is a binary file of the type: Binary
-
-# src\app\fonts\GeistVF.woff
-
-This is a binary file of the type: Binary
-
-# src\app\layout.tsx
+# src\app\dashboard\home\page.tsx
 
 ```tsx
-import NextAuthProvider from "@/provider/NextAuthProvider";
-import TanStackQueryProvider from "@/provider/TanstackProvider";
-import { ThemeProvider } from "@/provider/theme-provider";
-import "@/styles/globals.css";
-import { type Metadata } from "next";
-import localFont from "next/font/local";
-
-const tiktokSans = localFont({
-  variable: "--font-sans",
-  display: "swap",
-  src: [
-    {
-      path: "../fonts/tiktok/TikTokDisplayRegular.otf",
-      weight: "300",
-      style: "normal",
-    },
-    {
-      path: "../fonts/tiktok/TikTokTextRegular.otf",
-      weight: "400",
-      style: "normal",
-    },
-    {
-      path: "../fonts/tiktok/TikTokTextMedium.otf",
-      weight: "500",
-      style: "normal",
-    },
-    {
-      path: "../fonts/tiktok/TikTokDisplayMedium.otf",
-      weight: "600",
-      style: "normal",
-    },
-    {
-      path: "../fonts/tiktok/TikTokDisplayBold.otf",
-      weight: "700",
-      style: "normal",
-    },
-    {
-      path: "../fonts/tiktok/TikTokTextBold.otf",
-      weight: "800",
-      style: "normal",
-    },
-  ],
-});
-
-export const metadata: Metadata = {
-  title: "Create Next App",
-  description: "Generated by create next app",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function DashboardHome() {
   return (
-    <TanStackQueryProvider>
-      <NextAuthProvider>
-        <html lang="en" suppressHydrationWarning>
-          <head>
-            {/* sorgt dafür, dass Browser das richtige Farbschema kennt */}
-            <meta name="color-scheme" content="light dark" />
-          </head>
-          <body
-            className={`${tiktokSans.variable} font-sans antialiased`}
-            suppressHydrationWarning
-          >
-            {/* next-themes setzt die Klasse ("dark"/"light") auf <html> clientseitig */}
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="system"
-              enableSystem
-              disableTransitionOnChange
-            >
-              {children}
-            </ThemeProvider>
-          </body>
-        </html>
-      </NextAuthProvider>
-    </TanStackQueryProvider>
-  );
-}
-
-```
-
-# src\app\loading.tsx
-
-```tsx
-import { Loader2 } from "lucide-react";
-
-export default function Loading() {
-  return (
-    <div className="h-screen w-screen grid place-items-center">
-      <Loader2 className="animate-spin"></Loader2>
+    <div className="w-full h-full space-y-6 px-10 py-12 flex flex-col justify-start">
+      <h1 className="text-3xl font-semibold text-center">
+        What are you creating today?
+      </h1>
     </div>
   );
 }
 
 ```
 
-# src\app\page.tsx
+# src\app\dashboard\layout.tsx
+
+```tsx
+import { AppSidebar } from "@/components/app-sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import type { ReactNode } from "react";
+
+export default function DashboardLayout({ children }: { children: ReactNode }) {
+  return (
+    <SidebarProvider>
+      <div className="flex w-full min-h-screen">
+        <AppSidebar />
+        <main className="flex-1 overflow-y-auto w-full">{children}</main>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+```
+
+# src\app\dashboard\page.tsx
 
 ```tsx
 import { redirect } from "next/navigation";
-import { auth } from "@/server/auth";
-import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
-export default async function Home() {
-  const session = await auth();
-  if (session) {
-    redirect("/presentation");
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted">
-      <header className="border-b border-border/60">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-          <span className="text-lg font-semibold tracking-tight text-foreground">
-            My Slides AI
-          </span>
-          <GoogleSignInButton />
-        </div>
-      </header>
-
-      <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-24 sm:py-32">
-        <h1 className="text-4xl font-semibold leading-tight tracking-tight text-foreground sm:text-6xl text-center">
-          Automate TikToks that drive
-          <br className="hidden sm:block" />
-          traffic to your website
-        </h1>
-      </main>
-    </div>
-  );
+export default function DashboardRedirect() {
+  redirect("/dashboard/home");
 }
 
 ```
 
-# src\app\presentation\[id]\page.tsx
+# src\app\dashboard\slideshows\[id]\page.tsx
 
 ```tsx
 "use client";
@@ -3042,7 +3078,7 @@ export default function Page() {
 
 ```
 
-# src\app\presentation\generate\[id]\page.tsx
+# src\app\dashboard\slideshows\generate\[id]\page.tsx
 
 ```tsx
 "use client";
@@ -3193,7 +3229,9 @@ export default function PresentationGenerateWithIdPage() {
             presentationData.presentation.searchResults,
           )
             ? presentationData.presentation.searchResults
-            : JSON.parse(presentationData.presentation.searchResults as string);
+            : JSON.parse(
+                presentationData.presentation.searchResults as string,
+              );
           setWebSearchEnabled(true);
           setSearchResults(searchResults);
         } catch (error) {
@@ -3203,7 +3241,7 @@ export default function PresentationGenerateWithIdPage() {
       }
 
       // Set theme if available
-      if (presentationData?.presentation?.theme) {
+      if (presentationData.presentation?.theme) {
         const themeId = presentationData.presentation.theme;
 
         // Check if this is a predefined theme
@@ -3234,11 +3272,11 @@ export default function PresentationGenerateWithIdPage() {
       }
 
       // Set presentationStyle if available
-      if (presentationData?.presentation?.presentationStyle) {
+      if (presentationData.presentation?.presentationStyle) {
         setPresentationStyle(presentationData.presentation.presentationStyle);
       }
 
-      if (presentationData?.presentation?.imageSource) {
+      if (presentationData.presentation?.imageSource) {
         setImageSource(
           presentationData.presentation.imageSource as "ai" | "stock",
         );
@@ -3313,7 +3351,7 @@ export default function PresentationGenerateWithIdPage() {
       toast.error("Slides saved locally, but storing them failed.");
     } finally {
       state.setIsGeneratingPresentation(false);
-      router.push(`/presentation/${id}`);
+      router.push(`/dashboard/slideshows/${id}`);
     }
   };
 
@@ -3385,36 +3423,28 @@ export default function PresentationGenerateWithIdPage() {
 
 ```
 
-# src\app\presentation\layout.tsx
+# src\app\dashboard\slideshows\layout.tsx
 
 ```tsx
 import { PresentationGenerationManager } from "@/components/presentation/dashboard/PresentationGenerationManager";
-import PresentationHeader from "@/components/presentation/presentation-page/PresentationHeader";
-import type React from "react";
+import type { ReactNode } from "react";
 
-export default function PresentationLayout({
+export default function PresentationSectionLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <>
       <PresentationGenerationManager />
-      <div className="flex h-screen w-screen flex-col supports-[(height:100dvh)]:h-[100dvh]">
-        <PresentationHeader />
-        <main className="relative flex flex-1 overflow-hidden">
-          <div className="sheet-container h-[calc(100vh-3.8rem)] flex-1 place-items-center overflow-y-auto overflow-x-clip supports-[(height:100dvh)]:h-[calc(100dvh-3.8rem)]">
-            {children}
-          </div>
-        </main>
-      </div>
+      {children}
     </>
   );
 }
 
 ```
 
-# src\app\presentation\page.tsx
+# src\app\dashboard\slideshows\page.tsx
 
 ```tsx
 import { PresentationDashboard } from "@/components/presentation/dashboard/PresentationDashboard";
@@ -3424,6 +3454,164 @@ export default function page() {
 }
 
 ```
+
+# src\app\favicon.ico
+
+This is a binary file of the type: Binary
+
+# src\app\fonts\GeistMonoVF.woff
+
+This is a binary file of the type: Binary
+
+# src\app\fonts\GeistVF.woff
+
+This is a binary file of the type: Binary
+
+# src\app\layout.tsx
+
+```tsx
+import NextAuthProvider from "@/provider/NextAuthProvider";
+import TanStackQueryProvider from "@/provider/TanstackProvider";
+import { ThemeProvider } from "@/provider/theme-provider";
+import "@/styles/globals.css";
+import { type Metadata } from "next";
+import localFont from "next/font/local";
+
+const tiktokSans = localFont({
+  variable: "--font-sans",
+  display: "swap",
+  src: [
+    {
+      path: "../fonts/tiktok/TikTokDisplayRegular.otf",
+      weight: "300",
+      style: "normal",
+    },
+    {
+      path: "../fonts/tiktok/TikTokTextRegular.otf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../fonts/tiktok/TikTokTextMedium.otf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../fonts/tiktok/TikTokDisplayMedium.otf",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "../fonts/tiktok/TikTokDisplayBold.otf",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "../fonts/tiktok/TikTokTextBold.otf",
+      weight: "800",
+      style: "normal",
+    },
+  ],
+});
+
+export const metadata: Metadata = {
+  title: "SlidesCockpit - Make TikTok Slides & Automate Marketing",
+  description:
+    "Automated slideshows that drive traffic to your website, app, or business. Generate AI TikToks and create your own gen z marketing team.",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <TanStackQueryProvider>
+      <NextAuthProvider>
+        <html lang="en" suppressHydrationWarning>
+          <head>
+            {/* sorgt dafür, dass Browser das richtige Farbschema kennt */}
+            <meta name="color-scheme" content="light dark" />
+          </head>
+          <body
+            className={`${tiktokSans.variable} font-sans antialiased`}
+            suppressHydrationWarning
+          >
+            {/* next-themes setzt die Klasse ("dark"/"light") auf <html> clientseitig */}
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              {children}
+            </ThemeProvider>
+          </body>
+        </html>
+      </NextAuthProvider>
+    </TanStackQueryProvider>
+  );
+}
+
+```
+
+# src\app\loading.tsx
+
+```tsx
+import { Loader2 } from "lucide-react";
+
+export default function Loading() {
+  return (
+    <div className="h-screen w-screen grid place-items-center">
+      <Loader2 className="animate-spin"></Loader2>
+    </div>
+  );
+}
+
+```
+
+# src\app\page.tsx
+
+```tsx
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { auth } from "@/server/auth";
+import { redirect } from "next/navigation";
+
+export default async function Home() {
+  const session = await auth();
+  if (session) {
+    redirect("/dashboard/home");
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted">
+      <header className="border-b border-border/60">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
+          <span className="text-lg font-semibold tracking-tight text-foreground">
+            SlidesCockpit
+          </span>
+          <GoogleSignInButton />
+        </div>
+      </header>
+
+      <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-24 sm:py-32">
+        <h1 className="text-4xl font-semibold leading-tight tracking-tight text-foreground sm:text-6xl text-center">
+          Automate TikToks that drive
+          <br className="hidden sm:block" />
+          traffic to your website
+        </h1>
+      </main>
+    </div>
+  );
+}
+
+```
+
+# src\assets\logo_dark.png
+
+This is a binary file of the type: Image
+
+# src\assets\logo_light.png
+
+This is a binary file of the type: Image
 
 # src\canvas\CanvasToolbar.tsx
 
@@ -5784,6 +5972,9 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
   const layout = useMemo<SlideTextElement[]>(() => {
     const texts = doc.nodes.filter((n) => (n as any).type === "text") as any[];
     return texts.map((t, i) => {
+      // accept both legacy "text" and newer "content" fields for text nodes
+      const rawContent: string =
+        (t as any).content ?? (t as any).text ?? "";
       // Positionslogik: nx/ny (normiert) > x/y (px)
       const xPx = normToPxX(t.nx ?? t.x) ?? Math.round(W * 0.5);
       const yPx = normToPxY(t.ny ?? t.y) ?? Math.round(H * 0.5);
@@ -5803,7 +5994,7 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
             : "regular";
 
       return {
-        content: t.content ?? "",
+        content: rawContent,
         x: xPx / W,
         y: yPx / H,
         rotation: t.rotation ?? 0,
@@ -5864,7 +6055,9 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
             : src.weight === "semibold"
               ? "semibold"
               : "regular";
+        // write both fields for compatibility across canvas implementations
         n.content = src.content ?? n.content ?? "";
+        n.text = src.content ?? n.text ?? "";
 
         // Extras
         if ((src as any).italic !== undefined) n.italic = (src as any).italic;
@@ -5948,6 +6141,113 @@ export const DEFAULT_CANVAS: CanvasDoc = {
   nodes: [],
   selection: [],
 };
+
+```
+
+# src\components\app-sidebar-account.tsx
+
+```tsx
+import SideBarDropdown from "@/components/auth/Dropdown";
+
+export function SidebarAccountSection() {
+  return (
+    <div className="mt-auto border-t border-sidebar-border px-4 py-4">
+      <SideBarDropdown shouldViewFullName align="start" />
+    </div>
+  );
+}
+
+```
+
+# src\components\app-sidebar.tsx
+
+```tsx
+"use client";
+import { useTheme } from "next-themes";
+import { IoHomeOutline, IoImagesOutline } from "react-icons/io5";
+
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
+import { SidebarAccountSection } from "./app-sidebar-account";
+import { AppLogo } from "./logo/AppLogo";
+
+const startItems = [
+  {
+    title: "Home",
+    url: "/dashboard/home",
+    icon: IoHomeOutline,
+  },
+];
+
+// Menu items.
+const playgroundItems = [
+  {
+    title: "Slideshows",
+    url: "/dashboard/slideshows",
+    icon: IoImagesOutline,
+  },
+];
+
+export function AppSidebar() {
+  const { resolvedTheme } = useTheme();
+
+  return (
+    <Sidebar>
+      <SidebarContent>
+        <div className="flex justify-center gap-2 py-4">
+          <AppLogo size={24} dark={resolvedTheme === "dark"} />
+          <p className="text-base font-bold">SlidesCockpit</p>
+        </div>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {startItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild className="font-semibold">
+                    <a href={item.url}>
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Playground</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {playgroundItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild className="font-semibold">
+                    <a href={item.url}>
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarAccountSection />
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
 
 ```
 
@@ -6111,7 +6411,7 @@ interface GoogleSignInButtonProps {
 }
 
 export function GoogleSignInButton({
-  callbackUrl = "/presentation",
+  callbackUrl = "/dashboard/home",
 }: GoogleSignInButtonProps) {
   const handleClick = useCallback(() => {
     void signIn("google", { callbackUrl });
@@ -6185,6 +6485,49 @@ export default function AllweoneText(
           ALLWEONE
         </text>
       </svg>
+    </div>
+  );
+}
+
+```
+
+# src\components\logo\AppLogo.tsx
+
+```tsx
+"use client";
+
+import logoDark from "@/assets/logo_dark.png";
+import logoLight from "@/assets/logo_light.png";
+import { cn } from "@/lib/utils";
+import Image from "next/image";
+
+interface AppLogoProps {
+  dark?: boolean;
+  size?: number | string;
+  className?: string;
+}
+
+export function AppLogo({ dark = false, size = 48, className }: AppLogoProps) {
+  const dimension = typeof size === "number" ? `${size}px` : size;
+  const backgroundClass = dark ? "bg-white" : "bg-black";
+  const logo = dark ? logoDark : logoLight;
+
+  return (
+    <div
+      className={cn(
+        "relative flex items-center justify-center overflow-hidden rounded-sm",
+        backgroundClass,
+        className,
+      )}
+      style={{ width: dimension, height: dimension }}
+    >
+      <Image
+        src={logo}
+        alt="SlidesCockpit logo"
+        fill
+        className="p-0 object-contain"
+        priority
+      />
     </div>
   );
 }
@@ -26806,7 +27149,9 @@ export function PresentationDashboard({
           result.presentation.id,
           result.presentation.title,
         );
-        router.push(`/presentation/generate/${result.presentation.id}`);
+        router.push(
+          `/dashboard/slideshows/generate/${result.presentation.id}`,
+        );
       } else {
         setIsGeneratingOutline(false);
         toast.error(result.message || "Failed to create presentation");
@@ -27363,7 +27708,9 @@ export function PresentationGenerationManager() {
 
       const numberedMatches = Array.from(
         cleanContent.matchAll(/^\s*\d+[\.\)]\s+(.*\S)\s*$/gm),
-      ).map((match) => match[1].trim());
+      )
+        .map((match) => match[1]?.trim())
+        .filter((value): value is string => Boolean(value && value.length > 0));
 
       let outlineItems: string[] = [];
 
@@ -27695,7 +28042,7 @@ export function PresentationGenerationManager() {
 export function PresentationHeader() {
   return (
     <div className="space-y-6 text-center">
-      <h1 className="text-5xl font-bold text-gray-900 dark:text-white">
+      <h1 className="text-3xl font-semibold text-center">
         Create stunning presentations
         <br />
         in seconds with AI
@@ -27959,9 +28306,9 @@ export function PresentationItem({
       console.log(response);
       // Route based on content status
       if (Object.keys(response?.presentation?.content ?? {}).length > 0) {
-        router.push(`/presentation/${presentation.id}`);
+        router.push(`/dashboard/slideshows/${presentation.id}`);
       } else {
-        router.push(`/presentation/generate/${presentation.id}`);
+        router.push(`/dashboard/slideshows/generate/${presentation.id}`);
       }
     } catch (error) {
       console.error("Failed to navigate:", error);
@@ -28509,9 +28856,9 @@ export function RecentPresentations() {
         (response?.presentation?.content as { slides: unknown[] })?.slides
           ?.length > 0
       ) {
-        router.push(`/presentation/${presentation.id}`);
+        router.push(`/dashboard/slideshows/${presentation.id}`);
       } else {
-        router.push(`/presentation/generate/${presentation.id}`);
+        router.push(`/dashboard/slideshows/generate/${presentation.id}`);
       }
     } catch (error) {
       console.error("Failed to navigate:", error);
@@ -36482,7 +36829,7 @@ export default function LayoutImageDrop({
 
   const handleImageDrop = (
     item: { element: TElement },
-    _layoutType: LayoutType,
+    layoutType: LayoutType,
   ) => {
     // Only handle image elements
     if (item?.element?.type !== ImagePlugin.key) return;
@@ -36508,8 +36855,9 @@ export default function LayoutImageDrop({
           rootImage: {
             url: imageUrl,
             query: imageQuery,
+            layoutType,
           },
-          layoutType: "background",
+          layoutType,
         };
       }
       return slide;
@@ -41591,7 +41939,8 @@ export default function PresentationHeader({ title }: PresentationHeaderProps) {
   const pathname = usePathname();
   // Check if we're on the generate/outline page
   const isPresentationPage =
-    pathname.startsWith("/presentation/") && !pathname.includes("generate");
+    pathname.startsWith("/dashboard/slideshows/") &&
+    !pathname.includes("generate");
 
   // Update title when it changes in the state
   useEffect(() => {
@@ -41602,13 +41951,13 @@ export default function PresentationHeader({ title }: PresentationHeaderProps) {
     }
   }, [currentPresentationTitle, title]);
 
-  if (pathname === "/presentation/create")
+  if (pathname === "/dashboard/slideshows/create")
     return (
       <header className="flex h-12 max-w-[100vw]  items-center justify-between overflow-clip border-accent px-2 py-2">
         <div className="flex items-center gap-2">
           {/* This component is suppose to be logo but for now its is actually hamburger menu */}
 
-          <Link href={"/presentation/create"}>
+          <Link href={"/dashboard/slideshows/create"}>
             <Button size={"icon"} className="rounded-full" variant={"ghost"}>
               <Brain></Brain>
             </Button>
@@ -41634,7 +41983,7 @@ export default function PresentationHeader({ title }: PresentationHeaderProps) {
       {/* Left section with breadcrumb navigation */}
       <div className="flex items-center gap-2">
         <Link
-          href="/presentations"
+          href="/dashboard/slideshows"
           className="text-muted-foreground hover:text-foreground"
         >
           <Brain className="h-5 w-5"></Brain>
@@ -80201,6 +80550,785 @@ export {
 
 ```
 
+# src\components\ui\sidebar.tsx
+
+```tsx
+"use client"
+
+import * as React from "react"
+import { Slot } from "@radix-ui/react-slot"
+import { cva, type VariantProps } from "class-variance-authority"
+import { PanelLeft } from "lucide-react"
+
+import { useIsMobile } from "@/hooks/use-mobile"
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+
+const SIDEBAR_COOKIE_NAME = "sidebar_state"
+const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
+const SIDEBAR_WIDTH = "16rem"
+const SIDEBAR_WIDTH_MOBILE = "18rem"
+const SIDEBAR_WIDTH_ICON = "3rem"
+const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+
+type SidebarContextProps = {
+  state: "expanded" | "collapsed"
+  open: boolean
+  setOpen: (open: boolean) => void
+  openMobile: boolean
+  setOpenMobile: (open: boolean) => void
+  isMobile: boolean
+  toggleSidebar: () => void
+}
+
+const SidebarContext = React.createContext<SidebarContextProps | null>(null)
+
+function useSidebar() {
+  const context = React.useContext(SidebarContext)
+  if (!context) {
+    throw new Error("useSidebar must be used within a SidebarProvider.")
+  }
+
+  return context
+}
+
+const SidebarProvider = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div"> & {
+    defaultOpen?: boolean
+    open?: boolean
+    onOpenChange?: (open: boolean) => void
+  }
+>(
+  (
+    {
+      defaultOpen = true,
+      open: openProp,
+      onOpenChange: setOpenProp,
+      className,
+      style,
+      children,
+      ...props
+    },
+    ref
+  ) => {
+    const isMobile = useIsMobile()
+    const [openMobile, setOpenMobile] = React.useState(false)
+
+    // This is the internal state of the sidebar.
+    // We use openProp and setOpenProp for control from outside the component.
+    const [_open, _setOpen] = React.useState(defaultOpen)
+    const open = openProp ?? _open
+    const setOpen = React.useCallback(
+      (value: boolean | ((value: boolean) => boolean)) => {
+        const openState = typeof value === "function" ? value(open) : value
+        if (setOpenProp) {
+          setOpenProp(openState)
+        } else {
+          _setOpen(openState)
+        }
+
+        // This sets the cookie to keep the sidebar state.
+        document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+      },
+      [setOpenProp, open]
+    )
+
+    // Helper to toggle the sidebar.
+    const toggleSidebar = React.useCallback(() => {
+      return isMobile
+        ? setOpenMobile((open) => !open)
+        : setOpen((open) => !open)
+    }, [isMobile, setOpen, setOpenMobile])
+
+    // Adds a keyboard shortcut to toggle the sidebar.
+    React.useEffect(() => {
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (
+          event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
+          (event.metaKey || event.ctrlKey)
+        ) {
+          event.preventDefault()
+          toggleSidebar()
+        }
+      }
+
+      window.addEventListener("keydown", handleKeyDown)
+      return () => window.removeEventListener("keydown", handleKeyDown)
+    }, [toggleSidebar])
+
+    // We add a state so that we can do data-state="expanded" or "collapsed".
+    // This makes it easier to style the sidebar with Tailwind classes.
+    const state = open ? "expanded" : "collapsed"
+
+    const contextValue = React.useMemo<SidebarContextProps>(
+      () => ({
+        state,
+        open,
+        setOpen,
+        isMobile,
+        openMobile,
+        setOpenMobile,
+        toggleSidebar,
+      }),
+      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    )
+
+    return (
+      <SidebarContext.Provider value={contextValue}>
+        <TooltipProvider delayDuration={0}>
+          <div
+            style={
+              {
+                "--sidebar-width": SIDEBAR_WIDTH,
+                "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
+                ...style,
+              } as React.CSSProperties
+            }
+            className={cn(
+              "group/sidebar-wrapper flex min-h-svh w-full has-[[data-variant=inset]]:bg-sidebar",
+              className
+            )}
+            ref={ref}
+            {...props}
+          >
+            {children}
+          </div>
+        </TooltipProvider>
+      </SidebarContext.Provider>
+    )
+  }
+)
+SidebarProvider.displayName = "SidebarProvider"
+
+const Sidebar = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div"> & {
+    side?: "left" | "right"
+    variant?: "sidebar" | "floating" | "inset"
+    collapsible?: "offcanvas" | "icon" | "none"
+  }
+>(
+  (
+    {
+      side = "left",
+      variant = "sidebar",
+      collapsible = "offcanvas",
+      className,
+      children,
+      ...props
+    },
+    ref
+  ) => {
+    const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+
+    if (collapsible === "none") {
+      return (
+        <div
+          className={cn(
+            "flex h-full w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground",
+            className
+          )}
+          ref={ref}
+          {...props}
+        >
+          {children}
+        </div>
+      )
+    }
+
+    if (isMobile) {
+      return (
+        <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+          <SheetContent
+            data-sidebar="sidebar"
+            data-mobile="true"
+            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+            style={
+              {
+                "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+              } as React.CSSProperties
+            }
+            side={side}
+          >
+            <SheetHeader className="sr-only">
+              <SheetTitle>Sidebar</SheetTitle>
+              <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+            </SheetHeader>
+            <div className="flex h-full w-full flex-col">{children}</div>
+          </SheetContent>
+        </Sheet>
+      )
+    }
+
+    return (
+      <div
+        ref={ref}
+        className="group peer hidden text-sidebar-foreground md:block"
+        data-state={state}
+        data-collapsible={state === "collapsed" ? collapsible : ""}
+        data-variant={variant}
+        data-side={side}
+      >
+        {/* This is what handles the sidebar gap on desktop */}
+        <div
+          className={cn(
+            "relative w-[--sidebar-width] bg-transparent transition-[width] duration-200 ease-linear",
+            "group-data-[collapsible=offcanvas]:w-0",
+            "group-data-[side=right]:rotate-180",
+            variant === "floating" || variant === "inset"
+              ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]"
+              : "group-data-[collapsible=icon]:w-[--sidebar-width-icon]"
+          )}
+        />
+        <div
+          className={cn(
+            "fixed inset-y-0 z-10 hidden h-svh w-[--sidebar-width] transition-[left,right,width] duration-200 ease-linear md:flex",
+            side === "left"
+              ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
+              : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
+            // Adjust the padding for floating and inset variants.
+            variant === "floating" || variant === "inset"
+              ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]"
+              : "group-data-[collapsible=icon]:w-[--sidebar-width-icon] group-data-[side=left]:border-r group-data-[side=right]:border-l",
+            className
+          )}
+          {...props}
+        >
+          <div
+            data-sidebar="sidebar"
+            className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow"
+          >
+            {children}
+          </div>
+        </div>
+      </div>
+    )
+  }
+)
+Sidebar.displayName = "Sidebar"
+
+const SidebarTrigger = React.forwardRef<
+  React.ElementRef<typeof Button>,
+  React.ComponentProps<typeof Button>
+>(({ className, onClick, ...props }, ref) => {
+  const { toggleSidebar } = useSidebar()
+
+  return (
+    <Button
+      ref={ref}
+      data-sidebar="trigger"
+      variant="ghost"
+      size="icon"
+      className={cn("h-7 w-7", className)}
+      onClick={(event) => {
+        onClick?.(event)
+        toggleSidebar()
+      }}
+      {...props}
+    >
+      <PanelLeft />
+      <span className="sr-only">Toggle Sidebar</span>
+    </Button>
+  )
+})
+SidebarTrigger.displayName = "SidebarTrigger"
+
+const SidebarRail = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<"button">
+>(({ className, ...props }, ref) => {
+  const { toggleSidebar } = useSidebar()
+
+  return (
+    <button
+      ref={ref}
+      data-sidebar="rail"
+      aria-label="Toggle Sidebar"
+      tabIndex={-1}
+      onClick={toggleSidebar}
+      title="Toggle Sidebar"
+      className={cn(
+        "absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=left]:-right-4 group-data-[side=right]:left-0 sm:flex",
+        "[[data-side=left]_&]:cursor-w-resize [[data-side=right]_&]:cursor-e-resize",
+        "[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
+        "group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full group-data-[collapsible=offcanvas]:hover:bg-sidebar",
+        "[[data-side=left][data-collapsible=offcanvas]_&]:-right-2",
+        "[[data-side=right][data-collapsible=offcanvas]_&]:-left-2",
+        className
+      )}
+      {...props}
+    />
+  )
+})
+SidebarRail.displayName = "SidebarRail"
+
+const SidebarInset = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"main">
+>(({ className, ...props }, ref) => {
+  return (
+    <main
+      ref={ref}
+      className={cn(
+        "relative flex w-full flex-1 flex-col bg-background",
+        "md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow",
+        className
+      )}
+      {...props}
+    />
+  )
+})
+SidebarInset.displayName = "SidebarInset"
+
+const SidebarInput = React.forwardRef<
+  React.ElementRef<typeof Input>,
+  React.ComponentProps<typeof Input>
+>(({ className, ...props }, ref) => {
+  return (
+    <Input
+      ref={ref}
+      data-sidebar="input"
+      className={cn(
+        "h-8 w-full bg-background shadow-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+        className
+      )}
+      {...props}
+    />
+  )
+})
+SidebarInput.displayName = "SidebarInput"
+
+const SidebarHeader = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div">
+>(({ className, ...props }, ref) => {
+  return (
+    <div
+      ref={ref}
+      data-sidebar="header"
+      className={cn("flex flex-col gap-2 p-2", className)}
+      {...props}
+    />
+  )
+})
+SidebarHeader.displayName = "SidebarHeader"
+
+const SidebarFooter = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div">
+>(({ className, ...props }, ref) => {
+  return (
+    <div
+      ref={ref}
+      data-sidebar="footer"
+      className={cn("flex flex-col gap-2 p-2", className)}
+      {...props}
+    />
+  )
+})
+SidebarFooter.displayName = "SidebarFooter"
+
+const SidebarSeparator = React.forwardRef<
+  React.ElementRef<typeof Separator>,
+  React.ComponentProps<typeof Separator>
+>(({ className, ...props }, ref) => {
+  return (
+    <Separator
+      ref={ref}
+      data-sidebar="separator"
+      className={cn("mx-2 w-auto bg-sidebar-border", className)}
+      {...props}
+    />
+  )
+})
+SidebarSeparator.displayName = "SidebarSeparator"
+
+const SidebarContent = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div">
+>(({ className, ...props }, ref) => {
+  return (
+    <div
+      ref={ref}
+      data-sidebar="content"
+      className={cn(
+        "flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden",
+        className
+      )}
+      {...props}
+    />
+  )
+})
+SidebarContent.displayName = "SidebarContent"
+
+const SidebarGroup = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div">
+>(({ className, ...props }, ref) => {
+  return (
+    <div
+      ref={ref}
+      data-sidebar="group"
+      className={cn("relative flex w-full min-w-0 flex-col p-2", className)}
+      {...props}
+    />
+  )
+})
+SidebarGroup.displayName = "SidebarGroup"
+
+const SidebarGroupLabel = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div"> & { asChild?: boolean }
+>(({ className, asChild = false, ...props }, ref) => {
+  const Comp = asChild ? Slot : "div"
+
+  return (
+    <Comp
+      ref={ref}
+      data-sidebar="group-label"
+      className={cn(
+        "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-[margin,opacity] duration-200 ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+        "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
+        className
+      )}
+      {...props}
+    />
+  )
+})
+SidebarGroupLabel.displayName = "SidebarGroupLabel"
+
+const SidebarGroupAction = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<"button"> & { asChild?: boolean }
+>(({ className, asChild = false, ...props }, ref) => {
+  const Comp = asChild ? Slot : "button"
+
+  return (
+    <Comp
+      ref={ref}
+      data-sidebar="group-action"
+      className={cn(
+        "absolute right-3 top-3.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+        // Increases the hit area of the button on mobile.
+        "after:absolute after:-inset-2 after:md:hidden",
+        "group-data-[collapsible=icon]:hidden",
+        className
+      )}
+      {...props}
+    />
+  )
+})
+SidebarGroupAction.displayName = "SidebarGroupAction"
+
+const SidebarGroupContent = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div">
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    data-sidebar="group-content"
+    className={cn("w-full text-sm", className)}
+    {...props}
+  />
+))
+SidebarGroupContent.displayName = "SidebarGroupContent"
+
+const SidebarMenu = React.forwardRef<
+  HTMLUListElement,
+  React.ComponentProps<"ul">
+>(({ className, ...props }, ref) => (
+  <ul
+    ref={ref}
+    data-sidebar="menu"
+    className={cn("flex w-full min-w-0 flex-col gap-1", className)}
+    {...props}
+  />
+))
+SidebarMenu.displayName = "SidebarMenu"
+
+const SidebarMenuItem = React.forwardRef<
+  HTMLLIElement,
+  React.ComponentProps<"li">
+>(({ className, ...props }, ref) => (
+  <li
+    ref={ref}
+    data-sidebar="menu-item"
+    className={cn("group/menu-item relative", className)}
+    {...props}
+  />
+))
+SidebarMenuItem.displayName = "SidebarMenuItem"
+
+const sidebarMenuButtonVariants = cva(
+  "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-2 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
+  {
+    variants: {
+      variant: {
+        default: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        outline:
+          "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
+      },
+      size: {
+        default: "h-8 text-sm",
+        sm: "h-7 text-xs",
+        lg: "h-12 text-sm group-data-[collapsible=icon]:!p-0",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+)
+
+const SidebarMenuButton = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<"button"> & {
+    asChild?: boolean
+    isActive?: boolean
+    tooltip?: string | React.ComponentProps<typeof TooltipContent>
+  } & VariantProps<typeof sidebarMenuButtonVariants>
+>(
+  (
+    {
+      asChild = false,
+      isActive = false,
+      variant = "default",
+      size = "default",
+      tooltip,
+      className,
+      ...props
+    },
+    ref
+  ) => {
+    const Comp = asChild ? Slot : "button"
+    const { isMobile, state } = useSidebar()
+
+    const button = (
+      <Comp
+        ref={ref}
+        data-sidebar="menu-button"
+        data-size={size}
+        data-active={isActive}
+        className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
+        {...props}
+      />
+    )
+
+    if (!tooltip) {
+      return button
+    }
+
+    if (typeof tooltip === "string") {
+      tooltip = {
+        children: tooltip,
+      }
+    }
+
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipContent
+          side="right"
+          align="center"
+          hidden={state !== "collapsed" || isMobile}
+          {...tooltip}
+        />
+      </Tooltip>
+    )
+  }
+)
+SidebarMenuButton.displayName = "SidebarMenuButton"
+
+const SidebarMenuAction = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<"button"> & {
+    asChild?: boolean
+    showOnHover?: boolean
+  }
+>(({ className, asChild = false, showOnHover = false, ...props }, ref) => {
+  const Comp = asChild ? Slot : "button"
+
+  return (
+    <Comp
+      ref={ref}
+      data-sidebar="menu-action"
+      className={cn(
+        "absolute right-1 top-1.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 peer-hover/menu-button:text-sidebar-accent-foreground [&>svg]:size-4 [&>svg]:shrink-0",
+        // Increases the hit area of the button on mobile.
+        "after:absolute after:-inset-2 after:md:hidden",
+        "peer-data-[size=sm]/menu-button:top-1",
+        "peer-data-[size=default]/menu-button:top-1.5",
+        "peer-data-[size=lg]/menu-button:top-2.5",
+        "group-data-[collapsible=icon]:hidden",
+        showOnHover &&
+          "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
+        className
+      )}
+      {...props}
+    />
+  )
+})
+SidebarMenuAction.displayName = "SidebarMenuAction"
+
+const SidebarMenuBadge = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div">
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    data-sidebar="menu-badge"
+    className={cn(
+      "pointer-events-none absolute right-1 flex h-5 min-w-5 select-none items-center justify-center rounded-md px-1 text-xs font-medium tabular-nums text-sidebar-foreground",
+      "peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[active=true]/menu-button:text-sidebar-accent-foreground",
+      "peer-data-[size=sm]/menu-button:top-1",
+      "peer-data-[size=default]/menu-button:top-1.5",
+      "peer-data-[size=lg]/menu-button:top-2.5",
+      "group-data-[collapsible=icon]:hidden",
+      className
+    )}
+    {...props}
+  />
+))
+SidebarMenuBadge.displayName = "SidebarMenuBadge"
+
+const SidebarMenuSkeleton = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div"> & {
+    showIcon?: boolean
+  }
+>(({ className, showIcon = false, ...props }, ref) => {
+  // Random width between 50 to 90%.
+  const width = React.useMemo(() => {
+    return `${Math.floor(Math.random() * 40) + 50}%`
+  }, [])
+
+  return (
+    <div
+      ref={ref}
+      data-sidebar="menu-skeleton"
+      className={cn("flex h-8 items-center gap-2 rounded-md px-2", className)}
+      {...props}
+    >
+      {showIcon && (
+        <Skeleton
+          className="size-4 rounded-md"
+          data-sidebar="menu-skeleton-icon"
+        />
+      )}
+      <Skeleton
+        className="h-4 max-w-[--skeleton-width] flex-1"
+        data-sidebar="menu-skeleton-text"
+        style={
+          {
+            "--skeleton-width": width,
+          } as React.CSSProperties
+        }
+      />
+    </div>
+  )
+})
+SidebarMenuSkeleton.displayName = "SidebarMenuSkeleton"
+
+const SidebarMenuSub = React.forwardRef<
+  HTMLUListElement,
+  React.ComponentProps<"ul">
+>(({ className, ...props }, ref) => (
+  <ul
+    ref={ref}
+    data-sidebar="menu-sub"
+    className={cn(
+      "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5",
+      "group-data-[collapsible=icon]:hidden",
+      className
+    )}
+    {...props}
+  />
+))
+SidebarMenuSub.displayName = "SidebarMenuSub"
+
+const SidebarMenuSubItem = React.forwardRef<
+  HTMLLIElement,
+  React.ComponentProps<"li">
+>(({ ...props }, ref) => <li ref={ref} {...props} />)
+SidebarMenuSubItem.displayName = "SidebarMenuSubItem"
+
+const SidebarMenuSubButton = React.forwardRef<
+  HTMLAnchorElement,
+  React.ComponentProps<"a"> & {
+    asChild?: boolean
+    size?: "sm" | "md"
+    isActive?: boolean
+  }
+>(({ asChild = false, size = "md", isActive, className, ...props }, ref) => {
+  const Comp = asChild ? Slot : "a"
+
+  return (
+    <Comp
+      ref={ref}
+      data-sidebar="menu-sub-button"
+      data-size={size}
+      data-active={isActive}
+      className={cn(
+        "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground outline-none ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
+        "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground",
+        size === "sm" && "text-xs",
+        size === "md" && "text-sm",
+        "group-data-[collapsible=icon]:hidden",
+        className
+      )}
+      {...props}
+    />
+  )
+})
+SidebarMenuSubButton.displayName = "SidebarMenuSubButton"
+
+export {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupAction,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInput,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSkeleton,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarSeparator,
+  SidebarTrigger,
+  useSidebar,
+}
+
+```
+
 # src\components\ui\skeleton.tsx
 
 ```tsx
@@ -82967,12 +84095,12 @@ export async function middleware(request: NextRequest) {
 
   // If user hits the landing page while authenticated, send them to the app
   if (session && path === "/") {
-    return NextResponse.redirect(new URL("/presentation", request.url));
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   // If user is on auth page but already signed in, redirect to home page
   if (isAuthPage && session) {
-    return NextResponse.redirect(new URL("/presentation", request.url));
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   const isPublicPath = path === "/";
@@ -83705,7 +84833,16 @@ export const usePresentationState = create<PresentationState>((set) => ({
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background font-sans text-foreground;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }
 
@@ -83989,137 +85126,150 @@ const config = {
   ],
   prefix: "",
   theme: {
-    container: {
-      center: true,
-      padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
-    },
-    extend: {
-      backgroundImage: {
-        "grid-pattern":
-          "linear-gradient(to right, rgba(55, 65, 81, 0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(55, 65, 81, 0.1) 1px, transparent 1px)",
-      },
-      backgroundSize: {
-        "grid-pattern": "20px 20px",
-      },
-      colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        dbi: {
-          DEFAULT: "hsl(var(--dbi))",
-          background: "hsl(var(--dbi-background))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
-        },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
-        chart: {
-          "1": "hsl(var(--chart-1))",
-          "2": "hsl(var(--chart-2))",
-          "3": "hsl(var(--chart-3))",
-          "4": "hsl(var(--chart-4))",
-          "5": "hsl(var(--chart-5))",
-        },
-        brand: {
-          DEFAULT: "hsl(var(--brand))",
-          foreground: "hsl(var(--brand-foreground))",
-        },
-        highlight: {
-          DEFAULT: "hsl(var(--highlight))",
-          foreground: "hsl(var(--highlight-foreground))",
-        },
-      },
-      borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-      },
-      fontFamily: {
-        sans: ["TikTok Sans", "var(--font-sans)", ...fontFamily.sans],
-      },
-      keyframes: {
-        "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
-        },
-        shake: {
-          "0%, 100%": {
-            transform: "rotate(0deg)",
-          },
-          "25%": {
-            transform: "rotate(2deg)",
-          },
-          "50%": {
-            transform: "rotate(0deg)",
-          },
-          "75%": {
-            transform: "rotate(-2deg)",
-          },
-        },
-        "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
-        },
-        breathing: {
-          "0%, 100%": {
-            transform: "scale(1)",
-            opacity: "1",
-          },
-          "50%": {
-            transform: "scale(1.05)",
-            opacity: "0.8",
-          },
-        },
-      },
-      animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
-        breathing: "breathing 4s ease-in-out infinite",
-        shake: "shake 0.3s ease-out",
-      },
-      screens: {
-        "main-hover": {
-          raw: "(hover: hover)",
-        },
-      },
-    },
+  	container: {
+  		center: true,
+  		padding: '2rem',
+  		screens: {
+  			'2xl': '1400px'
+  		}
+  	},
+  	extend: {
+  		backgroundImage: {
+  			'grid-pattern': 'linear-gradient(to right, rgba(55, 65, 81, 0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(55, 65, 81, 0.1) 1px, transparent 1px)'
+  		},
+  		backgroundSize: {
+  			'grid-pattern': '20px 20px'
+  		},
+  		colors: {
+  			border: 'hsl(var(--border))',
+  			input: 'hsl(var(--input))',
+  			ring: 'hsl(var(--ring))',
+  			background: 'hsl(var(--background))',
+  			foreground: 'hsl(var(--foreground))',
+  			primary: {
+  				DEFAULT: 'hsl(var(--primary))',
+  				foreground: 'hsl(var(--primary-foreground))'
+  			},
+  			secondary: {
+  				DEFAULT: 'hsl(var(--secondary))',
+  				foreground: 'hsl(var(--secondary-foreground))'
+  			},
+  			destructive: {
+  				DEFAULT: 'hsl(var(--destructive))',
+  				foreground: 'hsl(var(--destructive-foreground))'
+  			},
+  			muted: {
+  				DEFAULT: 'hsl(var(--muted))',
+  				foreground: 'hsl(var(--muted-foreground))'
+  			},
+  			dbi: {
+  				DEFAULT: 'hsl(var(--dbi))',
+  				background: 'hsl(var(--dbi-background))'
+  			},
+  			accent: {
+  				DEFAULT: 'hsl(var(--accent))',
+  				foreground: 'hsl(var(--accent-foreground))'
+  			},
+  			popover: {
+  				DEFAULT: 'hsl(var(--popover))',
+  				foreground: 'hsl(var(--popover-foreground))'
+  			},
+  			card: {
+  				DEFAULT: 'hsl(var(--card))',
+  				foreground: 'hsl(var(--card-foreground))'
+  			},
+  			chart: {
+  				'1': 'hsl(var(--chart-1))',
+  				'2': 'hsl(var(--chart-2))',
+  				'3': 'hsl(var(--chart-3))',
+  				'4': 'hsl(var(--chart-4))',
+  				'5': 'hsl(var(--chart-5))'
+  			},
+  			brand: {
+  				DEFAULT: 'hsl(var(--brand))',
+  				foreground: 'hsl(var(--brand-foreground))'
+  			},
+  			highlight: {
+  				DEFAULT: 'hsl(var(--highlight))',
+  				foreground: 'hsl(var(--highlight-foreground))'
+  			},
+  			sidebar: {
+  				DEFAULT: 'hsl(var(--sidebar-background))',
+  				foreground: 'hsl(var(--sidebar-foreground))',
+  				primary: 'hsl(var(--sidebar-primary))',
+  				'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
+  				accent: 'hsl(var(--sidebar-accent))',
+  				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
+  				border: 'hsl(var(--sidebar-border))',
+  				ring: 'hsl(var(--sidebar-ring))'
+  			}
+  		},
+  		borderRadius: {
+  			lg: 'var(--radius)',
+  			md: 'calc(var(--radius) - 2px)',
+  			sm: 'calc(var(--radius) - 4px)'
+  		},
+  		fontFamily: {
+  			sans: [
+  				'TikTok Sans',
+  				'var(--font-sans)',
+                    ...fontFamily.sans
+                ]
+  		},
+  		keyframes: {
+  			'accordion-down': {
+  				from: {
+  					height: '0'
+  				},
+  				to: {
+  					height: 'var(--radix-accordion-content-height)'
+  				}
+  			},
+  			shake: {
+  				'0%, 100%': {
+  					transform: 'rotate(0deg)'
+  				},
+  				'25%': {
+  					transform: 'rotate(2deg)'
+  				},
+  				'50%': {
+  					transform: 'rotate(0deg)'
+  				},
+  				'75%': {
+  					transform: 'rotate(-2deg)'
+  				}
+  			},
+  			'accordion-up': {
+  				from: {
+  					height: 'var(--radix-accordion-content-height)'
+  				},
+  				to: {
+  					height: '0'
+  				}
+  			},
+  			breathing: {
+  				'0%, 100%': {
+  					transform: 'scale(1)',
+  					opacity: '1'
+  				},
+  				'50%': {
+  					transform: 'scale(1.05)',
+  					opacity: '0.8'
+  				}
+  			}
+  		},
+  		animation: {
+  			'accordion-down': 'accordion-down 0.2s ease-out',
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+  			breathing: 'breathing 4s ease-in-out infinite',
+  			shake: 'shake 0.3s ease-out'
+  		},
+  		screens: {
+  			'main-hover': {
+  				raw: '(hover: hover)'
+  			}
+  		}
+  	}
   },
   plugins: [
     require("tailwindcss-animate"),
