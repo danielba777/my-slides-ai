@@ -7,6 +7,7 @@ import {
   type PlateSlide,
 } from "@/components/presentation/utils/parser";
 import { Button } from "@/components/ui/button";
+import { withDefaults, addText } from "@/canvas/commands";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Layer, Rect, Stage, Text, Image as KonvaImage } from "react-konva";
 
@@ -66,8 +67,8 @@ function useCanvasImage(src?: string): [HTMLImageElement | null] {
 export default function SlideCanvasBase({
   slide,
   slideIndex,
-  width = 600,
-  height = 900,
+  width = 420,
+  height = 700,
   disableDrag = false,
   showExportButton = true,
 }: SlideCanvasProps) {
@@ -79,6 +80,25 @@ export default function SlideCanvasBase({
 
   const stageRef = useRef<any>(null);
   const [image] = useCanvasImage(slide.rootImage?.url ?? "");
+
+  // Globaler Listener für den "Text +" Button in der Plate FixedToolbar
+  useEffect(() => {
+    const handler = () => {
+      const { slides, setSlides } = usePresentationState.getState();
+      setSlides(
+        slides.map((s, i) =>
+          i === slideIndex
+            ? {
+                ...s,
+                canvas: addText(withDefaults(s.canvas)),
+              }
+            : s,
+        ),
+      );
+    };
+    window.addEventListener("canvas:add-text", handler);
+    return () => window.removeEventListener("canvas:add-text", handler);
+  }, [slideIndex]);
 
   const canvasDoc = slideWithExtras.canvas;
   const activeTextNode = useMemo(() => {

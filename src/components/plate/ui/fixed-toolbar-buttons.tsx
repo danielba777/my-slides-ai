@@ -8,6 +8,7 @@ import {
   HighlighterIcon,
   ItalicIcon,
   PaintBucketIcon,
+  Plus,
   StrikethroughIcon,
   UnderlineIcon,
   WandSparklesIcon,
@@ -48,8 +49,25 @@ import { TurnIntoToolbarButton } from "./turn-into-toolbar-button";
 export function FixedToolbarButtons() {
   const readOnly = useEditorReadOnly();
 
+  const handleAddText = () => {
+    // Triggert im Canvas das Hinzufügen eines Textfeldes
+    window.dispatchEvent(new CustomEvent("canvas:add-text"));
+  };
+
   return (
     <div className="flex w-full">
+      {/* Linke Sektion: immer sichtbarer "Text +" Button */}
+      <ToolbarGroup>
+        <button
+          onClick={handleAddText}
+          aria-label="Text hinzufügen"
+          title="Text hinzufügen"
+          className="inline-flex items-center justify-center whitespace-nowrap rounded-xl border border-border/80 bg-background/90 text-sm font-medium shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-0 h-9 w-9"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </ToolbarGroup>
+
       {!readOnly && (
         <>
           <ToolbarGroup>

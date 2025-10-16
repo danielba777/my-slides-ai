@@ -66,22 +66,27 @@ export function ToolbarSeparator({
 
 // From toggleVariants
 const toolbarButtonVariants = cva(
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-[color,box-shadow] outline-none hover:bg-muted hover:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-checked:bg-accent aria-checked:text-accent-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  // Angleichen an Side-Menü: klare Kanten, Border, leichte Card-Optik
+  "inline-flex items-center justify-center whitespace-nowrap rounded-xl border border-border/80 bg-background/90 text-sm font-medium shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-0 disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-muted data-[state=open]:text-foreground",
   {
     defaultVariants: {
-      size: "default",
-      variant: "default",
+      size: "icon",
+      variant: "outline",
     },
     variants: {
       size: {
-        default: "h-9 min-w-9 px-2",
-        lg: "h-10 min-w-10 px-2.5",
-        sm: "h-8 min-w-8 px-1.5",
+        default: "h-9 px-3",
+        sm: "h-8 rounded-xl px-2",
+        lg: "h-10 rounded-xl px-4",
+        icon: "h-9 w-9 rounded-xl",
       },
       variant: {
-        default: "bg-transparent",
-        outline:
-          "border border-input bg-transparent shadow-xs hover:bg-accent hover:text-accent-foreground",
+        default: "bg-background",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        outline: "border border-border/80 bg-background hover:bg-muted",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "bg-transparent hover:bg-muted",
+        link: "text-primary underline-offset-4 hover:underline",
       },
     },
   },

@@ -197,17 +197,38 @@ export default function CanvasToolbar({
     <TooltipProvider delayDuration={150} skipDelayDuration={0}>
       <div
         className={cn(
-          "flex w-[320px] flex-col gap-3 rounded-2xl border border-border/80 bg-background/95 px-4 py-3 shadow-xl backdrop-blur",
+          // Container wie Side-Menü: Card-Optik, Blur, Theme-Variablen
+          "grid grid-cols-[auto,1fr] items-start gap-3 rounded-2xl border border-border/80 bg-background/95 p-3 shadow-xl backdrop-blur",
+          // Breite etwas größer, da jetzt 2 Spalten
+          "w-[420px]",
           className,
         )}
       >
-        <div className="flex items-center gap-2">
-          <ToolbarIconButton
-            icon={Plus}
-            label="Textfeld hinzufuegen"
+        {/* Linke Spalte: Immer sichtbarer Add-Text Button */}
+        <div className="flex flex-col">
+          <button
+            type="button"
             onClick={onAddText}
-          />
+            className={cn(
+              // groß, klar, wie im Side-Menü
+              "inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-medium",
+              "bg-primary text-primary-foreground hover:opacity-90 transition",
+              // keine Ringe/Outlines
+              "focus-visible:outline-none focus-visible:ring-0",
+              // volle Breite der linken Spalte
+              "w-[90px]"
+            )}
+            aria-label="Neues Textfeld"
+            title="Neues Textfeld"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Text +
+          </button>
+        </div>
 
+        {/* Rechte Spalte: Alle weiteren Controls, sauber gestapelt */}
+        <div className="flex flex-col gap-3">
+          {/* Datei-Eingabe unsichtbar halten */}
           <input
             ref={fileInputRef}
             type="file"
@@ -215,182 +236,152 @@ export default function CanvasToolbar({
             className="hidden"
             onChange={handleFileChange}
           />
-          <ToolbarIconButton
-            icon={ImagePlus}
-            label="Bild einfuegen"
-            onClick={triggerImagePicker}
-          />
 
-          <ToolbarIconButton
-            icon={Copy}
-            label="Auswahl duplizieren"
-            onClick={onDuplicate}
-            disabled={!selected}
-          />
+          {/* Obere Aktionsleiste: Bild einfügen, Duplizieren, Snapshot, Löschen */}
+          <div className="flex flex-wrap items-center gap-2">
+            <ToolbarIconButton
+              icon={ImagePlus}
+              label="Bild einfuegen"
+              onClick={triggerImagePicker}
+            />
+            <ToolbarIconButton
+              icon={Copy}
+              label="Auswahl duplizieren"
+              onClick={onDuplicate}
+              disabled={!selected}
+            />
+            <ToolbarIconButton
+              icon={Camera}
+              label="Snapshot speichern"
+              onClick={onSnapshot}
+            />
+            <ToolbarIconButton
+              icon={Trash2}
+              label="Auswahl entfernen"
+              onClick={onDelete}
+              disabled={!selected}
+            />
+          </div>
 
-          <ToolbarIconButton
-            icon={Camera}
-            label="Snapshot speichern"
-            onClick={onSnapshot}
-          />
+          {/* Text-Formatierung (nur aktiv, wenn Text selektiert) */}
+          <div className="flex items-center gap-2">
+            <ToolbarIconButton
+              icon={Bold}
+              label="Fett"
+              onClick={() => toggleFontWeight("bold")}
+              disabled={!selectedIsText}
+              active={selectedIsText && (selected?.fontStyle ?? "normal").includes("bold")}
+            />
+            <ToolbarIconButton
+              icon={Italic}
+              label="Kursiv"
+              onClick={() => toggleFontWeight("italic")}
+              disabled={!selectedIsText}
+              active={selectedIsText && (selected?.fontStyle ?? "normal").includes("italic")}
+            />
+            <ToolbarIconButton
+              icon={AlignLeft}
+              label="Linksbuendig"
+              onClick={() => handleAlign("left")}
+              disabled={!selectedIsText}
+            />
+            <ToolbarIconButton
+              icon={AlignCenter}
+              label="Zentriert"
+              onClick={() => handleAlign("center")}
+              disabled={!selectedIsText}
+            />
+            <ToolbarIconButton
+              icon={AlignRight}
+              label="Rechtsbuendig"
+              onClick={() => handleAlign("right")}
+              disabled={!selectedIsText}
+            />
+          </div>
 
-          <ToolbarIconButton
-            icon={Trash2}
-            label="Auswahl entfernen"
-            onClick={onDelete}
-            disabled={!selected}
-          />
+          {/* Farben & Ebenen */}
+          <div className="flex items-center gap-2">
+            <Label htmlFor={colorInputId} className="text-xs text-muted-foreground">
+              Textfarbe
+            </Label>
+            <input
+              id={colorInputId}
+              type="color"
+              onChange={(e) => handleFillChange(e.target.value)}
+              value={(selectedIsText ? (selected?.fill as string) : canvas.bg) ?? "#111111"}
+              disabled={!selectedIsText}
+              className="h-8 w-10 cursor-pointer rounded-md border border-border bg-background p-1"
+              aria-label="Textfarbe"
+              title="Textfarbe"
+            />
+
+            <Separator orientation="vertical" className="h-6" />
+
+            <ToolbarIconButton
+              icon={BringToFront}
+              label="Nach vorne"
+              onClick={onFront}
+              disabled={!selected}
+            />
+            <ToolbarIconButton
+              icon={SendToBack}
+              label="Nach hinten"
+              onClick={onBack}
+              disabled={!selected}
+            />
+            <ToolbarIconButton
+              icon={selected?.locked ? Unlock : Lock}
+              label={selected?.locked ? "Entsperren" : "Sperren"}
+              onClick={() => onLock(!(selected?.locked ?? false))}
+              disabled={!selected}
+            />
+          </div>
+
+          {/* Typografie & Maße */}
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground">Größe</Label>
+            <Input
+              type="number"
+              min={8}
+              step={1}
+              value={selectedIsText ? (selected?.fontSize ?? 64) : 64}
+              onChange={(e) => handleNumberChange("fontSize", Number(e.target.value))}
+              disabled={!selectedIsText}
+              className="h-8 w-20"
+            />
+
+            <Label className="text-xs text-muted-foreground">Breite</Label>
+            <Input
+              type="number"
+              min={50}
+              step={10}
+              value={selectedIsText ? (selected?.width ?? 400) : 400}
+              onChange={(e) => handleNumberChange("width", Number(e.target.value))}
+              disabled={!selectedIsText}
+              className="h-8 w-24"
+            />
+
+            <Label className="text-xs text-muted-foreground">Zeilenh.</Label>
+            <Input
+              type="number"
+              step={0.05}
+              value={selectedIsText ? (selected?.lineHeight ?? 1.2) : 1.2}
+              onChange={(e) => handleNumberChange("lineHeight", Number(e.target.value))}
+              disabled={!selectedIsText}
+              className="h-8 w-20"
+            />
+
+            <Label className="text-xs text-muted-foreground">Buchst.</Label>
+            <Input
+              type="number"
+              step={0.5}
+              value={selectedIsText ? (selected?.letterSpacing ?? 0) : 0}
+              onChange={(e) => handleNumberChange("letterSpacing", Number(e.target.value))}
+              disabled={!selectedIsText}
+              className="h-8 w-20"
+            />
+          </div>
         </div>
-
-        <Separator />
-
-        <div className="flex items-center gap-3">
-          <Label
-            htmlFor={colorInputId}
-            className="text-xs font-medium text-muted-foreground"
-          >
-            Hintergrund
-          </Label>
-          <input
-            id={colorInputId}
-            type="color"
-            className="h-9 w-9 cursor-pointer rounded-full border border-border bg-transparent p-1"
-            value={canvas.bg ?? "#ffffff"}
-            onChange={(event) => onPatch({ bg: event.target.value })}
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <ToolbarIconButton
-            icon={BringToFront}
-            label="In den Vordergrund"
-            onClick={onFront}
-            disabled={!selected}
-          />
-          <ToolbarIconButton
-            icon={SendToBack}
-            label="In den Hintergrund"
-            onClick={onBack}
-            disabled={!selected}
-          />
-          <ToolbarIconButton
-            icon={Lock}
-            label="Auswahl sperren"
-            onClick={() => onLock(true)}
-            disabled={!selected}
-          />
-          <ToolbarIconButton
-            icon={Unlock}
-            label="Auswahl entsperren"
-            onClick={() => onLock(false)}
-            disabled={!selected}
-          />
-        </div>
-
-        {selectedIsText && (
-          <>
-            <Separator />
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-medium text-muted-foreground">
-                  Textinhalt
-                </Label>
-                <Input
-                  value={(selected as any).text ?? ""}
-                  onChange={(event) => handleTextChange(event.target.value)}
-                  placeholder="Hier schreiben..."
-                  className="h-9"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Schriftgroesse
-                  </Label>
-                  <Input
-                    type="number"
-                    className="h-9"
-                    value={(selected as any).fontSize ?? 72}
-                    onChange={(event) =>
-                      handleNumberChange("fontSize", Number(event.target.value))
-                    }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Breite
-                  </Label>
-                  <Input
-                    type="number"
-                    className="h-9"
-                    value={(selected as any).width ?? 400}
-                    onChange={(event) =>
-                      handleNumberChange("width", Number(event.target.value))
-                    }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Zeilenhoehe
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.05"
-                    className="h-9"
-                    value={(selected as any).lineHeight ?? 1.12}
-                    onChange={(event) =>
-                      handleNumberChange("lineHeight", Number(event.target.value))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <ToolbarIconButton
-                  icon={Bold}
-                  label="Fett"
-                  onClick={() => toggleFontWeight("bold")}
-                  active={(selected as any).fontStyle?.includes("bold")}
-                />
-                <ToolbarIconButton
-                  icon={Italic}
-                  label="Kursiv"
-                  onClick={() => toggleFontWeight("italic")}
-                  active={(selected as any).fontStyle?.includes("italic")}
-                />
-                <ToolbarIconButton
-                  icon={AlignLeft}
-                  label="Linksbundig"
-                  onClick={() => handleAlign("left")}
-                  active={(selected as any).align === "left"}
-                />
-                <ToolbarIconButton
-                  icon={AlignCenter}
-                  label="Zentriert"
-                  onClick={() => handleAlign("center")}
-                  active={(selected as any).align === "center"}
-                />
-                <ToolbarIconButton
-                  icon={AlignRight}
-                  label="Rechtsbundig"
-                  onClick={() => handleAlign("right")}
-                  active={(selected as any).align === "right"}
-                />
-
-                <div className="flex items-center gap-2 rounded-full border border-border/80 bg-background/60 px-2 py-1">
-                  <Palette className="h-4 w-4 text-muted-foreground" />
-                  <input
-                    type="color"
-                    className="h-6 w-6 cursor-pointer rounded-full border border-border"
-                    value={(selected as any).fill ?? "#111111"}
-                    onChange={(event) => handleFillChange(event.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-          </>
-        )}
       </div>
     </TooltipProvider>
   );
