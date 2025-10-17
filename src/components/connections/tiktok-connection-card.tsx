@@ -21,6 +21,7 @@ type ConnectedAccount = {
   openId: string;
   displayName: string | null;
   username: string | null;
+  unionId: string | null;
   avatarUrl: string | null;
   connectedAt: string;
 };
@@ -54,6 +55,7 @@ export function TikTokConnectionCard() {
             displayName:
               typeof item.displayName === "string" ? item.displayName : null,
             username: typeof item.username === "string" ? item.username : null,
+            unionId: typeof item.unionId === "string" ? item.unionId : null,
             avatarUrl:
               typeof item.avatarUrl === "string" ? item.avatarUrl : null,
             connectedAt:
@@ -121,6 +123,7 @@ export function TikTokConnectionCard() {
     return (
       account.username ??
       account.displayName ??
+      (account.unionId ? `ID ${account.unionId.slice(0, 8)}` : null) ??
       `ID ${account.openId.slice(0, 8)}`
     );
   }, []);
