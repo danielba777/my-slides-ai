@@ -13,7 +13,7 @@ import {
 } from "@dnd-kit/sortable";
 import dynamic from "next/dynamic";
 import { useEffect } from "react";
-import React from "react";
+import React, { memo } from "react";
 import { PresentModeHeader } from "../dashboard/PresentModeHeader";
 import { ThinkingDisplay } from "../dashboard/ThinkingDisplay";
 import { SortableSlide } from "./SortableSlide";
@@ -51,17 +51,9 @@ function useImageReady(url?: string) {
   return ready;
 }
 
-// Child-Komponente, damit Hooks nicht in einer Schleife aufgerufen werden
-function SlideFrame({
-  slide,
-  index,
-  itemsLength,
-  isPresenting,
-}: {
-  slide: any;
-  index: number;
-  itemsLength: number;
-  isPresenting: boolean;
+// ✅ Child-Komponente, damit der Hook NICHT in einer Schleife aufgerufen wird
+const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slidesCount }: {
+  slide: any; index: number; isPresenting: boolean; slidesCount: number;
 }) {
   const safeCanvas: CanvasDoc =
     (slide.canvas as CanvasDoc | undefined) ?? {
@@ -73,50 +65,35 @@ function SlideFrame({
     };
   const imgUrl = slide.rootImage?.url as string | undefined;
   const imageReady = useImageReady(imgUrl);
-
   return (
     <SortableSlide id={slide.id} key={slide.id}>
-      <div
-        className={cn(
-          `slide-wrapper slide-wrapper-${index} flex-shrink-0`,
-          !isPresenting && "max-w-full",
-        )}
-      >
-        <SlideContainer
-          index={index}
-          id={slide.id}
-          slideWidth={undefined}
-          slidesCount={itemsLength}
-        >
-          <div
-            className={cn(
-              `slide-container-${index}`,
-              isPresenting && "h-screen w-screen",
-            )}
-          >
+      <div className={cn(`slide-wrapper slide-wrapper-${index} flex-shrink-0`, !isPresenting && "max-w-full")}>
+        <SlideContainer index={index} id={slide.id} slideWidth={undefined} slidesCount={slidesCount}>
+          <div className={cn(`slide-container-${index}`, isPresenting && "h-screen w-screen")}>
             {imageReady ? (
               <SlideCanvas
                 doc={safeCanvas}
                 onChange={(next: CanvasDoc) => {
                   const { slides, setSlides } = usePresentationState.getState();
                   const updated = slides.slice();
-                  const indexToUpdate = updated.findIndex((x) => x.id === slide.id);
-                  if (indexToUpdate < 0) return;
-                  const current = updated[indexToUpdate];
+                  const i = updated.findIndex((x) => x.id === slide.id);
+                  if (i < 0) return;
+                  const current = updated[i];
                   if (!current) return;
+                  // Nur setzen, wenn sich was geändert hat (verhindert Re-Mount-Bursts)
                   if (current.canvas !== next) {
-                    updated[indexToUpdate] = { ...current, canvas: next };
+                    updated[i] = { ...current, canvas: next };
                     setSlides(updated);
                   }
                 }}
               />
             ) : (
-              // Placeholder hält den Platz und verhindert Schwarz-Blitzen
+              // Stabiler Placeholder verhindert Schwarz-Frames & Text-Flackern
               <div
                 className={cn(
                   "rounded-xl",
                   isPresenting ? "h-screen w-screen" : "h-[700px] w-[420px]",
-                  "bg-black/90",
+                  "bg-black/90"
                 )}
               />
             )}
@@ -125,7 +102,7 @@ function SlideFrame({
       </div>
     </SortableSlide>
   );
-}
+});
 
 interface PresentationSlidesViewProps {
   isGeneratingPresentation: boolean;
@@ -205,12 +182,12 @@ export const PresentationSlidesView = ({
         />
 
         <div className="flex w-full items-start gap-8">
-            {items.map((slide, index) => (
+          {items.map((slide, index) => (
             <SlideFrame
               key={slide.id}
               slide={slide}
               index={index}
-              itemsLength={items.length}
+              slidesCount={items.length}
               isPresenting={isPresenting}
             />
           ))}

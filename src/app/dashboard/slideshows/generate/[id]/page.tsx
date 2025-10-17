@@ -34,6 +34,20 @@ import { toast } from "sonner";
 
 export const PRESENTATION_GENERATION_COOKIE = "presentation_generation_pending";
 
+function hasPendingCookie() {
+  if (typeof document === "undefined") return false;
+  return document.cookie.split(";").some((c) => c.trim().startsWith(`${PRESENTATION_GENERATION_COOKIE}=`));
+}
+
+function clearPendingCookie() {
+  if (typeof document === "undefined") return;
+  const domain =
+    window.location.hostname === "localhost" ? "localhost" : ".allweone.com";
+  document.cookie = `${PRESENTATION_GENERATION_COOKIE}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; ${
+    domain !== "localhost" ? `domain=${domain}; ` : ""
+  }SameSite=Lax`;
+}
+
 function makeCanvasFromText(text: string, w = 1080, h = 1920): CanvasDoc {
   return {
     version: 1,
@@ -105,8 +119,9 @@ export default function PresentationGenerateWithIdPage() {
     document.cookie = `${PRESENTATION_GENERATION_COOKIE}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; ${domain !== "localhost" ? `domain=${domain}; ` : ""}`;
   };
 
-  // Clear the cookie when the page loads
+  // Clear legacy cookie name if vorhanden (Abwärtskompatibilität)
   useEffect(() => {
+    // früherer Name beibehalten:
     clearPresentationCookie();
   }, []);
 
@@ -117,9 +132,8 @@ export default function PresentationGenerateWithIdPage() {
     if (initialLoadComplete.current) return;
     initialLoadComplete.current = true;
 
-    // If isGeneratingOutline is true but generation hasn't been started yet,
-    // this indicates we just came from the dashboard and should start generation
-    if (isGeneratingOutline && !generationStarted.current) {
+    // Start, wenn Store-Flag ODER Pending-Cookie gesetzt ist
+    if ((isGeneratingOutline || hasPendingCookie()) && !generationStarted.current) {
       console.log("Starting outline generation after navigation");
       generationStarted.current = true;
 
@@ -127,6 +141,8 @@ export default function PresentationGenerateWithIdPage() {
       // before starting the generation process
       setTimeout(() => {
         setShouldStartOutlineGeneration(true);
+        // Cookie ist verbraucht
+        clearPendingCookie();
       }, 100);
     }
   }, [isGeneratingOutline, setShouldStartOutlineGeneration]);

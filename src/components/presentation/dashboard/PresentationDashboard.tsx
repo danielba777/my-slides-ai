@@ -54,6 +54,16 @@ export function PresentationDashboard({
       );
 
       if (result.success && result.presentation) {
+        // Setze Pending-Cookie, sodass die Zielseite sofort loslegt
+        try {
+          const domain =
+            typeof window !== "undefined" && window.location.hostname === "localhost"
+              ? "localhost"
+              : ".allweone.com";
+          document.cookie =
+            `presentation_generation_pending=true; path=/; SameSite=Lax;` +
+            (domain !== "localhost" ? ` domain=${domain};` : "");
+        } catch {}
         // Set the current presentation
         setCurrentPresentation(
           result.presentation.id,
