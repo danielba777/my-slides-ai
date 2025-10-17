@@ -1,6 +1,6 @@
 "use client";
+import { Home, Images, UserPen, type LucideIcon } from "lucide-react";
 import { useTheme } from "next-themes";
-import { Home, Images, type LucideIcon } from "lucide-react";
 
 import {
   Sidebar,
@@ -39,6 +39,15 @@ const playgroundItems: SidebarItem[] = [
   },
 ];
 
+// Configuration items.
+const configurationItems: SidebarItem[] = [
+  {
+    title: "Connections",
+    url: "/dashboard/connections",
+    icon: UserPen,
+  },
+];
+
 export function AppSidebar() {
   const { resolvedTheme } = useTheme();
 
@@ -71,6 +80,23 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {playgroundItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild className="font-semibold">
+                    <a href={item.url}>
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Configuration</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {configurationItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild className="font-semibold">
                     <a href={item.url}>

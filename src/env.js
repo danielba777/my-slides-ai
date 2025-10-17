@@ -22,6 +22,7 @@ export const env = createEnv({
       process.env.NODE_ENV === "production"
         ? z.string()
         : z.string().optional(),
+    SLIDESCOCKPIT_API: z.string().url(),
   },
 
   runtimeEnv: {
@@ -35,6 +36,7 @@ export const env = createEnv({
     TOGETHER_AI_API_KEY: process.env.TOGETHER_AI_API_KEY,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+    SLIDESCOCKPIT_API: process.env.SLIDESCOCKPIT_API,
   },
 
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
