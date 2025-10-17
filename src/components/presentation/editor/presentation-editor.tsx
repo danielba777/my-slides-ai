@@ -22,7 +22,7 @@ import LayoutImageDrop from "./dnd/components/LayoutImageDrop";
 import { presentationPlugins } from "./plugins";
 import PresentationEditorStaticView from "./presentation-editor-static";
 // Canvas (Polotno-like)
-import SlideCanvas from "@/canvas/SlideCanvas";
+import SlideCanvasAdapter from "@/canvas/SlideCanvasAdapter";
 import type { CanvasDoc } from "@/canvas/types";
 
 function slideSignature(slide?: PlateSlide): string {
@@ -173,8 +173,8 @@ const PresentationEditor = React.memo(
             data-slide-content="true"
           >
             {/* Canvas */}
-            <SlideCanvas
-              value={initialContent.canvas as CanvasDoc}
+            <SlideCanvasAdapter
+              doc={initialContent.canvas as CanvasDoc}
               onChange={(next: CanvasDoc) => {
                 // Slides im globalen State aktualisieren (inkl. optionalem Preview)
                 const { slides, setSlides } = usePresentationState.getState();
