@@ -114,21 +114,28 @@ export function SlideContainer({
           className,
         )}
       >
-        {/* Linke, vertikale Toolbar (immer sichtbar, stört nicht den Editor) */}
+        {/* Untere Toolbar: unter dem Canvas, horizontal und mittig */}
+        {!isPresenting && !isReadOnly && null}
+
+        {/* Hinweis: die früheren schwebenden + Buttons oben/unten wurden entfernt */}
+
+        {children}
+
+        {/* Untere Toolbar unter dem Canvas */}
         {!isPresenting && !isReadOnly && (
           <div
             className={cn(
-              "absolute top-1/2 -translate-y-1/2 -left-14 z-[1001]",
+              "z-[1001] mt-3 w-full",
             )}
             aria-label="Slide toolbar"
           >
-            <div className="flex flex-col items-center gap-2">
+            <div className="mx-auto flex w-full max-w-[760px] items-center justify-center gap-2 rounded-md bg-background/95 p-2 shadow-sm backdrop-blur">
               {/* Drag-Handle */}
               <button
                 ref={setActivatorNodeRef as React.Ref<HTMLButtonElement>}
                 {...listeners}
                 {...attributes}
-                className="flex h-9 w-9 items-center justify-center rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground focus:outline-none focus-visible:outline-none"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus:outline-none focus-visible:outline-none"
                 aria-label="Folienposition ziehen"
                 title="Verschieben"
               >
@@ -136,15 +143,15 @@ export function SlideContainer({
               </button>
 
               {/* Slide-Einstellungen */}
-              <div className="rounded-md bg-background/95 shadow-sm backdrop-blur">
+              <div className="rounded-md">
                 <SlideEditPopover index={index} />
               </div>
 
-              {/* Neues Canvas unter aktueller Folie */}
+              {/* Neue Folie darunter */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground focus:outline-none focus-visible:outline-none"
+                className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
                 onClick={() => addSlide("after", index)}
                 aria-label="Neue Folie darunter"
                 title="Neue Folie darunter"
@@ -158,7 +165,7 @@ export function SlideContainer({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-destructive focus:outline-none focus-visible:outline-none"
+                    className="h-9 w-9 rounded-md text-muted-foreground hover:text-destructive"
                     aria-label="Folie löschen"
                     title="Folie löschen"
                   >
@@ -185,10 +192,6 @@ export function SlideContainer({
             </div>
           </div>
         )}
-
-        {/* Hinweis: die früheren schwebenden + Buttons oben/unten wurden entfernt */}
-
-        {children}
       </div>
 
       {isPresenting && (
