@@ -1,145 +1,222 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-src/components/presentation/canvas/SlideCanvasBase.tsx
+Diff #1 – BG-Image-Update: nie wieder Text verlieren
+
+File: src/components/presentation/utils/canvas.ts
+
+*** a/src/components/presentation/utils/canvas.ts
+--- b/src/components/presentation/utils/canvas.ts
 @@
-const [textPosition, setTextPosition] = useState(
-slideWithExtras.position ?? defaultPosition,
-);
+-export function applyBackgroundImageToCanvas(
+-  canvas: CanvasDoc | null | undefined,
+-  imageUrl?: string | null,
+-): CanvasDoc {
+-  const base: CanvasDoc = {
+-    width: canvas?.width ?? DEFAULT_CANVAS.width,
+-    height: canvas?.height ?? DEFAULT_CANVAS.height,
+-    bg: canvas?.bg ?? DEFAULT_CANVAS.bg,
+-    nodes: canvas?.nodes ? [...canvas.nodes] : [],
+-    selection: canvas?.selection ?? [],
+-  };
++export function applyBackgroundImageToCanvas(
++  canvas: CanvasDoc | null | undefined,
++  imageUrl?: string | null,
++): CanvasDoc {
++  // Starte IMMER vom bestehenden Canvas und erhalte ALLE Nicht-Image-Nodes
++  const base: CanvasDoc = {
++    width: canvas?.width ?? DEFAULT_CANVAS.width,
++    height: canvas?.height ?? DEFAULT_CANVAS.height,
++    bg: canvas?.bg ?? DEFAULT_CANVAS.bg,
++    nodes: Array.isArray(canvas?.nodes) ? [...canvas!.nodes] : [],
++    selection: Array.isArray(canvas?.selection) ? [...(canvas!.selection as any[])] : [],
++  };
+ 
+   if (!imageUrl) {
+     return base;
+   }
+ 
+-  const imageNode = {
++  const imageNode = {
+     id: "canvas-background-image",
+     type: "image" as const,
+     x: 0,
+     y: 0,
+     width: base.width,
+     height: base.height,
+     url: imageUrl,
+   };
+ 
+-  const existingIndex = base.nodes.findIndex((node) => node.type === "image");
+-  if (existingIndex >= 0) {
+-    const existing = base.nodes[existingIndex] as any;
+-    const sameUrl =
+-      typeof existing?.url === "string" &&
+-      typeof imageNode.url === "string" &&
+-      existing.url === imageNode.url;
+-    const sameSize =
+-      existing?.width === imageNode.width && existing?.height === imageNode.height;
+-    if (sameUrl && sameSize) {
+-      return base;
+-    }
+-    base.nodes[existingIndex] = imageNode;
+-  } else {
+-    base.nodes.unshift(imageNode);
+-  }
++  // Entferne ausschließlich den bisherigen BG-Image-Knoten (falls vorhanden),
++  // erhalte aber ALLE anderen Nodes (v. a. Text!)
++  const withoutBg = base.nodes.filter((n: any) => !(n?.type === "image" && n?.id === "canvas-background-image"));
++
++  // Prüfe Idempotenz: existiert bereits der gleiche BG?
++  const prevBg = base.nodes.find((n: any) => n?.type === "image" && n?.id === "canvas-background-image") as any;
++  if (prevBg) {
++    const sameUrl = prevBg.url === imageNode.url;
++    const sameSize = prevBg.width === imageNode.width && prevBg.height === imageNode.height;
++    if (sameUrl && sameSize) {
++      // nichts ändern
++      return { ...base, nodes: base.nodes };
++    }
++  }
++
++  // BG-Image immer als unterstes Element einfügen
++  const mergedNodes = [imageNode, ...withoutBg];
++  return { ...base, nodes: mergedNodes };
+ }
 
-- useEffect(() => {
-- setTextPosition(slideWithExtras.position ?? defaultPosition);
-- }, [slideWithExtras.position?.x, slideWithExtras.position?.y, defaultPosition]);
 
-* // Verhindert, dass während Drag-Operationen die Position durch den Default/Effekt überschrieben wird
-* const isDraggingTextRef = useRef(false);
-*
-* useEffect(() => {
-* if (isDraggingTextRef.current) return;
-* const next = slideWithExtras.position ?? defaultPosition;
-* // nur setzen wenn es sich wirklich geändert hat (verhindert Flackern)
-* if (next.x !== textPosition.x || next.y !== textPosition.y) {
-*      setTextPosition(next);
-* }
-* }, [
-* slideWithExtras.position?.x,
-* slideWithExtras.position?.y,
-* defaultPosition,
-* textPosition.x,
-* textPosition.y,
-* ]);
-  @@
-  const textContent = useMemo(() => {
-  if (activeTextNode?.text) {
-  return activeTextNode.text;
-  }
-  return extractPlainText(slide.content ?? []);
-  }, [activeTextNode?.text, slide.content]);
+Was das verhindert: Egal wann applyBackgroundImageToCanvas aufgerufen wird – Textknoten bleiben immer erhalten, der BG-Node wird nur ge-upsertet und nie „mitgerissen“.
 
-- const handleDragEnd = useCallback(
+Diff #2 – Safe-Merge beim Setzen des Canvas aus dem Editor
 
-* // während des Draggen live die UI-Position updaten (kontrollierte Komponente)
-* const handleDragMove = useCallback((event: any) => {
-* isDraggingTextRef.current = true;
-* const next = { x: event.target.x(), y: event.target.y() };
-* // keine Persistierung hier – nur UI-State
-* setTextPosition(next);
-* }, []);
-*
-* const handleDragStart = useCallback(() => {
-* isDraggingTextRef.current = true;
-* }, []);
-*
-* const handleDragEnd = useCallback(
-  (event: any) => {
+File: src/components/presentation/presentation-page/PresentationSlidesView.tsx
+(dort, wo du dem SlideCanvas ein onChange gibst)
 
--      const next = { x: event.target.x(), y: event.target.y() };
--      setTextPosition(next);
+*** a/src/components/presentation/presentation-page/PresentationSlidesView.tsx
+--- b/src/components/presentation/presentation-page/PresentationSlidesView.tsx
+@@
+-              <SlideCanvas
+-                doc={safeCanvas}
+-                onChange={(next: CanvasDoc) => {
+-                  const { slides, setSlides } = usePresentationState.getState();
+-                  const updated = slides.slice();
+-                  const indexToUpdate = updated.findIndex((x) => x.id === slide.id);
+-                  if (indexToUpdate < 0) return;
+-                  const current = updated[indexToUpdate];
+-                  if (!current) return;
+-                  if (current.canvas !== next) {
+-                    updated[indexToUpdate] = { ...current, canvas: next };
+-                    setSlides(updated);
+-                  }
+-                }}
+-              />
++              <SlideCanvas
++                doc={safeCanvas}
++                onChange={(next: CanvasDoc) => {
++                  const { slides, setSlides } = usePresentationState.getState();
++                  const updated = slides.slice();
++                  const i = updated.findIndex((x) => x.id === slide.id);
++                  if (i < 0) return;
++                  const current = updated[i];
++                  if (!current) return;
++
++                  const currCanvas = current.canvas as CanvasDoc | undefined;
++
++                  // 🛡️ SAFETY MERGE: verliere nie Textknoten beim Update
++                  const currTextNodes = Array.isArray(currCanvas?.nodes)
++                    ? (currCanvas!.nodes.filter((n: any) => n?.type === "text"))
++                    : [];
++                  const nextTextNodes = Array.isArray(next?.nodes)
++                    ? (next!.nodes.filter((n: any) => n?.type === "text"))
++                    : [];
++
++                  let merged: CanvasDoc = next;
++                  if (currTextNodes.length > 0 && nextTextNodes.length === 0) {
++                    // Race: next hat (noch) keine Texte → Texte aus current konservieren
++                    const otherNodes = Array.isArray(next?.nodes) ? next.nodes.filter((n: any) => n?.type !== "text") : [];
++                    merged = { ...next, nodes: [...otherNodes, ...currTextNodes] };
++                  }
++
++                  // Nur setzen, wenn sich tatsächlich was geändert hat
++                  if (currCanvas !== merged) {
++                    updated[i] = { ...current, canvas: merged };
++                    setSlides(updated);
++                  }
++                }}
++              />
 
-*      const next = { x: event.target.x(), y: event.target.y() };
-*      // final: UI-State & Persistierung
-*      setTextPosition(next);
-*      isDraggingTextRef.current = false;
-       const { slides, setSlides } = usePresentationState.getState();
 
--      setSlides(
+Was das verhindert: Selbst wenn irgendwo im System noch ein Update ohne Textknoten reinkommt (z. B. durch späten BG-Reflow/Resize), bewahren wir vorhandene Textknoten und verlieren sie nicht mehr.
 
-*      setSlides(
-         slides.map((s, index) => {
-           if (index !== slideIndex) return s;
-           const updatedCanvas = s.canvas
-             ? {
-                 ...s.canvas,
-                 nodes: s.canvas.nodes.map((node) =>
+Diff #3 – Stabilität beim Drag & Render
 
--                  node.type === "text" && node.id === (activeTextNode?.id ?? node.id)
--                    ? { ...node, x: next.x, y: next.y }
+File: src/components/presentation/canvas/SlideCanvasBase.tsx
 
-*                  // Nur genau den aktiven Text-Knoten persistieren, falls vorhanden
-*                  node.type === "text" && activeTextNode?.id && node.id === activeTextNode.id
-*                    ? { ...node, x: next.x, y: next.y }
-                       : node,
-                   ),
-                 }
-               : s.canvas;
-             return {
-               ...s,
-               position: next,
-               canvas: updatedCanvas,
-             };
-           }),
-         );
-       },
-       [activeTextNode?.id, slideIndex],
-  );
-  @@
-  <Stage
-             ref={stageRef}
-             width={stageDimensions.width}
-             height={stageDimensions.height}
-             className="shadow-lg"
-           >
-  <Layer>
-  @@
+Du hast hier schon vieles richtig. Zwei kleine Ergänzungen, die Remounts vermeiden und während „stillen“ Updates das UI stabil halten.
 
+*** a/src/components/presentation/canvas/SlideCanvasBase.tsx
+--- b/src/components/presentation/canvas/SlideCanvasBase.tsx
+@@
 -            <Text
--              text={textContent}
--              fontSize={32}
--              fontFamily="TikTok Sans, sans-serif"
--              fill="#ffffff"
--              x={textPosition.x}
--              y={textPosition.y}
--              draggable={!disableDrag}
--              onDragEnd={handleDragEnd}
--            />
+-              key={`text-${activeTextNode?.id ?? "fallback"}`}
++            <Text
++              // Stabiler Key pro Slide, nicht pro Node-Wechsel → kein Remount beim Umschalten/Autosave
++              key={`text-slide-${slide.id}`}
+               text={textContent}
+               fontSize={32}
+               fontFamily="TikTok Sans, sans-serif"
+               fill="#ffffff"
+               x={textPosition.x}
+               y={textPosition.y}
+               draggable={!disableDrag}
+               onDragStart={handleDragStart}
+               onDragMove={handleDragMove}
+               onDragEnd={handleDragEnd}
++              visible={true}
++              opacity={1}
++              listening={true}
+               dragBoundFunc={(pos) => ({
+                 x: Math.min(
+                   Math.max(0, pos.x),
+                   stageDimensions.width - 10
+                 ),
+                 y: Math.min(
+                   Math.max(0, pos.y),
+                   stageDimensions.height - 10
+                 ),
+               })}
+             />
 
-*            <Text
-*              key={`text-${activeTextNode?.id ?? "fallback"}`}
-*              text={textContent}
-*              fontSize={32}
-*              fontFamily="TikTok Sans, sans-serif"
-*              fill="#ffffff"
-*              x={textPosition.x}
-*              y={textPosition.y}
-*              draggable={!disableDrag}
-*              // kontrolliertes Dragging:
-*              onDragStart={handleDragStart}
-*              onDragMove={handleDragMove}
-*              onDragEnd={handleDragEnd}
-*              // verhindert „Wegschnappen“ außerhalb der Bühne
-*              dragBoundFunc={(pos) => ({
-*                x: Math.min(
-*                  Math.max(0, pos.x),
-*                  stageDimensions.width - 10
-*                ),
-*                y: Math.min(
-*                  Math.max(0, pos.y),
-*                  stageDimensions.height - 10
-*                ),
-*              })}
-*            />
-            </Layer>
-          </Stage>
-        </div>
-      </div>
-  );
-  }
+
+Und zusätzlich ein Mini-Guard gegen „Positions-Resets“ genau während stiller BG-Updates:
+
+*** a/src/components/presentation/canvas/SlideCanvasBase.tsx
+--- b/src/components/presentation/canvas/SlideCanvasBase.tsx
+@@
+-  useEffect(() => {
+-    if (isDraggingTextRef.current) return;
+-    const next = slideWithExtras.position ?? defaultPosition;
+-    if (next.x !== textPosition.x || next.y !== textPosition.y) {
+-      setTextPosition(next);
+-    }
+-  }, [
+-    slideWithExtras.position?.x,
+-    slideWithExtras.position?.y,
+-    defaultPosition,
+-    textPosition.x,
+-    textPosition.y,
+-  ]);
++  useEffect(() => {
++    if (isDraggingTextRef.current) return;
++    const next = slideWithExtras.position ?? defaultPosition;
++    // Blockiere micro-jitters (±0.5px) durch Scale/Resize-Runden
++    const dx = Math.abs((next.x ?? 0) - (textPosition.x ?? 0));
++    const dy = Math.abs((next.y ?? 0) - (textPosition.y ?? 0));
++    if (dx > 0.5 || dy > 0.5) {
++      setTextPosition(next);
++    }
++  }, [
++    slideWithExtras.position?.x,
++    slideWithExtras.position?.y,
++    defaultPosition,
++    textPosition.x,
++    textPosition.y,
++  ]);

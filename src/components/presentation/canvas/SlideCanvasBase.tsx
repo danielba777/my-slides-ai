@@ -137,8 +137,10 @@ export default function SlideCanvasBase({
   useEffect(() => {
     if (isDraggingTextRef.current) return;
     const next = slideWithExtras.position ?? defaultPosition;
-    // nur setzen wenn es sich wirklich geändert hat (verhindert Flackern)
-    if (next.x !== textPosition.x || next.y !== textPosition.y) {
+    // Blockiere micro-jitters (±0.5px) durch Scale/Resize-Runden
+    const dx = Math.abs((next.x ?? 0) - (textPosition.x ?? 0));
+    const dy = Math.abs((next.y ?? 0) - (textPosition.y ?? 0));
+    if (dx > 0.5 || dy > 0.5) {
       setTextPosition(next);
     }
   }, [
@@ -246,7 +248,8 @@ export default function SlideCanvasBase({
               />
             )}
             <Text
-              key={`text-${activeTextNode?.id ?? "fallback"}`}
+              // Stabiler Key pro Slide, nicht pro Node-Wechsel → kein Remount beim Umschalten/Autosave
+              key={`text-slide-${slide.id}`}
               text={textContent}
               fontSize={32}
               fontFamily="TikTok Sans, sans-serif"
@@ -258,6 +261,9 @@ export default function SlideCanvasBase({
               onDragStart={handleDragStart}
               onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}
+              visible={true}
+              opacity={1}
+              listening={true}
               // verhindert "Wegschnappen" außerhalb der Bühne
               dragBoundFunc={(pos) => ({
                 x: Math.min(

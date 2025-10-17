@@ -61,15 +61,14 @@ export function applyBackgroundImageToCanvas(
   canvas: CanvasDoc | null | undefined,
   imageUrl?: string | null,
 ): CanvasDoc {
+  // Starte IMMER vom bestehenden Canvas und erhalte ALLE Nicht-Image-Nodes
   const base: CanvasDoc = {
     version: canvas?.version ?? 1,
     width: canvas?.width ?? CANVAS_WIDTH,
     height: canvas?.height ?? CANVAS_HEIGHT,
     bg: canvas?.bg ?? DEFAULT_CANVAS.bg,
-    nodes: [...(canvas?.nodes ?? [])],
-    selection: Array.isArray(canvas?.selection)
-      ? [...(canvas?.selection ?? [])]
-      : [],
+    nodes: Array.isArray(canvas?.nodes) ? [...canvas!.nodes] : [],
+    selection: Array.isArray(canvas?.selection) ? [...(canvas!.selection as any[])] : [],
     previewDataUrl: canvas?.previewDataUrl,
   };
 
@@ -87,26 +86,24 @@ export function applyBackgroundImageToCanvas(
     url: imageUrl,
   };
 
-  const existingIndex = base.nodes.findIndex((node) => node.type === "image");
-  if (existingIndex >= 0) {
-    const existing = base.nodes[existingIndex] as any;
-    // 🔒 Idempotent: nur ersetzen, wenn sich die URL wirklich geändert hat
-    const sameUrl =
-      typeof existing?.url === "string" &&
-      typeof imageNode.url === "string" &&
-      existing.url === imageNode.url;
-    const sameSize =
-      existing?.width === imageNode.width && existing?.height === imageNode.height;
+  // Entferne ausschließlich den bisherigen BG-Image-Knoten (falls vorhanden),
+  // erhalte aber ALLE anderen Nodes (v. a. Text!)
+  const withoutBg = base.nodes.filter((n: any) => !(n?.type === "image" && n?.id === "canvas-background-image"));
+
+  // Prüfe Idempotenz: existiert bereits der gleiche BG?
+  const prevBg = base.nodes.find((n: any) => n?.type === "image" && n?.id === "canvas-background-image") as any;
+  if (prevBg) {
+    const sameUrl = prevBg.url === imageNode.url;
+    const sameSize = prevBg.width === imageNode.width && prevBg.height === imageNode.height;
     if (sameUrl && sameSize) {
-      // nichts ändern → kein Re-Render/Reload des Bildes
-      return base;
+      // nichts ändern
+      return { ...base, nodes: base.nodes };
     }
-    base.nodes[existingIndex] = imageNode;
-  } else {
-    base.nodes.unshift(imageNode);
   }
 
-  return base;
+  // BG-Image immer als unterstes Element einfügen
+  const mergedNodes = [imageNode, ...withoutBg];
+  return { ...base, nodes: mergedNodes };
 }
 
 export function buildCanvasDocFromSlide(

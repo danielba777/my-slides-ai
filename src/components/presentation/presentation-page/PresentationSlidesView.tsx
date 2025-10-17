@@ -80,9 +80,27 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
                   if (i < 0) return;
                   const current = updated[i];
                   if (!current) return;
-                  // Nur setzen, wenn sich was geändert hat (verhindert Re-Mount-Bursts)
-                  if (current.canvas !== next) {
-                    updated[i] = { ...current, canvas: next };
+
+                  const currCanvas = current.canvas as CanvasDoc | undefined;
+
+                  // 🛡️ SAFETY MERGE: verliere nie Textknoten beim Update
+                  const currTextNodes = Array.isArray(currCanvas?.nodes)
+                    ? (currCanvas!.nodes.filter((n: any) => n?.type === "text"))
+                    : [];
+                  const nextTextNodes = Array.isArray(next?.nodes)
+                    ? (next!.nodes.filter((n: any) => n?.type === "text"))
+                    : [];
+
+                  let merged: CanvasDoc = next;
+                  if (currTextNodes.length > 0 && nextTextNodes.length === 0) {
+                    // Race: next hat (noch) keine Texte → Texte aus current konservieren
+                    const otherNodes = Array.isArray(next?.nodes) ? next.nodes.filter((n: any) => n?.type !== "text") : [];
+                    merged = { ...next, nodes: [...otherNodes, ...currTextNodes] };
+                  }
+
+                  // Nur setzen, wenn sich tatsächlich was geändert hat
+                  if (currCanvas !== merged) {
+                    updated[i] = { ...current, canvas: merged };
                     setSlides(updated);
                   }
                 }}
