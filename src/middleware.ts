@@ -16,7 +16,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  const isPublicPath = path === "/";
+  const publicPaths = new Set(["/"]);
+  const isPublicPath =
+    publicPaths.has(path) || path.startsWith("/integrations/social/tiktok");
 
   // If user is not authenticated and trying to access a protected route, redirect to sign-in
   if (

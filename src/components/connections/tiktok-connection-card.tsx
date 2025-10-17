@@ -22,19 +22,6 @@ export function TikTokConnectionCard() {
     setConnectionState("loading");
 
     try {
-      const loginResponse = await fetch("/api/postiz/login", {
-        method: "POST",
-      });
-
-      if (!loginResponse.ok) {
-        const loginError = await loginResponse.json().catch(() => null);
-        throw new Error(
-          loginError && typeof loginError.error === "string"
-            ? loginError.error
-            : "Login at Postiz failed",
-        );
-      }
-
       const startResponse = await fetch("/api/tiktok/start");
       const startPayload = await startResponse.json().catch(() => null);
 

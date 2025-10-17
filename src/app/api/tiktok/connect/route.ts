@@ -1,6 +1,5 @@
 import { env } from "@/env";
-import { applyPostizCookies, ensurePostizCookie } from "@/lib/postiz-session";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const payload = await req.json().catch(() => null);
@@ -16,19 +15,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let cookieHeader: string;
-  try {
-    cookieHeader = await ensurePostizCookie();
-  } catch (error) {
-    if (error instanceof Error && error.message === "missing-postiz-session") {
-      return NextResponse.json(
-        { error: "Postiz session missing, login required" },
-        { status: 401 },
-      );
-    }
-    throw error;
-  }
-
   const timezone =
     typeof payload.timezone === "string" && payload.timezone.length > 0
       ? payload.timezone
@@ -36,12 +22,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const response = await fetch(
-      `${env.POSTIZ_API}/integrations/social/tiktok/connect`,
+      `${env.SLIDESCOCKPIT_API}/integrations/social/tiktok/connect`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Cookie: cookieHeader,
         },
         body: JSON.stringify({
           code: payload.code,
@@ -63,19 +48,17 @@ export async function POST(req: NextRequest) {
         },
         { status: response.status },
       );
-      applyPostizCookies(errorResponse, response);
       return errorResponse;
     }
 
     const successResponse = NextResponse.json(data, {
       status: response.status,
     });
-    applyPostizCookies(successResponse, response);
     return successResponse;
   } catch (error) {
     console.error("Failed to complete TikTok OAuth flow", error);
     return NextResponse.json(
-      { error: "Unable to reach Postiz API" },
+      { error: "Unable to reach SlidesCockpit API" },
       { status: 500 },
     );
   }
