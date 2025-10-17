@@ -370,66 +370,205 @@ Thank you for contributing to make ALLWEONE Presentation Generator better for ev
 ```md
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-Diff 1 — löscht garantiert den richtigen Text
-
-Datei: src/canvas/SlideCanvasAdapter.tsx
-
-codebase
-
+Diff: src/components/presentation/presentation-page/PresentationSlidesView.tsx
+\*\*\* a/src/components/presentation/presentation-page/PresentationSlidesView.tsx
+--- b/src/components/presentation/presentation-page/PresentationSlidesView.tsx
 @@
+const SlideCanvas = dynamic(() => import("@/canvas/SlideCanvasAdapter"), {
+ssr: false,
+});
 
--      // 3) (Optional) Wenn weniger Layer als vorhandene Textknoten: überschüssige löschen
--      //    → verhindert "Zombie"-Knoten, wenn man Textlayer im Canvas löscht.
--      //    Kommentiere diesen Block aus, falls ihr grundsätzlich nie auto-löschen wollt.
--      const targetTextCount = next.length;
--      if (existingTextCount > targetTextCount) {
--        let seen = 0;
--        for (let i = newNodes.length - 1; i >= 0; i--) {
--          if (newNodes[i].type === "text") {
--            seen++;
--            if (seen > targetTextCount) {
--              newNodes.splice(i, 1);
--            }
--          }
--        }
--      }
+// -- Small utility to wait for root image decode before mounting the canvas --
+function useImageReady(url?: string) {
+const [ready, setReady] = React.useState(!url);
+React.useEffect(() => {
+let active = true;
+if (!url) {
+setReady(true);
+return;
+}
+const img = new Image();
+img.crossOrigin = "anonymous";
+const markReady = () => active && setReady(true);
+// Prefer decode() to avoid showing half-rendered frames (Chrome/Firefox)
+img.src = url;
+if (typeof (img as any).decode === "function") {
+(img as any)
+.decode()
+.then(markReady)
+.catch(markReady);
+} else {
+img.onload = markReady;
+img.onerror = markReady;
+}
+return () => {
+active = false;
+};
+}, [url]);
+return ready;
+}
 
-*      // 3) Überschüssige Textknoten **nach ID** entfernen (nicht „von hinten“),
-*      //    damit genau der vom Canvas gelöschte Layer verschwindet.
-*      const keepIds = new Set(next.map((t) => t.id));
-*      for (let i = newNodes.length - 1; i >= 0; i--) {
-*        const n = newNodes[i] as any;
-*        if (n?.type === "text" && !keepIds.has(n.id)) {
-*          newNodes.splice(i, 1);
-*        }
-*      }
++// Child-Komponente, damit Hooks nicht in einer Schleife aufgerufen werden
++function SlideFrame({
 
-Warum das hilft: Zuvor wurde nur die Anzahl der Textknoten reduziert (vom Ende her). Wenn die Reihenfolge der Textnodes im doc.nodes nicht exakt deiner Canvas-Reihenfolge entspricht, wurde oft der falsche Text entfernt. Mit dem ID-Set wird exakt der Text entfernt, der im Canvas wirklich gelöscht wurde. (Siehe die bisherige Tail-Trim-Stelle hier im Adapter, die ich durch ID-Filterung ersetze.
-
-codebase
-
-)
-
-Diff 2 — Deselect synchronisiert aktive Auswahl immer sauber
-
-Datei: src/canvas/legacy/SlideCanvasLegacy.tsx (kleiner Konsistenz-Fix)
-
-codebase
-
-@@
-
-- // Canvas-Hintergrund-Klick: Auswahl aufheben
-- const handleCanvasDeselect = () => {
-- setActiveLayerId(null);
-- activeLayerIdRef.current = null;
-- setIsEditing(null);
+- slide,
+- index,
+- itemsLength,
+- isPresenting,
+  +}: {
+- slide: any;
+- index: number;
+- itemsLength: number;
+- isPresenting: boolean;
+  +}) {
+- const safeCanvas: CanvasDoc =
+- (slide.canvas as CanvasDoc | undefined) ?? {
+-      width: DEFAULT_CANVAS.width,
+-      height: DEFAULT_CANVAS.height,
+-      bg: DEFAULT_CANVAS.bg,
+-      nodes: [],
+-      selection: [],
 - };
+- const imgUrl = slide.rootImage?.url as string | undefined;
+- const imageReady = useImageReady(imgUrl);
+-
+- return (
+- <SortableSlide id={slide.id} key={slide.id}>
+-      <div
+-        className={cn(
+-          `slide-wrapper slide-wrapper-${index} flex-shrink-0`,
+-          !isPresenting && "max-w-full",
+-        )}
+-      >
+-        <SlideContainer
+-          index={index}
+-          id={slide.id}
+-          slideWidth={undefined}
+-          slidesCount={itemsLength}
+-        >
+-          <div
+-            className={cn(
+-              `slide-container-${index}`,
+-              isPresenting && "h-screen w-screen",
+-            )}
+-          >
+-            {imageReady ? (
+-              <SlideCanvas
+-                doc={safeCanvas}
+-                onChange={(next: CanvasDoc) => {
+-                  const { slides, setSlides } = usePresentationState.getState();
+-                  const updated = slides.slice();
+-                  const indexToUpdate = updated.findIndex((x) => x.id === slide.id);
+-                  if (indexToUpdate < 0) return;
+-                  const current = updated[indexToUpdate];
+-                  if (!current) return;
+-                  if (current.canvas !== next) {
+-                    updated[indexToUpdate] = { ...current, canvas: next };
+-                    setSlides(updated);
+-                  }
+-                }}
+-              />
+-            ) : (
+-              // Placeholder hält den Platz und verhindert Schwarz-Blitzen
+-              <div
+-                className={cn(
+-                  "rounded-xl",
+-                  isPresenting ? "h-screen w-screen" : "h-[700px] w-[420px]",
+-                  "bg-black/90",
+-                )}
+-              />
+-            )}
+-          </div>
+-        </SlideContainer>
+-      </div>
+- </SortableSlide>
+- );
+  +}
+- interface PresentationSlidesViewProps {
+  isGeneratingPresentation: boolean;
+  }
+  export const PresentationSlidesView = ({
+  isGeneratingPresentation,
+  }: PresentationSlidesViewProps) => {
+  @@
 
-* // Canvas-Hintergrund-Klick: Auswahl aufheben (State + Ref immer gemeinsam!)
-* const handleCanvasDeselect = () => {
-* commitActiveLayer(null);
-* setIsEditing(null);
-* };
+*          {items.map((slide, index) => {
+*            const safeCanvas: CanvasDoc =
+*              (slide.canvas as CanvasDoc | undefined) ?? {
+*                width: DEFAULT_CANVAS.width,
+*                height: DEFAULT_CANVAS.height,
+*                bg: DEFAULT_CANVAS.bg,
+*                nodes: [],
+*                selection: [],
+*              };
+*            const imgUrl = slide.rootImage?.url;
+*            const imageReady = useImageReady(imgUrl);
+*            return (
+*              <SortableSlide id={slide.id} key={slide.id}>
+*                <div
+*                  className={cn(
+*                    `slide-wrapper slide-wrapper-${index} flex-shrink-0`,
+*                    !isPresenting && "max-w-full",
+*                  )}
+*                >
+*                  <SlideContainer
+*                    index={index}
+*                    id={slide.id}
+*                    slideWidth={undefined}
+*                    slidesCount={items.length}
+*                  >
+*                    <div
+*                      className={cn(
+*                        `slide-container-${index}`,
+*                        isPresenting && "h-screen w-screen",
+*                      )}
+*                    >
+*                      {imageReady ? (
+*                        <SlideCanvas
+*                          doc={safeCanvas}
+*                          onChange={(next: CanvasDoc) => {
+*                            const { slides, setSlides } =
+*                              usePresentationState.getState();
+*                            const updated = slides.slice();
+*                            const indexToUpdate = updated.findIndex(
+*                              (x) => x.id === slide.id,
+*                            );
+*                            if (indexToUpdate < 0) return;
+*                            const current = updated[indexToUpdate];
+*                            if (!current) return;
+*                            // Nur aktualisieren, wenn sich wirklich etwas ändert
+*                            if (current.canvas !== next) {
+*                              updated[indexToUpdate] = { ...current, canvas: next };
+*                              setSlides(updated);
+*                            }
+*                          }}
+*                        />
+*                      ) : (
+*                        // Placeholder hält den Platz und verhindert Schwarz-Blitzen
+*                        <div
+*                          className={cn(
+*                            "rounded-xl",
+*                            isPresenting ? "h-screen w-screen" : "h-[700px] w-[420px]",
+*                            "bg-black/90"
+*                          )}
+*                        />
+*                      )}
+*                    </div>
+*                  </SlideContainer>
+*                </div>
+*              </SortableSlide>
+*            );
+*          })}
+
+-          {items.map((slide, index) => (
+-            <SlideFrame
+-              key={slide.id}
+-              slide={slide}
+-              index={index}
+-              itemsLength={items.length}
+-              isPresenting={isPresenting}
+-            />
+-          ))}
 
 ```
 
@@ -3991,6 +4130,19 @@ export function loadImage(url: string): Promise<HTMLImageElement> {
     img.onerror = reject;
     img.src = url;
   });
+}
+
+export async function loadImageDecoded(url: string): Promise<HTMLImageElement> {
+  const img = await loadImage(url);
+  // decode() verhindert Paint-Glitches vor vollständiger Decodierung
+  // Fallback: falls nicht unterstützt, ist img schon geladen
+  try {
+    // @ts-expect-error older TS lib
+    if (typeof img.decode === "function") await img.decode();
+  } catch {
+    // ignore
+  }
+  return img;
 }
 
 export async function ensureFonts(families: string[], timeout = 5000) {
@@ -42407,12 +42559,119 @@ import {
 } from "@dnd-kit/sortable";
 import dynamic from "next/dynamic";
 import { useEffect } from "react";
+import React from "react";
 import { PresentModeHeader } from "../dashboard/PresentModeHeader";
 import { ThinkingDisplay } from "../dashboard/ThinkingDisplay";
 import { SortableSlide } from "./SortableSlide";
 const SlideCanvas = dynamic(() => import("@/canvas/SlideCanvasAdapter"), {
   ssr: false,
 });
+
+// -- Small utility to wait for root image decode before mounting the canvas --
+function useImageReady(url?: string) {
+  const [ready, setReady] = React.useState(!url);
+  React.useEffect(() => {
+    let active = true;
+    if (!url) {
+      setReady(true);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    const markReady = () => active && setReady(true);
+    // Prefer decode() to avoid showing half-rendered frames (Chrome/Firefox)
+    img.src = url;
+    if (typeof (img as any).decode === "function") {
+      (img as any)
+        .decode()
+        .then(markReady)
+        .catch(markReady);
+    } else {
+      img.onload = markReady;
+      img.onerror = markReady;
+    }
+    return () => {
+      active = false;
+    };
+  }, [url]);
+  return ready;
+}
+
+// Child-Komponente, damit Hooks nicht in einer Schleife aufgerufen werden
+function SlideFrame({
+  slide,
+  index,
+  itemsLength,
+  isPresenting,
+}: {
+  slide: any;
+  index: number;
+  itemsLength: number;
+  isPresenting: boolean;
+}) {
+  const safeCanvas: CanvasDoc =
+    (slide.canvas as CanvasDoc | undefined) ?? {
+      width: DEFAULT_CANVAS.width,
+      height: DEFAULT_CANVAS.height,
+      bg: DEFAULT_CANVAS.bg,
+      nodes: [],
+      selection: [],
+    };
+  const imgUrl = slide.rootImage?.url as string | undefined;
+  const imageReady = useImageReady(imgUrl);
+
+  return (
+    <SortableSlide id={slide.id} key={slide.id}>
+      <div
+        className={cn(
+          `slide-wrapper slide-wrapper-${index} flex-shrink-0`,
+          !isPresenting && "max-w-full",
+        )}
+      >
+        <SlideContainer
+          index={index}
+          id={slide.id}
+          slideWidth={undefined}
+          slidesCount={itemsLength}
+        >
+          <div
+            className={cn(
+              `slide-container-${index}`,
+              isPresenting && "h-screen w-screen",
+            )}
+          >
+            {imageReady ? (
+              <SlideCanvas
+                doc={safeCanvas}
+                onChange={(next: CanvasDoc) => {
+                  const { slides, setSlides } = usePresentationState.getState();
+                  const updated = slides.slice();
+                  const indexToUpdate = updated.findIndex((x) => x.id === slide.id);
+                  if (indexToUpdate < 0) return;
+                  const current = updated[indexToUpdate];
+                  if (!current) return;
+                  if (current.canvas !== next) {
+                    updated[indexToUpdate] = { ...current, canvas: next };
+                    setSlides(updated);
+                  }
+                }}
+              />
+            ) : (
+              // Placeholder hält den Platz und verhindert Schwarz-Blitzen
+              <div
+                className={cn(
+                  "rounded-xl",
+                  isPresenting ? "h-screen w-screen" : "h-[700px] w-[420px]",
+                  "bg-black/90",
+                )}
+              />
+            )}
+          </div>
+        </SlideContainer>
+      </div>
+    </SortableSlide>
+  );
+}
 
 interface PresentationSlidesViewProps {
   isGeneratingPresentation: boolean;
@@ -42492,55 +42751,15 @@ export const PresentationSlidesView = ({
         />
 
         <div className="flex w-full items-start gap-8">
-          {items.map((slide, index) => {
-            const safeCanvas: CanvasDoc =
-              (slide.canvas as CanvasDoc | undefined) ?? {
-                ...DEFAULT_CANVAS,
-                nodes: [],
-                selection: [],
-              };
-            return (
-              <SortableSlide id={slide.id} key={slide.id}>
-                <div
-                  className={cn(
-                    `slide-wrapper slide-wrapper-${index} flex-shrink-0`,
-                    !isPresenting && "max-w-full",
-                  )}
-                >
-                  <SlideContainer
-                    index={index}
-                    id={slide.id}
-                    slideWidth={undefined}
-                    slidesCount={items.length}
-                  >
-                    <div
-                      className={cn(
-                        `slide-container-${index}`,
-                        isPresenting && "h-screen w-screen",
-                      )}
-                    >
-                      <SlideCanvas
-                        doc={safeCanvas}
-                        onChange={(next: CanvasDoc) => {
-                          const { slides, setSlides } =
-                            usePresentationState.getState();
-                          const updated = slides.slice();
-                          const indexToUpdate = updated.findIndex(
-                            (x) => x.id === slide.id,
-                          );
-                          if (indexToUpdate < 0) return;
-                          const current = updated[indexToUpdate];
-                          if (!current) return;
-                          updated[indexToUpdate] = { ...current, canvas: next };
-                          setSlides(updated);
-                        }}
-                      />
-                    </div>
-                  </SlideContainer>
-                </div>
-              </SortableSlide>
-            );
-          })}
+            {items.map((slide, index) => (
+            <SlideFrame
+              key={slide.id}
+              slide={slide}
+              index={index}
+              itemsLength={items.length}
+              isPresenting={isPresenting}
+            />
+          ))}
         </div>
       </SortableContext>
     </DndContext>
@@ -42668,21 +42887,28 @@ export function SlideContainer({
           className,
         )}
       >
-        {/* Linke, vertikale Toolbar (immer sichtbar, stört nicht den Editor) */}
+        {/* Untere Toolbar: unter dem Canvas, horizontal und mittig */}
+        {!isPresenting && !isReadOnly && null}
+
+        {/* Hinweis: die früheren schwebenden + Buttons oben/unten wurden entfernt */}
+
+        {children}
+
+        {/* Untere Toolbar unter dem Canvas */}
         {!isPresenting && !isReadOnly && (
           <div
             className={cn(
-              "absolute top-1/2 -translate-y-1/2 -left-14 z-[1001]",
+              "z-[1001] mt-3 w-full",
             )}
             aria-label="Slide toolbar"
           >
-            <div className="flex flex-col items-center gap-2">
+            <div className="mx-auto flex w-full max-w-[760px] items-center justify-center gap-2 rounded-md bg-background/95 p-2 shadow-sm backdrop-blur">
               {/* Drag-Handle */}
               <button
                 ref={setActivatorNodeRef as React.Ref<HTMLButtonElement>}
                 {...listeners}
                 {...attributes}
-                className="flex h-9 w-9 items-center justify-center rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground focus:outline-none focus-visible:outline-none"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus:outline-none focus-visible:outline-none"
                 aria-label="Folienposition ziehen"
                 title="Verschieben"
               >
@@ -42690,15 +42916,15 @@ export function SlideContainer({
               </button>
 
               {/* Slide-Einstellungen */}
-              <div className="rounded-md bg-background/95 shadow-sm backdrop-blur">
+              <div className="rounded-md">
                 <SlideEditPopover index={index} />
               </div>
 
-              {/* Neues Canvas unter aktueller Folie */}
+              {/* Neue Folie darunter */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground focus:outline-none focus-visible:outline-none"
+                className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
                 onClick={() => addSlide("after", index)}
                 aria-label="Neue Folie darunter"
                 title="Neue Folie darunter"
@@ -42712,7 +42938,7 @@ export function SlideContainer({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-destructive focus:outline-none focus-visible:outline-none"
+                    className="h-9 w-9 rounded-md text-muted-foreground hover:text-destructive"
                     aria-label="Folie löschen"
                     title="Folie löschen"
                   >
@@ -42739,10 +42965,6 @@ export function SlideContainer({
             </div>
           </div>
         )}
-
-        {/* Hinweis: die früheren schwebenden + Buttons oben/unten wurden entfernt */}
-
-        {children}
       </div>
 
       {isPresenting && (
@@ -44960,6 +45182,18 @@ export function applyBackgroundImageToCanvas(
 
   const existingIndex = base.nodes.findIndex((node) => node.type === "image");
   if (existingIndex >= 0) {
+    const existing = base.nodes[existingIndex] as any;
+    // 🔒 Idempotent: nur ersetzen, wenn sich die URL wirklich geändert hat
+    const sameUrl =
+      typeof existing?.url === "string" &&
+      typeof imageNode.url === "string" &&
+      existing.url === imageNode.url;
+    const sameSize =
+      existing?.width === imageNode.width && existing?.height === imageNode.height;
+    if (sameUrl && sameSize) {
+      // nichts ändern → kein Re-Render/Reload des Bildes
+      return base;
+    }
     base.nodes[existingIndex] = imageNode;
   } else {
     base.nodes.unshift(imageNode);

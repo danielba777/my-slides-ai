@@ -89,6 +89,18 @@ export function applyBackgroundImageToCanvas(
 
   const existingIndex = base.nodes.findIndex((node) => node.type === "image");
   if (existingIndex >= 0) {
+    const existing = base.nodes[existingIndex] as any;
+    // 🔒 Idempotent: nur ersetzen, wenn sich die URL wirklich geändert hat
+    const sameUrl =
+      typeof existing?.url === "string" &&
+      typeof imageNode.url === "string" &&
+      existing.url === imageNode.url;
+    const sameSize =
+      existing?.width === imageNode.width && existing?.height === imageNode.height;
+    if (sameUrl && sameSize) {
+      // nichts ändern → kein Re-Render/Reload des Bildes
+      return base;
+    }
     base.nodes[existingIndex] = imageNode;
   } else {
     base.nodes.unshift(imageNode);

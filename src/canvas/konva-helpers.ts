@@ -11,6 +11,19 @@ export function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
+export async function loadImageDecoded(url: string): Promise<HTMLImageElement> {
+  const img = await loadImage(url);
+  // decode() verhindert Paint-Glitches vor vollständiger Decodierung
+  // Fallback: falls nicht unterstützt, ist img schon geladen
+  try {
+    // @ts-expect-error older TS lib
+    if (typeof img.decode === "function") await img.decode();
+  } catch {
+    // ignore
+  }
+  return img;
+}
+
 export async function ensureFonts(families: string[], timeout = 5000) {
   await Promise.allSettled(
     families
