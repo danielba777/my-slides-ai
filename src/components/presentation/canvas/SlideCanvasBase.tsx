@@ -90,7 +90,7 @@ export default function SlideCanvasBase({
           i === slideIndex
             ? {
                 ...s,
-                canvas: addText(withDefaults(s.canvas)),
+                canvas: addText(withDefaults(s.canvas ?? undefined)),
               }
             : s,
         ),

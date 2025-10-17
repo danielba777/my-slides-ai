@@ -13,6 +13,8 @@ export type CanvasTextNode = {
   fill?: string;
   stroke?: string;
   strokeWidth?: number;
+  lineHeight?: number;
+  letterSpacing?: number;
   padding?: number;
   textBg?: string | null;
   link?: string | null;
