@@ -22,6 +22,10 @@ export const env = createEnv({
       process.env.NODE_ENV === "production"
         ? z.string()
         : z.string().optional(),
+    POSTIZ_API: z.string().url(),
+    POSTIZ_EMAIL: z.string().email(),
+    POSTIZ_PASSWORD: z.string(),
+    POSTIZ_PROVIDER: z.string().default("LOCAL"),
   },
 
   runtimeEnv: {
@@ -35,6 +39,10 @@ export const env = createEnv({
     TOGETHER_AI_API_KEY: process.env.TOGETHER_AI_API_KEY,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+    POSTIZ_API: process.env.POSTIZ_API,
+    POSTIZ_EMAIL: process.env.POSTIZ_EMAIL,
+    POSTIZ_PASSWORD: process.env.POSTIZ_PASSWORD,
+    POSTIZ_PROVIDER: process.env.POSTIZ_PROVIDER,
   },
 
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
