@@ -9,35 +9,36 @@ export async function GET() {
   }
 
   try {
-    const response = await fetch(`${env.SLIDESCOCKPIT_API}/integrations/social/tiktok`, {
-      method: "GET",
-      headers: {
-        "x-user-id": session.user.id,
+    const response = await fetch(
+      `${env.SLIDESCOCKPIT_API}/integrations/social/tiktok/accounts`,
+      {
+        method: "GET",
+        headers: {
+          "x-user-id": session.user.id,
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    });
+    );
 
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
-      const errorResponse = NextResponse.json(
+      return NextResponse.json(
         {
           error:
-            typeof data === "object" && data && "message" in data
+            typeof data === "object" && data && "error" in data
+              ? (data as { error: string }).error
+              : typeof data === "object" && data && "message" in data
               ? (data as { message: string }).message
-          : "Failed to start TikTok integration",
+              : "Failed to load TikTok accounts",
         },
         { status: response.status },
       );
-      return errorResponse;
     }
 
-    const successResponse = NextResponse.json(data, {
-      status: response.status,
-    });
-    return successResponse;
+    return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error("Failed to start TikTok integration", error);
+    console.error("Failed to fetch TikTok accounts", error);
     return NextResponse.json(
       { error: "Unable to reach SlidesCockpit API" },
       { status: 500 },
