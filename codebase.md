@@ -370,86 +370,66 @@ Thank you for contributing to make ALLWEONE Presentation Generator better for ev
 ```md
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-\*\*\* a/src/canvas/legacy/SlideCanvasLegacy.tsx
---- b/src/canvas/legacy/SlideCanvasLegacy.tsx
-@@
-const setTextColor = (color: string) => {
-applyToActive(l => ({ ...l, color }));
-};
-const setOutlineColor = (color: string) => {
-applyToActive(l => ({ ...l, outlineEnabled: true, outlineColor: color }));
-};
+Diff 1 — löscht garantiert den richtigen Text
+
+Datei: src/canvas/SlideCanvasAdapter.tsx
+
+codebase
+
 @@
 
-- const [uiTextColor, setUiTextColor] = useState<string>("#ffffff");
-- const [uiOutlineColor, setUiOutlineColor] = useState<string>("#000000");
+-      // 3) (Optional) Wenn weniger Layer als vorhandene Textknoten: überschüssige löschen
+-      //    → verhindert "Zombie"-Knoten, wenn man Textlayer im Canvas löscht.
+-      //    Kommentiere diesen Block aus, falls ihr grundsätzlich nie auto-löschen wollt.
+-      const targetTextCount = next.length;
+-      if (existingTextCount > targetTextCount) {
+-        let seen = 0;
+-        for (let i = newNodes.length - 1; i >= 0; i--) {
+-          if (newNodes[i].type === "text") {
+-            seen++;
+-            if (seen > targetTextCount) {
+-              newNodes.splice(i, 1);
+-            }
+-          }
+-        }
+-      }
 
-* const [uiTextColor, setUiTextColor] = useState<string>("#ffffff");
-* const [uiOutlineColor, setUiOutlineColor] = useState<string>("#000000");
-  @@
+*      // 3) Überschüssige Textknoten **nach ID** entfernen (nicht „von hinten“),
+*      //    damit genau der vom Canvas gelöschte Layer verschwindet.
+*      const keepIds = new Set(next.map((t) => t.id));
+*      for (let i = newNodes.length - 1; i >= 0; i--) {
+*        const n = newNodes[i] as any;
+*        if (n?.type === "text" && !keepIds.has(n.id)) {
+*          newNodes.splice(i, 1);
+*        }
+*      }
 
-- const setTextColor = (color: string) => {
-- setUiTextColor(color);
-- applyToActive(l => ({ ...(l as any), color }));
+Warum das hilft: Zuvor wurde nur die Anzahl der Textknoten reduziert (vom Ende her). Wenn die Reihenfolge der Textnodes im doc.nodes nicht exakt deiner Canvas-Reihenfolge entspricht, wurde oft der falsche Text entfernt. Mit dem ID-Set wird exakt der Text entfernt, der im Canvas wirklich gelöscht wurde. (Siehe die bisherige Tail-Trim-Stelle hier im Adapter, die ich durch ID-Filterung ersetze.
+
+codebase
+
+)
+
+Diff 2 — Deselect synchronisiert aktive Auswahl immer sauber
+
+Datei: src/canvas/legacy/SlideCanvasLegacy.tsx (kleiner Konsistenz-Fix)
+
+codebase
+
+@@
+
+- // Canvas-Hintergrund-Klick: Auswahl aufheben
+- const handleCanvasDeselect = () => {
+- setActiveLayerId(null);
+- activeLayerIdRef.current = null;
+- setIsEditing(null);
 - };
-- const setOutlineColor = (color: string) => {
-- setUiOutlineColor(color);
-- applyToActive(l => ({ ...(l as any), outlineEnabled: true, outlineColor: color }));
-- };
 
-* // UI-Handler klar benennen, um Namenskollisionen mit den Canvas-Actions zu vermeiden
-* const setTextColorUI = (color: string) => {
-* setUiTextColor(color);
-* applyToActive(l => ({ ...(l as any), color }));
+* // Canvas-Hintergrund-Klick: Auswahl aufheben (State + Ref immer gemeinsam!)
+* const handleCanvasDeselect = () => {
+* commitActiveLayer(null);
+* setIsEditing(null);
 * };
-* const setOutlineColorUI = (color: string) => {
-* setUiOutlineColor(color);
-* applyToActive(l => ({ ...(l as any), outlineEnabled: true, outlineColor: color }));
-* };
-  @@
-
--      <div
--        className="sticky top-0 z-50 w-full bg-transparent flex justify-center"
--      >
-
-*      <div
-*        className="sticky top-0 z-50 w-full bg-transparent flex justify-center"
-*      >
-         {/* Die Toolbar-Box selbst: auto-breit, mittig */}
-         <LegacyEditorToolbar
-           onAddText={handleAddText}
-
--          className="py-1 px-2 inline-flex w-auto max-w-[calc(100vw-16px)] items-center justify-center gap-2 rounded-2xl border border-border/80 bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/70"
-
-*          className="py-1 px-2 inline-flex w-fit max-w-full items-center justify-center gap-2 rounded-2xl border border-border/80 bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/70 flex-wrap mx-auto"
-           >
-  @@
-
--          <input
-
-*          <input
-             type="color"
-             value={uiTextColor}
-
--            onChange={(e) => setTextColor(e.currentTarget.value)}
-
-*            onChange={(e) => setTextColorUI(e.currentTarget.value)}
-               className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
-             />
-  @@
-
--          <input
-
-*          <input
-             type="color"
-             value={uiOutlineColor}
-
--            onChange={(e) => setOutlineColor(e.currentTarget.value)}
-
-*            onChange={(e) => setOutlineColorUI(e.currentTarget.value)}
-             disabled={!uiOutlineOn}
-             className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5 disabled:opacity-40"
-           />
 
 ```
 
@@ -4376,7 +4356,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     const lines = computeWrappedLinesWithDOM(initial);
     initial.height = Math.ceil(computeAutoHeightForLayer(initial, lines));
     setTextLayers((prev) => [...prev, initial]);
-    setActiveLayerId(id);
+    commitActiveLayer(id);
     setIsEditing(id);
     // Cursor zurück in den Editor
     setTimeout(() => editorActiveRef.current?.focus(), 0);
@@ -4408,6 +4388,20 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     })[]
   >([]);
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
+  // Aktuelle Auswahl als Ref, damit Keydown (Capture) IMMER die sichtbare Auswahl löscht (keine stale Closure)
+  const activeLayerIdRef = useRef<string | null>(null);
+  const commitActiveLayer = useCallback(
+    (id: string | null) => {
+      setActiveLayerId(id);
+      activeLayerIdRef.current = id;
+    },
+    [],
+  );
+
+  // State ↔ Ref synchron halten
+  useEffect(() => {
+    activeLayerIdRef.current = activeLayerId;
+  }, [activeLayerId]);
 
   // Edit / Interaction
   const [isEditing, setIsEditing] = useState<string | null>(null); // grüner Modus (Editor)
@@ -4567,6 +4561,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     } catch {}
   };
 
+  // Canvas-Hintergrund-Klick: Auswahl aufheben (State + Ref immer gemeinsam!)
+  const handleCanvasDeselect = () => {
+    commitActiveLayer(null);
+    setIsEditing(null);
+  };
+
   // GLOBAL pointerup → Interaktion beenden & Parent syncen
   useEffect(() => {
     const onWindowPointerUp = () => {
@@ -4584,14 +4584,19 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
   // Layer Interaktionen
   const selectLayer = (layerId: string, e: React.PointerEvent) => {
+    // Wenn ein ANDERER Layer im Edit-Modus ist, erst sauber schließen,
+    // damit keine Blur/Focus-Races auftreten und States stabil bleiben.
+    if (isEditingRef.current && isEditingRef.current !== layerId) {
+      setIsEditing(null);
+    }
     if (isEditingRef.current === layerId) {
       // Im Editor-Modus: nichts blockieren, damit der Cursor/Selektion im Text funktioniert
-      setActiveLayerId(layerId);
+      commitActiveLayer(layerId);
       return;
     }
     e.stopPropagation();
     e.preventDefault();
-    setActiveLayerId(layerId);
+    commitActiveLayer(layerId);
     setDragMode("move-text");
     isInteracting.current = true;
     const start = pixelToCanvas(e.clientX, e.clientY);
@@ -4607,12 +4612,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       // Im Editor-Modus für diese Box: nicht resizen!
       e.stopPropagation();
       e.preventDefault();
-      setActiveLayerId(layerId);
+      commitActiveLayer(layerId);
       return;
     }
     e.stopPropagation();
     e.preventDefault();
-    setActiveLayerId(layerId);
+    commitActiveLayer(layerId);
     setDragMode(mode);
     isInteracting.current = true;
     const start = pixelToCanvas(e.clientX, e.clientY);
@@ -4835,38 +4840,45 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     onLayoutChange(newLayout);
   };
 
-  // Delete/Entf Taste: selektierten Text-Layer löschen
+  // Delete/Backspace: selektierten Text-Layer löschen (Capture-Phase, global)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Delete/Entf Taste nur behandeln wenn:
-      // 1. Ein Layer selektiert ist
-      // 2. Kein Eingabefeld (Textarea/Input) fokussiert ist
-      // 3. Nicht im Editiermodus
-      if (
-        (e.key === "Delete" || (e.key === "Backspace" && e.metaKey)) &&
-        activeLayerId &&
-        isEditingRef.current === null &&
-        document.activeElement?.tagName !== "TEXTAREA" &&
-        document.activeElement?.tagName !== "INPUT"
-      ) {
+      const ae = document.activeElement as HTMLElement | null;
+      const isInputFocused =
+        !!ae &&
+        (ae.tagName === "INPUT" ||
+          ae.tagName === "TEXTAREA" ||
+          ae.isContentEditable ||
+          ae.closest("[contenteditable='true']") !== null);
+
+      const selectedId = activeLayerIdRef.current;
+      const isDeleteKey =
+        e.key === "Delete" ||
+        e.key === "Backspace" ||
+        // Mac: "Entfernen" ist oft Backspace; Fn+Backspace sendet "Delete".
+        // Wir erlauben außerdem Meta/Ctrl+Backspace, solange kein Input fokussiert ist.
+        ((e.metaKey || e.ctrlKey) && e.key === "Backspace");
+
+      if (isDeleteKey && !isInputFocused && selectedId && isEditingRef.current === null) {
         e.preventDefault();
         e.stopPropagation();
-
         setTextLayers((prev) => {
-          const updated = prev.filter((l) => l.id !== activeLayerId);
+          const updated = prev.filter((l) => l.id !== selectedId);
+          // sofortiger Parent-Sync
           const newLayout = mapLayersToLayout(updated as any);
           const sig = layoutSignature(newLayout);
           lastSentLayoutSigRef.current = sig;
           onLayoutChange(newLayout);
-          setActiveLayerId(null);
+          commitActiveLayer(null);
           return updated;
         });
       }
     };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeLayerId, onLayoutChange]);
+    // Capture-Phase, damit uns kein onKeyDownCapture davor blockt
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+    // WICHTIG: keine Abhängigkeit von activeLayerId, sonst bekommt der Listener wieder eine neue (stale) Closure.
+  }, [onLayoutChange]);
 
   // Debounced Parent-Sync
   const layoutChangeTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -5925,12 +5937,14 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
     (next: SlideTextElement[]) => {
       // Text-Nodes im doc anhand Reihenfolge/Zuweisung updaten
       const newNodes = doc.nodes.map((n) => ({ ...n }));
+
+      // 1) Existierende Textknoten updaten (in Reihenfolge)
       let ti = 0;
       for (let i = 0; i < newNodes.length; i++) {
         const node = newNodes[i];
         if (!node || node.type !== "text") continue;
         const src = next[ti++];
-        if (!src) break;
+        if (!src) break; // keine weitere Quelle – restliche Textknoten bleiben wie sie sind
 
         const pxX = Math.round((src.x ?? 0.5) * W);
         const pxY = Math.round((src.y ?? 0.5) * H);
@@ -5971,6 +5985,58 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
         if ((src as any).color !== undefined)
           target.color = (src as any).color;
       }
+
+      // 2) Falls Legacy-Canvas MEHR Text-Layer hat als doc-Textknoten:
+      //    fehlende Textknoten APPENDEN, damit der zweite (dritte, …) Text bestehen bleibt.
+      const existingTextCount = newNodes.filter((n) => n.type === "text").length;
+      if (next.length > existingTextCount) {
+        for (let k = existingTextCount; k < next.length; k++) {
+          const src = next[k];
+          const pxX = Math.round((src.x ?? 0.5) * W);
+          const pxY = Math.round((src.y ?? 0.5) * H);
+          const weight: ExtendedCanvasTextNode["weight"] =
+            src.weight === "bold" ? "bold" : src.weight === "semibold" ? "semibold" : "regular";
+          newNodes.push({
+            id: src.id ?? `txt-${Date.now()}-${k}`,
+            type: "text",
+            x: pxX,
+            y: pxY,
+            rotation: src.rotation ?? 0,
+            width: src.maxWidth ?? 400,
+            text: src.content ?? "",
+            fontFamily: src.fontFamily ?? "Inter, system-ui, sans-serif",
+            fontSize: Math.round(BASE_FONT_PX * (src.scale ?? 1)),
+            lineHeight: src.lineHeight ?? 1.12,
+            letterSpacing: src.letterSpacing ?? 0,
+            align: src.align ?? "left",
+            weight,
+            color: (src as any).color ?? "#ffffff",
+            // erweiterte Felder für Legacy-Canvas-Kompatibilität
+            content: src.content ?? "",
+            scale: src.scale ?? 1,
+            height: (src as any).maxHeight ?? undefined,
+            zIndex: src.zIndex ?? newNodes.length,
+            italic: (src as any).italic ?? false,
+            outlineEnabled: (src as any).outlineEnabled ?? false,
+            outlineWidth: (src as any).outlineWidth ?? 6,
+            outlineColor: (src as any).outlineColor ?? "#000",
+            nx: pxToNormX(pxX),
+            ny: pxToNormY(pxY),
+            nmaxWidth: src.maxWidth ?? 400,
+          } as ExtendedCanvasTextNode);
+        }
+      }
+
+      // 3) Überschüssige Textknoten **nach ID** entfernen (nicht "von hinten"),
+      //    damit genau der vom Canvas gelöschte Layer verschwindet.
+      const keepIds = new Set(next.map((t) => t.id));
+      for (let i = newNodes.length - 1; i >= 0; i--) {
+        const n = newNodes[i] as any;
+        if (n?.type === "text" && !keepIds.has(n.id)) {
+          newNodes.splice(i, 1);
+        }
+      }
+
       onChange({ ...doc, nodes: newNodes });
     },
     [doc, onChange],
@@ -27631,6 +27697,11 @@ export function PresentationExamples() {
 import { generateImageAction } from "@/app/_actions/image/generate";
 import { getImageFromUnsplash } from "@/app/_actions/image/unsplash";
 import { updatePresentation } from "@/app/_actions/presentation/presentationActions";
+import {
+  applyBackgroundImageToCanvas,
+  ensureSlideCanvas,
+  ensureSlidesHaveCanvas,
+} from "@/components/presentation/utils/canvas";
 import { extractThinking } from "@/lib/thinking-extractor";
 import { usePresentationState } from "@/states/presentation-state";
 import { useChat, useCompletion } from "@ai-sdk/react";
@@ -27821,13 +27892,17 @@ export function PresentationGenerationManager() {
                 usePresentationState.getState().setSlides(
                   usePresentationState.getState().slides.map((s) =>
                     s.id === slideId
-                      ? {
+                      ? ensureSlideCanvas({
                           ...s,
                           rootImage: {
                             query: rootImage.query,
                             url: result.image.url,
                           },
-                        }
+                          canvas: applyBackgroundImageToCanvas(
+                            s.canvas,
+                            result.image.url,
+                          ),
+                        })
                       : s,
                   ),
                 );
@@ -27843,7 +27918,7 @@ export function PresentationGenerationManager() {
         }
       }
     }
-    setSlides(mergedSlides);
+    setSlides(ensureSlidesHaveCanvas(mergedSlides));
     slidesRafIdRef.current = null;
   };
 
@@ -28215,13 +28290,17 @@ export function PresentationGenerationManager() {
                 setSlides(
                   slides.map((s) =>
                     s.id === slideId
-                      ? {
+                      ? ensureSlideCanvas({
                           ...s,
                           rootImage: {
-                            ...s.rootImage!,
+                            ...(s.rootImage ?? { query: slide.rootImage!.query }),
                             url: result.image.url,
                           },
-                        }
+                          canvas: applyBackgroundImageToCanvas(
+                            s.canvas,
+                            result.image.url,
+                          ),
+                        })
                       : s,
                   ),
                 );
@@ -41839,6 +41918,7 @@ import {
   updatePresentationTheme,
 } from "@/app/_actions/presentation/presentationActions";
 import { getCustomThemeById } from "@/app/_actions/presentation/theme-actions";
+import { ensureSlidesHaveCanvas } from "@/components/presentation/utils/canvas";
 import { type PlateSlide } from "@/components/presentation/utils/parser";
 import {
   setThemeVariables,
@@ -41949,7 +42029,7 @@ export default function PresentationPage() {
       };
 
       // Set slides
-      setSlides(presentationContent?.slides ?? []);
+      setSlides(ensureSlidesHaveCanvas(presentationContent?.slides ?? []));
 
       // If there's no thumbnail yet, derive from first available rootImage or first img element
       const currentThumb = presentationData.thumbnailUrl;
@@ -44783,6 +44863,202 @@ export const fontOptions = [
   "TikTok Sans, var(--font-sans), sans-serif",
   "JetBrains Mono, monospace",
 ];
+
+```
+
+# src\components\presentation\utils\canvas.ts
+
+```ts
+import { DEFAULT_CANVAS, type CanvasDoc } from "@/canvas/types";
+import { nanoid } from "nanoid";
+import type { PlateNode, PlateSlide } from "./parser";
+
+const CANVAS_WIDTH = DEFAULT_CANVAS.width;
+const CANVAS_HEIGHT = DEFAULT_CANVAS.height;
+
+function collectTextSegments(nodes?: PlateNode[]): string[] {
+  if (!Array.isArray(nodes)) return [];
+  const segments: string[] = [];
+
+  const visit = (node: any, bucket: string[]): void => {
+    if (!node || typeof node !== "object") return;
+    if (typeof node.text === "string" && node.text.trim()) {
+      bucket.push(node.text.trim());
+    }
+    if (Array.isArray(node.children)) {
+      for (const child of node.children) {
+        visit(child, bucket);
+      }
+    }
+  };
+
+  for (const node of nodes) {
+    const bucket: string[] = [];
+    visit(node, bucket);
+    const merged = bucket.join(" ").replace(/\s+/g, " ").trim();
+    if (merged) segments.push(merged);
+  }
+
+  return segments;
+}
+
+function chooseTextColor(background?: string | null): string {
+  if (!background) return "#111827";
+  const hex = background.replace("#", "").trim();
+  const normalized =
+    hex.length === 3
+      ? hex
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : hex.padEnd(6, "0").slice(0, 6);
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
+    return "#111827";
+  }
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness < 140 ? "#f9fafb" : "#111827";
+}
+
+function pickFontSize(charCount: number): number {
+  if (charCount > 360) return 42;
+  if (charCount > 220) return 54;
+  return 72;
+}
+
+export function applyBackgroundImageToCanvas(
+  canvas: CanvasDoc | null | undefined,
+  imageUrl?: string | null,
+): CanvasDoc {
+  const base: CanvasDoc = {
+    version: canvas?.version ?? 1,
+    width: canvas?.width ?? CANVAS_WIDTH,
+    height: canvas?.height ?? CANVAS_HEIGHT,
+    bg: canvas?.bg ?? DEFAULT_CANVAS.bg,
+    nodes: [...(canvas?.nodes ?? [])],
+    selection: Array.isArray(canvas?.selection)
+      ? [...(canvas?.selection ?? [])]
+      : [],
+    previewDataUrl: canvas?.previewDataUrl,
+  };
+
+  if (!imageUrl) {
+    return base;
+  }
+
+  const imageNode = {
+    id: "canvas-background-image",
+    type: "image" as const,
+    x: 0,
+    y: 0,
+    width: base.width,
+    height: base.height,
+    url: imageUrl,
+  };
+
+  const existingIndex = base.nodes.findIndex((node) => node.type === "image");
+  if (existingIndex >= 0) {
+    base.nodes[existingIndex] = imageNode;
+  } else {
+    base.nodes.unshift(imageNode);
+  }
+
+  return base;
+}
+
+export function buildCanvasDocFromSlide(
+  slide: PlateSlide,
+): { canvas: CanvasDoc; position?: { x: number; y: number } } {
+  const segments = collectTextSegments(slide.content);
+  const width = slide.canvas?.width ?? CANVAS_WIDTH;
+  const height = slide.canvas?.height ?? CANVAS_HEIGHT;
+  const base: CanvasDoc = {
+    version: slide.canvas?.version ?? 1,
+    width,
+    height,
+    bg: slide.bgColor ?? slide.canvas?.bg ?? DEFAULT_CANVAS.bg,
+    nodes: [],
+    selection: [],
+    previewDataUrl: slide.canvas?.previewDataUrl,
+  };
+
+  let textPosition: { x: number; y: number } | undefined;
+  if (segments.length > 0) {
+    const content = segments.join("\n\n");
+    const textWidth = Math.round(width * 0.7);
+    const margin = Math.round(width * 0.1);
+    const alignment =
+      slide.alignment === "end"
+        ? "right"
+        : slide.alignment === "center"
+          ? "center"
+          : "left";
+
+    let x = slide.position?.x ?? margin;
+    if (!slide.position) {
+      if (alignment === "center") {
+        x = Math.max(margin, Math.round((width - textWidth) / 2));
+      } else if (alignment === "right") {
+        x = Math.max(margin, width - textWidth - margin);
+      }
+    }
+
+    const y = slide.position?.y ?? Math.round(height * 0.22);
+    const textColor = chooseTextColor(base.bg);
+    base.nodes.push({
+      id: `text-${nanoid()}`,
+      type: "text",
+      x,
+      y,
+      width: textWidth,
+      text: content,
+      fontFamily: "Inter",
+      fontSize: pickFontSize(content.length),
+      align: alignment,
+      fill: textColor,
+    });
+    textPosition = { x, y };
+  }
+
+  const canvas = applyBackgroundImageToCanvas(base, slide.rootImage?.url);
+  return { canvas, position: textPosition };
+}
+
+export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
+  const nodes = slide.canvas?.nodes ?? [];
+  const hasTextNode = nodes.some((node) => {
+    if (node.type !== "text") return false;
+    const raw = (node as any).text ?? (node as any).content ?? "";
+    return typeof raw === "string" && raw.trim().length > 0;
+  });
+  const hasImageNode = nodes.some(
+    (node) => node.type === "image" && typeof (node as any).url === "string",
+  );
+
+  if (!hasTextNode) {
+    const { canvas, position } = buildCanvasDocFromSlide(slide);
+    return {
+      ...slide,
+      canvas,
+      position: slide.position ?? position,
+    };
+  }
+
+  if (!hasImageNode && slide.rootImage?.url) {
+    return {
+      ...slide,
+      canvas: applyBackgroundImageToCanvas(slide.canvas, slide.rootImage.url),
+    };
+  }
+
+  return slide;
+}
+
+export function ensureSlidesHaveCanvas(slides: PlateSlide[]): PlateSlide[] {
+  return slides.map((slide) => ensureSlideCanvas(slide));
+}
 
 ```
 

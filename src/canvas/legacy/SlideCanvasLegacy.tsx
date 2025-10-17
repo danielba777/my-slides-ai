@@ -341,7 +341,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     const lines = computeWrappedLinesWithDOM(initial);
     initial.height = Math.ceil(computeAutoHeightForLayer(initial, lines));
     setTextLayers((prev) => [...prev, initial]);
-    setActiveLayerId(id);
+    commitActiveLayer(id);
     setIsEditing(id);
     // Cursor zurück in den Editor
     setTimeout(() => editorActiveRef.current?.focus(), 0);
@@ -373,6 +373,20 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     })[]
   >([]);
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
+  // Aktuelle Auswahl als Ref, damit Keydown (Capture) IMMER die sichtbare Auswahl löscht (keine stale Closure)
+  const activeLayerIdRef = useRef<string | null>(null);
+  const commitActiveLayer = useCallback(
+    (id: string | null) => {
+      setActiveLayerId(id);
+      activeLayerIdRef.current = id;
+    },
+    [],
+  );
+
+  // State ↔ Ref synchron halten
+  useEffect(() => {
+    activeLayerIdRef.current = activeLayerId;
+  }, [activeLayerId]);
 
   // Edit / Interaction
   const [isEditing, setIsEditing] = useState<string | null>(null); // grüner Modus (Editor)
@@ -532,6 +546,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     } catch {}
   };
 
+  // Canvas-Hintergrund-Klick: Auswahl aufheben (State + Ref immer gemeinsam!)
+  const handleCanvasDeselect = () => {
+    commitActiveLayer(null);
+    setIsEditing(null);
+  };
+
   // GLOBAL pointerup → Interaktion beenden & Parent syncen
   useEffect(() => {
     const onWindowPointerUp = () => {
@@ -549,14 +569,19 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
   // Layer Interaktionen
   const selectLayer = (layerId: string, e: React.PointerEvent) => {
+    // Wenn ein ANDERER Layer im Edit-Modus ist, erst sauber schließen,
+    // damit keine Blur/Focus-Races auftreten und States stabil bleiben.
+    if (isEditingRef.current && isEditingRef.current !== layerId) {
+      setIsEditing(null);
+    }
     if (isEditingRef.current === layerId) {
       // Im Editor-Modus: nichts blockieren, damit der Cursor/Selektion im Text funktioniert
-      setActiveLayerId(layerId);
+      commitActiveLayer(layerId);
       return;
     }
     e.stopPropagation();
     e.preventDefault();
-    setActiveLayerId(layerId);
+    commitActiveLayer(layerId);
     setDragMode("move-text");
     isInteracting.current = true;
     const start = pixelToCanvas(e.clientX, e.clientY);
@@ -572,12 +597,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       // Im Editor-Modus für diese Box: nicht resizen!
       e.stopPropagation();
       e.preventDefault();
-      setActiveLayerId(layerId);
+      commitActiveLayer(layerId);
       return;
     }
     e.stopPropagation();
     e.preventDefault();
-    setActiveLayerId(layerId);
+    commitActiveLayer(layerId);
     setDragMode(mode);
     isInteracting.current = true;
     const start = pixelToCanvas(e.clientX, e.clientY);
@@ -800,38 +825,45 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     onLayoutChange(newLayout);
   };
 
-  // Delete/Entf Taste: selektierten Text-Layer löschen
+  // Delete/Backspace: selektierten Text-Layer löschen (Capture-Phase, global)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Delete/Entf Taste nur behandeln wenn:
-      // 1. Ein Layer selektiert ist
-      // 2. Kein Eingabefeld (Textarea/Input) fokussiert ist
-      // 3. Nicht im Editiermodus
-      if (
-        (e.key === "Delete" || (e.key === "Backspace" && e.metaKey)) &&
-        activeLayerId &&
-        isEditingRef.current === null &&
-        document.activeElement?.tagName !== "TEXTAREA" &&
-        document.activeElement?.tagName !== "INPUT"
-      ) {
+      const ae = document.activeElement as HTMLElement | null;
+      const isInputFocused =
+        !!ae &&
+        (ae.tagName === "INPUT" ||
+          ae.tagName === "TEXTAREA" ||
+          ae.isContentEditable ||
+          ae.closest("[contenteditable='true']") !== null);
+
+      const selectedId = activeLayerIdRef.current;
+      const isDeleteKey =
+        e.key === "Delete" ||
+        e.key === "Backspace" ||
+        // Mac: "Entfernen" ist oft Backspace; Fn+Backspace sendet "Delete".
+        // Wir erlauben außerdem Meta/Ctrl+Backspace, solange kein Input fokussiert ist.
+        ((e.metaKey || e.ctrlKey) && e.key === "Backspace");
+
+      if (isDeleteKey && !isInputFocused && selectedId && isEditingRef.current === null) {
         e.preventDefault();
         e.stopPropagation();
-
         setTextLayers((prev) => {
-          const updated = prev.filter((l) => l.id !== activeLayerId);
+          const updated = prev.filter((l) => l.id !== selectedId);
+          // sofortiger Parent-Sync
           const newLayout = mapLayersToLayout(updated as any);
           const sig = layoutSignature(newLayout);
           lastSentLayoutSigRef.current = sig;
           onLayoutChange(newLayout);
-          setActiveLayerId(null);
+          commitActiveLayer(null);
           return updated;
         });
       }
     };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeLayerId, onLayoutChange]);
+    // Capture-Phase, damit uns kein onKeyDownCapture davor blockt
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+    // WICHTIG: keine Abhängigkeit von activeLayerId, sonst bekommt der Listener wieder eine neue (stale) Closure.
+  }, [onLayoutChange]);
 
   // Debounced Parent-Sync
   const layoutChangeTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);

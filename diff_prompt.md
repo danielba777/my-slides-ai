@@ -1,82 +1,160 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-\*\*\* a/src/canvas/legacy/SlideCanvasLegacy.tsx
---- b/src/canvas/legacy/SlideCanvasLegacy.tsx
-@@
-const setTextColor = (color: string) => {
-applyToActive(l => ({ ...l, color }));
-};
-const setOutlineColor = (color: string) => {
-applyToActive(l => ({ ...l, outlineEnabled: true, outlineColor: color }));
-};
+Diff 1 — Toolbar von links (absolut) nach unten (horizontal) verschieben
+
+Datei: src/components/presentation/presentation-page/SlideContainer.tsx
+
+codebase
+
 @@
 
-- const [uiTextColor, setUiTextColor] = useState<string>("#ffffff");
-- const [uiOutlineColor, setUiOutlineColor] = useState<string>("#000000");
+-        {/* Linke, vertikale Toolbar (immer sichtbar, stört nicht den Editor) */}
+-        {!isPresenting && !isReadOnly && (
+-          <div
+-            className={cn(
+-              "absolute top-1/2 -translate-y-1/2 -left-14 z-[1001]",
+-            )}
+-            aria-label="Slide toolbar"
+-          >
+-            <div className="flex flex-col items-center gap-2">
+-              {/* Drag-Handle */}
+-              <button
+-                ref={setActivatorNodeRef as React.Ref<HTMLButtonElement>}
+-                {...listeners}
+-                {...attributes}
+-                className="flex h-9 w-9 items-center justify-center rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground focus:outline-none focus-visible:outline-none"
+-                aria-label="Folienposition ziehen"
+-                title="Verschieben"
+-              >
+-                <GripVertical className="h-4 w-4" />
+-              </button>
+-
+-              {/* Slide-Einstellungen */}
+-              <div className="rounded-md bg-background/95 shadow-sm backdrop-blur">
+-                <SlideEditPopover index={index} />
+-              </div>
+-
+-              {/* Neues Canvas unter aktueller Folie */}
+-              <Button
+-                variant="ghost"
+-                size="icon"
+-                className="h-9 w-9 rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground focus:outline-none focus-visible:outline-none"
+-                onClick={() => addSlide("after", index)}
+-                aria-label="Neue Folie darunter"
+-                title="Neue Folie darunter"
+-              >
+-                <Plus className="h-4 w-4" />
+-              </Button>
+-
+-              {/* Löschen */}
+-              <AlertDialog>
+-                <AlertDialogTrigger asChild>
+-                  <Button
+-                    variant="ghost"
+-                    size="icon"
+-                    className="h-9 w-9 rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-destructive focus:outline-none focus-visible:outline-none"
+-                    aria-label="Folie löschen"
+-                    title="Folie löschen"
+-                  >
+-                    <Trash className="h-4 w-4" />
+-                  </Button>
+-                </AlertDialogTrigger>
+-                <AlertDialogContent>
+-                  <AlertDialogHeader>
+-                    <AlertDialogTitle>Delete Slide</AlertDialogTitle>
+-                    <AlertDialogDescription>
+-                      Are you sure you want to delete slide {index + 1}? This action cannot be undone.
+-                    </AlertDialogDescription>
+-                  </AlertDialogHeader>
+-                  <AlertDialogFooter>
+-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+-                    <AlertDialogAction asChild>
+-                      <Button variant="destructive" onClick={deleteSlide}>
+-                        Delete
+-                      </Button>
+-                    </AlertDialogAction>
+-                  </AlertDialogFooter>
+-                </AlertDialogContent>
+-              </AlertDialog>
+-            </div>
+-          </div>
+-        )}
 
-* const [uiTextColor, setUiTextColor] = useState<string>("#ffffff");
-* const [uiOutlineColor, setUiOutlineColor] = useState<string>("#000000");
-  @@
+*        {/* Untere Toolbar: unter dem Canvas, horizontal und mittig */}
+*        {!isPresenting && !isReadOnly && null}
 
-- const setTextColor = (color: string) => {
-- setUiTextColor(color);
-- applyToActive(l => ({ ...(l as any), color }));
-- };
-- const setOutlineColor = (color: string) => {
-- setUiOutlineColor(color);
-- applyToActive(l => ({ ...(l as any), outlineEnabled: true, outlineColor: color }));
-- };
+-        {children}
 
-* // UI-Handler klar benennen, um Namenskollisionen mit den Canvas-Actions zu vermeiden
-* const setTextColorUI = (color: string) => {
-* setUiTextColor(color);
-* applyToActive(l => ({ ...(l as any), color }));
-* };
-* const setOutlineColorUI = (color: string) => {
-* setUiOutlineColor(color);
-* applyToActive(l => ({ ...(l as any), outlineEnabled: true, outlineColor: color }));
-* };
-  @@
-
--      <div
--        className="sticky top-0 z-50 w-full bg-transparent flex justify-center"
--      >
-
-*      <div
-*        className="sticky top-0 z-50 w-full bg-transparent flex justify-center"
-*      >
-         {/* Die Toolbar-Box selbst: auto-breit, mittig */}
-         <LegacyEditorToolbar
-           onAddText={handleAddText}
-
--          className="py-1 px-2 inline-flex w-auto max-w-[calc(100vw-16px)] items-center justify-center gap-2 rounded-2xl border border-border/80 bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/70"
-
-*          className="py-1 px-2 inline-flex w-fit max-w-full items-center justify-center gap-2 rounded-2xl border border-border/80 bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/70 flex-wrap mx-auto"
-           >
-  @@
-
--          <input
-
-*          <input
-             type="color"
-             value={uiTextColor}
-
--            onChange={(e) => setTextColor(e.currentTarget.value)}
-
-*            onChange={(e) => setTextColorUI(e.currentTarget.value)}
-               className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
-             />
-  @@
-
--          <input
-
-*          <input
-             type="color"
-             value={uiOutlineColor}
-
--            onChange={(e) => setOutlineColor(e.currentTarget.value)}
-
-*            onChange={(e) => setOutlineColorUI(e.currentTarget.value)}
-             disabled={!uiOutlineOn}
-             className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5 disabled:opacity-40"
-           />
+*        {children}
+*
+*        {/* Untere Toolbar unter dem Canvas */}
+*        {!isPresenting && !isReadOnly && (
+*          <div
+*            className={cn(
+*              "z-[1001] mt-3 w-full",
+*            )}
+*            aria-label="Slide toolbar"
+*          >
+*            <div className="mx-auto flex w-full max-w-[760px] items-center justify-center gap-2 rounded-md bg-background/95 p-2 shadow-sm backdrop-blur">
+*              {/* Drag-Handle */}
+*              <button
+*                ref={setActivatorNodeRef as React.Ref<HTMLButtonElement>}
+*                {...listeners}
+*                {...attributes}
+*                className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus:outline-none focus-visible:outline-none"
+*                aria-label="Folienposition ziehen"
+*                title="Verschieben"
+*              >
+*                <GripVertical className="h-4 w-4" />
+*              </button>
+*
+*              {/* Slide-Einstellungen */}
+*              <div className="rounded-md">
+*                <SlideEditPopover index={index} />
+*              </div>
+*
+*              {/* Neue Folie darunter */}
+*              <Button
+*                variant="ghost"
+*                size="icon"
+*                className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
+*                onClick={() => addSlide("after", index)}
+*                aria-label="Neue Folie darunter"
+*                title="Neue Folie darunter"
+*              >
+*                <Plus className="h-4 w-4" />
+*              </Button>
+*
+*              {/* Löschen */}
+*              <AlertDialog>
+*                <AlertDialogTrigger asChild>
+*                  <Button
+*                    variant="ghost"
+*                    size="icon"
+*                    className="h-9 w-9 rounded-md text-muted-foreground hover:text-destructive"
+*                    aria-label="Folie löschen"
+*                    title="Folie löschen"
+*                  >
+*                    <Trash className="h-4 w-4" />
+*                  </Button>
+*                </AlertDialogTrigger>
+*                <AlertDialogContent>
+*                  <AlertDialogHeader>
+*                    <AlertDialogTitle>Delete Slide</AlertDialogTitle>
+*                    <AlertDialogDescription>
+*                      Are you sure you want to delete slide {index + 1}? This action cannot be undone.
+*                    </AlertDialogDescription>
+*                  </AlertDialogHeader>
+*                  <AlertDialogFooter>
+*                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+*                    <AlertDialogAction asChild>
+*                      <Button variant="destructive" onClick={deleteSlide}>
+*                        Delete
+*                      </Button>
+*                    </AlertDialogAction>
+*                  </AlertDialogFooter>
+*                </AlertDialogContent>
+*              </AlertDialog>
+*            </div>
+*          </div>
+*        )}

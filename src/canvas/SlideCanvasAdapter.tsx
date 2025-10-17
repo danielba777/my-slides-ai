@@ -119,12 +119,14 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
     (next: SlideTextElement[]) => {
       // Text-Nodes im doc anhand Reihenfolge/Zuweisung updaten
       const newNodes = doc.nodes.map((n) => ({ ...n }));
+
+      // 1) Existierende Textknoten updaten (in Reihenfolge)
       let ti = 0;
       for (let i = 0; i < newNodes.length; i++) {
         const node = newNodes[i];
         if (!node || node.type !== "text") continue;
         const src = next[ti++];
-        if (!src) break;
+        if (!src) break; // keine weitere Quelle – restliche Textknoten bleiben wie sie sind
 
         const pxX = Math.round((src.x ?? 0.5) * W);
         const pxY = Math.round((src.y ?? 0.5) * H);
@@ -165,6 +167,58 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
         if ((src as any).color !== undefined)
           target.color = (src as any).color;
       }
+
+      // 2) Falls Legacy-Canvas MEHR Text-Layer hat als doc-Textknoten:
+      //    fehlende Textknoten APPENDEN, damit der zweite (dritte, …) Text bestehen bleibt.
+      const existingTextCount = newNodes.filter((n) => n.type === "text").length;
+      if (next.length > existingTextCount) {
+        for (let k = existingTextCount; k < next.length; k++) {
+          const src = next[k];
+          const pxX = Math.round((src.x ?? 0.5) * W);
+          const pxY = Math.round((src.y ?? 0.5) * H);
+          const weight: ExtendedCanvasTextNode["weight"] =
+            src.weight === "bold" ? "bold" : src.weight === "semibold" ? "semibold" : "regular";
+          newNodes.push({
+            id: src.id ?? `txt-${Date.now()}-${k}`,
+            type: "text",
+            x: pxX,
+            y: pxY,
+            rotation: src.rotation ?? 0,
+            width: src.maxWidth ?? 400,
+            text: src.content ?? "",
+            fontFamily: src.fontFamily ?? "Inter, system-ui, sans-serif",
+            fontSize: Math.round(BASE_FONT_PX * (src.scale ?? 1)),
+            lineHeight: src.lineHeight ?? 1.12,
+            letterSpacing: src.letterSpacing ?? 0,
+            align: src.align ?? "left",
+            weight,
+            color: (src as any).color ?? "#ffffff",
+            // erweiterte Felder für Legacy-Canvas-Kompatibilität
+            content: src.content ?? "",
+            scale: src.scale ?? 1,
+            height: (src as any).maxHeight ?? undefined,
+            zIndex: src.zIndex ?? newNodes.length,
+            italic: (src as any).italic ?? false,
+            outlineEnabled: (src as any).outlineEnabled ?? false,
+            outlineWidth: (src as any).outlineWidth ?? 6,
+            outlineColor: (src as any).outlineColor ?? "#000",
+            nx: pxToNormX(pxX),
+            ny: pxToNormY(pxY),
+            nmaxWidth: src.maxWidth ?? 400,
+          } as ExtendedCanvasTextNode);
+        }
+      }
+
+      // 3) Überschüssige Textknoten **nach ID** entfernen (nicht "von hinten"),
+      //    damit genau der vom Canvas gelöschte Layer verschwindet.
+      const keepIds = new Set(next.map((t) => t.id));
+      for (let i = newNodes.length - 1; i >= 0; i--) {
+        const n = newNodes[i] as any;
+        if (n?.type === "text" && !keepIds.has(n.id)) {
+          newNodes.splice(i, 1);
+        }
+      }
+
       onChange({ ...doc, nodes: newNodes });
     },
     [doc, onChange],
