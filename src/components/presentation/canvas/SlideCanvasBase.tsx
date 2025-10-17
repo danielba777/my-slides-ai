@@ -131,9 +131,25 @@ export default function SlideCanvasBase({
     slideWithExtras.position ?? defaultPosition,
   );
 
+  // Verhindert, dass während Drag-Operationen die Position durch den Default/Effekt überschrieben wird
+  const isDraggingTextRef = useRef(false);
+
   useEffect(() => {
-    setTextPosition(slideWithExtras.position ?? defaultPosition);
-  }, [slideWithExtras.position?.x, slideWithExtras.position?.y, defaultPosition]);
+    if (isDraggingTextRef.current) return;
+    const next = slideWithExtras.position ?? defaultPosition;
+    // Blockiere micro-jitters (±0.5px) durch Scale/Resize-Runden
+    const dx = Math.abs((next.x ?? 0) - (textPosition.x ?? 0));
+    const dy = Math.abs((next.y ?? 0) - (textPosition.y ?? 0));
+    if (dx > 0.5 || dy > 0.5) {
+      setTextPosition(next);
+    }
+  }, [
+    slideWithExtras.position?.x,
+    slideWithExtras.position?.y,
+    defaultPosition,
+    textPosition.x,
+    textPosition.y,
+  ]);
 
   const textContent = useMemo(() => {
     if (activeTextNode?.text) {
@@ -142,11 +158,26 @@ export default function SlideCanvasBase({
     return extractPlainText(slide.content ?? []);
   }, [activeTextNode?.text, slide.content]);
 
+  // während des Draggens live die UI-Position updaten (kontrollierte Komponente)
+  const handleDragMove = useCallback((event: any) => {
+    isDraggingTextRef.current = true;
+    const next = { x: event.target.x(), y: event.target.y() };
+    // keine Persistierung hier – nur UI-State
+    setTextPosition(next);
+  }, []);
+
+  const handleDragStart = useCallback(() => {
+    isDraggingTextRef.current = true;
+  }, []);
+
   const handleDragEnd = useCallback(
     (event: any) => {
       const next = { x: event.target.x(), y: event.target.y() };
+      // final: UI-State & Persistierung
       setTextPosition(next);
+      isDraggingTextRef.current = false;
       const { slides, setSlides } = usePresentationState.getState();
+
       setSlides(
         slides.map((s, index) => {
           if (index !== slideIndex) return s;
@@ -154,7 +185,8 @@ export default function SlideCanvasBase({
             ? {
                 ...s.canvas,
                 nodes: s.canvas.nodes.map((node) =>
-                  node.type === "text" && node.id === (activeTextNode?.id ?? node.id)
+                  // Nur genau den aktiven Text-Knoten persistieren, falls vorhanden
+                  node.type === "text" && activeTextNode?.id && node.id === activeTextNode.id
                     ? { ...node, x: next.x, y: next.y }
                     : node,
                 ),
@@ -216,6 +248,8 @@ export default function SlideCanvasBase({
               />
             )}
             <Text
+              // Stabiler Key pro Slide, nicht pro Node-Wechsel → kein Remount beim Umschalten/Autosave
+              key={`text-slide-${slide.id}`}
               text={textContent}
               fontSize={32}
               fontFamily="TikTok Sans, sans-serif"
@@ -223,7 +257,24 @@ export default function SlideCanvasBase({
               x={textPosition.x}
               y={textPosition.y}
               draggable={!disableDrag}
+              // kontrolliertes Dragging:
+              onDragStart={handleDragStart}
+              onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}
+              visible={true}
+              opacity={1}
+              listening={true}
+              // verhindert "Wegschnappen" außerhalb der Bühne
+              dragBoundFunc={(pos) => ({
+                x: Math.min(
+                  Math.max(0, pos.x),
+                  stageDimensions.width - 10
+                ),
+                y: Math.min(
+                  Math.max(0, pos.y),
+                  stageDimensions.height - 10
+                ),
+              })}
               shadowColor="rgba(0,0,0,0.45)"
               shadowBlur={8}
               shadowOpacity={0.8}

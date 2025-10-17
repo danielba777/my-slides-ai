@@ -589,10 +589,7 @@ export class SlideParser {
     }
 
     if (rootImage) {
-      rootImage = {
-        ...rootImage,
-        layoutType: "background",
-      };
+      rootImage = { ...rootImage, layoutType: "background" };
       layoutType = "background";
     }
 
@@ -601,7 +598,7 @@ export class SlideParser {
       id: slideId, // Use the consistent ID
       content: plateElements,
       ...(rootImage ? { rootImage } : {}),
-      ...(layoutType ? { layoutType: layoutType } : {}),
+      ...(layoutType ? { layoutType } : {}),
       alignment: "center",
     };
   };

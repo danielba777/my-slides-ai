@@ -6,6 +6,7 @@ import {
   updatePresentationTheme,
 } from "@/app/_actions/presentation/presentationActions";
 import { getCustomThemeById } from "@/app/_actions/presentation/theme-actions";
+import { ensureSlidesHaveCanvas } from "@/components/presentation/utils/canvas";
 import { type PlateSlide } from "@/components/presentation/utils/parser";
 import {
   setThemeVariables,
@@ -116,7 +117,7 @@ export default function PresentationPage() {
       };
 
       // Set slides
-      setSlides(presentationContent?.slides ?? []);
+      setSlides(ensureSlidesHaveCanvas(presentationContent?.slides ?? []));
 
       // If there's no thumbnail yet, derive from first available rootImage or first img element
       const currentThumb = presentationData.thumbnailUrl;

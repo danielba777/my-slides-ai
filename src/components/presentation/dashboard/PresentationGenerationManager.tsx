@@ -3,6 +3,11 @@
 import { generateImageAction } from "@/app/_actions/image/generate";
 import { getImageFromUnsplash } from "@/app/_actions/image/unsplash";
 import { updatePresentation } from "@/app/_actions/presentation/presentationActions";
+import {
+  applyBackgroundImageToCanvas,
+  ensureSlideCanvas,
+  ensureSlidesHaveCanvas,
+} from "@/components/presentation/utils/canvas";
 import { extractThinking } from "@/lib/thinking-extractor";
 import { usePresentationState } from "@/states/presentation-state";
 import { useChat, useCompletion } from "@ai-sdk/react";
@@ -87,23 +92,69 @@ export function PresentationGenerationManager() {
     streamingParserRef.current.reset();
     streamingParserRef.current.parseChunk(processedPresentationCompletion);
     streamingParserRef.current.finalize();
-    const allSlides = streamingParserRef.current.getAllSlides();
-    // Merge any completed root image URLs from state into streamed slides
-    const mergedSlides = allSlides.map((slide) => {
+    const parsedSlides = streamingParserRef.current.getAllSlides();
+
+    // Heuristik: baue aus dem Slide-Text eine sinnvolle Bild-Query
+    const buildImageQueryFromSlide = (slide: any): string | null => {
+      try {
+        const nodes = Array.isArray(slide?.content) ? slide.content : [];
+        const texts: string[] = [];
+        const walk = (n: any) => {
+          if (!n || typeof n !== "object") return;
+          if (typeof n.text === "string" && n.text.trim())
+            texts.push(n.text.trim());
+          if (Array.isArray(n.children)) n.children.forEach(walk);
+        };
+        nodes.forEach(walk);
+        // Priorisiere H1, sonst die ersten 6–10 Wörter aus dem Fließtext
+        const h1 = nodes.find((n: any) => n?.type === "h1");
+        const h1Text =
+          typeof h1?.children?.[0]?.text === "string"
+            ? h1.children[0].text
+            : undefined;
+        const base = (h1Text || texts.join(" ")).replace(/\s+/g, " ").trim();
+        if (!base) return null;
+        const clipped = base.split(" ").slice(0, 10).join(" ");
+        return clipped.length > 120 ? clipped.slice(0, 120) : clipped;
+      } catch {
+        return null;
+      }
+    };
+
+    // Füge Slides ohne Bild ein rootImage.query hinzu (nur Query, URL wird gleich geladen)
+    const slidesWithAutoQueries = parsedSlides.map((slide) => {
+      if (!slide?.rootImage?.query) {
+        const q = buildImageQueryFromSlide(slide);
+        if (q) {
+          return {
+            ...slide,
+            rootImage: {
+              ...(slide.rootImage ?? {}),
+              query: q,
+              layoutType: slide.layoutType ?? "background",
+            },
+          };
+        }
+      }
+      return slide;
+    });
+
+    // Merge bereits erfolgreich generierte Bild-URLs aus dem State
+    const mergedSlides = slidesWithAutoQueries.map((slide) => {
       const gen = rootImageGeneration[slide.id];
       if (gen?.status === "success" && slide.rootImage?.query) {
         return {
           ...slide,
           rootImage: {
-            ...slide.rootImage,
+            ...(slide.rootImage as any),
             url: gen.url,
           },
         };
       }
       return slide;
     });
-    // For any slide that has a rootImage query but no url, ensure generation is tracked/started
-    for (const slide of allSlides) {
+    // Für alle Slides mit Query aber ohne URL: Bildgenerierung (Unsplash/AI) starten
+    for (const slide of mergedSlides) {
       const slideId = slide.id;
       const rootImage = slide.rootImage;
       if (rootImage?.query && !rootImage.url) {
@@ -147,13 +198,17 @@ export function PresentationGenerationManager() {
                 usePresentationState.getState().setSlides(
                   usePresentationState.getState().slides.map((s) =>
                     s.id === slideId
-                      ? {
+                      ? ensureSlideCanvas({
                           ...s,
                           rootImage: {
                             query: rootImage.query,
                             url: result.image.url,
                           },
-                        }
+                          canvas: applyBackgroundImageToCanvas(
+                            s.canvas,
+                            result.image.url,
+                          ),
+                        })
                       : s,
                   ),
                 );
@@ -169,7 +224,7 @@ export function PresentationGenerationManager() {
         }
       }
     }
-    setSlides(mergedSlides);
+    setSlides(ensureSlidesHaveCanvas(mergedSlides));
     slidesRafIdRef.current = null;
   };
 
@@ -541,13 +596,17 @@ export function PresentationGenerationManager() {
                 setSlides(
                   slides.map((s) =>
                     s.id === slideId
-                      ? {
+                      ? ensureSlideCanvas({
                           ...s,
                           rootImage: {
-                            ...s.rootImage!,
+                            ...(s.rootImage ?? { query: slide.rootImage!.query }),
                             url: result.image.url,
                           },
-                        }
+                          canvas: applyBackgroundImageToCanvas(
+                            s.canvas,
+                            result.image.url,
+                          ),
+                        })
                       : s,
                   ),
                 );

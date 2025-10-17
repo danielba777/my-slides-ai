@@ -370,87 +370,340 @@ Thank you for contributing to make ALLWEONE Presentation Generator better for ev
 ```md
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-\*\*\* a/src/canvas/legacy/SlideCanvasLegacy.tsx
---- b/src/canvas/legacy/SlideCanvasLegacy.tsx
+Diff-Files (copy-paste an Claude Code schicken)
+
+Wichtig: Genau so übernehmen, keine weiteren Stellen ändern.
+
+Diff #1 – Nur kurze Texte nutzen (H1-Pass-Through)
+
+File: src/app/api/presentation/generate/route.ts
+
+*** a/src/app/api/presentation/generate/route.ts
+--- b/src/app/api/presentation/generate/route.ts
 @@
-const setTextColor = (color: string) => {
-applyToActive(l => ({ ...l, color }));
-};
-const setOutlineColor = (color: string) => {
-applyToActive(l => ({ ...l, outlineEnabled: true, outlineColor: color }));
-};
+-// TODO: Add table and chart to the available layouts
+-const slidesTemplate = `
+-You are an expert presentation writer. Your task is to create a clear, text-only presentation in XML format.
+-
+-## CORE REQUIREMENTS
+-
+-1. FORMAT: Use <SECTION> tags for each slide.
+-2. CONTENT: Expand on the outline topics with cohesive paragraphs of text.
+-3. SIMPLICITY: Do NOT use any layout components (BOXES, BULLETS, ICONS, TABLE, CHART, etc.).
+-4. TEXT ONLY: Each slide must contain exactly one <H1> heading and one or more <P> paragraphs. No images or visual elements.
+-
+-## PRESENTATION DETAILS
+-...
+-Now create a complete XML presentation with {TOTAL_SLIDES} slides using this text-only structure.
+-`;
++// TODO: Add table and chart to the available layouts
++const slidesTemplate = `
++You are a formatting assistant. Produce a minimal XML presentation that **passes through** the given outline.
++
++## GOAL
++Create exactly {TOTAL_SLIDES} slides where **each slide contains ONLY one <H1>**.
++The <H1> text MUST be the corresponding outline line (trim leading numbering like "1. " / "2) " / "- ").
++Do **not** expand, paraphrase, add text, or add extra elements.
++
++## FORMAT RULES
++1) Wrap all slides in a single <PRESENTATION> root.
++2) For each outline item create:
++<SECTION>
++    <H1>Exact outline text (numbering removed)</H1>
++</SECTION>
++3) No <P>, no lists, no tables, no charts, no images, no extra attributes.
++4) Keep the original language: {LANGUAGE}. Ignore {TONE} for content; it's pass-through.
++
++## CONTEXT (for indexing only; do NOT add content from here)
++- Title: {TITLE}
++- User Request: {PROMPT}
++- Date: {CURRENT_DATE}
++- Outline Items: {OUTLINE_FORMATTED}
++- Slides: {TOTAL_SLIDES}
++- Research: {SEARCH_RESULTS}
++
++## OUTPUT
++Return ONLY valid XML as shown:
++\`\`\`xml
++<PRESENTATION>
++<SECTION>
++<H1>Outline item 1 (numbering removed)</H1>
++</SECTION>
++<!-- Repeat for each outline item -->
++</PRESENTATION>
++\`\`\`
++`;
+
+
+(Quelle zeigt altes/neues Template und dass jetzt wirklich nur <H1> erzeugt wird.) 
+
+codebase
+
+ 
+
+codebase
+
+Diff #2 – Hook-Fehler & Text-Flackern fixen (Hook aus der Map auslagern, Render-Gate bleibt)
+
+File: src/components/presentation/presentation-page/PresentationSlidesView.tsx
+(Falls dein File anders heißt: Das ist die Datei mit export const PresentationSlidesView = ({ isGeneratingPresentation }) => { ... items.map(...) }.)
+
+*** a/src/components/presentation/presentation-page/PresentationSlidesView.tsx
+--- b/src/components/presentation/presentation-page/PresentationSlidesView.tsx
 @@
+-import React from "react";
++import React, { memo } from "react";
+@@
+-// ❌ useImageReady wurde direkt in items.map(...) verwendet (Hook in Loop)
+-// -> Das führt zu "Rendered fewer hooks than expected"
+-function useImageReady(url?: string) {
++// Hilfs-Hook: Bild vorab decodieren (verhindert halb-gerenderte Frames)
++function useImageReady(url?: string) {
+   const [ready, setReady] = React.useState(!url);
+   React.useEffect(() => {
+     let active = true;
+     if (!url) {
+       setReady(true);
+       return;
+     }
+     const img = new Image();
+     img.crossOrigin = "anonymous";
+     const markReady = () => active && setReady(true);
+     img.src = url;
+     if (typeof (img as any).decode === "function") {
+       (img as any).decode().then(markReady).catch(markReady);
+     } else {
+       img.onload = markReady;
+       img.onerror = markReady;
+     }
+     return () => {
+       active = false;
+     };
+   }, [url]);
+   return ready;
+ }
+ 
++// ✅ Child-Komponente, damit der Hook NICHT in einer Schleife aufgerufen wird
++const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slidesCount }: {
++  slide: any; index: number; isPresenting: boolean; slidesCount: number;
++}) {
++  const safeCanvas: CanvasDoc =
++    (slide.canvas as CanvasDoc | undefined) ?? {
++      width: DEFAULT_CANVAS.width,
++      height: DEFAULT_CANVAS.height,
++      bg: DEFAULT_CANVAS.bg,
++      nodes: [],
++      selection: [],
++    };
++  const imgUrl = slide.rootImage?.url as string | undefined;
++  const imageReady = useImageReady(imgUrl);
++  return (
++    <SortableSlide id={slide.id} key={slide.id}>
++      <div className={cn(`slide-wrapper slide-wrapper-${index} flex-shrink-0`, !isPresenting && "max-w-full")}>
++        <SlideContainer index={index} id={slide.id} slideWidth={undefined} slidesCount={slidesCount}>
++          <div className={cn(`slide-container-${index}`, isPresenting && "h-screen w-screen")}>
++            {imageReady ? (
++              <SlideCanvas
++                doc={safeCanvas}
++                onChange={(next: CanvasDoc) => {
++                  const { slides, setSlides } = usePresentationState.getState();
++                  const updated = slides.slice();
++                  const i = updated.findIndex((x) => x.id === slide.id);
++                  if (i < 0) return;
++                  const current = updated[i];
++                  if (!current) return;
++                  // Nur setzen, wenn sich was geändert hat (verhindert Re-Mount-Bursts)
++                  if (current.canvas !== next) {
++                    updated[i] = { ...current, canvas: next };
++                    setSlides(updated);
++                  }
++                }}
++              />
++            ) : (
++              // Stabiler Placeholder verhindert Schwarz-Frames & Text-Flackern
++              <div
++                className={cn(
++                  "rounded-xl",
++                  isPresenting ? "h-screen w-screen" : "h-[700px] w-[420px]",
++                  "bg-black/90"
++                )}
++              />
++            )}
++          </div>
++        </SlideContainer>
++      </div>
++    </SortableSlide>
++  );
++});
++
+ export const PresentationSlidesView = ({ isGeneratingPresentation }: PresentationSlidesViewProps) => {
+@@
+-  {items.map((slide, index) => {
+-    const safeCanvas: CanvasDoc = (slide.canvas as CanvasDoc | undefined) ?? { ... };
+-    const imgUrl = slide.rootImage?.url;
+-    const imageReady = useImageReady(imgUrl);
+-    return (
+-      <SortableSlide id={slide.id} key={slide.id}>
+-        ...
+-        {imageReady ? (<SlideCanvas ... />) : (<div className="bg-black/90" />)}
+-        ...
+-      </SortableSlide>
+-    );
+-  })}
++  {items.map((slide, index) => (
++    <SlideFrame
++      key={slide.id}
++      slide={slide}
++      index={index}
++      isPresenting={isPresenting}
++      slidesCount={items.length}
++    />
++  ))}
 
-- const [uiTextColor, setUiTextColor] = useState<string>("#ffffff");
-- const [uiOutlineColor, setUiOutlineColor] = useState<string>("#000000");
 
-* const [uiTextColor, setUiTextColor] = useState<string>("#ffffff");
-* const [uiOutlineColor, setUiOutlineColor] = useState<string>("#000000");
-  @@
+Damit:
 
-- const setTextColor = (color: string) => {
-- setUiTextColor(color);
-- applyToActive(l => ({ ...(l as any), color }));
-- };
-- const setOutlineColor = (color: string) => {
-- setUiOutlineColor(color);
-- applyToActive(l => ({ ...(l as any), outlineEnabled: true, outlineColor: color }));
-- };
+Kein Hook mehr in der Schleife → Fehler weg.
 
-* // UI-Handler klar benennen, um Namenskollisionen mit den Canvas-Actions zu vermeiden
-* const setTextColorUI = (color: string) => {
-* setUiTextColor(color);
-* applyToActive(l => ({ ...(l as any), color }));
-* };
-* const setOutlineColorUI = (color: string) => {
-* setUiOutlineColor(color);
-* applyToActive(l => ({ ...(l as any), outlineEnabled: true, outlineColor: color }));
-* };
-  @@
+Canvas/Text wird erst gemountet, wenn das Bild decodiert wurde → kein Flackern.
+(Die betroffenen Stellen waren zuvor genau hier.) 
 
--      <div
--        className="sticky top-0 z-50 w-full bg-transparent flex justify-center"
--      >
+codebase
 
-*      <div
-*        className="sticky top-0 z-50 w-full bg-transparent flex justify-center"
-*      >
-         {/* Die Toolbar-Box selbst: auto-breit, mittig */}
-         <LegacyEditorToolbar
-           onAddText={handleAddText}
+ 
 
--          className="py-1 px-2 inline-flex w-auto max-w-[calc(100vw-16px)] items-center justify-center gap-2 rounded-2xl border border-border/80 bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/70"
+codebase
 
-*          className="py-1 px-2 inline-flex w-fit max-w-full items-center justify-center gap-2 rounded-2xl border border-border/80 bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/70 flex-wrap mx-auto"
-           >
-  @@
+Diff #3 – „Generieren“-Flow: Button bleibt „loading“, Zielseite startet zuverlässig
 
--          <input
+A. Dashboard: Cookie setzen vor Push
+File: src/components/presentation/dashboard/PresentationDashboard.tsx
 
-*          <input
-             type="color"
-             value={uiTextColor}
+*** a/src/components/presentation/dashboard/PresentationDashboard.tsx
+--- b/src/components/presentation/dashboard/PresentationDashboard.tsx
+@@
+   const handleGenerate = async () => {
+     if (!presentationInput.trim()) {
+       toast.error("Please enter a topic for your presentation");
+       return;
+     }
+ 
+     // Set UI loading state
+     setIsGeneratingOutline(true);
+ 
+     try {
+       const result = await createEmptyPresentation(
+         presentationInput.substring(0, 50) || "Untitled Presentation",
+         theme,
+         language,
+       );
+ 
+       if (result.success && result.presentation) {
++        // Setze Pending-Cookie, sodass die Zielseite sofort loslegt
++        try {
++          const domain =
++            typeof window !== "undefined" && window.location.hostname === "localhost"
++              ? "localhost"
++              : ".allweone.com";
++          document.cookie =
++            `presentation_generation_pending=true; path=/; SameSite=Lax;` +
++            (domain !== "localhost" ? ` domain=${domain};` : "");
++        } catch {}
+         // Set the current presentation
+         setCurrentPresentation(
+           result.presentation.id,
+           result.presentation.title,
+         );
+         router.push(
+           `/dashboard/slideshows/generate/${result.presentation.id}`,
+         );
+       } else {
+         setIsGeneratingOutline(false);
+         toast.error(result.message || "Failed to create presentation");
+       }
+     } catch (error) {
+       setIsGeneratingOutline(false);
+       console.error("Error creating presentation:", error);
+       toast.error("Failed to create presentation");
+     }
+   };
 
--            onChange={(e) => setTextColor(e.currentTarget.value)}
 
-*            onChange={(e) => setTextColorUI(e.currentTarget.value)}
-               className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
-             />
-  @@
+(Die Datei enthält bereits Loading-Variant & Disable-State; wir ergänzen nur das Cookie.) 
 
--          <input
+codebase
 
-*          <input
-             type="color"
-             value={uiOutlineColor}
+B. Generate-Seite: Cookie lesen → Start sofort triggern; anschließend Cookie löschen
+File: src/app/dashboard/slideshows/generate/[id]/page.tsx
 
--            onChange={(e) => setOutlineColor(e.currentTarget.value)}
+*** a/src/app/dashboard/slideshows/generate/[id]/page.tsx
+--- b/src/app/dashboard/slideshows/generate/[id]/page.tsx
+@@
+ export const PRESENTATION_GENERATION_COOKIE = "presentation_generation_pending";
+ 
++function hasPendingCookie() {
++  if (typeof document === "undefined") return false;
++  return document.cookie.split(";").some((c) => c.trim().startsWith(`${PRESENTATION_GENERATION_COOKIE}=`));
++}
++
++function clearPendingCookie() {
++  if (typeof document === "undefined") return;
++  const domain =
++    window.location.hostname === "localhost" ? "localhost" : ".allweone.com";
++  document.cookie = `${PRESENTATION_GENERATION_COOKIE}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; ${
++    domain !== "localhost" ? `domain=${domain}; ` : ""
++  }SameSite=Lax`;
++}
++
+@@
+-  // Clear the cookie when the page loads
+-  useEffect(() => {
+-    clearPresentationCookie();
+-  }, []);
++  // Clear legacy cookie name if vorhanden (Abwärtskompatibilität)
++  useEffect(() => {
++    // früherer Name beibehalten:
++    clearPresentationCookie();
++  }, []);
+ 
+   // This effect handles the immediate startup of generation upon first mount
+   // only if we're coming fresh from the dashboard (isGeneratingOutline === true)
+   useEffect(() => {
+     // Only run once on initial page load
+     if (initialLoadComplete.current) return;
+     initialLoadComplete.current = true;
+ 
+-    // If isGeneratingOutline is true but generation hasn't been started yet,
+-    // this indicates we just came from the dashboard and should start generation
+-    if (isGeneratingOutline && !generationStarted.current) {
++    // Start, wenn Store-Flag ODER Pending-Cookie gesetzt ist
++    if ((isGeneratingOutline || hasPendingCookie()) && !generationStarted.current) {
+       console.log("Starting outline generation after navigation");
+       generationStarted.current = true;
+ 
+       // Give the component time to fully mount and establish connections
+       // before starting the generation process
+       setTimeout(() => {
+         setShouldStartOutlineGeneration(true);
++        // Cookie ist verbraucht
++        clearPendingCookie();
+       }, 100);
+     }
+-  }, [isGeneratingOutline, setShouldStartOutlineGeneration]);
++  }, [isGeneratingOutline, setShouldStartOutlineGeneration]);
 
-*            onChange={(e) => setOutlineColorUI(e.currentTarget.value)}
-             disabled={!uiOutlineOn}
-             className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5 disabled:opacity-40"
-           />
 
+(Damit bleibt der Button „loading“, und die Zielseite startet immer zuverlässig – selbst wenn der Zustand beim Routen verloren ginge.) 
+
+codebase
+
+Ergebnis
+
+Kein Hook-Runtime-Error mehr & kein Text-Flackern (Bilder + Texte bleiben stabil).
+
+„Generieren“ bleibt im Loading-State, bis die Generate-Seite übernommen hat; sofortige Weiterleitung ohne zweiten Klick.
+
+Slides enthalten nur die kurzen H1-Titel aus der Outline, wie gewünscht.
 ```
 
 # next-env.d.ts
@@ -490,7 +743,6 @@ const config = {
         protocol: "https",
         hostname: "*.ufs.sh",
       },
-      // Placeholder-Bilder (wird in der Slideshows-Ansicht genutzt)
       {
         protocol: "https",
         hostname: "placehold.co",
@@ -902,348 +1154,110 @@ model GeneratedImage {
 # README.md
 
 ```md
-# ALLWEONE® AI Presentation Generator
+# My Slides AI
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Next.js](https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Plate JS](https://img.shields.io/badge/Plate.js-3B82F6?logoColor=white)](https://platejs.org)
-
-> ⭐ **Help us reach more developers and grow the ALLWEONE community. Star this repo!**
-
-An open-source, AI-powered presentation generator inspired by Gamma.app that creates beautiful, customizable slides in minutes. This tool is part of the broader ALLWEONE AI platform.
-
-<https://github.com/user-attachments/assets/a21dbd49-75b8-4822-bcec-a75b581d9c60>
-
-## 🔗 Quick Links
-
-- [Live Demo](http://presentation.allweone.com)
-- [Video Tutorial](https://www.youtube.com/watch?v=UUePLJeFqVQ)
-- [Discord Community](https://discord.gg/fsMHMhAHRV)
-- [Contributing Guidelines](CONTRIBUTING.md)
-
-## 📋 Table of Contents
-
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [Getting Started](#-getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [Database Setup](#database-setup)
-- [Usage](#-usage)
-  - [Creating a Presentation](#creating-a-presentation)
-  - [Custom Themes](#custom-themes)
-- [Local Models Guide](#-local-models-guide)
-- [Project Structure](#-project-structure)
-- [Roadmap](#️-roadmap)
-- [Contributing](#-contributing)
-- [License](#-license)
-- [Acknowledgements](#-acknowledgements)
-- [Support](#-support)
-
-## 🌟 Features
-
-### Core Functionality
-
-- **AI-Powered Content Generation**: Create complete presentations on any topic with AI
-- **Customizable Slides**: Choose the number of slides, language, and page style
-- **Editable Outlines**: Review and modify AI-generated outlines before finalizing
-- **Real-Time Generation**: Watch your presentation build live as content is created
-- **Auto-Save**: Everything saves automatically as you work
-
-### Design & Customization
-
-- **Multiple Themes**: 9 built-in themes with more coming soon
-- **Custom Theme Creation**: Create and save your own themes from scratch
-- **Full Editability**: Modify text, fonts, and design elements as needed
-- **Image Generation**: Choose different AI image generation models for your slides
-- **Audience-Focused Styles**: Select between professional and casual presentation styles
-
-### Presentation Tools
-
-- **Presentation Mode**: Present directly from the application
-- **Rich Text Editing**: Powered by Plate Editor for comprehensive text and image handling
-- **Drag and Drop**: Intuitive slide reordering and element manipulation
-
-## 🧰 Tech Stack
-
-| Category           | Technologies               |
-| ------------------ | -------------------------- |
-| **Framework**      | Next.js, React, TypeScript |
-| **Styling**        | Tailwind CSS               |
-| **Database**       | PostgreSQL with Prisma ORM |
-| **AI Integration** | OpenAI API, Together AI    |
-| **Authentication** | NextAuth.js                |
-| **UI Components**  | Radix UI                   |
-| **Text Editor**    | Plate Editor               |
-| **File Uploads**   | UploadThing                |
-| **Drag & Drop**    | DND Kit                    |
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-Before you begin, ensure you have the following installed:
-
-- Node.js 18.x or higher
-- npm, yarn, or pnpm package manager
-- PostgreSQL database
-- Required API keys:
-  - OpenAI API key (for AI generation features)
-  - Together AI API key (for image generation)
-  - Google Client ID and Secret (for authentication)
-
-### Installation
-
-1. **Clone the repository**
-
-   \`\`\`bash
-   git clone git@github.com:allweonedev/presentation-ai.git
-   cd presentation-ai
-   \`\`\`
-
-2. **Install dependencies**
-
-   \`\`\`bash
-   pnpm install
-   \`\`\`
-
-3. **Set up environment variables**
-
-   Create a `.env` file in the root directory with the following variables:
-
-   \`\`\`env
-   # AI Providers
-   OPENAI_API_KEY=""
-   TOGETHER_AI_API_KEY=""
-
-   # Next Auth Configuration
-   NEXTAUTH_SECRET=""
-   NEXTAUTH_URL="http://localhost:3000"
-
-   # Google OAuth Provider
-   GOOGLE_CLIENT_ID=""
-   GOOGLE_CLIENT_SECRET=""
-
-   # File Upload Service
-   UPLOADTHING_TOKEN=""
-
-   UNSPLASH_ACCESS_KEY=""
-   TAVILY_API_KEY=""
-
-   # PostgreSQL Database
-   DATABASE_URL="postgresql://username:password@localhost:5432/presentation_ai"
-   \`\`\`
-
-   > 💡 **Tip**: Copy `.env.example` to `.env` and fill in your actual values.
-
-### Database Setup
-
-1. **Initialize the database**
-
-   \`\`\`bash
-   pnpm db:push
-   \`\`\`
-
-1. **Start the development server**
-
-   \`\`\`bash
-   pnpm dev
-   \`\`\`
-
-1. **Open the application**
-
-   Navigate to [http://localhost:3000](http://localhost:3000) in your browser.
-
-## 💻 Usage
-
-### Creating a Presentation
-
-Follow these steps to create your first AI-generated presentation:
-
-1. Login the website
-1. Navigate to the dashboard
-1. Enter your presentation topic
-1. Choose the number of slides (recommended: 5-10)
-1. Select your preferred language
-1. Choose a page style
-1. Toggle web search (if you want)
-1. Click **"Generate Outline"**
-1. Review and edit the AI-generated outline
-1. Select a theme for your presentation
-1. Choose an image source (ai / stock)
-1. Select your presentation style (Professional/Casual)
-1. Click **"Generate Presentation"**
-1. Wait for the AI to create your slides in real-time
-1. Preview, edit, and refine your presentation as needed
-1. Present directly from the app or export your presentation
-
-### Custom Themes
-
-Create personalized themes to match your brand or style:
-
-1. Click **"Create New Theme"**
-2. Start from scratch or derive from an existing theme
-3. Customize colors, fonts, and layout
-4. Save your theme for future use
-
-## 🧠 Local Models Guide
-You can use either Ollama or LM Studio for using local models in ALLWEONE presentation ai. 
-
-### LM Studio
-
-1. Install [LM Studio](https://lmstudio.ai).
-2. In the LM Studio app, turn the Server ON and enable CORS.
-3. Download any model you want to use inside LM Studio.
-
-### Ollama
-
-1. Install [Ollama](https://ollama.com).
-2. Download whichever model you want to use (for example: `ollama pull llama3.1`).
-
-### Using Local Models in the App
-
-1. Open the app and open the text model selector.
-2. Chose the model you want to use (it must be downloaded in lm studio or ollama)
-3. Enjoy the generation
-
-Notes:
-
-- Models will automatically appear in the Model Selector when the LM Studio server or the Ollama daemon is running.
-- Make sure LM Studio has CORS enabled so the browser can connect.
-
-## 📁 Project Structure
-
-\`\`\`text
-presentation/
-├── .next/                      # Next.js build output
-├── node_modules/               # Dependencies
-├── prisma/                     # Database schema and migrations
-│   └── schema.prisma          # Prisma database model
-├── src/                        # Source code
-│   ├── app/                   # Next.js app router
-│   ├── components/            # Reusable UI components
-│   │   ├── auth/             # Authentication components
-│   │   ├── presentation/     # Presentation-related components
-│   │   │   ├── dashboard/   # Dashboard UI
-│   │   │   ├── editor/      # Presentation editor
-│   │   │   │   ├── custom-elements/   # Custom editor elements
-│   │   │   │   ├── dnd/              # Drag and drop functionality
-│   │   │   │   └── native-elements/  # Native editor elements
-│   │   │   ├── outline/     # Presentation outline components
-│   │   │   ├── theme/       # Theme-related components
-│   │   │   └── utils/       # Presentation utilities
-│   │   ├── prose-mirror/    # ProseMirror editor for outlines
-│   │   ├── plate/           # Text editor components
-│   │   │   ├── hooks/       # Editor hooks
-│   │   │   ├── lib/         # Editor libraries
-│   │   │   ├── ui/          # Plate editor UI components
-│   │   │   ├── utils/       # Functions necessary for platejs
-│   │   │   └── plugins/     # Editor plugins
-│   │   └── ui/              # Shared UI components
-│   ├── hooks/                # Custom React hooks
-│   ├── lib/                  # Utility functions and shared code
-│   ├── provider/             # Context providers
-│   ├── server/               # Server-side code
-│   ├── states/               # State management
-│   ├── styles/               # Styles required in the project
-│   ├── middleware.ts         # Next.js middleware
-│   └── env.js                # Environment configuration
-├── .env                       # Environment variables (not in git)
-├── .env.example              # Example environment variables
-├── next.config.js            # Next.js configuration
-├── package.json              # Project dependencies and scripts
-├── tailwind.config.ts        # Tailwind CSS configuration
-└── tsconfig.json             # TypeScript configuration
-\`\`\`
-
-## 🗺️ Roadmap
-
-| Feature                      | Status            | Notes                                                                                       |
-| ---------------------------- | ----------------- | ------------------------------------------------------------------------------------------- |
-| Export to PowerPoint (.pptx) | 🟡 Partially Done | Works but the images and other component do not translate one to one                        |
-| Media embedding              | 🟡 Partially Done | Functionality is there, but ui/ux need improvement                                          |
-| Additional built-in themes   | 🟡 In Progress    | Currently have 9 themes, planning to add 15+ more                                           |
-| Mobile responsiveness        | 🟡 In Progress    | Improving layout and interactions for mobile devices                                        |
-| Advanced charts              | 🟡 Started        | Support for AI generated charts                                                             |
-| Write e2e tests              | 🔴 Not Started    | Writing test to check the core features, so that we can catch if any changes break anything |
-| Real-time collaboration      | 🔴 Not Started    | Multiple users editing the same presentation simultaneously                                 |
-| Export to PDF                | 🔴 Not Started    | High priority - allow users to download presentations as PDFs                               |
-| Template library             | 🔴 Not Started    | Pre-built templates for common presentation types (pitch decks, reports, etc.)              |
-| Animation and transitions    | 🔴 Not Started    | Add slide transitions and element animations                                                |
-| Voice-over recording         | 🔴 Not Started    | Record and attach voice narration to slides                                                 |
-| Cloud storage integration    | 🔴 Not Started    | Connect with Google Drive, Dropbox, OneDrive                                                |
-| Presentation analytics       | 🔴 Not Started    | Track views, engagement, and presentation performance                                       |
-| AI presenter notes           | 🔴 Not Started    | Auto-generate speaker notes for each slide                                                  |
-| Custom font uploads          | 🔴 Not Started    | Allow users to upload and use their own fonts                                               |
-| Plugin system                | 🔴 Not Started    | Allow community to build and share extensions
-| API                          | 🔴 Not Started    | Allow developers to use the allweone presentation to generate content in their own applications. 
-
-> 📝 **Note**: This roadmap is subject to change based on community feedback and priorities. Want to contribute to any of these features? Check out our [Contributing Guidelines](CONTRIBUTING.md)!
-
-## 🤝 Contributing
-
-We welcome contributions from the community! Here's how you can help:
-
-### How to Contribute
-
-1. **Fork the repository**
-2. **Create a feature branch**
-
-   \`\`\`bash
-   git checkout -b feature/amazing-feature
-   \`\`\`
-
-3. **Commit your changes**
-
-   \`\`\`bash
-   git commit -m 'Add some amazing feature'
-   \`\`\`
-
-4. **Push to the branch**
-
-   \`\`\`bash
-   git push origin feature/amazing-feature
-   \`\`\`
-
-5. **Open a Pull Request**
-
-### Contribution Guidelines
-
-- Follow the existing code style and conventions
-- Write clear commit messages
-- Be respectful and constructive in discussions
-
-For more details, please read our [Contributing Guidelines](CONTRIBUTING.md).
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgements
-
-Special thanks to the following projects and organizations:
-
-- [OpenAI](https://openai.com/) for AI generation capabilities
-- [Plate Editor](https://plate.udecode.io/) for rich text editing
-- [Radix UI](https://www.radix-ui.com/) for accessible UI components
-- [Next.js](https://nextjs.org/) for the React framework
-- All our open-source [contributors](https://github.com/allweonedev/presentation-ai/graphs/contributors)
-
-## 💬 Support
-
-Need help or have questions?
-
-- 💬 [Discord Community](https://discord.gg/wSVNudUBdY)
-- 🐛 [Report a Bug](https://github.com/allweonedev/presentation-ai/issues)
-- 💡 [Request a Feature](https://github.com/allweonedev/presentation-ai/issues)
-- 📧 Contact us via GitHub Issues or Discord
+This repository powers the **My Slides AI** application. The most important part of this document is the branching workflow, so that we can collaborate without stepping on each other’s changes.
 
 ---
 
-**Built with ❤️ by the ALLWEONE™ Team**
+## Branch Strategy
 
-**[⭐ Star us on GitHub](https://github.com/allweonedev/presentation-ai)**
+| Branch | Purpose | Who pushes |
+|--------|---------|------------|
+| `main` | Production-ready code. This branch must always be deployable. | **Nobody pushes directly.** Only reviewed PRs are merged. |
+| `daniel` | Daniel’s integration branch. Draft and feature work starts here. | Daniel only. |
+| `artur` | Artur’s integration branch. Draft and feature work starts here. | Artur only. |
+
+Both personal branches are long-lived and track `main`. Any spike branches (feature, bugfix) should branch off your personal branch and merge back into it.
+
+---
+
+## Daily Workflow
+
+1. **Sync `main` locally**
+   \`\`\`bash
+   git checkout main
+   git pull origin main
+   \`\`\`
+2. **Sync your personal branch (`daniel` or `artur`)**
+   \`\`\`bash
+   git checkout <personal-branch>
+   git pull origin <personal-branch>
+   git merge main   # or git rebase main if you prefer a linear history
+   \`\`\`
+3. **Create a short-lived feature branch (optional but recommended)**
+   \`\`\`bash
+   git checkout -b feature/<topic>
+   \`\`\`
+4. **Commit changes frequently**
+   \`\`\`bash
+   git add .
+   git commit -m "Describe the change"
+   \`\`\`
+5. **Push the feature branch**
+   \`\`\`bash
+   git push origin feature/<topic>
+   \`\`\`
+6. **Open a Pull Request targeting your personal branch**
+   - Assign yourself as the owner and request review if needed.
+   - Once approved, merge into your personal branch.
+
+7. **When ready to promote work to production**
+   - Open a PR from your personal branch (`daniel` or `artur`) into `main`.
+   - Tag the other teammate for review.
+   - Only merge when CI passes and both agree the code is production-ready.
+
+---
+
+## Keeping Personal Branches Up to Date
+
+- **At least once per day**, merge `main` into your personal branch to minimize divergence.
+- Resolve conflicts locally before pushing.
+- If a change on `main` breaks your work-in-progress, coordinate early so we can fix it quickly.
+
+---
+
+## Pull Request Expectations
+
+1. **Clear description** of what changed and why.
+2. **Testing notes** (commands run, screenshots, etc.).
+3. **No direct pushes to `main`**. Every change must flow through a PR.
+4. **Use squash merge** for feature branches into personal branches to keep history tidy.
+5. **Use merge commits** (not squash) when promoting `daniel`/`artur` into `main` so we preserve the branch structure and deployment history.
+
+---
+
+## Handling Production Hotfixes
+
+1. Branch off `main` (`hotfix/<issue>`).
+2. Fix, test, and open a PR directly into `main`.
+3. After merging, immediately merge `main` back into both `daniel` and `artur` to keep them current.
+
+---
+
+## Local Development Tips
+
+- Install dependencies with `pnpm install`.
+- Common scripts:
+  \`\`\`bash
+  pnpm dev    # start Next.js locally
+  pnpm type   # run TypeScript checks
+  pnpm lint   # run lint (if configured)
+  \`\`\`
+- Follow the existing ESLint/Prettier setup so that diffs stay clean.
+
+---
+
+## Release Checklist
+
+1. Confirm `main` has the commits you want to release.
+2. Tag the release (optional) – `git tag -a vX.Y.Z -m "Release notes"`.
+3. Deploy using the production pipeline.
+4. Announce the release and archive the associated work items.
+
+---
+
+By sticking to this workflow, we keep `main` stable, ensure both `daniel` and `artur` stay in sync, and make it easy to understand who is responsible for each change. Happy shipping! 👍
 
 ```
 
@@ -3210,6 +3224,20 @@ import { toast } from "sonner";
 
 export const PRESENTATION_GENERATION_COOKIE = "presentation_generation_pending";
 
+function hasPendingCookie() {
+  if (typeof document === "undefined") return false;
+  return document.cookie.split(";").some((c) => c.trim().startsWith(`${PRESENTATION_GENERATION_COOKIE}=`));
+}
+
+function clearPendingCookie() {
+  if (typeof document === "undefined") return;
+  const domain =
+    window.location.hostname === "localhost" ? "localhost" : ".allweone.com";
+  document.cookie = `${PRESENTATION_GENERATION_COOKIE}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; ${
+    domain !== "localhost" ? `domain=${domain}; ` : ""
+  }SameSite=Lax`;
+}
+
 function makeCanvasFromText(text: string, w = 1080, h = 1920): CanvasDoc {
   return {
     version: 1,
@@ -3281,8 +3309,9 @@ export default function PresentationGenerateWithIdPage() {
     document.cookie = `${PRESENTATION_GENERATION_COOKIE}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; ${domain !== "localhost" ? `domain=${domain}; ` : ""}`;
   };
 
-  // Clear the cookie when the page loads
+  // Clear legacy cookie name if vorhanden (Abwärtskompatibilität)
   useEffect(() => {
+    // früherer Name beibehalten:
     clearPresentationCookie();
   }, []);
 
@@ -3293,9 +3322,8 @@ export default function PresentationGenerateWithIdPage() {
     if (initialLoadComplete.current) return;
     initialLoadComplete.current = true;
 
-    // If isGeneratingOutline is true but generation hasn't been started yet,
-    // this indicates we just came from the dashboard and should start generation
-    if (isGeneratingOutline && !generationStarted.current) {
+    // Start, wenn Store-Flag ODER Pending-Cookie gesetzt ist
+    if ((isGeneratingOutline || hasPendingCookie()) && !generationStarted.current) {
       console.log("Starting outline generation after navigation");
       generationStarted.current = true;
 
@@ -3303,6 +3331,8 @@ export default function PresentationGenerateWithIdPage() {
       // before starting the generation process
       setTimeout(() => {
         setShouldStartOutlineGeneration(true);
+        // Cookie ist verbraucht
+        clearPendingCookie();
       }, 100);
     }
   }, [isGeneratingOutline, setShouldStartOutlineGeneration]);
@@ -3460,6 +3490,7 @@ export default function PresentationGenerateWithIdPage() {
         language: state.language,
         searchResults: state.searchResults,
       });
+      state.setShouldStartPresentationGeneration(true);
     } catch (error) {
       console.error("Failed to store presentation slides:", error);
       toast.error("Slides saved locally, but storing them failed.");
@@ -3652,8 +3683,7 @@ export default function RootLayout({
             {/* next-themes setzt die Klasse ("dark"/"light") auf <html> clientseitig */}
             <ThemeProvider
               attribute="class"
-              defaultTheme="system"
-              enableSystem
+              defaultTheme="light"
               disableTransitionOnChange
             >
               {children}
@@ -4252,6 +4282,19 @@ export function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
+export async function loadImageDecoded(url: string): Promise<HTMLImageElement> {
+  const img = await loadImage(url);
+  // decode() verhindert Paint-Glitches vor vollständiger Decodierung
+  // Fallback: falls nicht unterstützt, ist img schon geladen
+  try {
+    // @ts-expect-error older TS lib
+    if (typeof img.decode === "function") await img.decode();
+  } catch {
+    // ignore
+  }
+  return img;
+}
+
 export async function ensureFonts(families: string[], timeout = 5000) {
   await Promise.allSettled(
     families
@@ -4615,7 +4658,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     const lines = computeWrappedLinesWithDOM(initial);
     initial.height = Math.ceil(computeAutoHeightForLayer(initial, lines));
     setTextLayers((prev) => [...prev, initial]);
-    setActiveLayerId(id);
+    commitActiveLayer(id);
     setIsEditing(id);
     // Cursor zurück in den Editor
     setTimeout(() => editorActiveRef.current?.focus(), 0);
@@ -4647,6 +4690,20 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     })[]
   >([]);
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
+  // Aktuelle Auswahl als Ref, damit Keydown (Capture) IMMER die sichtbare Auswahl löscht (keine stale Closure)
+  const activeLayerIdRef = useRef<string | null>(null);
+  const commitActiveLayer = useCallback(
+    (id: string | null) => {
+      setActiveLayerId(id);
+      activeLayerIdRef.current = id;
+    },
+    [],
+  );
+
+  // State ↔ Ref synchron halten
+  useEffect(() => {
+    activeLayerIdRef.current = activeLayerId;
+  }, [activeLayerId]);
 
   // Edit / Interaction
   const [isEditing, setIsEditing] = useState<string | null>(null); // grüner Modus (Editor)
@@ -4806,6 +4863,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     } catch {}
   };
 
+  // Canvas-Hintergrund-Klick: Auswahl aufheben (State + Ref immer gemeinsam!)
+  const handleCanvasDeselect = () => {
+    commitActiveLayer(null);
+    setIsEditing(null);
+  };
+
   // GLOBAL pointerup → Interaktion beenden & Parent syncen
   useEffect(() => {
     const onWindowPointerUp = () => {
@@ -4823,14 +4886,19 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
   // Layer Interaktionen
   const selectLayer = (layerId: string, e: React.PointerEvent) => {
+    // Wenn ein ANDERER Layer im Edit-Modus ist, erst sauber schließen,
+    // damit keine Blur/Focus-Races auftreten und States stabil bleiben.
+    if (isEditingRef.current && isEditingRef.current !== layerId) {
+      setIsEditing(null);
+    }
     if (isEditingRef.current === layerId) {
       // Im Editor-Modus: nichts blockieren, damit der Cursor/Selektion im Text funktioniert
-      setActiveLayerId(layerId);
+      commitActiveLayer(layerId);
       return;
     }
     e.stopPropagation();
     e.preventDefault();
-    setActiveLayerId(layerId);
+    commitActiveLayer(layerId);
     setDragMode("move-text");
     isInteracting.current = true;
     const start = pixelToCanvas(e.clientX, e.clientY);
@@ -4846,12 +4914,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       // Im Editor-Modus für diese Box: nicht resizen!
       e.stopPropagation();
       e.preventDefault();
-      setActiveLayerId(layerId);
+      commitActiveLayer(layerId);
       return;
     }
     e.stopPropagation();
     e.preventDefault();
-    setActiveLayerId(layerId);
+    commitActiveLayer(layerId);
     setDragMode(mode);
     isInteracting.current = true;
     const start = pixelToCanvas(e.clientX, e.clientY);
@@ -5074,38 +5142,45 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     onLayoutChange(newLayout);
   };
 
-  // Delete/Entf Taste: selektierten Text-Layer löschen
+  // Delete/Backspace: selektierten Text-Layer löschen (Capture-Phase, global)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Delete/Entf Taste nur behandeln wenn:
-      // 1. Ein Layer selektiert ist
-      // 2. Kein Eingabefeld (Textarea/Input) fokussiert ist
-      // 3. Nicht im Editiermodus
-      if (
-        (e.key === "Delete" || (e.key === "Backspace" && e.metaKey)) &&
-        activeLayerId &&
-        isEditingRef.current === null &&
-        document.activeElement?.tagName !== "TEXTAREA" &&
-        document.activeElement?.tagName !== "INPUT"
-      ) {
+      const ae = document.activeElement as HTMLElement | null;
+      const isInputFocused =
+        !!ae &&
+        (ae.tagName === "INPUT" ||
+          ae.tagName === "TEXTAREA" ||
+          ae.isContentEditable ||
+          ae.closest("[contenteditable='true']") !== null);
+
+      const selectedId = activeLayerIdRef.current;
+      const isDeleteKey =
+        e.key === "Delete" ||
+        e.key === "Backspace" ||
+        // Mac: "Entfernen" ist oft Backspace; Fn+Backspace sendet "Delete".
+        // Wir erlauben außerdem Meta/Ctrl+Backspace, solange kein Input fokussiert ist.
+        ((e.metaKey || e.ctrlKey) && e.key === "Backspace");
+
+      if (isDeleteKey && !isInputFocused && selectedId && isEditingRef.current === null) {
         e.preventDefault();
         e.stopPropagation();
-
         setTextLayers((prev) => {
-          const updated = prev.filter((l) => l.id !== activeLayerId);
+          const updated = prev.filter((l) => l.id !== selectedId);
+          // sofortiger Parent-Sync
           const newLayout = mapLayersToLayout(updated as any);
           const sig = layoutSignature(newLayout);
           lastSentLayoutSigRef.current = sig;
           onLayoutChange(newLayout);
-          setActiveLayerId(null);
+          commitActiveLayer(null);
           return updated;
         });
       }
     };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeLayerId, onLayoutChange]);
+    // Capture-Phase, damit uns kein onKeyDownCapture davor blockt
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+    // WICHTIG: keine Abhängigkeit von activeLayerId, sonst bekommt der Listener wieder eine neue (stale) Closure.
+  }, [onLayoutChange]);
 
   // Debounced Parent-Sync
   const layoutChangeTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -6164,12 +6239,14 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
     (next: SlideTextElement[]) => {
       // Text-Nodes im doc anhand Reihenfolge/Zuweisung updaten
       const newNodes = doc.nodes.map((n) => ({ ...n }));
+
+      // 1) Existierende Textknoten updaten (in Reihenfolge)
       let ti = 0;
       for (let i = 0; i < newNodes.length; i++) {
         const node = newNodes[i];
         if (!node || node.type !== "text") continue;
         const src = next[ti++];
-        if (!src) break;
+        if (!src) break; // keine weitere Quelle – restliche Textknoten bleiben wie sie sind
 
         const pxX = Math.round((src.x ?? 0.5) * W);
         const pxY = Math.round((src.y ?? 0.5) * H);
@@ -6210,6 +6287,58 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
         if ((src as any).color !== undefined)
           target.color = (src as any).color;
       }
+
+      // 2) Falls Legacy-Canvas MEHR Text-Layer hat als doc-Textknoten:
+      //    fehlende Textknoten APPENDEN, damit der zweite (dritte, …) Text bestehen bleibt.
+      const existingTextCount = newNodes.filter((n) => n.type === "text").length;
+      if (next.length > existingTextCount) {
+        for (let k = existingTextCount; k < next.length; k++) {
+          const src = next[k];
+          const pxX = Math.round((src.x ?? 0.5) * W);
+          const pxY = Math.round((src.y ?? 0.5) * H);
+          const weight: ExtendedCanvasTextNode["weight"] =
+            src.weight === "bold" ? "bold" : src.weight === "semibold" ? "semibold" : "regular";
+          newNodes.push({
+            id: src.id ?? `txt-${Date.now()}-${k}`,
+            type: "text",
+            x: pxX,
+            y: pxY,
+            rotation: src.rotation ?? 0,
+            width: src.maxWidth ?? 400,
+            text: src.content ?? "",
+            fontFamily: src.fontFamily ?? "Inter, system-ui, sans-serif",
+            fontSize: Math.round(BASE_FONT_PX * (src.scale ?? 1)),
+            lineHeight: src.lineHeight ?? 1.12,
+            letterSpacing: src.letterSpacing ?? 0,
+            align: src.align ?? "left",
+            weight,
+            color: (src as any).color ?? "#ffffff",
+            // erweiterte Felder für Legacy-Canvas-Kompatibilität
+            content: src.content ?? "",
+            scale: src.scale ?? 1,
+            height: (src as any).maxHeight ?? undefined,
+            zIndex: src.zIndex ?? newNodes.length,
+            italic: (src as any).italic ?? false,
+            outlineEnabled: (src as any).outlineEnabled ?? false,
+            outlineWidth: (src as any).outlineWidth ?? 6,
+            outlineColor: (src as any).outlineColor ?? "#000",
+            nx: pxToNormX(pxX),
+            ny: pxToNormY(pxY),
+            nmaxWidth: src.maxWidth ?? 400,
+          } as ExtendedCanvasTextNode);
+        }
+      }
+
+      // 3) Überschüssige Textknoten **nach ID** entfernen (nicht "von hinten"),
+      //    damit genau der vom Canvas gelöschte Layer verschwindet.
+      const keepIds = new Set(next.map((t) => t.id));
+      for (let i = newNodes.length - 1; i >= 0; i--) {
+        const n = newNodes[i] as any;
+        if (n?.type === "text" && !keepIds.has(n.id)) {
+          newNodes.splice(i, 1);
+        }
+      }
+
       onChange({ ...doc, nodes: newNodes });
     },
     [doc, onChange],
@@ -6305,7 +6434,7 @@ export function SidebarAccountSection() {
 ```tsx
 "use client";
 import { useTheme } from "next-themes";
-import { IoHomeOutline, IoImagesOutline } from "react-icons/io5";
+import { Home, Images, type LucideIcon } from "lucide-react";
 
 import {
   Sidebar,
@@ -6321,20 +6450,26 @@ import {
 import { SidebarAccountSection } from "./app-sidebar-account";
 import { AppLogo } from "./logo/AppLogo";
 
-const startItems = [
+interface SidebarItem {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+}
+
+const startItems: SidebarItem[] = [
   {
     title: "Home",
     url: "/dashboard/home",
-    icon: IoHomeOutline,
+    icon: Home,
   },
 ];
 
 // Menu items.
-const playgroundItems = [
+const playgroundItems: SidebarItem[] = [
   {
     title: "Slideshows",
     url: "/dashboard/slideshows",
-    icon: IoImagesOutline,
+    icon: Images,
   },
 ];
 
@@ -27564,6 +27699,16 @@ export function PresentationDashboard({
       );
 
       if (result.success && result.presentation) {
+        // Setze Pending-Cookie, sodass die Zielseite sofort loslegt
+        try {
+          const domain =
+            typeof window !== "undefined" && window.location.hostname === "localhost"
+              ? "localhost"
+              : ".allweone.com";
+          document.cookie =
+            `presentation_generation_pending=true; path=/; SameSite=Lax;` +
+            (domain !== "localhost" ? ` domain=${domain};` : "");
+        } catch {}
         // Set the current presentation
         setCurrentPresentation(
           result.presentation.id,
@@ -27864,6 +28009,11 @@ export function PresentationExamples() {
 import { generateImageAction } from "@/app/_actions/image/generate";
 import { getImageFromUnsplash } from "@/app/_actions/image/unsplash";
 import { updatePresentation } from "@/app/_actions/presentation/presentationActions";
+import {
+  applyBackgroundImageToCanvas,
+  ensureSlideCanvas,
+  ensureSlidesHaveCanvas,
+} from "@/components/presentation/utils/canvas";
 import { extractThinking } from "@/lib/thinking-extractor";
 import { usePresentationState } from "@/states/presentation-state";
 import { useChat, useCompletion } from "@ai-sdk/react";
@@ -27948,23 +28098,69 @@ export function PresentationGenerationManager() {
     streamingParserRef.current.reset();
     streamingParserRef.current.parseChunk(processedPresentationCompletion);
     streamingParserRef.current.finalize();
-    const allSlides = streamingParserRef.current.getAllSlides();
-    // Merge any completed root image URLs from state into streamed slides
-    const mergedSlides = allSlides.map((slide) => {
+    const parsedSlides = streamingParserRef.current.getAllSlides();
+
+    // Heuristik: baue aus dem Slide-Text eine sinnvolle Bild-Query
+    const buildImageQueryFromSlide = (slide: any): string | null => {
+      try {
+        const nodes = Array.isArray(slide?.content) ? slide.content : [];
+        const texts: string[] = [];
+        const walk = (n: any) => {
+          if (!n || typeof n !== "object") return;
+          if (typeof n.text === "string" && n.text.trim())
+            texts.push(n.text.trim());
+          if (Array.isArray(n.children)) n.children.forEach(walk);
+        };
+        nodes.forEach(walk);
+        // Priorisiere H1, sonst die ersten 6–10 Wörter aus dem Fließtext
+        const h1 = nodes.find((n: any) => n?.type === "h1");
+        const h1Text =
+          typeof h1?.children?.[0]?.text === "string"
+            ? h1.children[0].text
+            : undefined;
+        const base = (h1Text || texts.join(" ")).replace(/\s+/g, " ").trim();
+        if (!base) return null;
+        const clipped = base.split(" ").slice(0, 10).join(" ");
+        return clipped.length > 120 ? clipped.slice(0, 120) : clipped;
+      } catch {
+        return null;
+      }
+    };
+
+    // Füge Slides ohne Bild ein rootImage.query hinzu (nur Query, URL wird gleich geladen)
+    const slidesWithAutoQueries = parsedSlides.map((slide) => {
+      if (!slide?.rootImage?.query) {
+        const q = buildImageQueryFromSlide(slide);
+        if (q) {
+          return {
+            ...slide,
+            rootImage: {
+              ...(slide.rootImage ?? {}),
+              query: q,
+              layoutType: slide.layoutType ?? "background",
+            },
+          };
+        }
+      }
+      return slide;
+    });
+
+    // Merge bereits erfolgreich generierte Bild-URLs aus dem State
+    const mergedSlides = slidesWithAutoQueries.map((slide) => {
       const gen = rootImageGeneration[slide.id];
       if (gen?.status === "success" && slide.rootImage?.query) {
         return {
           ...slide,
           rootImage: {
-            ...slide.rootImage,
+            ...(slide.rootImage as any),
             url: gen.url,
           },
         };
       }
       return slide;
     });
-    // For any slide that has a rootImage query but no url, ensure generation is tracked/started
-    for (const slide of allSlides) {
+    // Für alle Slides mit Query aber ohne URL: Bildgenerierung (Unsplash/AI) starten
+    for (const slide of mergedSlides) {
       const slideId = slide.id;
       const rootImage = slide.rootImage;
       if (rootImage?.query && !rootImage.url) {
@@ -28008,13 +28204,17 @@ export function PresentationGenerationManager() {
                 usePresentationState.getState().setSlides(
                   usePresentationState.getState().slides.map((s) =>
                     s.id === slideId
-                      ? {
+                      ? ensureSlideCanvas({
                           ...s,
                           rootImage: {
                             query: rootImage.query,
                             url: result.image.url,
                           },
-                        }
+                          canvas: applyBackgroundImageToCanvas(
+                            s.canvas,
+                            result.image.url,
+                          ),
+                        })
                       : s,
                   ),
                 );
@@ -28030,7 +28230,7 @@ export function PresentationGenerationManager() {
         }
       }
     }
-    setSlides(mergedSlides);
+    setSlides(ensureSlidesHaveCanvas(mergedSlides));
     slidesRafIdRef.current = null;
   };
 
@@ -28402,13 +28602,17 @@ export function PresentationGenerationManager() {
                 setSlides(
                   slides.map((s) =>
                     s.id === slideId
-                      ? {
+                      ? ensureSlideCanvas({
                           ...s,
                           rootImage: {
-                            ...s.rootImage!,
+                            ...(s.rootImage ?? { query: slide.rootImage!.query }),
                             url: result.image.url,
                           },
-                        }
+                          canvas: applyBackgroundImageToCanvas(
+                            s.canvas,
+                            result.image.url,
+                          ),
+                        })
                       : s,
                   ),
                 );
@@ -42026,6 +42230,7 @@ import {
   updatePresentationTheme,
 } from "@/app/_actions/presentation/presentationActions";
 import { getCustomThemeById } from "@/app/_actions/presentation/theme-actions";
+import { ensureSlidesHaveCanvas } from "@/components/presentation/utils/canvas";
 import { type PlateSlide } from "@/components/presentation/utils/parser";
 import {
   setThemeVariables,
@@ -42136,7 +42341,7 @@ export default function PresentationPage() {
       };
 
       // Set slides
-      setSlides(presentationContent?.slides ?? []);
+      setSlides(ensureSlidesHaveCanvas(presentationContent?.slides ?? []));
 
       // If there's no thumbnail yet, derive from first available rootImage or first img element
       const currentThumb = presentationData.thumbnailUrl;
@@ -42306,13 +42511,12 @@ export default function PresentationPage() {
     <PresentationLayout
       isLoading={isLoading}
       themeData={currentThemeData ?? undefined}
+      hideSidebar
     >
-      <div className="mx-auto max-w-[90%] space-y-8 pt-16">
-        <div className="space-y-8">
-          <PresentationSlidesView
-            isGeneratingPresentation={isGeneratingPresentation}
-          />
-        </div>
+      <div className="mx-auto w-full max-w-none px-8 pt-16">
+        <PresentationSlidesView
+          isGeneratingPresentation={isGeneratingPresentation}
+        />
       </div>
     </PresentationLayout>
   );
@@ -42458,6 +42662,7 @@ interface PresentationLayoutProps {
   isLoading?: boolean;
   themeData?: ThemeProperties;
   isShared?: boolean;
+  hideSidebar?: boolean;
 }
 
 export function PresentationLayout({
@@ -42465,6 +42670,7 @@ export function PresentationLayout({
   isLoading = false,
   themeData,
   isShared = false,
+  hideSidebar = false,
 }: PresentationLayoutProps) {
   const isPresenting = usePresentationState((s) => s.isPresenting);
 
@@ -42475,16 +42681,16 @@ export function PresentationLayout({
   }
 
   // Hide sidebar in shared mode and when presenting
-  const showSidebar = !isShared && !isPresenting;
+  const showSidebar = !hideSidebar && !isShared && !isPresenting;
 
   return (
     <ThemeBackground className="h-full w-full">
       <DndProvider backend={HTML5Backend}>
         {themeData && <CustomThemeFontLoader themeData={themeData} />}
         <div className="flex h-full">
-          <SlidePreview showSidebar={showSidebar} />
+          {showSidebar && <SlidePreview showSidebar={showSidebar} />}
           {/* Main Presentation Content - Scrollable */}
-          <div className="presentation-slides flex max-h-full flex-1 overflow-auto pb-20">
+          <div className="presentation-slides flex max-h-full flex-1 items-start overflow-x-auto overflow-y-hidden pb-20">
             {children}
           </div>
         </div>
@@ -42509,15 +42715,99 @@ import { usePresentationState } from "@/states/presentation-state";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import {
   SortableContext,
-  verticalListSortingStrategy,
+  horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import dynamic from "next/dynamic";
 import { useEffect } from "react";
+import React, { memo } from "react";
 import { PresentModeHeader } from "../dashboard/PresentModeHeader";
 import { ThinkingDisplay } from "../dashboard/ThinkingDisplay";
 import { SortableSlide } from "./SortableSlide";
 const SlideCanvas = dynamic(() => import("@/canvas/SlideCanvasAdapter"), {
   ssr: false,
+});
+
+// -- Small utility to wait for root image decode before mounting the canvas --
+function useImageReady(url?: string) {
+  const [ready, setReady] = React.useState(!url);
+  React.useEffect(() => {
+    let active = true;
+    if (!url) {
+      setReady(true);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    const markReady = () => active && setReady(true);
+    // Prefer decode() to avoid showing half-rendered frames (Chrome/Firefox)
+    img.src = url;
+    if (typeof (img as any).decode === "function") {
+      (img as any)
+        .decode()
+        .then(markReady)
+        .catch(markReady);
+    } else {
+      img.onload = markReady;
+      img.onerror = markReady;
+    }
+    return () => {
+      active = false;
+    };
+  }, [url]);
+  return ready;
+}
+
+// ✅ Child-Komponente, damit der Hook NICHT in einer Schleife aufgerufen wird
+const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slidesCount }: {
+  slide: any; index: number; isPresenting: boolean; slidesCount: number;
+}) {
+  const safeCanvas: CanvasDoc =
+    (slide.canvas as CanvasDoc | undefined) ?? {
+      width: DEFAULT_CANVAS.width,
+      height: DEFAULT_CANVAS.height,
+      bg: DEFAULT_CANVAS.bg,
+      nodes: [],
+      selection: [],
+    };
+  const imgUrl = slide.rootImage?.url as string | undefined;
+  const imageReady = useImageReady(imgUrl);
+  return (
+    <SortableSlide id={slide.id} key={slide.id}>
+      <div className={cn(`slide-wrapper slide-wrapper-${index} flex-shrink-0`, !isPresenting && "max-w-full")}>
+        <SlideContainer index={index} id={slide.id} slideWidth={undefined} slidesCount={slidesCount}>
+          <div className={cn(`slide-container-${index}`, isPresenting && "h-screen w-screen")}>
+            {imageReady ? (
+              <SlideCanvas
+                doc={safeCanvas}
+                onChange={(next: CanvasDoc) => {
+                  const { slides, setSlides } = usePresentationState.getState();
+                  const updated = slides.slice();
+                  const i = updated.findIndex((x) => x.id === slide.id);
+                  if (i < 0) return;
+                  const current = updated[i];
+                  if (!current) return;
+                  // Nur setzen, wenn sich was geändert hat (verhindert Re-Mount-Bursts)
+                  if (current.canvas !== next) {
+                    updated[i] = { ...current, canvas: next };
+                    setSlides(updated);
+                  }
+                }}
+              />
+            ) : (
+              // Stabiler Placeholder verhindert Schwarz-Frames & Text-Flackern
+              <div
+                className={cn(
+                  "rounded-xl",
+                  isPresenting ? "h-screen w-screen" : "h-[700px] w-[420px]",
+                  "bg-black/90"
+                )}
+              />
+            )}
+          </div>
+        </SlideContainer>
+      </div>
+    </SortableSlide>
+  );
 });
 
 interface PresentationSlidesViewProps {
@@ -42584,7 +42874,7 @@ export const PresentationSlidesView = ({
     >
       <SortableContext
         items={items.map((s) => s.id)}
-        strategy={verticalListSortingStrategy}
+        strategy={horizontalListSortingStrategy}
       >
         <PresentModeHeader
           presentationTitle={currentPresentationTitle}
@@ -42597,50 +42887,17 @@ export const PresentationSlidesView = ({
           title="AI is thinking about your presentation..."
         />
 
-        {items.map((slide, index) => {
-          const safeCanvas: CanvasDoc =
-            (slide.canvas as CanvasDoc | undefined) ?? {
-              ...DEFAULT_CANVAS,
-              nodes: [],
-              selection: [],
-            };
-          return (
-            <SortableSlide id={slide.id} key={slide.id}>
-              <div className={`slide-wrapper slide-wrapper-${index} w-full`}>
-                <SlideContainer
-                  index={index}
-                  id={slide.id}
-                  slideWidth={undefined}
-                  slidesCount={items.length}
-                >
-                  <div
-                    className={cn(
-                      `slide-container-${index}`,
-                      isPresenting && "h-screen w-screen",
-                    )}
-                >
-                  <SlideCanvas
-                    doc={safeCanvas}
-                    onChange={(next: CanvasDoc) => {
-                      const { slides, setSlides } =
-                        usePresentationState.getState();
-                      const updated = slides.slice();
-                      const indexToUpdate = updated.findIndex(
-                        (x) => x.id === slide.id,
-                      );
-                      if (indexToUpdate < 0) return;
-                      const current = updated[indexToUpdate];
-                      if (!current) return;
-                      updated[indexToUpdate] = { ...current, canvas: next };
-                      setSlides(updated);
-                    }}
-                  />
-                  </div>
-                </SlideContainer>
-              </div>
-            </SortableSlide>
-          );
-        })}
+        <div className="flex w-full items-start gap-8">
+          {items.map((slide, index) => (
+            <SlideFrame
+              key={slide.id}
+              slide={slide}
+              index={index}
+              slidesCount={items.length}
+              isPresenting={isPresenting}
+            />
+          ))}
+        </div>
       </SortableContext>
     </DndContext>
   );
@@ -42767,21 +43024,28 @@ export function SlideContainer({
           className,
         )}
       >
-        {/* Linke, vertikale Toolbar (immer sichtbar, stört nicht den Editor) */}
+        {/* Untere Toolbar: unter dem Canvas, horizontal und mittig */}
+        {!isPresenting && !isReadOnly && null}
+
+        {/* Hinweis: die früheren schwebenden + Buttons oben/unten wurden entfernt */}
+
+        {children}
+
+        {/* Untere Toolbar unter dem Canvas */}
         {!isPresenting && !isReadOnly && (
           <div
             className={cn(
-              "absolute top-1/2 -translate-y-1/2 -left-14 z-[1001]",
+              "z-[1001] mt-3 w-full",
             )}
             aria-label="Slide toolbar"
           >
-            <div className="flex flex-col items-center gap-2">
+            <div className="mx-auto flex w-full max-w-[760px] items-center justify-center gap-2 rounded-md bg-background/95 p-2 shadow-sm backdrop-blur">
               {/* Drag-Handle */}
               <button
                 ref={setActivatorNodeRef as React.Ref<HTMLButtonElement>}
                 {...listeners}
                 {...attributes}
-                className="flex h-9 w-9 items-center justify-center rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground focus:outline-none focus-visible:outline-none"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus:outline-none focus-visible:outline-none"
                 aria-label="Folienposition ziehen"
                 title="Verschieben"
               >
@@ -42789,15 +43053,15 @@ export function SlideContainer({
               </button>
 
               {/* Slide-Einstellungen */}
-              <div className="rounded-md bg-background/95 shadow-sm backdrop-blur">
+              <div className="rounded-md">
                 <SlideEditPopover index={index} />
               </div>
 
-              {/* Neues Canvas unter aktueller Folie */}
+              {/* Neue Folie darunter */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground focus:outline-none focus-visible:outline-none"
+                className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
                 onClick={() => addSlide("after", index)}
                 aria-label="Neue Folie darunter"
                 title="Neue Folie darunter"
@@ -42811,7 +43075,7 @@ export function SlideContainer({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-md bg-background/95 text-muted-foreground shadow-sm backdrop-blur hover:text-destructive focus:outline-none focus-visible:outline-none"
+                    className="h-9 w-9 rounded-md text-muted-foreground hover:text-destructive"
                     aria-label="Folie löschen"
                     title="Folie löschen"
                   >
@@ -42838,10 +43102,6 @@ export function SlideContainer({
             </div>
           </div>
         )}
-
-        {/* Hinweis: die früheren schwebenden + Buttons oben/unten wurden entfernt */}
-
-        {children}
       </div>
 
       {isPresenting && (
@@ -44962,6 +45222,214 @@ export const fontOptions = [
   "TikTok Sans, var(--font-sans), sans-serif",
   "JetBrains Mono, monospace",
 ];
+
+```
+
+# src\components\presentation\utils\canvas.ts
+
+```ts
+import { DEFAULT_CANVAS, type CanvasDoc } from "@/canvas/types";
+import { nanoid } from "nanoid";
+import type { PlateNode, PlateSlide } from "./parser";
+
+const CANVAS_WIDTH = DEFAULT_CANVAS.width;
+const CANVAS_HEIGHT = DEFAULT_CANVAS.height;
+
+function collectTextSegments(nodes?: PlateNode[]): string[] {
+  if (!Array.isArray(nodes)) return [];
+  const segments: string[] = [];
+
+  const visit = (node: any, bucket: string[]): void => {
+    if (!node || typeof node !== "object") return;
+    if (typeof node.text === "string" && node.text.trim()) {
+      bucket.push(node.text.trim());
+    }
+    if (Array.isArray(node.children)) {
+      for (const child of node.children) {
+        visit(child, bucket);
+      }
+    }
+  };
+
+  for (const node of nodes) {
+    const bucket: string[] = [];
+    visit(node, bucket);
+    const merged = bucket.join(" ").replace(/\s+/g, " ").trim();
+    if (merged) segments.push(merged);
+  }
+
+  return segments;
+}
+
+function chooseTextColor(background?: string | null): string {
+  if (!background) return "#111827";
+  const hex = background.replace("#", "").trim();
+  const normalized =
+    hex.length === 3
+      ? hex
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : hex.padEnd(6, "0").slice(0, 6);
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
+    return "#111827";
+  }
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness < 140 ? "#f9fafb" : "#111827";
+}
+
+function pickFontSize(charCount: number): number {
+  if (charCount > 360) return 42;
+  if (charCount > 220) return 54;
+  return 72;
+}
+
+export function applyBackgroundImageToCanvas(
+  canvas: CanvasDoc | null | undefined,
+  imageUrl?: string | null,
+): CanvasDoc {
+  const base: CanvasDoc = {
+    version: canvas?.version ?? 1,
+    width: canvas?.width ?? CANVAS_WIDTH,
+    height: canvas?.height ?? CANVAS_HEIGHT,
+    bg: canvas?.bg ?? DEFAULT_CANVAS.bg,
+    nodes: [...(canvas?.nodes ?? [])],
+    selection: Array.isArray(canvas?.selection)
+      ? [...(canvas?.selection ?? [])]
+      : [],
+    previewDataUrl: canvas?.previewDataUrl,
+  };
+
+  if (!imageUrl) {
+    return base;
+  }
+
+  const imageNode = {
+    id: "canvas-background-image",
+    type: "image" as const,
+    x: 0,
+    y: 0,
+    width: base.width,
+    height: base.height,
+    url: imageUrl,
+  };
+
+  const existingIndex = base.nodes.findIndex((node) => node.type === "image");
+  if (existingIndex >= 0) {
+    const existing = base.nodes[existingIndex] as any;
+    // 🔒 Idempotent: nur ersetzen, wenn sich die URL wirklich geändert hat
+    const sameUrl =
+      typeof existing?.url === "string" &&
+      typeof imageNode.url === "string" &&
+      existing.url === imageNode.url;
+    const sameSize =
+      existing?.width === imageNode.width && existing?.height === imageNode.height;
+    if (sameUrl && sameSize) {
+      // nichts ändern → kein Re-Render/Reload des Bildes
+      return base;
+    }
+    base.nodes[existingIndex] = imageNode;
+  } else {
+    base.nodes.unshift(imageNode);
+  }
+
+  return base;
+}
+
+export function buildCanvasDocFromSlide(
+  slide: PlateSlide,
+): { canvas: CanvasDoc; position?: { x: number; y: number } } {
+  const segments = collectTextSegments(slide.content);
+  const width = slide.canvas?.width ?? CANVAS_WIDTH;
+  const height = slide.canvas?.height ?? CANVAS_HEIGHT;
+  const base: CanvasDoc = {
+    version: slide.canvas?.version ?? 1,
+    width,
+    height,
+    bg: slide.bgColor ?? slide.canvas?.bg ?? DEFAULT_CANVAS.bg,
+    nodes: [],
+    selection: [],
+    previewDataUrl: slide.canvas?.previewDataUrl,
+  };
+
+  let textPosition: { x: number; y: number } | undefined;
+  if (segments.length > 0) {
+    const content = segments.join("\n\n");
+    const textWidth = Math.round(width * 0.7);
+    const margin = Math.round(width * 0.1);
+    const alignment =
+      slide.alignment === "end"
+        ? "right"
+        : slide.alignment === "center"
+          ? "center"
+          : "left";
+
+    let x = slide.position?.x ?? margin;
+    if (!slide.position) {
+      if (alignment === "center") {
+        x = Math.max(margin, Math.round((width - textWidth) / 2));
+      } else if (alignment === "right") {
+        x = Math.max(margin, width - textWidth - margin);
+      }
+    }
+
+    const y = slide.position?.y ?? Math.round(height * 0.22);
+    const textColor = chooseTextColor(base.bg);
+    base.nodes.push({
+      id: `text-${nanoid()}`,
+      type: "text",
+      x,
+      y,
+      width: textWidth,
+      text: content,
+      fontFamily: "Inter",
+      fontSize: pickFontSize(content.length),
+      align: alignment,
+      fill: textColor,
+    });
+    textPosition = { x, y };
+  }
+
+  const canvas = applyBackgroundImageToCanvas(base, slide.rootImage?.url);
+  return { canvas, position: textPosition };
+}
+
+export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
+  const nodes = slide.canvas?.nodes ?? [];
+  const hasTextNode = nodes.some((node) => {
+    if (node.type !== "text") return false;
+    const raw = (node as any).text ?? (node as any).content ?? "";
+    return typeof raw === "string" && raw.trim().length > 0;
+  });
+  const hasImageNode = nodes.some(
+    (node) => node.type === "image" && typeof (node as any).url === "string",
+  );
+
+  if (!hasTextNode) {
+    const { canvas, position } = buildCanvasDocFromSlide(slide);
+    return {
+      ...slide,
+      canvas,
+      position: slide.position ?? position,
+    };
+  }
+
+  if (!hasImageNode && slide.rootImage?.url) {
+    return {
+      ...slide,
+      canvas: applyBackgroundImageToCanvas(slide.canvas, slide.rootImage.url),
+    };
+  }
+
+  return slide;
+}
+
+export function ensureSlidesHaveCanvas(slides: PlateSlide[]): PlateSlide[] {
+  return slides.map((slide) => ensureSlideCanvas(slide));
+}
 
 ```
 
@@ -47287,10 +47755,7 @@ export class SlideParser {
     }
 
     if (rootImage) {
-      rootImage = {
-        ...rootImage,
-        layoutType: "background",
-      };
+      rootImage = { ...rootImage, layoutType: "background" };
       layoutType = "background";
     }
 
@@ -47299,7 +47764,7 @@ export class SlideParser {
       id: slideId, // Use the consistent ID
       content: plateElements,
       ...(rootImage ? { rootImage } : {}),
-      ...(layoutType ? { layoutType: layoutType } : {}),
+      ...(layoutType ? { layoutType } : {}),
       alignment: "center",
     };
   };
@@ -78820,11 +79285,6 @@ const IconPicker = ({
           iconModule = mod as unknown as IconModule;
           break;
         }
-        case "io": {
-          const mod = await import("react-icons/io");
-          iconModule = mod as unknown as IconModule;
-          break;
-        }
         case "md": {
           const mod = await import("react-icons/md");
           iconModule = mod as unknown as IconModule;
@@ -83266,22 +83726,31 @@ export function usePresentationSlides() {
   // Scroll to a slide by index
   const scrollToSlide = useCallback((index: number) => {
     // Target the slide wrapper instead of slide container
-    const slideElement = document.querySelector(`.slide-wrapper-${index}`);
+    const slideElement = document.querySelector(
+      `.slide-wrapper-${index}`,
+    ) as HTMLElement | null;
 
     if (slideElement) {
       // Find the scrollable container
-      const scrollContainer = document.querySelector(".presentation-slides");
+      const scrollContainer = document.querySelector(
+        ".presentation-slides",
+      ) as HTMLElement | null;
 
       if (scrollContainer) {
-        // Calculate the scroll position
+        const slideRect = slideElement.getBoundingClientRect();
+        const containerRect = scrollContainer.getBoundingClientRect();
+        // Calculate the horizontal scroll position with a small padding
+        const offsetLeft =
+          slideRect.left - containerRect.left + scrollContainer.scrollLeft - 30;
+
         scrollContainer.scrollTo({
-          top: (slideElement as HTMLElement).offsetTop - 30, // Add a small offset for better visibility
+          left: offsetLeft,
+          top: 0,
           behavior: "smooth",
         });
 
         setTimeout(() => {
           // Focus the editor after scrolling
-          // Try to find and focus the editor within the slide container
           const editorElement = slideElement.querySelector(
             "[contenteditable=true]",
           );
@@ -83632,7 +84101,11 @@ export const useSlideChangeWatcher = (
 "use client";
 
 import { type PlateSlide } from "@/components/presentation/utils/parser";
-import { DEFAULT_CANVAS } from "@/canvas/types";
+import {
+  DEFAULT_CANVAS,
+  type CanvasDoc,
+  type CanvasTextNode,
+} from "@/canvas/types";
 import { usePresentationState } from "@/states/presentation-state";
 import { nanoid } from "nanoid";
 
@@ -83644,7 +84117,7 @@ export function useSlideOperations() {
     (s) => s.setCurrentSlideIndex,
   );
 
-  const createDefaultCanvasDoc = () => ({
+  const createDefaultCanvasDoc = (): CanvasDoc => ({
     ...DEFAULT_CANVAS,
     nodes: [
       {
@@ -83657,7 +84130,7 @@ export function useSlideOperations() {
         fontSize: 72,
         fill: "#111",
       },
-    ],
+    ] satisfies CanvasTextNode[],
     selection: [],
   });
 
