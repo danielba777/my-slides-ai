@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,14 @@ interface ApiResponse {
   status: string;
 }
 
+interface ConnectedAccount {
+  openId: string;
+  displayName: string | null;
+  username: string | null;
+  avatarUrl: string | null;
+  connectedAt: string;
+}
+
 export default function TikTokPostingTestPage() {
   const [form, setForm] = useState<TikTokPostPayload>({
     openId: "",
@@ -38,14 +46,76 @@ export default function TikTokPostingTestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setAccountsLoading(true);
+      try {
+        const response = await fetch("/api/tiktok/accounts", { cache: "no-store" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !Array.isArray(payload)) {
+          throw new Error(
+            payload && typeof payload.error === "string"
+              ? payload.error
+              : "TikTok Accounts konnten nicht geladen werden",
+          );
+        }
+
+        if (active) {
+          setAccounts(payload as ConnectedAccount[]);
+          if (payload.length > 0) {
+            setForm((prev) => ({ ...prev, openId: payload[0].openId }));
+          }
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unable to load TikTok accounts";
+        if (active) {
+          setAccounts([]);
+          toast.error(message);
+        }
+      } finally {
+        if (active) {
+          setAccountsLoading(false);
+        }
+      }
+    };
+
+    void load();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (accounts.length === 0) {
+      setForm((prev) => ({ ...prev, openId: "" }));
+      return;
+    }
+
+    const exists = accounts.some((account) => account.openId === form.openId);
+    if (!exists) {
+      const fallback = accounts[0];
+      if (fallback) {
+        setForm((prev) => ({ ...prev, openId: fallback.openId ?? "" }));
+      }
+    }
+  }, [accounts, form.openId]);
 
   const updateField = useCallback(<K extends keyof TikTokPostPayload>(key: K, value: TikTokPostPayload[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    if (!form.openId || !form.mediaUrl) {
-      toast.error("OpenID und Medien-URL sind Pflichtfelder");
+    if (!form.openId) {
+      toast.error("Bitte wähle einen verbundenen TikTok Account aus");
+      return;
+    }
+
+    if (!form.mediaUrl) {
+      toast.error("Bitte gib eine Medien-URL aus dem Files-Bucket an");
       return;
     }
 
@@ -106,13 +176,27 @@ export default function TikTokPostingTestPage() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="openId">TikTok OpenID</Label>
-              <Input
+              <Label htmlFor="openId">Verbundenes TikTok Konto</Label>
+              <select
                 id="openId"
-                placeholder="z. B. 94bf305f6eeef301fea2b957"
+                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                disabled={accountsLoading || accounts.length === 0}
                 value={form.openId}
                 onChange={(event) => updateField("openId", event.target.value)}
-              />
+              >
+                {accountsLoading && <option>Lade Konten…</option>}
+                {!accountsLoading && accounts.length === 0 && (
+                  <option>Keine TikTok Accounts verbunden</option>
+                )}
+                {accounts.map((account) => {
+                  const label = account.username ?? account.displayName ?? account.openId;
+                  return (
+                    <option key={account.openId} value={account.openId}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="mediaUrl">Medien-URL</Label>
@@ -182,7 +266,7 @@ export default function TikTokPostingTestPage() {
           </div>
         </CardContent>
         <CardFooter className="flex items-center gap-4">
-          <Button onClick={handleSubmit} disabled={submitting}>
+          <Button onClick={handleSubmit} disabled={submitting || accountsLoading || accounts.length === 0}>
             {submitting ? "Posting..." : "TikTok Post auslösen"}
           </Button>
           {error && <p className="text-sm text-destructive">{error}</p>}
