@@ -37,7 +37,7 @@ export async function POST(request: Request) {
           },
     ],
     settings: {
-      contentPostingMethod: "DIRECT_POST",
+      contentPostingMethod: "UPLOAD",
       privacyLevel: "SELF_ONLY",
       duet: false,
       comment: false,
