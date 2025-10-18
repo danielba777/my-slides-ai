@@ -1,5 +1,5 @@
 "use client";
-import { Home, Images, UserPen, type LucideIcon } from "lucide-react";
+import { Home, Images, TestTube2, UserPen, type LucideIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import {
@@ -36,6 +36,11 @@ const playgroundItems: SidebarItem[] = [
     title: "Slideshows",
     url: "/dashboard/slideshows",
     icon: Images,
+  },
+  {
+    title: "TikTok Posting Test",
+    url: "/dashboard/tests/tiktok-post",
+    icon: TestTube2,
   },
 ];
 
