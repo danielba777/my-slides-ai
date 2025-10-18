@@ -16,8 +16,12 @@ export async function loadImageDecoded(url: string): Promise<HTMLImageElement> {
   // decode() verhindert Paint-Glitches vor vollständiger Decodierung
   // Fallback: falls nicht unterstützt, ist img schon geladen
   try {
-    // @ts-expect-error older TS lib
-    if (typeof img.decode === "function") await img.decode();
+    const maybeDecode = (img as HTMLImageElement & {
+      decode?: () => Promise<void>;
+    }).decode;
+    if (typeof maybeDecode === "function") {
+      await maybeDecode.call(img);
+    }
   } catch {
     // ignore
   }

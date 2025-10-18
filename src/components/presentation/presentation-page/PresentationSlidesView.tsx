@@ -57,6 +57,7 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
 }) {
   const safeCanvas: CanvasDoc =
     (slide.canvas as CanvasDoc | undefined) ?? {
+      version: DEFAULT_CANVAS.version,
       width: DEFAULT_CANVAS.width,
       height: DEFAULT_CANVAS.height,
       bg: DEFAULT_CANVAS.bg,

@@ -125,8 +125,12 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
       for (let i = 0; i < newNodes.length; i++) {
         const node = newNodes[i];
         if (!node || node.type !== "text") continue;
-        const src = next[ti++];
-        if (!src) break; // keine weitere Quelle – restliche Textknoten bleiben wie sie sind
+
+        const src = next[ti];
+        if (!src) {
+          break; // keine weitere Quelle – restliche Textknoten bleiben wie sie sind
+        }
+        ti += 1;
 
         const pxX = Math.round((src.x ?? 0.5) * W);
         const pxY = Math.round((src.y ?? 0.5) * H);
@@ -174,6 +178,8 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
       if (next.length > existingTextCount) {
         for (let k = existingTextCount; k < next.length; k++) {
           const src = next[k];
+          if (!src) continue;
+
           const pxX = Math.round((src.x ?? 0.5) * W);
           const pxY = Math.round((src.y ?? 0.5) * H);
           const weight: ExtendedCanvasTextNode["weight"] =
