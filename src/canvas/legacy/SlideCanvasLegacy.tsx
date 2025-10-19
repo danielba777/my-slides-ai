@@ -142,7 +142,7 @@ function computeWrappedLinesWithDOM(
   return result.lines;
 }
 
-/** Höhe automatisch bestimmen (lokal) – nutzt ausschließlich die Utility */
+/** Höhe automatisch bestimmen (lokal) – direkt über measureWrappedText */
 function computeAutoHeightForLayer(
   layerBase: TextLayer & { italic?: boolean },
   _lines?: string[],
@@ -155,20 +155,20 @@ function computeAutoHeightForLayer(
         : 400;
   const scaledFontPx = BASE_FONT_PX * (layerBase.scale ?? 1);
   const lineHeightPx = scaledFontPx * (layerBase.lineHeight ?? 1.12);
-  return computeAutoHeightFromUtil({
+  const m = measureWrappedText({
     text: String(layerBase.content ?? ""),
     fontFamily: layerBase.fontFamily ?? "Inter",
     fontWeight: weight,
     fontStyle: (layerBase as any).italic ? "italic" : "normal",
     fontSizePx: scaledFontPx,
     lineHeightPx,
-    maxWidthPx: layerBase.width,
+    maxWidthPx: Math.max(8, layerBase.width),
     letterSpacingPx: layerBase.letterSpacing ?? 0,
     whiteSpaceMode: "pre-wrap",
     wordBreakMode: "normal",
-    width: layerBase.width,
     paddingPx: PADDING,
   });
+  return Math.max(40, Math.ceil(m.totalHeight));
 }
 
 /** Mapping: Props-Layout -> interne TextLayer (mit optionalen Editor-Feldern) */
@@ -668,22 +668,17 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           const delta = mode === "resize-left" ? -dx : dx;
           const nextW = Math.max(40, layerStart.width + delta);
           // Immer Auto-Höhe bei horizontalem Resize → direkte Anpassung bei Zeilenumbruch
-          const textH = computeAutoHeightFromUtil({
-            content: l.content,
-            baseFontPx: BASE_FONT_PX,
-            scale: l.scale,
-            lineHeight: l.lineHeight,
-            letterSpacing: l.letterSpacing,
-            maxWidthPx: nextW - PADDING * 2,
-            fontFamily: l.fontFamily ?? "Inter",
-            fontWeight:
-              l.weight === "bold" ? 700 : l.weight === "semibold" ? 600 : 400,
-            italic: (l as any).italic ?? false,
-          });
+          const computedHeight = Math.ceil(
+            computeAutoHeightForLayer({
+              ...l,
+              width: nextW,
+              italic: (l as any).italic,
+            } as any),
+          );
           const temp = {
             ...l,
             width: nextW,
-            height: Math.max(40, Math.ceil(textH + PADDING * 2)),
+            height: Math.max(40, computedHeight),
           } as TextLayer & { autoHeight?: boolean };
           (temp as any).autoHeight = true;
           return temp;
