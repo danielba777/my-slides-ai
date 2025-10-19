@@ -122,17 +122,19 @@ function computeWrappedLinesWithDOM(
 ): string[] {
   const weight =
     layer.weight === "bold" ? 700 : layer.weight === "semibold" ? 600 : 400;
-  const scaledFontPx = BASE_FONT_PX * (layer.scale ?? 1);
-  const lineHeightPx = scaledFontPx * (layer.lineHeight ?? 1.12);
+
+  // WICHTIG: Layout/Wrap passiert vor transform:scale → immer mit Basis-Font messen
+  const baseFontPx = BASE_FONT_PX;
+  const lineHeightPx = baseFontPx * (layer.lineHeight ?? 1.12);
 
   const result = measureWrappedText({
     text: String(layer.content ?? ""),
     fontFamily: layer.fontFamily ?? "Inter",
     fontWeight: weight,
     fontStyle: (layer as any).italic ? "italic" : "normal",
-    fontSizePx: scaledFontPx,
+    fontSizePx: baseFontPx,
     lineHeightPx,
-    maxWidthPx: layer.width,
+    maxWidthPx: Math.max(8, layer.width),
     letterSpacingPx: layer.letterSpacing ?? 0,
     whiteSpaceMode: "pre-wrap",
     wordBreakMode: "normal",
@@ -142,7 +144,7 @@ function computeWrappedLinesWithDOM(
   return result.lines;
 }
 
-/** Höhe automatisch bestimmen (lokal) – direkt über measureWrappedText */
+/** Höhe automatisch bestimmen (lokal) – direkt über measureWrappedText (ohne Scale) */
 function computeAutoHeightForLayer(
   layerBase: TextLayer & { italic?: boolean },
   _lines?: string[],
@@ -153,14 +155,16 @@ function computeAutoHeightForLayer(
       : layerBase.weight === "semibold"
         ? 600
         : 400;
-  const scaledFontPx = BASE_FONT_PX * (layerBase.scale ?? 1);
-  const lineHeightPx = scaledFontPx * (layerBase.lineHeight ?? 1.12);
+
+  // Wrap/Höhe werden mit unskaliertem Font berechnet – Skalierung passiert via transform
+  const baseFontPx = BASE_FONT_PX;
+  const lineHeightPx = baseFontPx * (layerBase.lineHeight ?? 1.12);
   const m = measureWrappedText({
     text: String(layerBase.content ?? ""),
     fontFamily: layerBase.fontFamily ?? "Inter",
     fontWeight: weight,
     fontStyle: (layerBase as any).italic ? "italic" : "normal",
-    fontSizePx: scaledFontPx,
+    fontSizePx: baseFontPx,
     lineHeightPx,
     maxWidthPx: Math.max(8, layerBase.width),
     letterSpacingPx: layerBase.letterSpacing ?? 0,
@@ -694,20 +698,21 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             Math.round(layerStart.height * s),
           );
 
-          // Mindesthöhe basierend auf Content-Höhe sicherstellen
+          // Mindesthöhe basierend auf Content-Höhe sicherstellen (Messung ohne Scale)
           const weight =
             l.weight === "bold" ? 700 : l.weight === "semibold" ? 600 : 400;
-          const scaledFontPx = BASE_FONT_PX * l.scale;
-          const lineHeightPx = scaledFontPx * (l.lineHeight ?? 1.12);
+
+          const baseFontPx = BASE_FONT_PX;
+          const lineHeightPx = baseFontPx * (l.lineHeight ?? 1.12);
 
           const measureResult = measureWrappedText({
             text: String(l.content ?? ""),
             fontFamily: l.fontFamily ?? "Inter",
             fontWeight: weight,
             fontStyle: (l as any).italic ? "italic" : "normal",
-            fontSizePx: scaledFontPx,
+            fontSizePx: baseFontPx,
             lineHeightPx,
-            maxWidthPx: l.width,
+            maxWidthPx: Math.max(8, l.width),
             letterSpacingPx: l.letterSpacing ?? 0,
             whiteSpaceMode: "pre-wrap",
             wordBreakMode: "normal",

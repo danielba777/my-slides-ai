@@ -13,14 +13,14 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import dynamic from "next/dynamic";
-import { useEffect } from "react";
-import React, { memo } from "react";
+import React, { memo, useEffect, useRef } from "react";
 import { PresentModeHeader } from "../dashboard/PresentModeHeader";
 import { ThinkingDisplay } from "../dashboard/ThinkingDisplay";
 import { SortableSlide } from "./SortableSlide";
 const SlideCanvas = dynamic(() => import("@/canvas/SlideCanvasAdapter"), {
   ssr: false,
 });
+import type { SlideCanvasAdapterHandle } from "@/canvas/SlideCanvasAdapter";
 
 // -- Small utility to wait for root image decode before mounting the canvas --
 function useImageReady(url?: string) {
@@ -69,6 +69,22 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
   // BG-Image direkt in den Canvas-Daten verankern, ohne Text zu verlieren
   const docWithBg = applyBackgroundImageToCanvas(safeCanvas, imgUrl);
   const imageReady = useImageReady(imgUrl);
+
+  const canvasRef = useRef<SlideCanvasAdapterHandle | null>(null);
+
+  // Registriere pro Slide einen Exporter in einer globalen Map, damit der Header
+  // zentral in der aktuellen Reihenfolge exportieren kann.
+  useEffect(() => {
+    (window as any).__slideExporters = (window as any).__slideExporters || new Map<string, () => Promise<Blob>>();
+    const map: Map<string, () => Promise<Blob>> = (window as any).__slideExporters;
+    const exporter = async () => {
+      return (await canvasRef.current?.exportPNG?.()) ?? new Blob([], { type: "image/png" });
+    };
+    map.set(slide.id, exporter);
+    return () => {
+      map.delete(slide.id);
+    };
+  }, [slide?.id]);
   return (
     <SortableSlide id={slide.id} key={slide.id}>
       <div className={cn(`slide-wrapper slide-wrapper-${index} flex-shrink-0`, !isPresenting && "max-w-full")}>
@@ -76,6 +92,7 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
           <div className={cn(`slide-container-${index}`, isPresenting && "h-screen w-screen")}>
             {imageReady ? (
               <SlideCanvas
+                ref={canvasRef}
                 doc={docWithBg}
                 onChange={(next: CanvasDoc) => {
                   const { slides, setSlides } = usePresentationState.getState();
