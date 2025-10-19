@@ -26,8 +26,8 @@ export const useSlideChangeWatcher = (
 
   // Watch for changes to the slides array and trigger save
   useEffect(() => {
-    // Only save if we have slides and we're not generating
-    if (slides.length > 0) {
+    // Nur speichern, wenn NICHT generiert wird – verhindert POST-Spam & UI-Flackern
+    if (slides.length > 0 && !isGeneratingPresentation) {
       save();
     }
   }, [slides, save, isGeneratingPresentation]);

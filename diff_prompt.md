@@ -1,222 +1,185 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-Diff #1 – BG-Image-Update: nie wieder Text verlieren
+Diff #1 – Autosave-Spam abstellen (keine POST-Flut während Generierung)
 
-File: src/components/presentation/utils/canvas.ts
+File: src/hooks/presentation/useSlideChangeWatcher.ts
 
-*** a/src/components/presentation/utils/canvas.ts
---- b/src/components/presentation/utils/canvas.ts
+codebase
+
+\*\*\* a/src/hooks/presentation/useSlideChangeWatcher.ts
+--- b/src/hooks/presentation/useSlideChangeWatcher.ts
 @@
--export function applyBackgroundImageToCanvas(
--  canvas: CanvasDoc | null | undefined,
--  imageUrl?: string | null,
--): CanvasDoc {
--  const base: CanvasDoc = {
--    width: canvas?.width ?? DEFAULT_CANVAS.width,
--    height: canvas?.height ?? DEFAULT_CANVAS.height,
--    bg: canvas?.bg ?? DEFAULT_CANVAS.bg,
--    nodes: canvas?.nodes ? [...canvas.nodes] : [],
--    selection: canvas?.selection ?? [],
--  };
-+export function applyBackgroundImageToCanvas(
-+  canvas: CanvasDoc | null | undefined,
-+  imageUrl?: string | null,
-+): CanvasDoc {
-+  // Starte IMMER vom bestehenden Canvas und erhalte ALLE Nicht-Image-Nodes
-+  const base: CanvasDoc = {
-+    width: canvas?.width ?? DEFAULT_CANVAS.width,
-+    height: canvas?.height ?? DEFAULT_CANVAS.height,
-+    bg: canvas?.bg ?? DEFAULT_CANVAS.bg,
-+    nodes: Array.isArray(canvas?.nodes) ? [...canvas!.nodes] : [],
-+    selection: Array.isArray(canvas?.selection) ? [...(canvas!.selection as any[])] : [],
-+  };
- 
-   if (!imageUrl) {
-     return base;
-   }
- 
--  const imageNode = {
-+  const imageNode = {
-     id: "canvas-background-image",
-     type: "image" as const,
-     x: 0,
-     y: 0,
-     width: base.width,
-     height: base.height,
-     url: imageUrl,
-   };
- 
--  const existingIndex = base.nodes.findIndex((node) => node.type === "image");
--  if (existingIndex >= 0) {
--    const existing = base.nodes[existingIndex] as any;
--    const sameUrl =
--      typeof existing?.url === "string" &&
--      typeof imageNode.url === "string" &&
--      existing.url === imageNode.url;
--    const sameSize =
--      existing?.width === imageNode.width && existing?.height === imageNode.height;
--    if (sameUrl && sameSize) {
--      return base;
--    }
--    base.nodes[existingIndex] = imageNode;
--  } else {
--    base.nodes.unshift(imageNode);
--  }
-+  // Entferne ausschließlich den bisherigen BG-Image-Knoten (falls vorhanden),
-+  // erhalte aber ALLE anderen Nodes (v. a. Text!)
-+  const withoutBg = base.nodes.filter((n: any) => !(n?.type === "image" && n?.id === "canvas-background-image"));
-+
-+  // Prüfe Idempotenz: existiert bereits der gleiche BG?
-+  const prevBg = base.nodes.find((n: any) => n?.type === "image" && n?.id === "canvas-background-image") as any;
-+  if (prevBg) {
-+    const sameUrl = prevBg.url === imageNode.url;
-+    const sameSize = prevBg.width === imageNode.width && prevBg.height === imageNode.height;
-+    if (sameUrl && sameSize) {
-+      // nichts ändern
-+      return { ...base, nodes: base.nodes };
-+    }
-+  }
-+
-+  // BG-Image immer als unterstes Element einfügen
-+  const mergedNodes = [imageNode, ...withoutBg];
-+  return { ...base, nodes: mergedNodes };
- }
+// Watch for changes to the slides array and trigger save
+useEffect(() => {
 
+- // Only save if we have slides and we're not generating
+- if (slides.length > 0) {
 
-Was das verhindert: Egal wann applyBackgroundImageToCanvas aufgerufen wird – Textknoten bleiben immer erhalten, der BG-Node wird nur ge-upsertet und nie „mitgerissen“.
+* // Nur speichern, wenn NICHT generiert wird – verhindert POST-Spam & UI-Flackern
+* if (slides.length > 0 && !isGeneratingPresentation) {
+  save();
+  }
 
-Diff #2 – Safe-Merge beim Setzen des Canvas aus dem Editor
+- }, [slides, save, isGeneratingPresentation]);
+
+* }, [slides, save, isGeneratingPresentation]);
+
+Wirkung: Während isGeneratingPresentation=true wird nicht gespeichert → die vielen POST /dashboard/slideshows/... hören auf.
+
+Diff #2 – Textpositionen behalten & BG-Image ohne Node-Reset setzen
+
+File: src/hooks/presentation/useSlideOperations.ts
+(enthält bereits applyBackgroundImageToCanvas und buildCanvasDocFromSlide)
+
+codebase
+
+\*\*\* a/src/hooks/presentation/useSlideOperations.ts
+--- b/src/hooks/presentation/useSlideOperations.ts
+@@
+export function buildCanvasDocFromSlide(
+slide: PlateSlide,
+): { canvas: CanvasDoc; position?: { x: number; y: number } } {
+
+- const segments = collectTextSegments(slide.content);
+- const width = slide.canvas?.width ?? CANVAS_WIDTH;
+- const height = slide.canvas?.height ?? CANVAS_HEIGHT;
+- const base: CanvasDoc = {
+- version: slide.canvas?.version ?? 1,
+- width,
+- height,
+- bg: slide.bgColor ?? slide.canvas?.bg ?? DEFAULT_CANVAS.bg,
+- nodes: [],
+- selection: [],
+- previewDataUrl: slide.canvas?.previewDataUrl,
+- };
+
+* const segments = collectTextSegments(slide.content);
+* const width = slide.canvas?.width ?? CANVAS_WIDTH;
+* const height = slide.canvas?.height ?? CANVAS_HEIGHT;
+* const base: CanvasDoc = {
+* version: slide.canvas?.version ?? 1,
+* width,
+* height,
+* bg: slide.bgColor ?? slide.canvas?.bg ?? DEFAULT_CANVAS.bg,
+* nodes: [],
+* selection: [],
+* previewDataUrl: slide.canvas?.previewDataUrl,
+* };
+
+- let textPosition: { x: number; y: number } | undefined;
+
+* // 🔒 WICHTIG: Wenn bereits ein Canvas mit Nodes existiert, NIEMALS neu aufbauen.
+* // Das verhindert, dass Text/Elemente beim Rendern "zurückspringen".
+* if (Array.isArray(slide.canvas?.nodes) && slide.canvas!.nodes.length > 0) {
+* const withBg = applyBackgroundImageToCanvas(slide.canvas, slide.rootImage?.url);
+* return { canvas: withBg, position: slide.position };
+* }
+*
+* let textPosition: { x: number; y: number } | undefined;
+  @@
+
+- if (segments.length > 0) {
+
+* if (segments.length > 0) {
+  const content = segments.join("\n\n");
+  @@
+
+- let x = slide.position?.x ?? /_ ... _/
+
+* let x = slide.position?.x ?? /_ ... _/
+  // (Rest unverändert)
+  }
+
+- // (Rest: Nodes aus content erzeugen, etc.)
+- // Füge am Ende ggf. das Root-Image als BG hinzu
+- const finalDoc = applyBackgroundImageToCanvas(base, slide.rootImage?.url);
+- return { canvas: finalDoc, position: textPosition };
+
+* // (Rest: Nodes aus content erzeugen, etc.)
+* // Füge am Ende das Root-Image als BG hinzu (ohne Text zu überschreiben)
+* const finalDoc = applyBackgroundImageToCanvas(base, slide.rootImage?.url);
+* return { canvas: finalDoc, position: textPosition };
+
+Wirkung:
+
+Wenn ein Slide bereits ein canvas.nodes hat, wird es eins-zu-eins weiterverwendet (inkl. Textpositionen).
+
+Das Hintergrundbild wird idempotent als unterster Node gesetzt (ohne andere Nodes zu löschen). → Kein Zurückspringen, kein Flackern, kein Greenscreen-Zwischenzustand. (Die Funktion selbst ist schon korrekt implementiert in dieser Datei.)
+
+codebase
+
+Diff #3 – Beim Anzeigen sofort vollständige Slides (BG + Text) rendern
 
 File: src/components/presentation/presentation-page/PresentationSlidesView.tsx
-(dort, wo du dem SlideCanvas ein onChange gibst)
 
-*** a/src/components/presentation/presentation-page/PresentationSlidesView.tsx
+codebase
+
+\*\*\* a/src/components/presentation/presentation-page/PresentationSlidesView.tsx
 --- b/src/components/presentation/presentation-page/PresentationSlidesView.tsx
 @@
+-import { DEFAULT_CANVAS, type CanvasDoc } from "@/canvas/types";
++import { DEFAULT_CANVAS, type CanvasDoc } from "@/canvas/types";
++import { applyBackgroundImageToCanvas } from "@/hooks/presentation/useSlideOperations";
+@@
+
+- const safeCanvas: CanvasDoc =
+
+* const safeCanvas: CanvasDoc =
+  (slide.canvas as CanvasDoc | undefined) ?? {
+  version: DEFAULT_CANVAS.version,
+  width: DEFAULT_CANVAS.width,
+  height: DEFAULT_CANVAS.height,
+  bg: DEFAULT_CANVAS.bg,
+  nodes: [],
+  selection: [],
+  };
+
+- const imgUrl = slide.rootImage?.url as string | undefined;
+- const imageReady = useImageReady(imgUrl);
+
+* const imgUrl = slide.rootImage?.url as string | undefined;
+* // BG-Image direkt in den Canvas-Daten verankern, ohne Text zu verlieren
+* const docWithBg = applyBackgroundImageToCanvas(safeCanvas, imgUrl);
+* const imageReady = useImageReady(imgUrl);
+  @@
+
+-            {imageReady ? (
 -              <SlideCanvas
--                doc={safeCanvas}
--                onChange={(next: CanvasDoc) => {
--                  const { slides, setSlides } = usePresentationState.getState();
--                  const updated = slides.slice();
--                  const indexToUpdate = updated.findIndex((x) => x.id === slide.id);
--                  if (indexToUpdate < 0) return;
--                  const current = updated[indexToUpdate];
--                  if (!current) return;
--                  if (current.canvas !== next) {
--                    updated[indexToUpdate] = { ...current, canvas: next };
--                    setSlides(updated);
--                  }
--                }}
+-                slide={{ ...slide, canvas: safeCanvas }}
+-                slideIndex={index}
+-                disableDrag={isPresenting}
 -              />
-+              <SlideCanvas
-+                doc={safeCanvas}
-+                onChange={(next: CanvasDoc) => {
-+                  const { slides, setSlides } = usePresentationState.getState();
-+                  const updated = slides.slice();
-+                  const i = updated.findIndex((x) => x.id === slide.id);
-+                  if (i < 0) return;
-+                  const current = updated[i];
-+                  if (!current) return;
-+
-+                  const currCanvas = current.canvas as CanvasDoc | undefined;
-+
-+                  // 🛡️ SAFETY MERGE: verliere nie Textknoten beim Update
-+                  const currTextNodes = Array.isArray(currCanvas?.nodes)
-+                    ? (currCanvas!.nodes.filter((n: any) => n?.type === "text"))
-+                    : [];
-+                  const nextTextNodes = Array.isArray(next?.nodes)
-+                    ? (next!.nodes.filter((n: any) => n?.type === "text"))
-+                    : [];
-+
-+                  let merged: CanvasDoc = next;
-+                  if (currTextNodes.length > 0 && nextTextNodes.length === 0) {
-+                    // Race: next hat (noch) keine Texte → Texte aus current konservieren
-+                    const otherNodes = Array.isArray(next?.nodes) ? next.nodes.filter((n: any) => n?.type !== "text") : [];
-+                    merged = { ...next, nodes: [...otherNodes, ...currTextNodes] };
-+                  }
-+
-+                  // Nur setzen, wenn sich tatsächlich was geändert hat
-+                  if (currCanvas !== merged) {
-+                    updated[i] = { ...current, canvas: merged };
-+                    setSlides(updated);
-+                  }
-+                }}
-+              />
+-            ) : (
+-              <div className="h-[700px] w-[420px] rounded-lg bg-muted" />
+-            )}
 
+*            {imageReady ? (
+*              <SlideCanvas
+*                slide={{ ...slide, canvas: docWithBg }}
+*                slideIndex={index}
+*                disableDrag={isPresenting}
+*              />
+*            ) : (
+*              // Stabiles Placeholder, aber KEIN Entfernen/Neu-Erzeugen der Nodes
+*              <SlideCanvas
+*                slide={{ ...slide, canvas: docWithBg }}
+*                slideIndex={index}
+*                disableDrag
+*              />
+*            )}
 
-Was das verhindert: Selbst wenn irgendwo im System noch ein Update ohne Textknoten reinkommt (z. B. durch späten BG-Reflow/Resize), bewahren wir vorhandene Textknoten und verlieren sie nicht mehr.
+Wirkung:
 
-Diff #3 – Stabilität beim Drag & Render
+Wir rendern sofort den Canvas inkl. Text und bereits gesetztem BG-Image.
 
-File: src/components/presentation/canvas/SlideCanvasBase.tsx
+Während das Bild noch dekodiert (useImageReady), bleibt das Canvas bestehen (kein Unmount/Remount), also keine Layout-Resets.
 
-Du hast hier schon vieles richtig. Zwei kleine Ergänzungen, die Remounts vermeiden und während „stillen“ Updates das UI stabil halten.
+Sobald das Bild bereit ist, ist es schon als Node vorhanden → kein Schwarz/Greenscreen-Flackern.
 
-*** a/src/components/presentation/canvas/SlideCanvasBase.tsx
---- b/src/components/presentation/canvas/SlideCanvasBase.tsx
-@@
--            <Text
--              key={`text-${activeTextNode?.id ?? "fallback"}`}
-+            <Text
-+              // Stabiler Key pro Slide, nicht pro Node-Wechsel → kein Remount beim Umschalten/Autosave
-+              key={`text-slide-${slide.id}`}
-               text={textContent}
-               fontSize={32}
-               fontFamily="TikTok Sans, sans-serif"
-               fill="#ffffff"
-               x={textPosition.x}
-               y={textPosition.y}
-               draggable={!disableDrag}
-               onDragStart={handleDragStart}
-               onDragMove={handleDragMove}
-               onDragEnd={handleDragEnd}
-+              visible={true}
-+              opacity={1}
-+              listening={true}
-               dragBoundFunc={(pos) => ({
-                 x: Math.min(
-                   Math.max(0, pos.x),
-                   stageDimensions.width - 10
-                 ),
-                 y: Math.min(
-                   Math.max(0, pos.y),
-                   stageDimensions.height - 10
-                 ),
-               })}
-             />
+Was das insgesamt fix’t
 
+Flackern weg: BG-Image wird idempotent als Node gehalten; wir unmounten die Canvas-Instanz nicht mehr während des Decodes.
 
-Und zusätzlich ein Mini-Guard gegen „Positions-Resets“ genau während stiller BG-Updates:
+Text springt nicht zurück: buildCanvasDocFromSlide respektiert vorhandene canvas.nodes; es werden keine Text-Nodes mehr neu erstellt, wenn schon vorhanden.
 
-*** a/src/components/presentation/canvas/SlideCanvasBase.tsx
---- b/src/components/presentation/canvas/SlideCanvasBase.tsx
-@@
--  useEffect(() => {
--    if (isDraggingTextRef.current) return;
--    const next = slideWithExtras.position ?? defaultPosition;
--    if (next.x !== textPosition.x || next.y !== textPosition.y) {
--      setTextPosition(next);
--    }
--  }, [
--    slideWithExtras.position?.x,
--    slideWithExtras.position?.y,
--    defaultPosition,
--    textPosition.x,
--    textPosition.y,
--  ]);
-+  useEffect(() => {
-+    if (isDraggingTextRef.current) return;
-+    const next = slideWithExtras.position ?? defaultPosition;
-+    // Blockiere micro-jitters (±0.5px) durch Scale/Resize-Runden
-+    const dx = Math.abs((next.x ?? 0) - (textPosition.x ?? 0));
-+    const dy = Math.abs((next.y ?? 0) - (textPosition.y ?? 0));
-+    if (dx > 0.5 || dy > 0.5) {
-+      setTextPosition(next);
-+    }
-+  }, [
-+    slideWithExtras.position?.x,
-+    slideWithExtras.position?.y,
-+    defaultPosition,
-+    textPosition.x,
-+    textPosition.y,
-+  ]);
+POST-Spam weg: Autosave läuft nicht während der Generierung.
