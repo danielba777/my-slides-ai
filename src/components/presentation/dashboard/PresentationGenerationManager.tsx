@@ -6,25 +6,12 @@ import { updatePresentation } from "@/app/_actions/presentation/presentationActi
 import {
   applyBackgroundImageToCanvas,
   ensureSlideCanvas,
-  ensureSlidesHaveCanvas,
 } from "@/components/presentation/utils/canvas";
 import { extractThinking } from "@/lib/thinking-extractor";
 import { usePresentationState } from "@/states/presentation-state";
-import { useChat, useCompletion } from "@ai-sdk/react";
+import { useChat } from "@ai-sdk/react";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { SlideParser } from "../utils/parser";
-
-function stripXmlCodeBlock(input: string): string {
-  let result = input.trim();
-  if (result.startsWith("```xml")) {
-    result = result.slice(6).trimStart();
-  }
-  if (result.endsWith("```")) {
-    result = result.slice(0, -3).trimEnd();
-  }
-  return result;
-}
 
 export function PresentationGenerationManager() {
   const {
@@ -32,7 +19,6 @@ export function PresentationGenerationManager() {
     language,
     presentationInput,
     shouldStartOutlineGeneration,
-    shouldStartPresentationGeneration,
     webSearchEnabled,
     modelProvider,
     modelId,
@@ -43,192 +29,27 @@ export function PresentationGenerationManager() {
     resetForNewGeneration,
     setOutline,
     setSearchResults,
-    setSlides,
     setOutlineThinking,
-    setPresentationThinking,
-    setIsGeneratingPresentation,
     setCurrentPresentation,
     currentPresentationId,
     imageModel,
     imageSource,
     rootImageGeneration,
-    startRootImageGeneration,
     completeRootImageGeneration,
     failRootImageGeneration,
     isGeneratingPresentation,
     isGeneratingOutline,
     slides,
+    setSlides,
   } = usePresentationState();
 
-  // Create a ref for the streaming parser to persist between renders
-  const streamingParserRef = useRef<SlideParser>(new SlideParser());
-  // Add refs to track the animation frame IDs
-  const slidesRafIdRef = useRef<number | null>(null);
   const outlineRafIdRef = useRef<number | null>(null);
   const outlineBufferRef = useRef<string[] | null>(null);
-  const searchResultsBufferRef = useRef<Array<{
-    query: string;
-    results: unknown[];
-  }> | null>(null);
-  // Track the last processed messages length to avoid unnecessary updates
-  const lastProcessedMessagesLength = useRef<number>(0);
-  // Track if title has already been extracted to avoid unnecessary processing
+  const searchResultsBufferRef = useRef<
+    Array<{ query: string; results: unknown[] }> | null
+  >(null);
   const titleExtractedRef = useRef<boolean>(false);
 
-  // Function to update slides using requestAnimationFrame
-  const updateSlidesWithRAF = (): void => {
-    // Extract thinking for presentation and parse only the remaining content
-    const presentationThinkingExtract = extractThinking(presentationCompletion);
-    if (presentationThinkingExtract.hasThinking) {
-      setPresentationThinking(presentationThinkingExtract.thinking);
-    }
-    const presentationContentToParse = presentationThinkingExtract.hasThinking
-      ? presentationThinkingExtract.content
-      : presentationCompletion;
-
-    const processedPresentationCompletion = stripXmlCodeBlock(
-      presentationContentToParse,
-    );
-    streamingParserRef.current.reset();
-    streamingParserRef.current.parseChunk(processedPresentationCompletion);
-    streamingParserRef.current.finalize();
-    const parsedSlides = streamingParserRef.current.getAllSlides();
-
-    // Heuristik: baue aus dem Slide-Text eine sinnvolle Bild-Query
-    const buildImageQueryFromSlide = (slide: any): string | null => {
-      try {
-        const nodes = Array.isArray(slide?.content) ? slide.content : [];
-        const texts: string[] = [];
-        const walk = (n: any) => {
-          if (!n || typeof n !== "object") return;
-          if (typeof n.text === "string" && n.text.trim())
-            texts.push(n.text.trim());
-          if (Array.isArray(n.children)) n.children.forEach(walk);
-        };
-        nodes.forEach(walk);
-        // Priorisiere H1, sonst die ersten 6–10 Wörter aus dem Fließtext
-        const h1 = nodes.find((n: any) => n?.type === "h1");
-        const h1Text =
-          typeof h1?.children?.[0]?.text === "string"
-            ? h1.children[0].text
-            : undefined;
-        const base = (h1Text || texts.join(" ")).replace(/\s+/g, " ").trim();
-        if (!base) return null;
-        const clipped = base.split(" ").slice(0, 10).join(" ");
-        return clipped.length > 120 ? clipped.slice(0, 120) : clipped;
-      } catch {
-        return null;
-      }
-    };
-
-    // Füge Slides ohne Bild ein rootImage.query hinzu (nur Query, URL wird gleich geladen)
-    const slidesWithAutoQueries = parsedSlides.map((slide) => {
-      if (!slide?.rootImage?.query) {
-        const q = buildImageQueryFromSlide(slide);
-        if (q) {
-          return {
-            ...slide,
-            rootImage: {
-              ...(slide.rootImage ?? {}),
-              query: q,
-              layoutType: slide.layoutType ?? "background",
-            },
-          };
-        }
-      }
-      return slide;
-    });
-
-    // Merge bereits erfolgreich generierte Bild-URLs aus dem State
-    const mergedSlides = slidesWithAutoQueries.map((slide) => {
-      const gen = rootImageGeneration[slide.id];
-      if (gen?.status === "success" && slide.rootImage?.query) {
-        return {
-          ...slide,
-          rootImage: {
-            ...(slide.rootImage as any),
-            url: gen.url,
-          },
-        };
-      }
-      return slide;
-    });
-    // Für alle Slides mit Query aber ohne URL: Bildgenerierung (Unsplash/AI) starten
-    for (const slide of mergedSlides) {
-      const slideId = slide.id;
-      const rootImage = slide.rootImage;
-      if (rootImage?.query && !rootImage.url) {
-        const already = rootImageGeneration[slideId];
-        if (!already || already.status === "error") {
-          startRootImageGeneration(slideId, rootImage.query);
-          void (async () => {
-            try {
-              let result;
-
-              if (imageSource === "stock") {
-                // Use Unsplash for stock images
-                const unsplashResult = await getImageFromUnsplash(
-                  rootImage.query,
-                  rootImage.layoutType,
-                );
-                if (unsplashResult.success && unsplashResult.imageUrl) {
-                  result = { image: { url: unsplashResult.imageUrl } };
-                }
-              } else {
-                // Use AI generation
-                result = await generateImageAction(rootImage.query, imageModel);
-              }
-
-              if (result?.image?.url) {
-                completeRootImageGeneration(slideId, result.image.url);
-                // If we don't have a thumbnail yet, set it now and persist once
-                const stateNow = usePresentationState.getState();
-                if (!stateNow.thumbnailUrl && stateNow.currentPresentationId) {
-                  stateNow.setThumbnailUrl(result.image.url);
-                  try {
-                    await updatePresentation({
-                      id: stateNow.currentPresentationId,
-                      thumbnailUrl: result.image.url,
-                    });
-                  } catch {
-                    // Ignore persistence errors for thumbnail to avoid interrupting generation flow
-                  }
-                }
-                // Persist into slides state
-                usePresentationState.getState().setSlides(
-                  usePresentationState.getState().slides.map((s) =>
-                    s.id === slideId
-                      ? ensureSlideCanvas({
-                          ...s,
-                          rootImage: {
-                            query: rootImage.query,
-                            url: result.image.url,
-                          },
-                          canvas: applyBackgroundImageToCanvas(
-                            s.canvas,
-                            result.image.url,
-                          ),
-                        })
-                      : s,
-                  ),
-                );
-              } else {
-                failRootImageGeneration(slideId, "No image url returned");
-              }
-            } catch (err) {
-              const message =
-                err instanceof Error ? err.message : "Image generation failed";
-              failRootImageGeneration(slideId, message);
-            }
-          })();
-        }
-      }
-    }
-    setSlides(ensureSlidesHaveCanvas(mergedSlides));
-    slidesRafIdRef.current = null;
-  };
-
-  // Function to extract title from content
   const extractTitle = (
     content: string,
   ): { title: string | null; cleanContent: string } => {
@@ -241,15 +62,12 @@ export function PresentationGenerationManager() {
     return { title: null, cleanContent: content };
   };
 
-  // Function to process messages and extract data (optimized - only process last message)
   const processMessages = (messages: typeof outlineMessages): void => {
     if (messages.length <= 1) return;
 
-    // Get the last message - this is where all the current data is
     const lastMessage = messages[messages.length - 1];
     if (!lastMessage) return;
 
-    // Extract search results from the last message only (much more efficient)
     if (webSearchEnabled && lastMessage.parts) {
       const searchResults: Array<{ query: string; results: unknown[] }> = [];
 
@@ -267,7 +85,6 @@ export function PresentationGenerationManager() {
                 ? invocation.args.query
                 : "Unknown query";
 
-            // Parse the search result
             let parsedResult;
             try {
               parsedResult =
@@ -286,15 +103,12 @@ export function PresentationGenerationManager() {
         }
       }
 
-      // Store search results in buffer (only if we found any)
       if (searchResults.length > 0) {
         searchResultsBufferRef.current = searchResults;
       }
     }
 
-    // Extract outline from the last assistant message
     if (lastMessage.role === "assistant" && lastMessage.content) {
-      // Extract <think> content from assistant message and keep only the remainder for parsing
       const thinkingExtract = extractThinking(lastMessage.content);
       if (thinkingExtract.hasThinking) {
         setOutlineThinking(thinkingExtract.thinking);
@@ -304,7 +118,6 @@ export function PresentationGenerationManager() {
         ? thinkingExtract.content
         : lastMessage.content;
 
-      // Extract title once if provided, otherwise keep existing title
       if (!titleExtractedRef.current) {
         const { title, cleanContent: extractedCleanContent } =
           extractTitle(cleanContent);
@@ -314,7 +127,6 @@ export function PresentationGenerationManager() {
         if (title && title.trim().length > 0) {
           setCurrentPresentation(currentPresentationId, title);
         }
-        // mark as processed even if no explicit title was provided
         titleExtractedRef.current = true;
       } else {
         cleanContent = cleanContent.replace(/<TITLE>.*?<\/TITLE>/i, "").trim();
@@ -331,7 +143,6 @@ export function PresentationGenerationManager() {
       if (numberedMatches.length > 0) {
         outlineItems = numberedMatches;
       } else {
-        // Fallback to legacy markdown heading format
         const sections = cleanContent.split(/^#\s+/gm).filter(Boolean);
         outlineItems =
           sections.length > 0
@@ -348,27 +159,20 @@ export function PresentationGenerationManager() {
     }
   };
 
-  // Function to update outline and search results using requestAnimationFrame
   const updateOutlineWithRAF = (): void => {
-    // Batch all updates in a single RAF callback for better performance
-
-    // Update search results if available
     if (searchResultsBufferRef.current !== null) {
       setSearchResults(searchResultsBufferRef.current);
       searchResultsBufferRef.current = null;
     }
 
-    // Update outline if available
     if (outlineBufferRef.current !== null) {
       setOutline(outlineBufferRef.current);
       outlineBufferRef.current = null;
     }
 
-    // Clear the current frame ID
     outlineRafIdRef.current = null;
   };
 
-  // Outline generation with or without web search
   const { messages: outlineMessages, append: appendOutlineMessage } = useChat({
     api: webSearchEnabled
       ? "/api/presentation/outline-with-search"
@@ -386,27 +190,26 @@ export function PresentationGenerationManager() {
       setShouldStartPresentationGeneration(false);
 
       const {
-        currentPresentationId,
+        currentPresentationId: presentationId,
         outline,
         searchResults,
         currentPresentationTitle,
         theme,
-        imageSource,
+        imageSource: stateImageSource,
       } = usePresentationState.getState();
 
-      if (currentPresentationId) {
+      if (presentationId) {
         void updatePresentation({
-          id: currentPresentationId,
+          id: presentationId,
           outline,
           searchResults,
           prompt: presentationInput,
           title: currentPresentationTitle ?? "",
           theme,
-          imageSource,
+          imageSource: stateImageSource,
         });
       }
 
-      // Cancel any pending outline animation frame
       if (outlineRafIdRef.current !== null) {
         cancelAnimationFrame(outlineRafIdRef.current);
         outlineRafIdRef.current = null;
@@ -416,7 +219,6 @@ export function PresentationGenerationManager() {
       toast.error("Failed to generate outline: " + error.message);
       resetGeneration();
 
-      // Cancel any pending outline animation frame
       if (outlineRafIdRef.current !== null) {
         cancelAnimationFrame(outlineRafIdRef.current);
         outlineRafIdRef.current = null;
@@ -424,203 +226,134 @@ export function PresentationGenerationManager() {
     },
   });
 
-  // Lightweight useEffect that only schedules RAF updates
   useEffect(() => {
-    console.log("outlineMessages", outlineMessages);
-    // Only update if we have new messages
     if (outlineMessages.length > 1) {
-      lastProcessedMessagesLength.current = outlineMessages.length;
-
-      // Process messages and store in buffers (non-blocking)
       processMessages(outlineMessages);
 
-      // Only schedule a new frame if one isn't already pending
       if (outlineRafIdRef.current === null) {
         outlineRafIdRef.current = requestAnimationFrame(updateOutlineWithRAF);
       }
     }
   }, [outlineMessages, webSearchEnabled]);
 
-  // Watch for outline generation start
   useEffect(() => {
     const startOutlineGeneration = async (): Promise<void> => {
-      if (shouldStartOutlineGeneration) {
-        try {
-          // Reset all state except ID and input when starting new generation
-          resetForNewGeneration();
+      if (!shouldStartOutlineGeneration) return;
 
-          // Reset processing refs for new generation
-          titleExtractedRef.current = false;
+      try {
+        resetForNewGeneration();
+        titleExtractedRef.current = false;
+        setIsGeneratingOutline(true);
 
-          setIsGeneratingOutline(true);
+        const { presentationInput: currentPrompt } =
+          usePresentationState.getState();
 
-          // Get the current input after reset (it's preserved)
-          const { presentationInput } = usePresentationState.getState();
-
-          // Start the RAF cycle for outline updates
-          if (outlineRafIdRef.current === null) {
-            outlineRafIdRef.current =
-              requestAnimationFrame(updateOutlineWithRAF);
-          }
-
-          await appendOutlineMessage(
-            {
-              role: "user",
-              content: presentationInput,
-            },
-            {
-              body: {
-                prompt: presentationInput,
-                numberOfCards: numSlides,
-                language,
-              },
-            },
-          );
-        } catch (error) {
-          console.log(error);
-          // Error is handled by onError callback
-        } finally {
-          setIsGeneratingOutline(false);
-          setShouldStartOutlineGeneration(false);
+        if (outlineRafIdRef.current === null) {
+          outlineRafIdRef.current =
+            requestAnimationFrame(updateOutlineWithRAF);
         }
+
+        await appendOutlineMessage(
+          {
+            role: "user",
+            content: currentPrompt,
+          },
+          {
+            body: {
+              prompt: currentPrompt,
+              numberOfCards: numSlides,
+              language,
+            },
+          },
+        );
+      } catch (error) {
+        console.error("Outline generation failed:", error);
+        toast.error("Unable to start outline generation.");
+      } finally {
+        setIsGeneratingOutline(false);
+        setShouldStartOutlineGeneration(false);
       }
     };
 
     void startOutlineGeneration();
-  }, [shouldStartOutlineGeneration]);
-
-  const { completion: presentationCompletion, complete: generatePresentation } =
-    useCompletion({
-      api: "/api/presentation/generate",
-      onFinish: (_prompt, _completion) => {
-        setIsGeneratingPresentation(false);
-        setShouldStartPresentationGeneration(false);
-      },
-      onError: (error) => {
-        toast.error("Failed to generate presentation: " + error.message);
-        resetGeneration();
-        streamingParserRef.current.reset();
-
-        // Cancel any pending animation frame
-        if (slidesRafIdRef.current !== null) {
-          cancelAnimationFrame(slidesRafIdRef.current);
-          slidesRafIdRef.current = null;
-        }
-      },
-    });
+  }, [shouldStartOutlineGeneration, numSlides, language, appendOutlineMessage]);
 
   useEffect(() => {
-    if (presentationCompletion) {
-      try {
-        // Only schedule a new frame if one isn't already pending
-        if (slidesRafIdRef.current === null) {
-          slidesRafIdRef.current = requestAnimationFrame(updateSlidesWithRAF);
-        }
-      } catch (error) {
-        console.error("Error processing presentation XML:", error);
-        toast.error("Error processing presentation content");
-      }
-    }
-  }, [presentationCompletion]);
-
-  useEffect(() => {
-    if (shouldStartPresentationGeneration) {
-      const {
-        outline,
-        presentationInput,
-        language,
-        presentationStyle,
-        currentPresentationTitle,
-        searchResults: stateSearchResults,
-        modelProvider,
-        modelId,
-        setThumbnailUrl,
-      } = usePresentationState.getState();
-
-      // Reset the parser before starting a new generation
-      streamingParserRef.current.reset();
-      setIsGeneratingPresentation(true);
-      setThumbnailUrl(undefined);
-      void generatePresentation(presentationInput ?? "", {
-        body: {
-          title: currentPresentationTitle ?? presentationInput ?? "",
-          prompt: presentationInput ?? "",
-          outline,
-          searchResults: stateSearchResults,
-          language,
-          tone: presentationStyle,
-          modelProvider,
-          modelId,
-        },
-      });
-    }
-  }, [shouldStartPresentationGeneration]);
-
-  // Listen for manual root image generation changes (when user manually triggers image generation)
-  useEffect(() => {
-    // Only process if we're not currently generating presentation or outline
     if (isGeneratingPresentation || isGeneratingOutline) {
       return;
     }
 
-    // Check for any pending root image generations that need to be processed
     for (const [slideId, gen] of Object.entries(rootImageGeneration)) {
-      if (gen.status === "pending") {
-        // Find the slide to get the rootImage query
-        const slide = slides.find((s) => s.id === slideId);
-        if (slide?.rootImage?.query) {
-          void (async () => {
-            try {
-              let result;
+      if (gen.status !== "pending") continue;
 
-              if (imageSource === "stock") {
-                // Use Unsplash for stock images
-                const unsplashResult = await getImageFromUnsplash(
-                  slide.rootImage!.query,
-                  slide.rootImage!.layoutType,
-                );
-                if (unsplashResult.success && unsplashResult.imageUrl) {
-                  result = { image: { url: unsplashResult.imageUrl } };
-                }
-              } else {
-                // Use AI generation
-                result = await generateImageAction(
-                  slide.rootImage!.query,
-                  imageModel,
-                );
-              }
+      const slide = slides.find((s) => s.id === slideId);
+      const query = slide?.rootImage?.query;
+      if (!query) continue;
 
-              if (result?.image?.url) {
-                completeRootImageGeneration(slideId, result.image.url);
-                // Update the slide with the new image URL
-                setSlides(
-                  slides.map((s) =>
-                    s.id === slideId
-                      ? ensureSlideCanvas({
-                          ...s,
-                          rootImage: {
-                            ...(s.rootImage ?? { query: slide.rootImage!.query }),
-                            url: result.image.url,
-                          },
-                          canvas: applyBackgroundImageToCanvas(
-                            s.canvas,
-                            result.image.url,
-                          ),
-                        })
-                      : s,
-                  ),
-                );
-              } else {
-                failRootImageGeneration(slideId, "No image url returned");
-              }
-            } catch (err) {
-              const message =
-                err instanceof Error ? err.message : "Image generation failed";
-              failRootImageGeneration(slideId, message);
+      void (async () => {
+        try {
+          let imageUrl: string | undefined;
+
+          if (imageSource === "stock") {
+            const unsplash = await getImageFromUnsplash(
+              query,
+              slide.rootImage?.layoutType,
+            );
+            if (unsplash.success && unsplash.imageUrl) {
+              imageUrl = unsplash.imageUrl;
             }
-          })();
+          } else {
+            const generated = await generateImageAction(query, imageModel);
+            if (generated?.image?.url) {
+              imageUrl = generated.image.url;
+            }
+          }
+
+          if (!imageUrl) {
+            failRootImageGeneration(slideId, "No image url returned");
+            return;
+          }
+
+          completeRootImageGeneration(slideId, imageUrl);
+
+          const {
+            thumbnailUrl,
+            currentPresentationId: presentationId,
+            setThumbnailUrl,
+          } = usePresentationState.getState();
+
+          if (!thumbnailUrl && presentationId) {
+            setThumbnailUrl(imageUrl);
+            try {
+              await updatePresentation({
+                id: presentationId,
+                thumbnailUrl: imageUrl,
+              });
+            } catch (thumbnailError) {
+              console.warn("Failed to persist thumbnail:", thumbnailError);
+            }
+          }
+
+          setSlides(
+            slides.map((s) =>
+              s.id === slideId
+                ? ensureSlideCanvas({
+                    ...s,
+                    rootImage: {
+                      ...(s.rootImage ?? { query }),
+                      url: imageUrl,
+                    },
+                    canvas: applyBackgroundImageToCanvas(s.canvas, imageUrl),
+                  })
+                : s,
+            ),
+          );
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : "Image generation failed";
+          failRootImageGeneration(slideId, message);
         }
-      }
+      })();
     }
   }, [
     rootImageGeneration,
@@ -634,14 +367,8 @@ export function PresentationGenerationManager() {
     setSlides,
   ]);
 
-  // Clean up RAF on unmount
   useEffect(() => {
     return () => {
-      if (slidesRafIdRef.current !== null) {
-        cancelAnimationFrame(slidesRafIdRef.current);
-        slidesRafIdRef.current = null;
-      }
-
       if (outlineRafIdRef.current !== null) {
         cancelAnimationFrame(outlineRafIdRef.current);
         outlineRafIdRef.current = null;
