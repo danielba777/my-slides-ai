@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 import { toast } from "sonner";
 
 interface TikTokPostPayload {
@@ -46,14 +47,6 @@ interface TikTokPostResult {
   releaseUrl?: string;
 }
 
-interface ConnectedAccount {
-  openId: string;
-  displayName: string | null;
-  username: string | null;
-  avatarUrl: string | null;
-  connectedAt: string;
-}
-
 export default function TikTokPostingTestPage() {
   const [form, setForm] = useState<TikTokPostPayload>({
     openId: "",
@@ -68,51 +61,18 @@ export default function TikTokPostingTestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<TikTokPostResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
-  const [accountsLoading, setAccountsLoading] = useState<boolean>(true);
+  const {
+    accounts,
+    loading: accountsLoading,
+    error: accountsError,
+    refresh: refreshAccounts,
+  } = useTikTokAccounts();
 
   useEffect(() => {
-    let active = true;
-    const load = async () => {
-      setAccountsLoading(true);
-      try {
-        const response = await fetch("/api/tiktok/accounts", {
-          cache: "no-store",
-        });
-        const payload = await response.json().catch(() => null);
-        if (!response.ok || !Array.isArray(payload)) {
-          throw new Error(
-            payload && typeof payload.error === "string"
-              ? payload.error
-              : "TikTok Accounts konnten nicht geladen werden",
-          );
-        }
-
-        if (active) {
-          setAccounts(payload as ConnectedAccount[]);
-          if (payload.length > 0) {
-            setForm((prev) => ({ ...prev, openId: payload[0].openId }));
-          }
-        }
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Unable to load TikTok accounts";
-        if (active) {
-          setAccounts([]);
-          toast.error(message);
-        }
-      } finally {
-        if (active) {
-          setAccountsLoading(false);
-        }
-      }
-    };
-
-    void load();
-    return () => {
-      active = false;
-    };
-  }, []);
+    if (accountsError) {
+      toast.error(accountsError);
+    }
+  }, [accountsError]);
 
   useEffect(() => {
     if (accounts.length === 0) {
@@ -124,7 +84,7 @@ export default function TikTokPostingTestPage() {
     if (!exists) {
       const fallback = accounts[0];
       if (fallback) {
-        setForm((prev) => ({ ...prev, openId: fallback.openId ?? "" }));
+        setForm((prev) => ({ ...prev, openId: fallback.openId }));
       }
     }
   }, [accounts, form.openId]);
@@ -463,6 +423,13 @@ export default function TikTokPostingTestPage() {
             disabled={submitting || accountsLoading || accounts.length === 0}
           >
             {submitting ? "Posting & Polling..." : "TikTok Post auslösen"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => void refreshAccounts()}
+            disabled={accountsLoading}
+          >
+            Accounts aktualisieren
           </Button>
           {error && <p className="text-sm text-destructive">{error}</p>}
         </CardFooter>

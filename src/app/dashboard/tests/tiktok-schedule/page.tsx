@@ -8,15 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 import { toast } from "sonner";
-
-interface ConnectedAccount {
-  openId: string;
-  displayName: string | null;
-  username: string | null;
-  avatarUrl: string | null;
-  connectedAt: string;
-}
 
 interface ScheduleResult {
   scheduled: boolean;
@@ -42,8 +35,12 @@ interface ScheduleFormState {
 }
 
 export default function TikTokScheduleTestPage() {
-  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
-  const [accountsLoading, setAccountsLoading] = useState(true);
+  const {
+    accounts,
+    loading: accountsLoading,
+    error: accountsError,
+    refresh: refreshAccounts,
+  } = useTikTokAccounts();
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ScheduleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,52 +64,25 @@ export default function TikTokScheduleTestPage() {
   });
 
   useEffect(() => {
-    let active = true;
-    const loadAccounts = async () => {
-      setAccountsLoading(true);
-      try {
-        const response = await fetch("/api/tiktok/accounts", { cache: "no-store" });
-        const payload = await response.json().catch(() => null);
-        if (!response.ok || !Array.isArray(payload)) {
-          throw new Error(
-            payload && typeof payload.error === "string"
-              ? payload.error
-              : "TikTok Accounts konnten nicht geladen werden",
-          );
-        }
-
-        if (active) {
-          setAccounts(payload as ConnectedAccount[]);
-          if (payload.length > 0) {
-            setForm((prev) => ({ ...prev, openId: payload[0].openId }));
-          }
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Unable to load TikTok accounts";
-        if (active) {
-          toast.error(message);
-          setAccounts([]);
-        }
-      } finally {
-        if (active) setAccountsLoading(false);
-      }
-    };
-
-    void loadAccounts();
-    return () => {
-      active = false;
-    };
-  }, []);
+    if (accountsError) {
+      toast.error(accountsError);
+    }
+  }, [accountsError]);
 
   useEffect(() => {
     if (accounts.length === 0) {
       setForm((prev) => ({ ...prev, openId: "" }));
       return;
     }
+
     const exists = accounts.some((account) => account.openId === form.openId);
     if (!exists) {
-      const fallback = accounts[0]?.openId ?? "";
-      setForm((prev) => ({ ...prev, openId: fallback }));
+      const fallback = accounts[0];
+      if (!fallback) {
+        setForm((prev) => ({ ...prev, openId: "" }));
+        return;
+      }
+      setForm((prev) => ({ ...prev, openId: fallback.openId }));
     }
   }, [accounts, form.openId]);
 
@@ -128,14 +98,17 @@ export default function TikTokScheduleTestPage() {
       toast.error("Bitte wähle einen verbundenen TikTok Account aus");
       return;
     }
+
     if (!form.mediaUrl) {
       toast.error("Bitte gib eine Medien-URL aus dem Files-Bucket an");
       return;
     }
+
     if (!form.publishAt) {
       toast.error("Bitte wähle ein Veröffentlichungsdatum");
       return;
     }
+
     if (!form.idempotencyKey.trim()) {
       toast.error("Bitte gib einen Idempotency Key an");
       return;
@@ -192,6 +165,7 @@ export default function TikTokScheduleTestPage() {
       });
 
       const data = (await response.json().catch(() => null)) as ScheduleResult | { error?: string } | null;
+
       if (!response.ok || !data || typeof data !== "object" || !("scheduled" in data)) {
         const message =
           data && typeof data === "object" && "error" in data && typeof data.error === "string"
@@ -321,7 +295,9 @@ export default function TikTokScheduleTestPage() {
                 id="postMode"
                 className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 value={form.postMode}
-                onChange={(event) => updateField("postMode", event.target.value as PostMode)}
+                onChange={(event) =>
+                  updateField("postMode", event.target.value as PostMode)
+                }
               >
                 <option value="INBOX">Inbox (Draft)</option>
                 <option value="PUBLISH">Direct Publish</option>
@@ -339,7 +315,10 @@ export default function TikTokScheduleTestPage() {
                 className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 value={form.contentPostingMethod}
                 onChange={(event) =>
-                  updateField("contentPostingMethod", event.target.value as PostingMethod)
+                  updateField(
+                    "contentPostingMethod",
+                    event.target.value as PostingMethod,
+                  )
                 }
               >
                 <option value="UPLOAD">Upload (Videos)</option>
@@ -410,8 +389,18 @@ export default function TikTokScheduleTestPage() {
           </div>
         </CardContent>
         <CardFooter className="flex items-center gap-4">
-          <Button onClick={handleSubmit} disabled={submitting || accountsLoading || accounts.length === 0}>
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting || accountsLoading || accounts.length === 0}
+          >
             {submitting ? "Planen..." : "TikTok Post planen"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => void refreshAccounts()}
+            disabled={accountsLoading}
+          >
+            Accounts aktualisieren
           </Button>
           {error && <p className="text-sm text-destructive">{error}</p>}
         </CardFooter>
