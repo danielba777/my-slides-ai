@@ -728,45 +728,53 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           return { ...l, height, autoHeight: false };
         }
 
-        const sign = {
-          "resize-se": { sx: 1, sy: 1 },
-          "resize-ne": { sx: 1, sy: -1 },
-          "resize-sw": { sx: -1, sy: 1 },
-          "resize-nw": { sx: -1, sy: -1 },
-        } as const;
-        const { sx, sy } = sign[mode as keyof typeof sign];
-        const sxFactor = 1 + (sx * dx) / Math.max(1, layerStart.width);
-        const syFactor = 1 + (sy * dy) / Math.max(1, layerStart.height);
-        let s = (sxFactor + syFactor) / 2;
-        s = Math.max(0.05, s);
+        // === Corner resize: scale ONLY the text (hug width), auto-height ===
+        // Need to implement rotatePoint function here
+        const rotatePoint = (x: number, y: number, angle: number) => {
+          const cos = Math.cos(angle);
+          const sin = Math.sin(angle);
+          return { x: x * cos - y * sin, y: x * sin + y * cos };
+        };
 
-        let nextW = layerStart.width * s;
-        let nextH = layerStart.height * s;
-        if (nextW < MIN_W) nextW = MIN_W;
-        if (nextH < MIN_H) nextH = MIN_H;
+        const center = { x: layerStart.x, y: layerStart.y };
+        const p0 = rotatePoint(
+          start.x - center.x,
+          start.y - center.y,
+          -layerStart.rotation * Math.PI / 180,
+        );
+        const p1 = rotatePoint(
+          now.x - center.x,
+          now.y - center.y,
+          -layerStart.rotation * Math.PI / 180,
+        );
 
-        const nextScale = Math.max(MIN_SCALE, layerStart.scale * s);
+        const startLen = Math.hypot(p0.x, p0.y) || 1;
+        const currLen = Math.hypot(p1.x, p1.y) || 1;
+        const s = currLen / startLen;
 
+        const nextScale = Math.max(0.2, layerStart.scale * s);
+
+        // Breite bleibt fix – Text soll Box nicht aufblasen
+        const keepW = Math.max(40, layerStart.width);
         const temp = {
           ...l,
-          width: Math.round(nextW),
-          height: Math.round(nextH),
           scale: nextScale,
-          fontSize: BASE_FONT_PX * nextScale,
+          width: keepW,
         } as TextLayer & { autoHeight?: boolean };
 
-        if (l.autoHeight) {
-          const lines = computeWrappedLinesWithDOM({
-            ...temp,
-            italic: (temp as any).italic,
-          });
-          temp.height = Math.ceil(
-            computeAutoHeightForLayer(
-              { ...temp, italic: (temp as any).italic },
-              lines,
-            ),
-          );
-        }
+        // Höhe immer neu aus Text berechnen (hug content)
+        const lines = computeWrappedLinesWithDOM({
+          ...temp,
+          italic: (temp as any).italic,
+        });
+        temp.height = Math.ceil(
+          computeAutoHeightForLayer(
+            { ...temp, italic: (temp as any).italic },
+            lines,
+          ),
+        );
+        (temp as any).autoHeight = true;
+
         return temp;
       }),
     );
@@ -914,10 +922,21 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     }
     // === ENDE NEU ===
 
-    // Text
+    // Text (skip fully off-canvas)
     const sorted = [...textLayers].sort((a, b) => a.zIndex - b.zIndex);
     for (const layer of sorted) {
       if (!layer.content) continue;
+
+      const halfW = (layer.width * layer.scale) / 2;
+      const halfH = (layer.height * layer.scale) / 2;
+      const left = layer.x - halfW;
+      const right = layer.x + halfW;
+      const top = layer.y - halfH;
+      const bottom = layer.y + halfH;
+
+      const fullyOutside =
+        right < 0 || left > W || bottom < 0 || top > H;
+      if (fullyOutside) continue;
 
       const lines = computeWrappedLinesWithDOM(layer as any);
       const weight =
@@ -1593,102 +1612,102 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                     </div>
                   )}
 
-                  {/* === Handles INSIDE the box so they inherit rotation/scale and stay attached === */}
+                  {/* === Handles (größer + modernere Hitbox) INSIDE der Box === */}
                   {isActive && !isCurrentEditing && (
                     <div
                       className="absolute inset-0"
                       style={{ pointerEvents: "none" }}
                     >
-                      {/* Corners: großer klickbarer Wrapper, kleiner sichtbarer Punkt */}
+                      {/* ---- Ecken (größere Handles) ---- */}
                       <div
                         data-role="handle"
-                        title="Größe (proportional + Text)"
-                        className="absolute top-0 left-0 w-5 h-5 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
+                        title="Größe proportional ändern"
+                        className="absolute top-0 left-0 w-7 h-7 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-nw", e)
                         }
                       >
-                        <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-4 w-4 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
-                        title="Größe (proportional + Text)"
-                        className="absolute top-0 right-0 w-5 h-5 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
+                        title="Größe proportional ändern"
+                        className="absolute top-0 right-0 w-7 h-7 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-ne", e)
                         }
                       >
-                        <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-4 w-4 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
-                        title="Größe (proportional + Text)"
-                        className="absolute bottom-0 left-0 w-5 h-5 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
+                        title="Größe proportional ändern"
+                        className="absolute bottom-0 left-0 w-7 h-7 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-sw", e)
                         }
                       >
-                        <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-4 w-4 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
-                        title="Größe (proportional + Text)"
-                        className="absolute bottom-0 right-0 w-5 h-5 translate-x-1/2 translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
+                        title="Größe proportional ändern"
+                        className="absolute bottom-0 right-0 w-7 h-7 translate-x-1/2 translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-se", e)
                         }
                       >
-                        <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-4 w-4 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
 
-                      {/* Sides: großer klickbarer Wrapper, schmaler sichtbarer Balken */}
+                      {/* ---- Seiten (größere Balken-Handles) ---- */}
                       <div
                         data-role="handle"
-                        title="Breite (links)"
-                        className="absolute left-0 top-1/2 w-5 h-8 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
+                        title="Breite ändern (links)"
+                        className="absolute left-0 top-1/2 w-7 h-10 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-left", e)
                         }
                       >
-                        <div className="h-6 w-2 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-7 w-[10px] rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
-                        title="Breite (rechts)"
-                        className="absolute right-0 top-1/2 w-5 h-8 translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
+                        title="Breite ändern (rechts)"
+                        className="absolute right-0 top-1/2 w-7 h-10 translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-right", e)
                         }
                       >
-                        <div className="h-6 w-2 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-7 w-[10px] rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
                         title="Höhe (oben)"
-                        className="absolute top-0 left-1/2 w-8 h-5 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize flex items-center justify-center"
+                        className="absolute top-0 left-1/2 w-10 h-7 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-top", e)
                         }
                       >
-                        <div className="h-2 w-6 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-[10px] w-7 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
                         title="Höhe (unten)"
-                        className="absolute bottom-0 left-1/2 w-8 h-5 -translate-x-1/2 translate-y-1/2 cursor-ns-resize flex items-center justify-center"
+                        className="absolute bottom-0 left-1/2 w-10 h-7 -translate-x-1/2 translate-y-1/2 cursor-ns-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-bottom", e)
                         }
                       >
-                        <div className="h-2 w-6 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-[10px] w-7 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                     </div>
                   )}
