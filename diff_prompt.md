@@ -1,185 +1,253 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-Diff #1 – Autosave-Spam abstellen (keine POST-Flut während Generierung)
-
-File: src/hooks/presentation/useSlideChangeWatcher.ts
-
-codebase
-
-\*\*\* a/src/hooks/presentation/useSlideChangeWatcher.ts
---- b/src/hooks/presentation/useSlideChangeWatcher.ts
+**_ Begin Patch
+_** Update File: src/canvas/legacy/SlideCanvasLegacy.tsx
 @@
-// Watch for changes to the slides array and trigger save
-useEffect(() => {
+} else if (
+mode.startsWith("resize-") &&
+(mode.endsWith("nw") ||
+mode.endsWith("ne") ||
+mode.endsWith("sw") ||
+mode.endsWith("se"))
+) {
 
-- // Only save if we have slides and we're not generating
-- if (slides.length > 0) {
+-        // === Corner resize: keep aspect & scale text ===
+-        // Convert pointer delta into local coords respecting rotation
+-        const center = { x: layerStart.x, y: layerStart.y };
+-        const p0 = rotatePoint(
+-          pointerStart.x - center.x,
+-          pointerStart.y - center.y,
+-          -layerStart.rotation,
+-        );
+-        const p1 = rotatePoint(
+-          x - center.x,
+-          y - center.y,
+-          -layerStart.rotation,
+-        );
+-        const startLen = Math.hypot(p0.x, p0.y) || 1;
+-        const currLen = Math.hypot(p1.x, p1.y) || 1;
+-        const s = currLen / startLen;
+-
+-        const nextScale = Math.max(0.2, layerStart.scale * s);
+-        // Width/height update (kept before, but we'll tighten)
+-        let nextW = Math.max(40, layerStart.width * s);
+-        let nextH = Math.max(40, layerStart.height * s);
+-
+-        // Apply changes
+-        draft.forEach((l) => {
+-          if (l.id !== layerStart.id) return;
+-          l.scale = nextScale;
+-          l.width = nextW;
+-          if ((l as any).autoHeight) {
+-            const textH = computeAutoHeightFromUtil({
+-              content: l.content,
+-              baseFontPx: BASE_FONT_PX,
+-              scale: nextScale,
+-              lineHeight: l.lineHeight,
+-              letterSpacing: l.letterSpacing,
+-              maxWidthPx: l.width - PADDING * 2,
+-              fontFamily: l.fontFamily ?? "Inter",
+-              fontWeight:
+-                l.weight === "bold" ? 700 : l.weight === "semibold" ? 600 : 400,
+-              italic: (l as any).italic ?? false,
+-            });
+-            l.height = Math.max(40, Math.ceil(textH + PADDING * 2));
+-          } else {
+-            l.height = nextH;
+-          }
+-        });
 
-* // Nur speichern, wenn NICHT generiert wird – verhindert POST-Spam & UI-Flackern
-* if (slides.length > 0 && !isGeneratingPresentation) {
-  save();
-  }
-
-- }, [slides, save, isGeneratingPresentation]);
-
-* }, [slides, save, isGeneratingPresentation]);
-
-Wirkung: Während isGeneratingPresentation=true wird nicht gespeichert → die vielen POST /dashboard/slideshows/... hören auf.
-
-Diff #2 – Textpositionen behalten & BG-Image ohne Node-Reset setzen
-
-File: src/hooks/presentation/useSlideOperations.ts
-(enthält bereits applyBackgroundImageToCanvas und buildCanvasDocFromSlide)
-
-codebase
-
-\*\*\* a/src/hooks/presentation/useSlideOperations.ts
---- b/src/hooks/presentation/useSlideOperations.ts
-@@
-export function buildCanvasDocFromSlide(
-slide: PlateSlide,
-): { canvas: CanvasDoc; position?: { x: number; y: number } } {
-
-- const segments = collectTextSegments(slide.content);
-- const width = slide.canvas?.width ?? CANVAS_WIDTH;
-- const height = slide.canvas?.height ?? CANVAS_HEIGHT;
-- const base: CanvasDoc = {
-- version: slide.canvas?.version ?? 1,
-- width,
-- height,
-- bg: slide.bgColor ?? slide.canvas?.bg ?? DEFAULT_CANVAS.bg,
-- nodes: [],
-- selection: [],
-- previewDataUrl: slide.canvas?.previewDataUrl,
-- };
-
-* const segments = collectTextSegments(slide.content);
-* const width = slide.canvas?.width ?? CANVAS_WIDTH;
-* const height = slide.canvas?.height ?? CANVAS_HEIGHT;
-* const base: CanvasDoc = {
-* version: slide.canvas?.version ?? 1,
-* width,
-* height,
-* bg: slide.bgColor ?? slide.canvas?.bg ?? DEFAULT_CANVAS.bg,
-* nodes: [],
-* selection: [],
-* previewDataUrl: slide.canvas?.previewDataUrl,
-* };
-
-- let textPosition: { x: number; y: number } | undefined;
-
-* // 🔒 WICHTIG: Wenn bereits ein Canvas mit Nodes existiert, NIEMALS neu aufbauen.
-* // Das verhindert, dass Text/Elemente beim Rendern "zurückspringen".
-* if (Array.isArray(slide.canvas?.nodes) && slide.canvas!.nodes.length > 0) {
-* const withBg = applyBackgroundImageToCanvas(slide.canvas, slide.rootImage?.url);
-* return { canvas: withBg, position: slide.position };
-* }
+*        // === Corner resize: scale ONLY the text (hug width), auto-height ===
+*        const center = { x: layerStart.x, y: layerStart.y };
+*        const p0 = rotatePoint(
+*          pointerStart.x - center.x,
+*          pointerStart.y - center.y,
+*          -layerStart.rotation,
+*        );
+*        const p1 = rotatePoint(
+*          x - center.x,
+*          y - center.y,
+*          -layerStart.rotation,
+*        );
 *
-* let textPosition: { x: number; y: number } | undefined;
+*        const startLen = Math.hypot(p0.x, p0.y) || 1;
+*        const currLen = Math.hypot(p1.x, p1.y) || 1;
+*        const s = currLen / startLen;
+*
+*        const nextScale = Math.max(0.2, layerStart.scale * s);
+*
+*        draft.forEach((l) => {
+*          if (l.id !== layerStart.id) return;
+*
+*          // Breite bleibt fix – Text soll Box nicht aufblasen
+*          const keepW = Math.max(40, layerStart.width);
+*          l.scale = nextScale;
+*          l.width = keepW;
+*
+*          // Höhe immer neu aus Text berechnen (hug content)
+*          const textH = computeAutoHeightFromUtil({
+*            content: l.content,
+*            baseFontPx: BASE_FONT_PX,
+*            scale: nextScale,
+*            lineHeight: l.lineHeight,
+*            letterSpacing: l.letterSpacing,
+*            maxWidthPx: keepW - PADDING * 2,
+*            fontFamily: l.fontFamily ?? "Inter",
+*            fontWeight:
+*              l.weight === "bold" ? 700 : l.weight === "semibold" ? 600 : 400,
+*            italic: (l as any).italic ?? false,
+*          });
+*
+*          l.height = Math.max(40, Math.ceil(textH + PADDING * 2));
+*          (l as any).autoHeight = true;
+*        });
   @@
+  // === EXPORT ===
+  exportPNG: async () => {
+  const canvas = canvasRef.current;
+  const ctx = canvas?.getContext("2d");
+  if (!canvas || !ctx) return new Blob();
+           // Clear
+           ctx.clearRect(0, 0, W, H);
 
-- if (segments.length > 0) {
+           // Draw image
+           if (imageUrl && imgRef.current && imgRef.current.complete) {
+             const img = imgRef.current;
+             ctx.save();
+             ctx.translate(W / 2, H / 2);
+             ctx.translate(offset.x, offset.y);
+             ctx.scale(Math.max(0.001, scale), Math.max(0.001, scale));
+             ctx.drawImage(img, -img.width / 2, -img.height / 2);
+             ctx.restore();
+           } else if (!imageUrl) {
+             ctx.fillStyle = "black";
+             ctx.fillRect(0, 0, W, H);
+           }
 
-* if (segments.length > 0) {
-  const content = segments.join("\n\n");
-  @@
+-        // Draw texts
 
-- let x = slide.position?.x ?? /_ ... _/
+*        // Draw texts (skip fully off-canvas)
+         textLayers.forEach((l) => {
+*          const halfW = (l.width * l.scale) / 2;
+*          const halfH = (l.height * l.scale) / 2;
+*          const left = l.x - halfW;
+*          const right = l.x + halfW;
+*          const top = l.y - halfH;
+*          const bottom = l.y + halfH;
+*
+*          const fullyOutside =
+*            right < 0 || left > W || bottom < 0 || top > H;
+*          if (fullyOutside) return;
+  \*\*\* End Patch
 
-* let x = slide.position?.x ?? /_ ... _/
-  // (Rest unverändert)
-  }
-
-- // (Rest: Nodes aus content erzeugen, etc.)
-- // Füge am Ende ggf. das Root-Image als BG hinzu
-- const finalDoc = applyBackgroundImageToCanvas(base, slide.rootImage?.url);
-- return { canvas: finalDoc, position: textPosition };
-
-* // (Rest: Nodes aus content erzeugen, etc.)
-* // Füge am Ende das Root-Image als BG hinzu (ohne Text zu überschreiben)
-* const finalDoc = applyBackgroundImageToCanvas(base, slide.rootImage?.url);
-* return { canvas: finalDoc, position: textPosition };
-
-Wirkung:
-
-Wenn ein Slide bereits ein canvas.nodes hat, wird es eins-zu-eins weiterverwendet (inkl. Textpositionen).
-
-Das Hintergrundbild wird idempotent als unterster Node gesetzt (ohne andere Nodes zu löschen). → Kein Zurückspringen, kein Flackern, kein Greenscreen-Zwischenzustand. (Die Funktion selbst ist schon korrekt implementiert in dieser Datei.)
-
-codebase
-
-Diff #3 – Beim Anzeigen sofort vollständige Slides (BG + Text) rendern
-
-File: src/components/presentation/presentation-page/PresentationSlidesView.tsx
-
-codebase
-
-\*\*\* a/src/components/presentation/presentation-page/PresentationSlidesView.tsx
---- b/src/components/presentation/presentation-page/PresentationSlidesView.tsx
+**_ Begin Patch
+_** Update File: src/canvas/legacy/SlideCanvasLegacy.tsx
 @@
--import { DEFAULT_CANVAS, type CanvasDoc } from "@/canvas/types";
-+import { DEFAULT_CANVAS, type CanvasDoc } from "@/canvas/types";
-+import { applyBackgroundImageToCanvas } from "@/hooks/presentation/useSlideOperations";
-@@
 
-- const safeCanvas: CanvasDoc =
+-                  {/* === Handles INSIDE the box so they inherit rotation/scale and stay attached === */}
 
-* const safeCanvas: CanvasDoc =
-  (slide.canvas as CanvasDoc | undefined) ?? {
-  version: DEFAULT_CANVAS.version,
-  width: DEFAULT_CANVAS.width,
-  height: DEFAULT_CANVAS.height,
-  bg: DEFAULT_CANVAS.bg,
-  nodes: [],
-  selection: [],
-  };
+*                  {/* === Handles (größer + modernere Hitbox) INSIDE der Box === */}
+                   {isActive && !isCurrentEditing && (
+                     <div
+                       className="absolute inset-0"
+                       style={{ pointerEvents: "none" }}
+                     >
 
-- const imgUrl = slide.rootImage?.url as string | undefined;
-- const imageReady = useImageReady(imgUrl);
+-                      {/* Corners */}
 
-* const imgUrl = slide.rootImage?.url as string | undefined;
-* // BG-Image direkt in den Canvas-Daten verankern, ohne Text zu verlieren
-* const docWithBg = applyBackgroundImageToCanvas(safeCanvas, imgUrl);
-* const imageReady = useImageReady(imgUrl);
-  @@
+*                      {/* ---- Ecken (größere Handles) ---- */}
+                       <div
+                         data-role="handle"
+                         title="Größe proportional ändern"
 
--            {imageReady ? (
--              <SlideCanvas
--                slide={{ ...slide, canvas: safeCanvas }}
--                slideIndex={index}
--                disableDrag={isPresenting}
--              />
--            ) : (
--              <div className="h-[700px] w-[420px] rounded-lg bg-muted" />
--            )}
+-                        className="absolute top-0 left-0 w-5 h-5 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
 
-*            {imageReady ? (
-*              <SlideCanvas
-*                slide={{ ...slide, canvas: docWithBg }}
-*                slideIndex={index}
-*                disableDrag={isPresenting}
-*              />
-*            ) : (
-*              // Stabiles Placeholder, aber KEIN Entfernen/Neu-Erzeugen der Nodes
-*              <SlideCanvas
-*                slide={{ ...slide, canvas: docWithBg }}
-*                slideIndex={index}
-*                disableDrag
-*              />
-*            )}
+*                        className="absolute top-0 left-0 w-7 h-7 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
+                         style={{ pointerEvents: "auto" }}
+                         onPointerDown={(e) => startResize(layer.id, 'resize-nw', e)}
+                       >
 
-Wirkung:
+-                        <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
 
-Wir rendern sofort den Canvas inkl. Text und bereits gesetztem BG-Image.
+*                        <div className="h-4 w-4 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                       </div>
+                       <div
+                         data-role="handle"
+                         title="Größe proportional ändern"
 
-Während das Bild noch dekodiert (useImageReady), bleibt das Canvas bestehen (kein Unmount/Remount), also keine Layout-Resets.
+-                        className="absolute top-0 right-0 w-5 h-5 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
 
-Sobald das Bild bereit ist, ist es schon als Node vorhanden → kein Schwarz/Greenscreen-Flackern.
+*                        className="absolute top-0 right-0 w-7 h-7 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
+                         style={{ pointerEvents: "auto" }}
+                         onPointerDown={(e) => startResize(layer.id, 'resize-ne', e)}
+                       >
 
-Was das insgesamt fix’t
+-                        <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
 
-Flackern weg: BG-Image wird idempotent als Node gehalten; wir unmounten die Canvas-Instanz nicht mehr während des Decodes.
+*                        <div className="h-4 w-4 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                       </div>
+                       <div
+                         data-role="handle"
+                         title="Größe proportional ändern"
 
-Text springt nicht zurück: buildCanvasDocFromSlide respektiert vorhandene canvas.nodes; es werden keine Text-Nodes mehr neu erstellt, wenn schon vorhanden.
+-                        className="absolute bottom-0 left-0 w-5 h-5 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
 
-POST-Spam weg: Autosave läuft nicht während der Generierung.
+*                        className="absolute bottom-0 left-0 w-7 h-7 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
+                         style={{ pointerEvents: "auto" }}
+                         onPointerDown={(e) => startResize(layer.id, 'resize-sw', e)}
+                       >
+
+-                        <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+
+*                        <div className="h-4 w-4 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                       </div>
+                       <div
+                         data-role="handle"
+                         title="Größe proportional ändern"
+
+-                        className="absolute bottom-0 right-0 w-5 h-5 translate-x-1/2 translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
+
+*                        className="absolute bottom-0 right-0 w-7 h-7 translate-x-1/2 translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
+                         style={{ pointerEvents: "auto" }}
+                         onPointerDown={(e) => startResize(layer.id, 'resize-se', e)}
+                       >
+
+-                        <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+
+*                        <div className="h-4 w-4 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                       </div>
+
+-                      {/* Sides */}
+
+*                      {/* ---- Seiten (größere Balken-Handles) ---- */}
+                       <div
+                         data-role="handle"
+                         title="Breite ändern (links)"
+
+-                        className="absolute left-0 top-1/2 w-5 h-8 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
+
+*                        className="absolute left-0 top-1/2 w-7 h-10 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
+                         style={{ pointerEvents: "auto" }}
+                         onPointerDown={(e) => startResize(layer.id, 'resize-left', e)}
+                       >
+
+-                        <div className="h-6 w-2 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+
+*                        <div className="h-7 w-[10px] rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                       </div>
+                       <div
+                         data-role="handle"
+                         title="Breite ändern (rechts)"
+
+-                        className="absolute right-0 top-1/2 w-5 h-8 translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
+
+*                        className="absolute right-0 top-1/2 w-7 h-10 translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
+                         style={{ pointerEvents: "auto" }}
+                         onPointerDown={(e) => startResize(layer.id, 'resize-right', e)}
+                       >
+
+-                        <div className="h-6 w-2 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+
+*                        <div className="h-7 w-[10px] rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                         </div>
+  \*\*\* End Patch

@@ -2932,6 +2932,79 @@ export async function GET(request: Request) {
 
 ```
 
+# src\app\api\tests\tiktok-schedule\route.ts
+
+```ts
+import { env } from "@/env";
+import { auth } from "@/server/auth";
+import { NextResponse } from "next/server";
+
+interface ScheduleRequestPayload {
+  openId?: string;
+  publishAt?: string;
+  idempotencyKey?: string;
+  post?: Record<string, unknown>;
+}
+
+export async function POST(request: Request) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = (await request.json().catch(() => null)) as ScheduleRequestPayload | null;
+  if (
+    !body ||
+    typeof body.openId !== "string" ||
+    typeof body.publishAt !== "string" ||
+    typeof body.idempotencyKey !== "string" ||
+    typeof body.post !== "object" ||
+    body.post === null
+  ) {
+    return NextResponse.json(
+      { error: "Missing openId, publishAt, idempotencyKey or post payload" },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const response = await fetch(
+      `${env.SLIDESCOCKPIT_API}/integrations/social/tiktok/${encodeURIComponent(
+        body.openId,
+      )}/schedule`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": session.user.id,
+        },
+        body: JSON.stringify({
+          publishAt: body.publishAt,
+          idempotencyKey: body.idempotencyKey,
+          post: body.post,
+        }),
+      },
+    );
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      const message =
+        payload && typeof payload.error === "string"
+          ? payload.error
+          : "TikTok scheduling failed";
+      return NextResponse.json({ error: message }, { status: response.status });
+    }
+
+    return NextResponse.json(payload, { status: response.status });
+  } catch (error) {
+    console.error("TikTok scheduling request failed", error);
+    return NextResponse.json({ error: "Unable to reach SlidesCockpit API" }, { status: 500 });
+  }
+}
+
+
+```
+
 # src\app\api\tiktok\accounts\route.ts
 
 ```ts
@@ -3394,16 +3467,19 @@ export default function Page() {
 ```tsx
 "use client";
 
+import { generateImageAction } from "@/app/_actions/image/generate";
+import { getImageFromUnsplash } from "@/app/_actions/image/unsplash";
 import {
   getPresentation,
   updatePresentation,
 } from "@/app/_actions/presentation/presentationActions";
 import { getCustomThemeById } from "@/app/_actions/presentation/theme-actions";
-import type { CanvasDoc, CanvasTextNode } from "@/canvas/types";
+import { type CanvasDoc, type CanvasTextNode } from "@/canvas/types";
 import {
   type PlateNode,
   type PlateSlide,
 } from "@/components/presentation/utils/parser";
+import { applyBackgroundImageToCanvas } from "@/components/presentation/utils/canvas";
 import { ThinkingDisplay } from "@/components/presentation/dashboard/ThinkingDisplay";
 import { Header } from "@/components/presentation/outline/Header";
 import { OutlineList } from "@/components/presentation/outline/OutlineList";
@@ -3646,34 +3722,78 @@ export default function PresentationGenerateWithIdPage() {
     // Canvas-only: jedes Outline-Item wird ein Canvas-Slide
     const chosenWidth = 1080; // TODO: aus Preset/Wizard holen
     const chosenHeight = 1920; // TODO: aus Preset/Wizard holen
-    const slides: PlateSlide[] = state.outline.map((item) => {
-      const normalized = item.replace(/^#\s+/, "").trim();
-      const canvasDoc = makeCanvasFromText(
-        normalized,
-        chosenWidth,
-        chosenHeight,
-      );
-      const firstTextNode = canvasDoc.nodes.find(
-        (node) => node.type === "text",
-      ) as CanvasTextNode | undefined;
 
-      const paragraph = {
-        type: "p",
-        children: [{ text: normalized }],
-      } as unknown as PlateNode;
+    const slides: PlateSlide[] = await Promise.all(
+      state.outline.map(async (item) => {
+        const normalized = item.replace(/^#\s+/, "").trim();
+        const canvasDoc = makeCanvasFromText(
+          normalized,
+          chosenWidth,
+          chosenHeight,
+        );
+        const firstTextNode = canvasDoc.nodes.find(
+          (node) => node.type === "text",
+        ) as CanvasTextNode | undefined;
 
-      return {
-        id: nanoid(),
-        content: [paragraph],
-        bgColor: canvasDoc.bg ?? undefined,
-        position: firstTextNode
-          ? { x: firstTextNode.x, y: firstTextNode.y }
-          : undefined,
-        canvas: canvasDoc,
-      };
-    });
+        const paragraph = {
+          type: "p",
+          children: [{ text: normalized }],
+        } as unknown as PlateNode;
+
+        const query = normalized.split(/\s+/).slice(0, 10).join(" ");
+        let imageUrl: string | undefined;
+
+        if (query && state.imageSource === "stock") {
+          try {
+            const imageResult = await getImageFromUnsplash(query);
+            if (imageResult.success && imageResult.imageUrl) {
+              imageUrl = imageResult.imageUrl;
+            }
+          } catch (error) {
+            console.error("Unsplash image lookup failed:", error);
+          }
+        } else if (query && state.imageSource === "ai") {
+          try {
+            const aiResult = await generateImageAction(
+              query,
+              state.imageModel,
+            );
+            if (aiResult?.image?.url) {
+              imageUrl = aiResult.image.url;
+            }
+          } catch (error) {
+            console.error("AI image generation failed:", error);
+          }
+        }
+
+        const canvasWithBg = imageUrl
+          ? applyBackgroundImageToCanvas(canvasDoc, imageUrl)
+          : canvasDoc;
+
+        return {
+          id: nanoid(),
+          content: [paragraph],
+          bgColor: canvasWithBg.bg ?? undefined,
+          position: firstTextNode
+            ? { x: firstTextNode.x, y: firstTextNode.y }
+            : undefined,
+          canvas: canvasWithBg,
+          rootImage: query
+            ? {
+                query,
+                url: imageUrl,
+                layoutType: "background",
+              }
+            : undefined,
+        };
+      }),
+    );
 
     state.setSlides(slides);
+    const firstSlideWithImage = slides.find((slide) => slide.rootImage?.url);
+    if (firstSlideWithImage?.rootImage?.url) {
+      state.setThumbnailUrl(firstSlideWithImage.rootImage.url);
+    }
 
     const presentationTitle = state.currentPresentationTitle?.trim().length
       ? state.currentPresentationTitle
@@ -3693,8 +3813,8 @@ export default function PresentationGenerateWithIdPage() {
         presentationStyle: state.presentationStyle,
         language: state.language,
         searchResults: state.searchResults,
+        thumbnailUrl: firstSlideWithImage?.rootImage?.url,
       });
-      state.setShouldStartPresentationGeneration(true);
     } catch (error) {
       console.error("Failed to store presentation slides:", error);
       toast.error("Slides saved locally, but storing them failed.");
@@ -4312,6 +4432,453 @@ export default function TikTokPostingTestPage() {
             )}
             <p>
               <span className="font-semibold">Status:</span> {result.status}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+```
+
+# src\app\dashboard\tests\tiktok-schedule\page.tsx
+
+```tsx
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+
+interface ConnectedAccount {
+  openId: string;
+  displayName: string | null;
+  username: string | null;
+  avatarUrl: string | null;
+  connectedAt: string;
+}
+
+interface ScheduleResult {
+  scheduled: boolean;
+  runAt: string;
+  jobKey: string;
+}
+
+type MediaType = "photo" | "video";
+type PostMode = "INBOX" | "PUBLISH" | "DIRECT_POST" | "MEDIA_UPLOAD";
+type PostingMethod = "UPLOAD" | "MEDIA_UPLOAD" | "DIRECT_POST" | "URL";
+
+interface ScheduleFormState {
+  openId: string;
+  caption: string;
+  mediaUrl: string;
+  mediaType: MediaType;
+  thumbnailTimestampMs?: number;
+  autoAddMusic: boolean;
+  postMode: PostMode;
+  contentPostingMethod: PostingMethod;
+  publishAt: string;
+  idempotencyKey: string;
+}
+
+export default function TikTokScheduleTestPage() {
+  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<ScheduleResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const initialPublishAt = useMemo(() => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 5);
+    return now.toISOString().slice(0, 16);
+  }, []);
+
+  const [form, setForm] = useState<ScheduleFormState>({
+    openId: "",
+    caption: "",
+    mediaUrl: "",
+    mediaType: "photo",
+    autoAddMusic: true,
+    postMode: "INBOX",
+    contentPostingMethod: "MEDIA_UPLOAD",
+    publishAt: initialPublishAt,
+    idempotencyKey: `schedule_${Date.now()}`,
+  });
+
+  useEffect(() => {
+    let active = true;
+    const loadAccounts = async () => {
+      setAccountsLoading(true);
+      try {
+        const response = await fetch("/api/tiktok/accounts", { cache: "no-store" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !Array.isArray(payload)) {
+          throw new Error(
+            payload && typeof payload.error === "string"
+              ? payload.error
+              : "TikTok Accounts konnten nicht geladen werden",
+          );
+        }
+
+        if (active) {
+          setAccounts(payload as ConnectedAccount[]);
+          if (payload.length > 0) {
+            setForm((prev) => ({ ...prev, openId: payload[0].openId }));
+          }
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unable to load TikTok accounts";
+        if (active) {
+          toast.error(message);
+          setAccounts([]);
+        }
+      } finally {
+        if (active) setAccountsLoading(false);
+      }
+    };
+
+    void loadAccounts();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (accounts.length === 0) {
+      setForm((prev) => ({ ...prev, openId: "" }));
+      return;
+    }
+    const exists = accounts.some((account) => account.openId === form.openId);
+    if (!exists) {
+      const fallback = accounts[0]?.openId ?? "";
+      setForm((prev) => ({ ...prev, openId: fallback }));
+    }
+  }, [accounts, form.openId]);
+
+  const updateField = useCallback(
+    <K extends keyof ScheduleFormState>(key: K, value: ScheduleFormState[K]) => {
+      setForm((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
+
+  const handleSubmit = useCallback(async () => {
+    if (!form.openId) {
+      toast.error("Bitte wähle einen verbundenen TikTok Account aus");
+      return;
+    }
+    if (!form.mediaUrl) {
+      toast.error("Bitte gib eine Medien-URL aus dem Files-Bucket an");
+      return;
+    }
+    if (!form.publishAt) {
+      toast.error("Bitte wähle ein Veröffentlichungsdatum");
+      return;
+    }
+    if (!form.idempotencyKey.trim()) {
+      toast.error("Bitte gib einen Idempotency Key an");
+      return;
+    }
+
+    const publishDate = new Date(form.publishAt);
+    if (Number.isNaN(publishDate.getTime())) {
+      toast.error("Ungültiges Datum");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    setResult(null);
+
+    const media =
+      form.mediaType === "photo"
+        ? [{ type: "photo" as const, url: form.mediaUrl }]
+        : [
+            {
+              type: "video" as const,
+              url: form.mediaUrl,
+              thumbnailTimestampMs: form.thumbnailTimestampMs ?? 1000,
+            },
+          ];
+
+    const payload = {
+      openId: form.openId,
+      publishAt: publishDate.toISOString(),
+      idempotencyKey: form.idempotencyKey,
+      post: {
+        caption: form.caption,
+        postMode: form.postMode,
+        media,
+        settings: {
+          contentPostingMethod: form.contentPostingMethod,
+          privacyLevel: "SELF_ONLY",
+          duet: false,
+          comment: false,
+          stitch: false,
+          autoAddMusic: form.autoAddMusic,
+          videoMadeWithAi: false,
+          brandContentToggle: false,
+          brandOrganicToggle: false,
+        },
+      },
+    };
+
+    try {
+      const response = await fetch("/api/tests/tiktok-schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = (await response.json().catch(() => null)) as ScheduleResult | { error?: string } | null;
+      if (!response.ok || !data || typeof data !== "object" || !("scheduled" in data)) {
+        const message =
+          data && typeof data === "object" && "error" in data && typeof data.error === "string"
+            ? data.error
+            : "TikTok Scheduling fehlgeschlagen";
+        setError(message);
+        toast.error(message);
+        return;
+      }
+
+      setResult(data);
+      toast.success("TikTok Post wurde erfolgreich geplant");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unbekannter Fehler";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  }, [form]);
+
+  const resetIdempotencyKey = useCallback(() => {
+    updateField("idempotencyKey", `schedule_${Date.now()}`);
+  }, [updateField]);
+
+  return (
+    <div className="flex flex-col gap-6 p-8">
+      <div>
+        <h1 className="text-3xl font-semibold">TikTok Scheduling Test</h1>
+        <p className="text-muted-foreground">
+          Plane einen TikTok-Post über die SlidesCockpit API und überprüfe den Hintergrund-Worker.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Post planen</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="openId">Verbundenes TikTok Konto</Label>
+              <select
+                id="openId"
+                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                disabled={accountsLoading || accounts.length === 0}
+                value={form.openId}
+                onChange={(event) => updateField("openId", event.target.value)}
+              >
+                {accountsLoading && <option>Lade Konten…</option>}
+                {!accountsLoading && accounts.length === 0 && (
+                  <option>Keine TikTok Accounts verbunden</option>
+                )}
+                {accounts.map((account) => {
+                  const label = account.username ?? account.displayName ?? account.openId;
+                  return (
+                    <option key={account.openId} value={account.openId}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="mediaUrl">Medien-URL</Label>
+              <Input
+                id="mediaUrl"
+                placeholder="https://files.slidescockpit.com/..."
+                value={form.mediaUrl}
+                onChange={(event) => updateField("mediaUrl", event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="mediaType">Medientyp</Label>
+              <select
+                id="mediaType"
+                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={form.mediaType}
+                onChange={(event) => {
+                  const nextType = event.target.value as MediaType;
+                  setForm((prev) => ({
+                    ...prev,
+                    mediaType: nextType,
+                    postMode:
+                      nextType === "photo"
+                        ? "INBOX"
+                        : prev.postMode === "INBOX" || prev.postMode === "MEDIA_UPLOAD"
+                          ? "PUBLISH"
+                          : prev.postMode,
+                    contentPostingMethod:
+                      nextType === "photo"
+                        ? "MEDIA_UPLOAD"
+                        : prev.contentPostingMethod === "MEDIA_UPLOAD"
+                          ? "UPLOAD"
+                          : prev.contentPostingMethod,
+                  }));
+                }}
+              >
+                <option value="photo">Photo (Inbox)</option>
+                <option value="video">Video</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="thumbnailTimestamp">Thumbnail Timestamp (ms)</Label>
+              <Input
+                id="thumbnailTimestamp"
+                type="number"
+                value={form.thumbnailTimestampMs ?? ""}
+                onChange={(event) =>
+                  updateField(
+                    "thumbnailTimestampMs",
+                    event.target.value === "" ? undefined : Number(event.target.value),
+                  )
+                }
+                disabled={form.mediaType !== "video"}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="postMode">Post Mode</Label>
+              <select
+                id="postMode"
+                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={form.postMode}
+                onChange={(event) => updateField("postMode", event.target.value as PostMode)}
+              >
+                <option value="INBOX">Inbox (Draft)</option>
+                <option value="PUBLISH">Direct Publish</option>
+                <option value="MEDIA_UPLOAD">TikTok Media Upload</option>
+                <option value="DIRECT_POST">TikTok Direct Post</option>
+              </select>
+              <p className="text-sm text-muted-foreground">
+                Inbox entspricht TikToks Draft-Flow. Für Direct Publish wähle PUBLISH/DIRECT_POST.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contentPostingMethod">Posting Methode</Label>
+              <select
+                id="contentPostingMethod"
+                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={form.contentPostingMethod}
+                onChange={(event) =>
+                  updateField("contentPostingMethod", event.target.value as PostingMethod)
+                }
+              >
+                <option value="UPLOAD">Upload (Videos)</option>
+                <option value="MEDIA_UPLOAD">Media Upload (Inbox/Drafts)</option>
+                <option value="DIRECT_POST">Direct Post</option>
+                <option value="URL">Pull from URL</option>
+              </select>
+              <p className="text-sm text-muted-foreground">
+                Muss zu TikToks post_mode passen. MEDIA_UPLOAD sendet Inhalte in den Inbox-Entwurf.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="publishAt">Veröffentlichungszeit (UTC)</Label>
+              <Input
+                id="publishAt"
+                type="datetime-local"
+                value={form.publishAt}
+                onChange={(event) => updateField("publishAt", event.target.value)}
+              />
+              <p className="text-sm text-muted-foreground">
+                Werte werden als UTC-String an die API gesendet.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="idempotencyKey">Idempotency Key</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="idempotencyKey"
+                  value={form.idempotencyKey}
+                  onChange={(event) => updateField("idempotencyKey", event.target.value)}
+                />
+                <Button type="button" variant="secondary" onClick={resetIdempotencyKey}>
+                  Neu
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Gleiche Keys verhindern doppelte Jobs in der Queue.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="caption">Caption</Label>
+            <Textarea
+              id="caption"
+              placeholder="Was soll TikTok posten?"
+              value={form.caption}
+              onChange={(event) => updateField("caption", event.target.value)}
+              rows={4}
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Switch
+              id="autoMusic"
+              checked={form.autoAddMusic}
+              onCheckedChange={(checked) => updateField("autoAddMusic", checked)}
+            />
+            <div>
+              <Label htmlFor="autoMusic">Automatische Musik hinzufügen</Label>
+              <p className="text-sm text-muted-foreground">
+                Aktiviert standardmäßig, damit TikTok Hintergrundmusik wählt.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="flex items-center gap-4">
+          <Button onClick={handleSubmit} disabled={submitting || accountsLoading || accounts.length === 0}>
+            {submitting ? "Planen..." : "TikTok Post planen"}
+          </Button>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </CardFooter>
+      </Card>
+
+      {result && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Ergebnis</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p>
+              <span className="font-semibold">Job Key:</span> {result.jobKey}
+            </p>
+            <p>
+              <span className="font-semibold">Ausführung geplant für:</span> {result.runAt}
+            </p>
+            <p>
+              <span className="font-semibold">Status:</span>{" "}
+              {result.scheduled ? "Job wurde erfolgreich eingeplant" : "Planung fehlgeschlagen"}
             </p>
           </CardContent>
         </Card>
@@ -7276,13 +7843,7 @@ export function SidebarAccountSection() {
 
 ```tsx
 "use client";
-import {
-  Home,
-  Images,
-  TestTube2,
-  UserPen,
-  type LucideIcon,
-} from "lucide-react";
+import { CalendarClock, Home, Images, TestTube2, UserPen, type LucideIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import {
@@ -7336,6 +7897,11 @@ const debugItems: SidebarItem[] = [
     title: "TikTok Posting",
     url: "/dashboard/tests/tiktok-post",
     icon: TestTube2,
+  },
+  {
+    title: "TikTok Scheduling",
+    url: "/dashboard/tests/tiktok-schedule",
+    icon: CalendarClock,
   },
 ];
 
@@ -29174,25 +29740,12 @@ import { updatePresentation } from "@/app/_actions/presentation/presentationActi
 import {
   applyBackgroundImageToCanvas,
   ensureSlideCanvas,
-  ensureSlidesHaveCanvas,
 } from "@/components/presentation/utils/canvas";
 import { extractThinking } from "@/lib/thinking-extractor";
 import { usePresentationState } from "@/states/presentation-state";
-import { useChat, useCompletion } from "@ai-sdk/react";
+import { useChat } from "@ai-sdk/react";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { SlideParser } from "../utils/parser";
-
-function stripXmlCodeBlock(input: string): string {
-  let result = input.trim();
-  if (result.startsWith("\`\`\`xml")) {
-    result = result.slice(6).trimStart();
-  }
-  if (result.endsWith("\`\`\`")) {
-    result = result.slice(0, -3).trimEnd();
-  }
-  return result;
-}
 
 export function PresentationGenerationManager() {
   const {
@@ -29200,7 +29753,6 @@ export function PresentationGenerationManager() {
     language,
     presentationInput,
     shouldStartOutlineGeneration,
-    shouldStartPresentationGeneration,
     webSearchEnabled,
     modelProvider,
     modelId,
@@ -29211,192 +29763,28 @@ export function PresentationGenerationManager() {
     resetForNewGeneration,
     setOutline,
     setSearchResults,
-    setSlides,
     setOutlineThinking,
-    setPresentationThinking,
-    setIsGeneratingPresentation,
     setCurrentPresentation,
     currentPresentationId,
     imageModel,
     imageSource,
     rootImageGeneration,
-    startRootImageGeneration,
     completeRootImageGeneration,
     failRootImageGeneration,
     isGeneratingPresentation,
     isGeneratingOutline,
     slides,
+    setSlides,
   } = usePresentationState();
 
-  // Create a ref for the streaming parser to persist between renders
-  const streamingParserRef = useRef<SlideParser>(new SlideParser());
-  // Add refs to track the animation frame IDs
-  const slidesRafIdRef = useRef<number | null>(null);
   const outlineRafIdRef = useRef<number | null>(null);
   const outlineBufferRef = useRef<string[] | null>(null);
-  const searchResultsBufferRef = useRef<Array<{
-    query: string;
-    results: unknown[];
-  }> | null>(null);
-  // Track the last processed messages length to avoid unnecessary updates
-  const lastProcessedMessagesLength = useRef<number>(0);
-  // Track if title has already been extracted to avoid unnecessary processing
+  const searchResultsBufferRef = useRef<
+    Array<{ query: string; results: unknown[] }> | null
+  >(null);
   const titleExtractedRef = useRef<boolean>(false);
+  const outlineRequestInFlightRef = useRef(false);
 
-  // Function to update slides using requestAnimationFrame
-  const updateSlidesWithRAF = (): void => {
-    // Extract thinking for presentation and parse only the remaining content
-    const presentationThinkingExtract = extractThinking(presentationCompletion);
-    if (presentationThinkingExtract.hasThinking) {
-      setPresentationThinking(presentationThinkingExtract.thinking);
-    }
-    const presentationContentToParse = presentationThinkingExtract.hasThinking
-      ? presentationThinkingExtract.content
-      : presentationCompletion;
-
-    const processedPresentationCompletion = stripXmlCodeBlock(
-      presentationContentToParse,
-    );
-    streamingParserRef.current.reset();
-    streamingParserRef.current.parseChunk(processedPresentationCompletion);
-    streamingParserRef.current.finalize();
-    const parsedSlides = streamingParserRef.current.getAllSlides();
-
-    // Heuristik: baue aus dem Slide-Text eine sinnvolle Bild-Query
-    const buildImageQueryFromSlide = (slide: any): string | null => {
-      try {
-        const nodes = Array.isArray(slide?.content) ? slide.content : [];
-        const texts: string[] = [];
-        const walk = (n: any) => {
-          if (!n || typeof n !== "object") return;
-          if (typeof n.text === "string" && n.text.trim())
-            texts.push(n.text.trim());
-          if (Array.isArray(n.children)) n.children.forEach(walk);
-        };
-        nodes.forEach(walk);
-        // Priorisiere H1, sonst die ersten 6–10 Wörter aus dem Fließtext
-        const h1 = nodes.find((n: any) => n?.type === "h1");
-        const h1Text =
-          typeof h1?.children?.[0]?.text === "string"
-            ? h1.children[0].text
-            : undefined;
-        const base = (h1Text || texts.join(" ")).replace(/\s+/g, " ").trim();
-        if (!base) return null;
-        const clipped = base.split(" ").slice(0, 10).join(" ");
-        return clipped.length > 120 ? clipped.slice(0, 120) : clipped;
-      } catch {
-        return null;
-      }
-    };
-
-    // Füge Slides ohne Bild ein rootImage.query hinzu (nur Query, URL wird gleich geladen)
-    const slidesWithAutoQueries = parsedSlides.map((slide) => {
-      if (!slide?.rootImage?.query) {
-        const q = buildImageQueryFromSlide(slide);
-        if (q) {
-          return {
-            ...slide,
-            rootImage: {
-              ...(slide.rootImage ?? {}),
-              query: q,
-              layoutType: slide.layoutType ?? "background",
-            },
-          };
-        }
-      }
-      return slide;
-    });
-
-    // Merge bereits erfolgreich generierte Bild-URLs aus dem State
-    const mergedSlides = slidesWithAutoQueries.map((slide) => {
-      const gen = rootImageGeneration[slide.id];
-      if (gen?.status === "success" && slide.rootImage?.query) {
-        return {
-          ...slide,
-          rootImage: {
-            ...(slide.rootImage as any),
-            url: gen.url,
-          },
-        };
-      }
-      return slide;
-    });
-    // Für alle Slides mit Query aber ohne URL: Bildgenerierung (Unsplash/AI) starten
-    for (const slide of mergedSlides) {
-      const slideId = slide.id;
-      const rootImage = slide.rootImage;
-      if (rootImage?.query && !rootImage.url) {
-        const already = rootImageGeneration[slideId];
-        if (!already || already.status === "error") {
-          startRootImageGeneration(slideId, rootImage.query);
-          void (async () => {
-            try {
-              let result;
-
-              if (imageSource === "stock") {
-                // Use Unsplash for stock images
-                const unsplashResult = await getImageFromUnsplash(
-                  rootImage.query,
-                  rootImage.layoutType,
-                );
-                if (unsplashResult.success && unsplashResult.imageUrl) {
-                  result = { image: { url: unsplashResult.imageUrl } };
-                }
-              } else {
-                // Use AI generation
-                result = await generateImageAction(rootImage.query, imageModel);
-              }
-
-              if (result?.image?.url) {
-                completeRootImageGeneration(slideId, result.image.url);
-                // If we don't have a thumbnail yet, set it now and persist once
-                const stateNow = usePresentationState.getState();
-                if (!stateNow.thumbnailUrl && stateNow.currentPresentationId) {
-                  stateNow.setThumbnailUrl(result.image.url);
-                  try {
-                    await updatePresentation({
-                      id: stateNow.currentPresentationId,
-                      thumbnailUrl: result.image.url,
-                    });
-                  } catch {
-                    // Ignore persistence errors for thumbnail to avoid interrupting generation flow
-                  }
-                }
-                // Persist into slides state
-                usePresentationState.getState().setSlides(
-                  usePresentationState.getState().slides.map((s) =>
-                    s.id === slideId
-                      ? ensureSlideCanvas({
-                          ...s,
-                          rootImage: {
-                            query: rootImage.query,
-                            url: result.image.url,
-                          },
-                          canvas: applyBackgroundImageToCanvas(
-                            s.canvas,
-                            result.image.url,
-                          ),
-                        })
-                      : s,
-                  ),
-                );
-              } else {
-                failRootImageGeneration(slideId, "No image url returned");
-              }
-            } catch (err) {
-              const message =
-                err instanceof Error ? err.message : "Image generation failed";
-              failRootImageGeneration(slideId, message);
-            }
-          })();
-        }
-      }
-    }
-    setSlides(ensureSlidesHaveCanvas(mergedSlides));
-    slidesRafIdRef.current = null;
-  };
-
-  // Function to extract title from content
   const extractTitle = (
     content: string,
   ): { title: string | null; cleanContent: string } => {
@@ -29409,15 +29797,12 @@ export function PresentationGenerationManager() {
     return { title: null, cleanContent: content };
   };
 
-  // Function to process messages and extract data (optimized - only process last message)
   const processMessages = (messages: typeof outlineMessages): void => {
     if (messages.length <= 1) return;
 
-    // Get the last message - this is where all the current data is
     const lastMessage = messages[messages.length - 1];
     if (!lastMessage) return;
 
-    // Extract search results from the last message only (much more efficient)
     if (webSearchEnabled && lastMessage.parts) {
       const searchResults: Array<{ query: string; results: unknown[] }> = [];
 
@@ -29435,7 +29820,6 @@ export function PresentationGenerationManager() {
                 ? invocation.args.query
                 : "Unknown query";
 
-            // Parse the search result
             let parsedResult;
             try {
               parsedResult =
@@ -29454,15 +29838,12 @@ export function PresentationGenerationManager() {
         }
       }
 
-      // Store search results in buffer (only if we found any)
       if (searchResults.length > 0) {
         searchResultsBufferRef.current = searchResults;
       }
     }
 
-    // Extract outline from the last assistant message
     if (lastMessage.role === "assistant" && lastMessage.content) {
-      // Extract <think> content from assistant message and keep only the remainder for parsing
       const thinkingExtract = extractThinking(lastMessage.content);
       if (thinkingExtract.hasThinking) {
         setOutlineThinking(thinkingExtract.thinking);
@@ -29472,7 +29853,6 @@ export function PresentationGenerationManager() {
         ? thinkingExtract.content
         : lastMessage.content;
 
-      // Extract title once if provided, otherwise keep existing title
       if (!titleExtractedRef.current) {
         const { title, cleanContent: extractedCleanContent } =
           extractTitle(cleanContent);
@@ -29482,7 +29862,6 @@ export function PresentationGenerationManager() {
         if (title && title.trim().length > 0) {
           setCurrentPresentation(currentPresentationId, title);
         }
-        // mark as processed even if no explicit title was provided
         titleExtractedRef.current = true;
       } else {
         cleanContent = cleanContent.replace(/<TITLE>.*?<\/TITLE>/i, "").trim();
@@ -29499,7 +29878,6 @@ export function PresentationGenerationManager() {
       if (numberedMatches.length > 0) {
         outlineItems = numberedMatches;
       } else {
-        // Fallback to legacy markdown heading format
         const sections = cleanContent.split(/^#\s+/gm).filter(Boolean);
         outlineItems =
           sections.length > 0
@@ -29516,27 +29894,20 @@ export function PresentationGenerationManager() {
     }
   };
 
-  // Function to update outline and search results using requestAnimationFrame
   const updateOutlineWithRAF = (): void => {
-    // Batch all updates in a single RAF callback for better performance
-
-    // Update search results if available
     if (searchResultsBufferRef.current !== null) {
       setSearchResults(searchResultsBufferRef.current);
       searchResultsBufferRef.current = null;
     }
 
-    // Update outline if available
     if (outlineBufferRef.current !== null) {
       setOutline(outlineBufferRef.current);
       outlineBufferRef.current = null;
     }
 
-    // Clear the current frame ID
     outlineRafIdRef.current = null;
   };
 
-  // Outline generation with or without web search
   const { messages: outlineMessages, append: appendOutlineMessage } = useChat({
     api: webSearchEnabled
       ? "/api/presentation/outline-with-search"
@@ -29554,27 +29925,26 @@ export function PresentationGenerationManager() {
       setShouldStartPresentationGeneration(false);
 
       const {
-        currentPresentationId,
+        currentPresentationId: presentationId,
         outline,
         searchResults,
         currentPresentationTitle,
         theme,
-        imageSource,
+        imageSource: stateImageSource,
       } = usePresentationState.getState();
 
-      if (currentPresentationId) {
+      if (presentationId) {
         void updatePresentation({
-          id: currentPresentationId,
+          id: presentationId,
           outline,
           searchResults,
           prompt: presentationInput,
           title: currentPresentationTitle ?? "",
           theme,
-          imageSource,
+          imageSource: stateImageSource,
         });
       }
 
-      // Cancel any pending outline animation frame
       if (outlineRafIdRef.current !== null) {
         cancelAnimationFrame(outlineRafIdRef.current);
         outlineRafIdRef.current = null;
@@ -29584,7 +29954,6 @@ export function PresentationGenerationManager() {
       toast.error("Failed to generate outline: " + error.message);
       resetGeneration();
 
-      // Cancel any pending outline animation frame
       if (outlineRafIdRef.current !== null) {
         cancelAnimationFrame(outlineRafIdRef.current);
         outlineRafIdRef.current = null;
@@ -29592,203 +29961,140 @@ export function PresentationGenerationManager() {
     },
   });
 
-  // Lightweight useEffect that only schedules RAF updates
   useEffect(() => {
-    console.log("outlineMessages", outlineMessages);
-    // Only update if we have new messages
     if (outlineMessages.length > 1) {
-      lastProcessedMessagesLength.current = outlineMessages.length;
-
-      // Process messages and store in buffers (non-blocking)
       processMessages(outlineMessages);
 
-      // Only schedule a new frame if one isn't already pending
       if (outlineRafIdRef.current === null) {
         outlineRafIdRef.current = requestAnimationFrame(updateOutlineWithRAF);
       }
     }
   }, [outlineMessages, webSearchEnabled]);
 
-  // Watch for outline generation start
   useEffect(() => {
     const startOutlineGeneration = async (): Promise<void> => {
-      if (shouldStartOutlineGeneration) {
-        try {
-          // Reset all state except ID and input when starting new generation
-          resetForNewGeneration();
+      if (!shouldStartOutlineGeneration) return;
 
-          // Reset processing refs for new generation
-          titleExtractedRef.current = false;
+      if (outlineRequestInFlightRef.current) {
+        return;
+      }
 
-          setIsGeneratingOutline(true);
+      try {
+        outlineRequestInFlightRef.current = true;
+        resetForNewGeneration();
+        titleExtractedRef.current = false;
+        setIsGeneratingOutline(true);
 
-          // Get the current input after reset (it's preserved)
-          const { presentationInput } = usePresentationState.getState();
+        const { presentationInput: currentPrompt } =
+          usePresentationState.getState();
 
-          // Start the RAF cycle for outline updates
-          if (outlineRafIdRef.current === null) {
-            outlineRafIdRef.current =
-              requestAnimationFrame(updateOutlineWithRAF);
-          }
-
-          await appendOutlineMessage(
-            {
-              role: "user",
-              content: presentationInput,
-            },
-            {
-              body: {
-                prompt: presentationInput,
-                numberOfCards: numSlides,
-                language,
-              },
-            },
-          );
-        } catch (error) {
-          console.log(error);
-          // Error is handled by onError callback
-        } finally {
-          setIsGeneratingOutline(false);
-          setShouldStartOutlineGeneration(false);
+        if (outlineRafIdRef.current === null) {
+          outlineRafIdRef.current =
+            requestAnimationFrame(updateOutlineWithRAF);
         }
+
+        await appendOutlineMessage(
+          {
+            role: "user",
+            content: currentPrompt,
+          },
+          {
+            body: {
+              prompt: currentPrompt,
+              numberOfCards: numSlides,
+              language,
+            },
+          },
+        );
+      } catch (error) {
+        console.error("Outline generation failed:", error);
+        toast.error("Unable to start outline generation.");
+      } finally {
+        outlineRequestInFlightRef.current = false;
+        setIsGeneratingOutline(false);
+        setShouldStartOutlineGeneration(false);
       }
     };
 
     void startOutlineGeneration();
-  }, [shouldStartOutlineGeneration]);
-
-  const { completion: presentationCompletion, complete: generatePresentation } =
-    useCompletion({
-      api: "/api/presentation/generate",
-      onFinish: (_prompt, _completion) => {
-        setIsGeneratingPresentation(false);
-        setShouldStartPresentationGeneration(false);
-      },
-      onError: (error) => {
-        toast.error("Failed to generate presentation: " + error.message);
-        resetGeneration();
-        streamingParserRef.current.reset();
-
-        // Cancel any pending animation frame
-        if (slidesRafIdRef.current !== null) {
-          cancelAnimationFrame(slidesRafIdRef.current);
-          slidesRafIdRef.current = null;
-        }
-      },
-    });
+  }, [shouldStartOutlineGeneration, numSlides, language, appendOutlineMessage]);
 
   useEffect(() => {
-    if (presentationCompletion) {
-      try {
-        // Only schedule a new frame if one isn't already pending
-        if (slidesRafIdRef.current === null) {
-          slidesRafIdRef.current = requestAnimationFrame(updateSlidesWithRAF);
-        }
-      } catch (error) {
-        console.error("Error processing presentation XML:", error);
-        toast.error("Error processing presentation content");
-      }
-    }
-  }, [presentationCompletion]);
-
-  useEffect(() => {
-    if (shouldStartPresentationGeneration) {
-      const {
-        outline,
-        presentationInput,
-        language,
-        presentationStyle,
-        currentPresentationTitle,
-        searchResults: stateSearchResults,
-        modelProvider,
-        modelId,
-        setThumbnailUrl,
-      } = usePresentationState.getState();
-
-      // Reset the parser before starting a new generation
-      streamingParserRef.current.reset();
-      setIsGeneratingPresentation(true);
-      setThumbnailUrl(undefined);
-      void generatePresentation(presentationInput ?? "", {
-        body: {
-          title: currentPresentationTitle ?? presentationInput ?? "",
-          prompt: presentationInput ?? "",
-          outline,
-          searchResults: stateSearchResults,
-          language,
-          tone: presentationStyle,
-          modelProvider,
-          modelId,
-        },
-      });
-    }
-  }, [shouldStartPresentationGeneration]);
-
-  // Listen for manual root image generation changes (when user manually triggers image generation)
-  useEffect(() => {
-    // Only process if we're not currently generating presentation or outline
     if (isGeneratingPresentation || isGeneratingOutline) {
       return;
     }
 
-    // Check for any pending root image generations that need to be processed
     for (const [slideId, gen] of Object.entries(rootImageGeneration)) {
-      if (gen.status === "pending") {
-        // Find the slide to get the rootImage query
-        const slide = slides.find((s) => s.id === slideId);
-        if (slide?.rootImage?.query) {
-          void (async () => {
-            try {
-              let result;
+      if (gen.status !== "pending") continue;
 
-              if (imageSource === "stock") {
-                // Use Unsplash for stock images
-                const unsplashResult = await getImageFromUnsplash(
-                  slide.rootImage!.query,
-                  slide.rootImage!.layoutType,
-                );
-                if (unsplashResult.success && unsplashResult.imageUrl) {
-                  result = { image: { url: unsplashResult.imageUrl } };
-                }
-              } else {
-                // Use AI generation
-                result = await generateImageAction(
-                  slide.rootImage!.query,
-                  imageModel,
-                );
-              }
+      const slide = slides.find((s) => s.id === slideId);
+      const query = slide?.rootImage?.query;
+      if (!query) continue;
 
-              if (result?.image?.url) {
-                completeRootImageGeneration(slideId, result.image.url);
-                // Update the slide with the new image URL
-                setSlides(
-                  slides.map((s) =>
-                    s.id === slideId
-                      ? ensureSlideCanvas({
-                          ...s,
-                          rootImage: {
-                            ...(s.rootImage ?? { query: slide.rootImage!.query }),
-                            url: result.image.url,
-                          },
-                          canvas: applyBackgroundImageToCanvas(
-                            s.canvas,
-                            result.image.url,
-                          ),
-                        })
-                      : s,
-                  ),
-                );
-              } else {
-                failRootImageGeneration(slideId, "No image url returned");
-              }
-            } catch (err) {
-              const message =
-                err instanceof Error ? err.message : "Image generation failed";
-              failRootImageGeneration(slideId, message);
+      void (async () => {
+        try {
+          let imageUrl: string | undefined;
+
+          if (imageSource === "stock") {
+            const unsplash = await getImageFromUnsplash(
+              query,
+              slide.rootImage?.layoutType,
+            );
+            if (unsplash.success && unsplash.imageUrl) {
+              imageUrl = unsplash.imageUrl;
             }
-          })();
+          } else {
+            const generated = await generateImageAction(query, imageModel);
+            if (generated?.image?.url) {
+              imageUrl = generated.image.url;
+            }
+          }
+
+          if (!imageUrl) {
+            failRootImageGeneration(slideId, "No image url returned");
+            return;
+          }
+
+          completeRootImageGeneration(slideId, imageUrl);
+
+          const {
+            thumbnailUrl,
+            currentPresentationId: presentationId,
+            setThumbnailUrl,
+          } = usePresentationState.getState();
+
+          if (!thumbnailUrl && presentationId) {
+            setThumbnailUrl(imageUrl);
+            try {
+              await updatePresentation({
+                id: presentationId,
+                thumbnailUrl: imageUrl,
+              });
+            } catch (thumbnailError) {
+              console.warn("Failed to persist thumbnail:", thumbnailError);
+            }
+          }
+
+          setSlides(
+            slides.map((s) =>
+              s.id === slideId
+                ? ensureSlideCanvas({
+                    ...s,
+                    rootImage: {
+                      ...(s.rootImage ?? { query }),
+                      url: imageUrl,
+                    },
+                    canvas: applyBackgroundImageToCanvas(s.canvas, imageUrl),
+                  })
+                : s,
+            ),
+          );
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : "Image generation failed";
+          failRootImageGeneration(slideId, message);
         }
-      }
+      })();
     }
   }, [
     rootImageGeneration,
@@ -29802,14 +30108,8 @@ export function PresentationGenerationManager() {
     setSlides,
   ]);
 
-  // Clean up RAF on unmount
   useEffect(() => {
     return () => {
-      if (slidesRafIdRef.current !== null) {
-        cancelAnimationFrame(slidesRafIdRef.current);
-        slidesRafIdRef.current = null;
-      }
-
       if (outlineRafIdRef.current !== null) {
         cancelAnimationFrame(outlineRafIdRef.current);
         outlineRafIdRef.current = null;
