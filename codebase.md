@@ -370,139 +370,114 @@ Thank you for contributing to make ALLWEONE Presentation Generator better for ev
 ```md
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-Diff-Files (copy-paste an Claude Code schicken)
+Diff #1 – BG-Image-Update: nie wieder Text verlieren
 
-Wichtig: Genau so übernehmen, keine weiteren Stellen ändern.
+File: src/components/presentation/utils/canvas.ts
 
-Diff #1 – Nur kurze Texte nutzen (H1-Pass-Through)
-
-File: src/app/api/presentation/generate/route.ts
-
-*** a/src/app/api/presentation/generate/route.ts
---- b/src/app/api/presentation/generate/route.ts
+*** a/src/components/presentation/utils/canvas.ts
+--- b/src/components/presentation/utils/canvas.ts
 @@
--// TODO: Add table and chart to the available layouts
--const slidesTemplate = `
--You are an expert presentation writer. Your task is to create a clear, text-only presentation in XML format.
--
--## CORE REQUIREMENTS
--
--1. FORMAT: Use <SECTION> tags for each slide.
--2. CONTENT: Expand on the outline topics with cohesive paragraphs of text.
--3. SIMPLICITY: Do NOT use any layout components (BOXES, BULLETS, ICONS, TABLE, CHART, etc.).
--4. TEXT ONLY: Each slide must contain exactly one <H1> heading and one or more <P> paragraphs. No images or visual elements.
--
--## PRESENTATION DETAILS
--...
--Now create a complete XML presentation with {TOTAL_SLIDES} slides using this text-only structure.
--`;
-+// TODO: Add table and chart to the available layouts
-+const slidesTemplate = `
-+You are a formatting assistant. Produce a minimal XML presentation that **passes through** the given outline.
-+
-+## GOAL
-+Create exactly {TOTAL_SLIDES} slides where **each slide contains ONLY one <H1>**.
-+The <H1> text MUST be the corresponding outline line (trim leading numbering like "1. " / "2) " / "- ").
-+Do **not** expand, paraphrase, add text, or add extra elements.
-+
-+## FORMAT RULES
-+1) Wrap all slides in a single <PRESENTATION> root.
-+2) For each outline item create:
-+<SECTION>
-+    <H1>Exact outline text (numbering removed)</H1>
-+</SECTION>
-+3) No <P>, no lists, no tables, no charts, no images, no extra attributes.
-+4) Keep the original language: {LANGUAGE}. Ignore {TONE} for content; it's pass-through.
-+
-+## CONTEXT (for indexing only; do NOT add content from here)
-+- Title: {TITLE}
-+- User Request: {PROMPT}
-+- Date: {CURRENT_DATE}
-+- Outline Items: {OUTLINE_FORMATTED}
-+- Slides: {TOTAL_SLIDES}
-+- Research: {SEARCH_RESULTS}
-+
-+## OUTPUT
-+Return ONLY valid XML as shown:
-+\`\`\`xml
-+<PRESENTATION>
-+<SECTION>
-+<H1>Outline item 1 (numbering removed)</H1>
-+</SECTION>
-+<!-- Repeat for each outline item -->
-+</PRESENTATION>
-+\`\`\`
-+`;
-
-
-(Quelle zeigt altes/neues Template und dass jetzt wirklich nur <H1> erzeugt wird.) 
-
-codebase
-
+-export function applyBackgroundImageToCanvas(
+-  canvas: CanvasDoc | null | undefined,
+-  imageUrl?: string | null,
+-): CanvasDoc {
+-  const base: CanvasDoc = {
+-    width: canvas?.width ?? DEFAULT_CANVAS.width,
+-    height: canvas?.height ?? DEFAULT_CANVAS.height,
+-    bg: canvas?.bg ?? DEFAULT_CANVAS.bg,
+-    nodes: canvas?.nodes ? [...canvas.nodes] : [],
+-    selection: canvas?.selection ?? [],
+-  };
++export function applyBackgroundImageToCanvas(
++  canvas: CanvasDoc | null | undefined,
++  imageUrl?: string | null,
++): CanvasDoc {
++  // Starte IMMER vom bestehenden Canvas und erhalte ALLE Nicht-Image-Nodes
++  const base: CanvasDoc = {
++    width: canvas?.width ?? DEFAULT_CANVAS.width,
++    height: canvas?.height ?? DEFAULT_CANVAS.height,
++    bg: canvas?.bg ?? DEFAULT_CANVAS.bg,
++    nodes: Array.isArray(canvas?.nodes) ? [...canvas!.nodes] : [],
++    selection: Array.isArray(canvas?.selection) ? [...(canvas!.selection as any[])] : [],
++  };
  
+   if (!imageUrl) {
+     return base;
+   }
+ 
+-  const imageNode = {
++  const imageNode = {
+     id: "canvas-background-image",
+     type: "image" as const,
+     x: 0,
+     y: 0,
+     width: base.width,
+     height: base.height,
+     url: imageUrl,
+   };
+ 
+-  const existingIndex = base.nodes.findIndex((node) => node.type === "image");
+-  if (existingIndex >= 0) {
+-    const existing = base.nodes[existingIndex] as any;
+-    const sameUrl =
+-      typeof existing?.url === "string" &&
+-      typeof imageNode.url === "string" &&
+-      existing.url === imageNode.url;
+-    const sameSize =
+-      existing?.width === imageNode.width && existing?.height === imageNode.height;
+-    if (sameUrl && sameSize) {
+-      return base;
+-    }
+-    base.nodes[existingIndex] = imageNode;
+-  } else {
+-    base.nodes.unshift(imageNode);
+-  }
++  // Entferne ausschließlich den bisherigen BG-Image-Knoten (falls vorhanden),
++  // erhalte aber ALLE anderen Nodes (v. a. Text!)
++  const withoutBg = base.nodes.filter((n: any) => !(n?.type === "image" && n?.id === "canvas-background-image"));
++
++  // Prüfe Idempotenz: existiert bereits der gleiche BG?
++  const prevBg = base.nodes.find((n: any) => n?.type === "image" && n?.id === "canvas-background-image") as any;
++  if (prevBg) {
++    const sameUrl = prevBg.url === imageNode.url;
++    const sameSize = prevBg.width === imageNode.width && prevBg.height === imageNode.height;
++    if (sameUrl && sameSize) {
++      // nichts ändern
++      return { ...base, nodes: base.nodes };
++    }
++  }
++
++  // BG-Image immer als unterstes Element einfügen
++  const mergedNodes = [imageNode, ...withoutBg];
++  return { ...base, nodes: mergedNodes };
+ }
 
-codebase
 
-Diff #2 – Hook-Fehler & Text-Flackern fixen (Hook aus der Map auslagern, Render-Gate bleibt)
+Was das verhindert: Egal wann applyBackgroundImageToCanvas aufgerufen wird – Textknoten bleiben immer erhalten, der BG-Node wird nur ge-upsertet und nie „mitgerissen“.
+
+Diff #2 – Safe-Merge beim Setzen des Canvas aus dem Editor
 
 File: src/components/presentation/presentation-page/PresentationSlidesView.tsx
-(Falls dein File anders heißt: Das ist die Datei mit export const PresentationSlidesView = ({ isGeneratingPresentation }) => { ... items.map(...) }.)
+(dort, wo du dem SlideCanvas ein onChange gibst)
 
 *** a/src/components/presentation/presentation-page/PresentationSlidesView.tsx
 --- b/src/components/presentation/presentation-page/PresentationSlidesView.tsx
 @@
--import React from "react";
-+import React, { memo } from "react";
-@@
--// ❌ useImageReady wurde direkt in items.map(...) verwendet (Hook in Loop)
--// -> Das führt zu "Rendered fewer hooks than expected"
--function useImageReady(url?: string) {
-+// Hilfs-Hook: Bild vorab decodieren (verhindert halb-gerenderte Frames)
-+function useImageReady(url?: string) {
-   const [ready, setReady] = React.useState(!url);
-   React.useEffect(() => {
-     let active = true;
-     if (!url) {
-       setReady(true);
-       return;
-     }
-     const img = new Image();
-     img.crossOrigin = "anonymous";
-     const markReady = () => active && setReady(true);
-     img.src = url;
-     if (typeof (img as any).decode === "function") {
-       (img as any).decode().then(markReady).catch(markReady);
-     } else {
-       img.onload = markReady;
-       img.onerror = markReady;
-     }
-     return () => {
-       active = false;
-     };
-   }, [url]);
-   return ready;
- }
- 
-+// ✅ Child-Komponente, damit der Hook NICHT in einer Schleife aufgerufen wird
-+const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slidesCount }: {
-+  slide: any; index: number; isPresenting: boolean; slidesCount: number;
-+}) {
-+  const safeCanvas: CanvasDoc =
-+    (slide.canvas as CanvasDoc | undefined) ?? {
-+      width: DEFAULT_CANVAS.width,
-+      height: DEFAULT_CANVAS.height,
-+      bg: DEFAULT_CANVAS.bg,
-+      nodes: [],
-+      selection: [],
-+    };
-+  const imgUrl = slide.rootImage?.url as string | undefined;
-+  const imageReady = useImageReady(imgUrl);
-+  return (
-+    <SortableSlide id={slide.id} key={slide.id}>
-+      <div className={cn(`slide-wrapper slide-wrapper-${index} flex-shrink-0`, !isPresenting && "max-w-full")}>
-+        <SlideContainer index={index} id={slide.id} slideWidth={undefined} slidesCount={slidesCount}>
-+          <div className={cn(`slide-container-${index}`, isPresenting && "h-screen w-screen")}>
-+            {imageReady ? (
+-              <SlideCanvas
+-                doc={safeCanvas}
+-                onChange={(next: CanvasDoc) => {
+-                  const { slides, setSlides } = usePresentationState.getState();
+-                  const updated = slides.slice();
+-                  const indexToUpdate = updated.findIndex((x) => x.id === slide.id);
+-                  if (indexToUpdate < 0) return;
+-                  const current = updated[indexToUpdate];
+-                  if (!current) return;
+-                  if (current.canvas !== next) {
+-                    updated[indexToUpdate] = { ...current, canvas: next };
+-                    setSlides(updated);
+-                  }
+-                }}
+-              />
 +              <SlideCanvas
 +                doc={safeCanvas}
 +                onChange={(next: CanvasDoc) => {
@@ -512,198 +487,109 @@ File: src/components/presentation/presentation-page/PresentationSlidesView.tsx
 +                  if (i < 0) return;
 +                  const current = updated[i];
 +                  if (!current) return;
-+                  // Nur setzen, wenn sich was geändert hat (verhindert Re-Mount-Bursts)
-+                  if (current.canvas !== next) {
-+                    updated[i] = { ...current, canvas: next };
++
++                  const currCanvas = current.canvas as CanvasDoc | undefined;
++
++                  // 🛡️ SAFETY MERGE: verliere nie Textknoten beim Update
++                  const currTextNodes = Array.isArray(currCanvas?.nodes)
++                    ? (currCanvas!.nodes.filter((n: any) => n?.type === "text"))
++                    : [];
++                  const nextTextNodes = Array.isArray(next?.nodes)
++                    ? (next!.nodes.filter((n: any) => n?.type === "text"))
++                    : [];
++
++                  let merged: CanvasDoc = next;
++                  if (currTextNodes.length > 0 && nextTextNodes.length === 0) {
++                    // Race: next hat (noch) keine Texte → Texte aus current konservieren
++                    const otherNodes = Array.isArray(next?.nodes) ? next.nodes.filter((n: any) => n?.type !== "text") : [];
++                    merged = { ...next, nodes: [...otherNodes, ...currTextNodes] };
++                  }
++
++                  // Nur setzen, wenn sich tatsächlich was geändert hat
++                  if (currCanvas !== merged) {
++                    updated[i] = { ...current, canvas: merged };
 +                    setSlides(updated);
 +                  }
 +                }}
 +              />
-+            ) : (
-+              // Stabiler Placeholder verhindert Schwarz-Frames & Text-Flackern
-+              <div
-+                className={cn(
-+                  "rounded-xl",
-+                  isPresenting ? "h-screen w-screen" : "h-[700px] w-[420px]",
-+                  "bg-black/90"
-+                )}
-+              />
-+            )}
-+          </div>
-+        </SlideContainer>
-+      </div>
-+    </SortableSlide>
-+  );
-+});
-+
- export const PresentationSlidesView = ({ isGeneratingPresentation }: PresentationSlidesViewProps) => {
+
+
+Was das verhindert: Selbst wenn irgendwo im System noch ein Update ohne Textknoten reinkommt (z. B. durch späten BG-Reflow/Resize), bewahren wir vorhandene Textknoten und verlieren sie nicht mehr.
+
+Diff #3 – Stabilität beim Drag & Render
+
+File: src/components/presentation/canvas/SlideCanvasBase.tsx
+
+Du hast hier schon vieles richtig. Zwei kleine Ergänzungen, die Remounts vermeiden und während „stillen“ Updates das UI stabil halten.
+
+*** a/src/components/presentation/canvas/SlideCanvasBase.tsx
+--- b/src/components/presentation/canvas/SlideCanvasBase.tsx
 @@
--  {items.map((slide, index) => {
--    const safeCanvas: CanvasDoc = (slide.canvas as CanvasDoc | undefined) ?? { ... };
--    const imgUrl = slide.rootImage?.url;
--    const imageReady = useImageReady(imgUrl);
--    return (
--      <SortableSlide id={slide.id} key={slide.id}>
--        ...
--        {imageReady ? (<SlideCanvas ... />) : (<div className="bg-black/90" />)}
--        ...
--      </SortableSlide>
--    );
--  })}
-+  {items.map((slide, index) => (
-+    <SlideFrame
-+      key={slide.id}
-+      slide={slide}
-+      index={index}
-+      isPresenting={isPresenting}
-+      slidesCount={items.length}
-+    />
-+  ))}
+-            <Text
+-              key={`text-${activeTextNode?.id ?? "fallback"}`}
++            <Text
++              // Stabiler Key pro Slide, nicht pro Node-Wechsel → kein Remount beim Umschalten/Autosave
++              key={`text-slide-${slide.id}`}
+               text={textContent}
+               fontSize={32}
+               fontFamily="TikTok Sans, sans-serif"
+               fill="#ffffff"
+               x={textPosition.x}
+               y={textPosition.y}
+               draggable={!disableDrag}
+               onDragStart={handleDragStart}
+               onDragMove={handleDragMove}
+               onDragEnd={handleDragEnd}
++              visible={true}
++              opacity={1}
++              listening={true}
+               dragBoundFunc={(pos) => ({
+                 x: Math.min(
+                   Math.max(0, pos.x),
+                   stageDimensions.width - 10
+                 ),
+                 y: Math.min(
+                   Math.max(0, pos.y),
+                   stageDimensions.height - 10
+                 ),
+               })}
+             />
 
 
-Damit:
+Und zusätzlich ein Mini-Guard gegen „Positions-Resets“ genau während stiller BG-Updates:
 
-Kein Hook mehr in der Schleife → Fehler weg.
-
-Canvas/Text wird erst gemountet, wenn das Bild decodiert wurde → kein Flackern.
-(Die betroffenen Stellen waren zuvor genau hier.) 
-
-codebase
-
- 
-
-codebase
-
-Diff #3 – „Generieren“-Flow: Button bleibt „loading“, Zielseite startet zuverlässig
-
-A. Dashboard: Cookie setzen vor Push
-File: src/components/presentation/dashboard/PresentationDashboard.tsx
-
-*** a/src/components/presentation/dashboard/PresentationDashboard.tsx
---- b/src/components/presentation/dashboard/PresentationDashboard.tsx
+*** a/src/components/presentation/canvas/SlideCanvasBase.tsx
+--- b/src/components/presentation/canvas/SlideCanvasBase.tsx
 @@
-   const handleGenerate = async () => {
-     if (!presentationInput.trim()) {
-       toast.error("Please enter a topic for your presentation");
-       return;
-     }
- 
-     // Set UI loading state
-     setIsGeneratingOutline(true);
- 
-     try {
-       const result = await createEmptyPresentation(
-         presentationInput.substring(0, 50) || "Untitled Presentation",
-         theme,
-         language,
-       );
- 
-       if (result.success && result.presentation) {
-+        // Setze Pending-Cookie, sodass die Zielseite sofort loslegt
-+        try {
-+          const domain =
-+            typeof window !== "undefined" && window.location.hostname === "localhost"
-+              ? "localhost"
-+              : ".allweone.com";
-+          document.cookie =
-+            `presentation_generation_pending=true; path=/; SameSite=Lax;` +
-+            (domain !== "localhost" ? ` domain=${domain};` : "");
-+        } catch {}
-         // Set the current presentation
-         setCurrentPresentation(
-           result.presentation.id,
-           result.presentation.title,
-         );
-         router.push(
-           `/dashboard/slideshows/generate/${result.presentation.id}`,
-         );
-       } else {
-         setIsGeneratingOutline(false);
-         toast.error(result.message || "Failed to create presentation");
-       }
-     } catch (error) {
-       setIsGeneratingOutline(false);
-       console.error("Error creating presentation:", error);
-       toast.error("Failed to create presentation");
-     }
-   };
-
-
-(Die Datei enthält bereits Loading-Variant & Disable-State; wir ergänzen nur das Cookie.) 
-
-codebase
-
-B. Generate-Seite: Cookie lesen → Start sofort triggern; anschließend Cookie löschen
-File: src/app/dashboard/slideshows/generate/[id]/page.tsx
-
-*** a/src/app/dashboard/slideshows/generate/[id]/page.tsx
---- b/src/app/dashboard/slideshows/generate/[id]/page.tsx
-@@
- export const PRESENTATION_GENERATION_COOKIE = "presentation_generation_pending";
- 
-+function hasPendingCookie() {
-+  if (typeof document === "undefined") return false;
-+  return document.cookie.split(";").some((c) => c.trim().startsWith(`${PRESENTATION_GENERATION_COOKIE}=`));
-+}
-+
-+function clearPendingCookie() {
-+  if (typeof document === "undefined") return;
-+  const domain =
-+    window.location.hostname === "localhost" ? "localhost" : ".allweone.com";
-+  document.cookie = `${PRESENTATION_GENERATION_COOKIE}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; ${
-+    domain !== "localhost" ? `domain=${domain}; ` : ""
-+  }SameSite=Lax`;
-+}
-+
-@@
--  // Clear the cookie when the page loads
 -  useEffect(() => {
--    clearPresentationCookie();
--  }, []);
-+  // Clear legacy cookie name if vorhanden (Abwärtskompatibilität)
+-    if (isDraggingTextRef.current) return;
+-    const next = slideWithExtras.position ?? defaultPosition;
+-    if (next.x !== textPosition.x || next.y !== textPosition.y) {
+-      setTextPosition(next);
+-    }
+-  }, [
+-    slideWithExtras.position?.x,
+-    slideWithExtras.position?.y,
+-    defaultPosition,
+-    textPosition.x,
+-    textPosition.y,
+-  ]);
 +  useEffect(() => {
-+    // früherer Name beibehalten:
-+    clearPresentationCookie();
-+  }, []);
- 
-   // This effect handles the immediate startup of generation upon first mount
-   // only if we're coming fresh from the dashboard (isGeneratingOutline === true)
-   useEffect(() => {
-     // Only run once on initial page load
-     if (initialLoadComplete.current) return;
-     initialLoadComplete.current = true;
- 
--    // If isGeneratingOutline is true but generation hasn't been started yet,
--    // this indicates we just came from the dashboard and should start generation
--    if (isGeneratingOutline && !generationStarted.current) {
-+    // Start, wenn Store-Flag ODER Pending-Cookie gesetzt ist
-+    if ((isGeneratingOutline || hasPendingCookie()) && !generationStarted.current) {
-       console.log("Starting outline generation after navigation");
-       generationStarted.current = true;
- 
-       // Give the component time to fully mount and establish connections
-       // before starting the generation process
-       setTimeout(() => {
-         setShouldStartOutlineGeneration(true);
-+        // Cookie ist verbraucht
-+        clearPendingCookie();
-       }, 100);
-     }
--  }, [isGeneratingOutline, setShouldStartOutlineGeneration]);
-+  }, [isGeneratingOutline, setShouldStartOutlineGeneration]);
-
-
-(Damit bleibt der Button „loading“, und die Zielseite startet immer zuverlässig – selbst wenn der Zustand beim Routen verloren ginge.) 
-
-codebase
-
-Ergebnis
-
-Kein Hook-Runtime-Error mehr & kein Text-Flackern (Bilder + Texte bleiben stabil).
-
-„Generieren“ bleibt im Loading-State, bis die Generate-Seite übernommen hat; sofortige Weiterleitung ohne zweiten Klick.
-
-Slides enthalten nur die kurzen H1-Titel aus der Outline, wie gewünscht.
++    if (isDraggingTextRef.current) return;
++    const next = slideWithExtras.position ?? defaultPosition;
++    // Blockiere micro-jitters (±0.5px) durch Scale/Resize-Runden
++    const dx = Math.abs((next.x ?? 0) - (textPosition.x ?? 0));
++    const dy = Math.abs((next.y ?? 0) - (textPosition.y ?? 0));
++    if (dx > 0.5 || dy > 0.5) {
++      setTextPosition(next);
++    }
++  }, [
++    slideWithExtras.position?.x,
++    slideWithExtras.position?.y,
++    defaultPosition,
++    textPosition.x,
++    textPosition.y,
++  ]);
 ```
 
 # next-env.d.ts
@@ -2929,6 +2815,342 @@ export async function POST(req: Request) {
 
 ```
 
+# src\app\api\tests\tiktok-post\route.ts
+
+```ts
+import { env } from "@/env";
+import { auth } from "@/server/auth";
+import { NextResponse } from "next/server";
+
+interface RequestPayload {
+  openId?: string;
+  caption?: string;
+  mediaUrl?: string;
+  mediaType?: "video" | "photo";
+  thumbnailTimestampMs?: number;
+  autoAddMusic?: boolean;
+  postMode?: "INBOX" | "PUBLISH" | "DIRECT_POST" | "MEDIA_UPLOAD";
+  contentPostingMethod?: "UPLOAD" | "MEDIA_UPLOAD" | "DIRECT_POST" | "URL";
+}
+
+export async function POST(request: Request) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = (await request.json().catch(() => null)) as RequestPayload | null;
+  if (!body || typeof body.openId !== "string" || typeof body.mediaUrl !== "string") {
+    return NextResponse.json({ error: "Missing openId or mediaUrl" }, { status: 400 });
+  }
+
+  const inferredContentMethod =
+    body.contentPostingMethod ??
+    (body.mediaType === "photo"
+      ? body.postMode === "INBOX" || body.postMode === "MEDIA_UPLOAD"
+        ? "MEDIA_UPLOAD"
+        : "DIRECT_POST"
+      : "UPLOAD");
+
+  const payload = {
+    caption: body.caption ?? "",
+    postMode: body.postMode ?? (inferredContentMethod === "MEDIA_UPLOAD" ? "INBOX" : "PUBLISH"),
+    media: [
+      body.mediaType === "photo"
+        ? {
+            type: "photo" as const,
+            url: body.mediaUrl,
+          }
+        : {
+            type: "video" as const,
+            url: body.mediaUrl,
+            thumbnailTimestampMs: body.thumbnailTimestampMs ?? 1000,
+          },
+    ],
+    settings: {
+      contentPostingMethod: inferredContentMethod,
+      privacyLevel: "SELF_ONLY" as const,
+      duet: false,
+      comment: false,
+      stitch: false,
+      autoAddMusic: body.autoAddMusic ?? true,
+      videoMadeWithAi: false,
+      brandContentToggle: false,
+      brandOrganicToggle: false,
+    },
+  };
+
+  try {
+    const response = await fetch(
+      `${env.SLIDESCOCKPIT_API}/integrations/social/tiktok/${encodeURIComponent(
+        body.openId,
+      )}/post?async=true`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": session.user.id,
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const message =
+        data && typeof data.error === "string"
+          ? data.error
+          : "TikTok posting failed";
+      return NextResponse.json({ error: message }, { status: response.status });
+    }
+
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    console.error("TikTok posting request failed", error);
+    return NextResponse.json({ error: "Unable to reach SlidesCockpit API" }, { status: 500 });
+  }
+}
+
+```
+
+# src\app\api\tests\tiktok-post\status\route.ts
+
+```ts
+import { env } from "@/env";
+import { auth } from "@/server/auth";
+import { NextResponse } from "next/server";
+
+export async function GET(request: Request) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const url = new URL(request.url);
+  const openId = url.searchParams.get("openId");
+  const publishId = url.searchParams.get("publishId");
+
+  if (!openId || !publishId) {
+    return NextResponse.json({ error: "Missing openId or publishId" }, { status: 400 });
+  }
+
+  try {
+    const response = await fetch(
+      `${env.SLIDESCOCKPIT_API}/integrations/social/tiktok/${encodeURIComponent(
+        openId,
+      )}/post/status/${encodeURIComponent(publishId)}`,
+      {
+        method: "GET",
+        headers: {
+          "x-user-id": session.user.id,
+        },
+        cache: "no-store",
+      },
+    );
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      const message =
+        payload && typeof payload.error === "string"
+          ? payload.error
+          : "TikTok status check failed";
+      return NextResponse.json({ error: message }, { status: response.status });
+    }
+
+    return NextResponse.json(payload, { status: 200 });
+  } catch (error) {
+    console.error("TikTok status polling failed", error);
+    return NextResponse.json({ error: "Unable to reach SlidesCockpit API" }, { status: 500 });
+  }
+}
+
+
+```
+
+# src\app\api\tiktok\accounts\route.ts
+
+```ts
+import { env } from "@/env";
+import { auth } from "@/server/auth";
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const response = await fetch(
+      `${env.SLIDESCOCKPIT_API}/integrations/social/tiktok/accounts`,
+      {
+        method: "GET",
+        headers: {
+          "x-user-id": session.user.id,
+        },
+        cache: "no-store",
+      },
+    );
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      return NextResponse.json(
+        {
+          error:
+            typeof data === "object" && data && "error" in data
+              ? (data as { error: string }).error
+              : typeof data === "object" && data && "message" in data
+              ? (data as { message: string }).message
+              : "Failed to load TikTok accounts",
+        },
+        { status: response.status },
+      );
+    }
+
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    console.error("Failed to fetch TikTok accounts", error);
+    return NextResponse.json(
+      { error: "Unable to reach SlidesCockpit API" },
+      { status: 500 },
+    );
+  }
+}
+
+```
+
+# src\app\api\tiktok\connect\route.ts
+
+```ts
+import { env } from "@/env";
+import { auth } from "@/server/auth";
+import { type NextRequest, NextResponse } from "next/server";
+
+export async function POST(req: NextRequest) {
+  const payload = await req.json().catch(() => null);
+
+  if (
+    !payload ||
+    typeof payload.code !== "string" ||
+    typeof payload.state !== "string"
+  ) {
+    return NextResponse.json(
+      { error: "Missing TikTok OAuth parameters" },
+      { status: 400 },
+    );
+  }
+
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const timezone =
+    typeof payload.timezone === "string" && payload.timezone.length > 0
+      ? payload.timezone
+      : String(-new Date().getTimezoneOffset());
+
+  try {
+    const response = await fetch(
+      `${env.SLIDESCOCKPIT_API}/integrations/social/tiktok/connect`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": session.user.id,
+        },
+        body: JSON.stringify({
+          code: payload.code,
+          state: payload.state,
+          timezone,
+        }),
+      },
+    );
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const errorResponse = NextResponse.json(
+        {
+          error:
+            typeof data === "object" && data && "message" in data
+              ? (data as { message: string }).message
+              : "Failed to connect TikTok account",
+        },
+        { status: response.status },
+      );
+      return errorResponse;
+    }
+
+    const successResponse = NextResponse.json(data, {
+      status: response.status,
+    });
+    return successResponse;
+  } catch (error) {
+    console.error("Failed to complete TikTok OAuth flow", error);
+    return NextResponse.json(
+      { error: "Unable to reach SlidesCockpit API" },
+      { status: 500 },
+    );
+  }
+}
+
+```
+
+# src\app\api\tiktok\start\route.ts
+
+```ts
+import { env } from "@/env";
+import { auth } from "@/server/auth";
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const response = await fetch(`${env.SLIDESCOCKPIT_API}/integrations/social/tiktok`, {
+      method: "GET",
+      headers: {
+        "x-user-id": session.user.id,
+      },
+      cache: "no-store",
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const errorResponse = NextResponse.json(
+        {
+          error:
+            typeof data === "object" && data && "message" in data
+              ? (data as { message: string }).message
+          : "Failed to start TikTok integration",
+        },
+        { status: response.status },
+      );
+      return errorResponse;
+    }
+
+    const successResponse = NextResponse.json(data, {
+      status: response.status,
+    });
+    return successResponse;
+  } catch (error) {
+    console.error("Failed to start TikTok integration", error);
+    return NextResponse.json(
+      { error: "Unable to reach SlidesCockpit API" },
+      { status: 500 },
+    );
+  }
+}
+
+```
+
 # src\app\api\uploadthing\core.ts
 
 ```ts
@@ -3120,6 +3342,24 @@ export default function SignOut() {
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+```
+
+# src\app\dashboard\connections\page.tsx
+
+```tsx
+import { TikTokConnectionCard } from "@/components/connections/tiktok-connection-card";
+
+export default function ConnectionsPage() {
+  return (
+    <div className="w-full px-10 py-12 space-y-8">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-semibold">Connected Accounts</h1>
+      </div>
+      <TikTokConnectionCard />
     </div>
   );
 }
@@ -3600,6 +3840,524 @@ export default function page() {
 
 ```
 
+# src\app\dashboard\tests\tiktok-post\page.tsx
+
+```tsx
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+
+interface TikTokPostPayload {
+  openId: string;
+  caption: string;
+  mediaUrl: string;
+  mediaType: "video" | "photo";
+  thumbnailTimestampMs?: number;
+  autoAddMusic: boolean;
+  postMode: "INBOX" | "PUBLISH" | "DIRECT_POST" | "MEDIA_UPLOAD";
+  contentPostingMethod: "UPLOAD" | "MEDIA_UPLOAD" | "DIRECT_POST" | "URL";
+}
+
+interface PostStartResponse {
+  accepted: boolean;
+  publishId: string;
+  status: "processing";
+}
+
+interface StatusResponse {
+  status: "processing" | "success" | "failed" | "inbox";
+  postId?: string;
+  releaseUrl?: string;
+}
+
+interface TikTokPostResult {
+  publishId: string;
+  status: StatusResponse["status"];
+  postId?: string;
+  releaseUrl?: string;
+}
+
+interface ConnectedAccount {
+  openId: string;
+  displayName: string | null;
+  username: string | null;
+  avatarUrl: string | null;
+  connectedAt: string;
+}
+
+export default function TikTokPostingTestPage() {
+  const [form, setForm] = useState<TikTokPostPayload>({
+    openId: "",
+    caption: "",
+    mediaUrl: "",
+    mediaType: "video",
+    thumbnailTimestampMs: 1000,
+    autoAddMusic: true,
+    postMode: "PUBLISH",
+    contentPostingMethod: "UPLOAD",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<TikTokPostResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setAccountsLoading(true);
+      try {
+        const response = await fetch("/api/tiktok/accounts", {
+          cache: "no-store",
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !Array.isArray(payload)) {
+          throw new Error(
+            payload && typeof payload.error === "string"
+              ? payload.error
+              : "TikTok Accounts konnten nicht geladen werden",
+          );
+        }
+
+        if (active) {
+          setAccounts(payload as ConnectedAccount[]);
+          if (payload.length > 0) {
+            setForm((prev) => ({ ...prev, openId: payload[0].openId }));
+          }
+        }
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Unable to load TikTok accounts";
+        if (active) {
+          setAccounts([]);
+          toast.error(message);
+        }
+      } finally {
+        if (active) {
+          setAccountsLoading(false);
+        }
+      }
+    };
+
+    void load();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (accounts.length === 0) {
+      setForm((prev) => ({ ...prev, openId: "" }));
+      return;
+    }
+
+    const exists = accounts.some((account) => account.openId === form.openId);
+    if (!exists) {
+      const fallback = accounts[0];
+      if (fallback) {
+        setForm((prev) => ({ ...prev, openId: fallback.openId ?? "" }));
+      }
+    }
+  }, [accounts, form.openId]);
+
+  const updateField = useCallback(
+    <K extends keyof TikTokPostPayload>(
+      key: K,
+      value: TikTokPostPayload[K],
+    ) => {
+      setForm((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
+
+  const pollStatus = useCallback(
+    async (openId: string, publishId: string): Promise<StatusResponse> => {
+      const MAX_ATTEMPTS = 30;
+      const DELAY_MS = 5_000;
+
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+        const response = await fetch(
+          `/api/tests/tiktok-post/status?openId=${encodeURIComponent(openId)}&publishId=${encodeURIComponent(publishId)}`,
+          {
+            cache: "no-store",
+          },
+        );
+        const payload = (await response.json().catch(() => null)) as StatusResponse | { error?: string } | null;
+
+        if (!response.ok || !payload || typeof payload !== "object" || !("status" in payload)) {
+          const message =
+            payload &&
+            typeof payload === "object" &&
+            "error" in payload &&
+            typeof payload.error === "string"
+              ? payload.error
+              : "TikTok Status konnte nicht abgefragt werden";
+          throw new Error(message);
+        }
+
+        if (payload.status !== "processing") {
+          return payload;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
+      }
+
+      throw new Error(
+        "TikTok Status blieb im Status 'processing'. Bitte versuche es später erneut.",
+      );
+    },
+    [],
+  );
+
+  const handleSubmit = useCallback(async () => {
+    if (!form.openId) {
+      toast.error("Bitte wähle einen verbundenen TikTok Account aus");
+      return;
+    }
+
+    if (!form.mediaUrl) {
+      toast.error("Bitte gib eine Medien-URL aus dem Files-Bucket an");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const response = await fetch("/api/tests/tiktok-post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          openId: form.openId,
+          caption: form.caption,
+          mediaUrl: form.mediaUrl,
+          mediaType: form.mediaType,
+          thumbnailTimestampMs: form.thumbnailTimestampMs,
+          autoAddMusic: form.autoAddMusic,
+          postMode: form.postMode,
+          contentPostingMethod: form.contentPostingMethod,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | PostStartResponse
+        | { error?: string }
+        | null;
+
+      if (!response.ok || !payload || typeof payload !== "object" || !("status" in payload)) {
+        const message =
+          payload &&
+          typeof payload === "object" &&
+          "error" in payload &&
+          typeof payload.error === "string"
+            ? payload.error
+            : "TikTok Posting fehlgeschlagen";
+        setError(message);
+        toast.error(message);
+        return;
+      }
+
+      if ("accepted" in payload && payload.accepted) {
+        setResult({ publishId: payload.publishId, status: payload.status });
+        toast.success("TikTok Post wurde gestartet – Status wird abgefragt");
+
+        try {
+          const finalStatus = await pollStatus(form.openId, payload.publishId);
+          setResult({
+            publishId: payload.publishId,
+            status: finalStatus.status,
+            postId: finalStatus.postId ?? payload.publishId,
+            releaseUrl: finalStatus.releaseUrl,
+          });
+
+          if (finalStatus.status === "success") {
+            toast.success("TikTok Post erfolgreich veröffentlicht");
+          } else if (finalStatus.status === "inbox") {
+            toast.success("TikTok Post wurde in den Inbox-Entwürfen abgelegt");
+          } else if (finalStatus.status === "failed") {
+            toast.error("TikTok Post wurde von TikTok abgelehnt");
+          }
+        } catch (pollError) {
+          const message =
+            pollError instanceof Error
+              ? pollError.message
+              : "TikTok Status konnte nicht abgefragt werden";
+          setError(message);
+          toast.error(message);
+        }
+        return;
+      }
+
+      setResult({
+        publishId: payload.publishId ?? "",
+        status: payload.status,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unbekannter Fehler";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  }, [form, pollStatus]);
+
+  return (
+    <div className="flex flex-col gap-6 p-8">
+      <div>
+        <h1 className="text-3xl font-semibold">TikTok Posting Test</h1>
+        <p className="text-muted-foreground">
+          Lade ein Asset über die Pre-Sign-Route hoch und teste danach das
+          direkte Posting zu TikTok.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Post konfigurieren</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="openId">Verbundenes TikTok Konto</Label>
+              <select
+                id="openId"
+                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                disabled={accountsLoading || accounts.length === 0}
+                value={form.openId}
+                onChange={(event) => updateField("openId", event.target.value)}
+              >
+                {accountsLoading && <option>Lade Konten…</option>}
+                {!accountsLoading && accounts.length === 0 && (
+                  <option>Keine TikTok Accounts verbunden</option>
+                )}
+                {accounts.map((account) => {
+                  const label =
+                    account.username ?? account.displayName ?? account.openId;
+                  return (
+                    <option key={account.openId} value={account.openId}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="mediaUrl">Medien-URL</Label>
+              <Input
+                id="mediaUrl"
+                placeholder="https://files.slidescockpit.com/..."
+                value={form.mediaUrl}
+                onChange={(event) =>
+                  updateField("mediaUrl", event.target.value)
+                }
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="mediaType">Medientyp</Label>
+              <select
+                id="mediaType"
+                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={form.mediaType}
+                onChange={(event) => {
+                  const nextType = event.target
+                    .value as TikTokPostPayload["mediaType"];
+                  setForm((prev) => ({
+                    ...prev,
+                    mediaType: nextType,
+                    postMode:
+                      nextType === "photo"
+                        ? "INBOX"
+                        : prev.postMode === "INBOX" ||
+                            prev.postMode === "MEDIA_UPLOAD"
+                          ? "PUBLISH"
+                          : prev.postMode,
+                    contentPostingMethod:
+                      nextType === "photo"
+                        ? "MEDIA_UPLOAD"
+                        : prev.contentPostingMethod === "MEDIA_UPLOAD"
+                          ? "UPLOAD"
+                          : prev.contentPostingMethod,
+                  }));
+                }}
+              >
+                <option value="video">Video</option>
+                <option value="photo">Photo (Carousel)</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="thumbnailTimestamp">
+                Thumbnail Timestamp (ms)
+              </Label>
+              <Input
+                id="thumbnailTimestamp"
+                type="number"
+                value={form.thumbnailTimestampMs ?? ""}
+                onChange={(event) =>
+                  updateField(
+                    "thumbnailTimestampMs",
+                    event.target.value === ""
+                      ? undefined
+                      : Number(event.target.value),
+                  )
+                }
+                disabled={form.mediaType !== "video"}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="postMode">Post Mode</Label>
+              <select
+                id="postMode"
+                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={form.postMode}
+                onChange={(event) =>
+                  updateField(
+                    "postMode",
+                    event.target.value as TikTokPostPayload["postMode"],
+                  )
+                }
+              >
+                <option value="INBOX">Inbox (Draft)</option>
+                <option value="PUBLISH">Direct Publish</option>
+                <option value="MEDIA_UPLOAD">TikTok Media Upload</option>
+                <option value="DIRECT_POST">TikTok Direct Post</option>
+              </select>
+              <p className="text-sm text-muted-foreground">
+                Inbox entspricht TikToks Draft-Flow. Für Direct Publish wähle
+                PUBLISH/DIRECT_POST.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contentPostingMethod">Posting Methode</Label>
+              <select
+                id="contentPostingMethod"
+                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={form.contentPostingMethod}
+                onChange={(event) =>
+                  updateField(
+                    "contentPostingMethod",
+                    event.target
+                      .value as TikTokPostPayload["contentPostingMethod"],
+                  )
+                }
+              >
+                <option value="UPLOAD">Upload (Videos)</option>
+                <option value="MEDIA_UPLOAD">
+                  Media Upload (Inbox/Drafts)
+                </option>
+                <option value="DIRECT_POST">Direct Post</option>
+                <option value="URL">Pull from URL</option>
+              </select>
+              <p className="text-sm text-muted-foreground">
+                Muss zu TikToks post_mode passen. MEDIA_UPLOAD sendet Inhalte in
+                den Inbox-Entwurf.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="caption">Caption</Label>
+            <Textarea
+              id="caption"
+              placeholder="Was soll TikTok posten?"
+              value={form.caption}
+              onChange={(event) => updateField("caption", event.target.value)}
+              rows={4}
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Switch
+              id="auto-music"
+              checked={form.autoAddMusic}
+              onCheckedChange={(checked) =>
+                updateField("autoAddMusic", checked)
+              }
+            />
+            <div>
+              <Label htmlFor="auto-music">Automatische Musik hinzufügen</Label>
+              <p className="text-sm text-muted-foreground">
+                Aktiviert standardmäßig, damit TikTok Hintergrundmusik wählt.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="flex items-center gap-4">
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting || accountsLoading || accounts.length === 0}
+          >
+            {submitting ? "Posting & Polling..." : "TikTok Post auslösen"}
+          </Button>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </CardFooter>
+      </Card>
+
+      {result && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Ergebnis</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p>
+              <span className="font-semibold">Publish ID:</span>{" "}
+              {result.publishId}
+            </p>
+            {result.postId && (
+              <p>
+                <span className="font-semibold">Post ID:</span> {result.postId}
+              </p>
+            )}
+            {result.releaseUrl ? (
+              <p>
+                <span className="font-semibold">Release URL:</span>{" "}
+                <a
+                  href={result.releaseUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary underline"
+                >
+                  {result.releaseUrl}
+                </a>
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Keine Release URL verfügbar – bei Inbox-Posts liefert TikTok
+                keine URL.
+              </p>
+            )}
+            <p>
+              <span className="font-semibold">Status:</span> {result.status}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+```
+
 # src\app\favicon.ico
 
 This is a binary file of the type: Binary
@@ -3611,6 +4369,115 @@ This is a binary file of the type: Binary
 # src\app\fonts\GeistVF.woff
 
 This is a binary file of the type: Binary
+
+# src\app\integrations\social\tiktok\page.tsx
+
+```tsx
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+
+type ConnectStatus = "idle" | "processing" | "success" | "error";
+
+export default function TikTokCallbackPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [status, setStatus] = useState<ConnectStatus>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const code = searchParams.get("code");
+    const state = searchParams.get("state");
+
+    if (!code || !state) {
+      setStatus("error");
+      setErrorMessage("Missing TikTok authorization parameters.");
+      return;
+    }
+
+    const connect = async () => {
+      setStatus("processing");
+
+      try {
+        const response = await fetch("/api/tiktok/connect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code,
+            state,
+            timezone: String(-new Date().getTimezoneOffset()),
+          }),
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(
+            payload && typeof payload.error === "string"
+              ? payload.error
+              : "TikTok connection failed",
+          );
+        }
+
+        setStatus("success");
+        toast.success("TikTok account connected");
+        setTimeout(() => {
+          router.replace("/dashboard/connections");
+        }, 1500);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "TikTok connection failed";
+        setErrorMessage(message);
+        toast.error(message);
+        setStatus("error");
+      }
+    };
+
+    void connect();
+  }, [router, searchParams]);
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+      {status === "processing" && (
+        <>
+          <Spinner text="Connecting your TikTok account..." />
+          <p className="text-sm text-muted-foreground">
+            This will only take a moment.
+          </p>
+        </>
+      )}
+
+      {status === "success" && (
+        <>
+          <h1 className="text-2xl font-semibold">TikTok connected</h1>
+          <p className="text-sm text-muted-foreground">
+            Redirecting you back to your connections&hellip;
+          </p>
+        </>
+      )}
+
+      {status === "error" && (
+        <>
+          <h1 className="text-2xl font-semibold">Connection failed</h1>
+          <p className="text-sm text-muted-foreground">
+            {errorMessage ??
+              "We could not connect your TikTok account. Please try again."}
+          </p>
+          <Button onClick={() => router.replace("/dashboard/connections")}>
+            Back to connections
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
+```
 
 # src\app\layout.tsx
 
@@ -4287,8 +5154,12 @@ export async function loadImageDecoded(url: string): Promise<HTMLImageElement> {
   // decode() verhindert Paint-Glitches vor vollständiger Decodierung
   // Fallback: falls nicht unterstützt, ist img schon geladen
   try {
-    // @ts-expect-error older TS lib
-    if (typeof img.decode === "function") await img.decode();
+    const maybeDecode = (img as HTMLImageElement & {
+      decode?: () => Promise<void>;
+    }).decode;
+    if (typeof maybeDecode === "function") {
+      await maybeDecode.call(img);
+    }
   } catch {
     // ignore
   }
@@ -6245,8 +7116,12 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
       for (let i = 0; i < newNodes.length; i++) {
         const node = newNodes[i];
         if (!node || node.type !== "text") continue;
-        const src = next[ti++];
-        if (!src) break; // keine weitere Quelle – restliche Textknoten bleiben wie sie sind
+
+        const src = next[ti];
+        if (!src) {
+          break; // keine weitere Quelle – restliche Textknoten bleiben wie sie sind
+        }
+        ti += 1;
 
         const pxX = Math.round((src.x ?? 0.5) * W);
         const pxY = Math.round((src.y ?? 0.5) * H);
@@ -6294,6 +7169,8 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
       if (next.length > existingTextCount) {
         for (let k = existingTextCount; k < next.length; k++) {
           const src = next[k];
+          if (!src) continue;
+
           const pxX = Math.round((src.x ?? 0.5) * W);
           const pxY = Math.round((src.y ?? 0.5) * H);
           const weight: ExtendedCanvasTextNode["weight"] =
@@ -6373,6 +7250,8 @@ export type CanvasTextNode = {
   fill?: string;
   stroke?: string;
   strokeWidth?: number;
+  lineHeight?: number;
+  letterSpacing?: number;
   padding?: number;
   textBg?: string | null;
   link?: string | null;
@@ -6433,8 +7312,14 @@ export function SidebarAccountSection() {
 
 ```tsx
 "use client";
+import {
+  Home,
+  Images,
+  TestTube2,
+  UserPen,
+  type LucideIcon,
+} from "lucide-react";
 import { useTheme } from "next-themes";
-import { Home, Images, type LucideIcon } from "lucide-react";
 
 import {
   Sidebar,
@@ -6470,6 +7355,23 @@ const playgroundItems: SidebarItem[] = [
     title: "Slideshows",
     url: "/dashboard/slideshows",
     icon: Images,
+  },
+];
+
+// Configuration items.
+const configurationItems: SidebarItem[] = [
+  {
+    title: "Connections",
+    url: "/dashboard/connections",
+    icon: UserPen,
+  },
+];
+
+const debugItems: SidebarItem[] = [
+  {
+    title: "TikTok Posting",
+    url: "/dashboard/tests/tiktok-post",
+    icon: TestTube2,
   },
 ];
 
@@ -6510,6 +7412,42 @@ export function AppSidebar() {
                     <a href={item.url}>
                       <item.icon className="w-5 h-5" />
                       <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Configuration</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {configurationItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild className="font-semibold">
+                    <a href={item.url}>
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-red-500">DEBUG</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {debugItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild className="font-semibold">
+                    <a href={item.url}>
+                      <item.icon className="w-5 h-5 text-red-500" />
+                      <span className="font-semibold text-red-500">
+                        {item.title}
+                      </span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -6728,6 +7666,215 @@ export function GoogleSignInButton({
         Sign in with Google
       </span>
     </button>
+  );
+}
+
+```
+
+# src\components\connections\tiktok-connection-card.tsx
+
+```tsx
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { toast } from "sonner";
+
+type ConnectionState = "idle" | "loading";
+
+type ConnectedAccount = {
+  openId: string;
+  displayName: string | null;
+  username: string | null;
+  unionId: string | null;
+  avatarUrl: string | null;
+  connectedAt: string;
+};
+
+export function TikTokConnectionCard() {
+  const [connectionState, setConnectionState] =
+    useState<ConnectionState>("idle");
+  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState<boolean>(true);
+
+  const fetchAccounts = useCallback(async () => {
+    setAccountsLoading(true);
+    try {
+      const response = await fetch("/api/tiktok/accounts", {
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message =
+          payload && typeof payload.error === "string"
+            ? payload.error
+            : "Unable to load connected TikTok accounts";
+        throw new Error(message);
+      }
+
+      if (Array.isArray(payload)) {
+        setAccounts(
+          payload.map((item) => ({
+            openId: String(item.openId ?? item.id ?? ""),
+            displayName:
+              typeof item.displayName === "string" ? item.displayName : null,
+            username: typeof item.username === "string" ? item.username : null,
+            unionId: typeof item.unionId === "string" ? item.unionId : null,
+            avatarUrl:
+              typeof item.avatarUrl === "string" ? item.avatarUrl : null,
+            connectedAt:
+              typeof item.connectedAt === "string"
+                ? item.connectedAt
+                : new Date().toISOString(),
+          })),
+        );
+      } else {
+        setAccounts([]);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to load TikTok accounts";
+      toast.error(message);
+    } finally {
+      setAccountsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchAccounts();
+  }, [fetchAccounts]);
+
+  const sortedAccounts = useMemo(
+    () =>
+      [...accounts].sort(
+        (a, b) =>
+          new Date(b.connectedAt).getTime() - new Date(a.connectedAt).getTime(),
+      ),
+    [accounts],
+  );
+
+  const handleConnect = useCallback(async () => {
+    setConnectionState("loading");
+
+    try {
+      const startResponse = await fetch("/api/tiktok/start");
+      const startPayload = await startResponse.json().catch(() => null);
+
+      if (
+        !startResponse.ok ||
+        !startPayload ||
+        typeof startPayload.url !== "string"
+      ) {
+        throw new Error(
+          startPayload && typeof startPayload.error === "string"
+            ? startPayload.error
+            : "Unable to start TikTok OAuth flow",
+        );
+      }
+
+      window.location.href = startPayload.url;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "TikTok connection failed";
+      toast.error(message);
+      setConnectionState("idle");
+    }
+  }, []);
+
+  const renderAccountLabel = useCallback((account: ConnectedAccount) => {
+    return (
+      account.username ??
+      account.displayName ??
+      (account.unionId ? `ID ${account.unionId.slice(0, 8)}` : null) ??
+      `ID ${account.openId.slice(0, 8)}`
+    );
+  }, []);
+
+  const renderAccountInitials = useCallback(
+    (account: ConnectedAccount) => {
+      const label = renderAccountLabel(account).trim();
+      const letters = label.replace(/[^A-Za-z0-9]/g, "");
+      if (letters.length === 0) {
+        return "TT";
+      }
+      return letters.slice(0, 2).toUpperCase();
+    },
+    [renderAccountLabel],
+  );
+
+  return (
+    <Card className="max-w-xl">
+      <CardHeader>
+        <CardTitle>Connect TikTok</CardTitle>
+        <CardDescription>
+          Link your TikTok account to import and schedule posts directly from
+          SlidesCockpit.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          We will redirect you to TikTok to authorize access. After authorizing,
+          you will land back here automatically.
+        </p>
+
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Connected TikTok accounts</p>
+          {accountsLoading ? (
+            <p className="text-sm text-muted-foreground">Loading accounts…</p>
+          ) : sortedAccounts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No TikTok accounts connected yet.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {sortedAccounts.map((account) => (
+                <Badge
+                  key={account.openId}
+                  variant="secondary"
+                  className="flex items-center gap-2 pr-3"
+                >
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage
+                      alt={renderAccountLabel(account)}
+                      src={account.avatarUrl ?? undefined}
+                    />
+                    <AvatarFallback className="text-[10px]">
+                      {renderAccountInitials(account)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs font-medium">
+                    {renderAccountLabel(account)}
+                  </span>
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      </CardContent>
+      <CardFooter>
+        <Button
+          variant={connectionState === "loading" ? "loading" : "default"}
+          onClick={handleConnect}
+          disabled={connectionState === "loading"}
+        >
+          {connectionState === "loading" ? "Connecting..." : "Connect TikTok"}
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -27053,7 +28200,7 @@ export default function SlideCanvasBase({
           i === slideIndex
             ? {
                 ...s,
-                canvas: addText(withDefaults(s.canvas)),
+                canvas: addText(withDefaults(s.canvas ?? undefined)),
               }
             : s,
         ),
@@ -27094,9 +28241,25 @@ export default function SlideCanvasBase({
     slideWithExtras.position ?? defaultPosition,
   );
 
+  // Verhindert, dass während Drag-Operationen die Position durch den Default/Effekt überschrieben wird
+  const isDraggingTextRef = useRef(false);
+
   useEffect(() => {
-    setTextPosition(slideWithExtras.position ?? defaultPosition);
-  }, [slideWithExtras.position?.x, slideWithExtras.position?.y, defaultPosition]);
+    if (isDraggingTextRef.current) return;
+    const next = slideWithExtras.position ?? defaultPosition;
+    // Blockiere micro-jitters (±0.5px) durch Scale/Resize-Runden
+    const dx = Math.abs((next.x ?? 0) - (textPosition.x ?? 0));
+    const dy = Math.abs((next.y ?? 0) - (textPosition.y ?? 0));
+    if (dx > 0.5 || dy > 0.5) {
+      setTextPosition(next);
+    }
+  }, [
+    slideWithExtras.position?.x,
+    slideWithExtras.position?.y,
+    defaultPosition,
+    textPosition.x,
+    textPosition.y,
+  ]);
 
   const textContent = useMemo(() => {
     if (activeTextNode?.text) {
@@ -27105,11 +28268,26 @@ export default function SlideCanvasBase({
     return extractPlainText(slide.content ?? []);
   }, [activeTextNode?.text, slide.content]);
 
+  // während des Draggens live die UI-Position updaten (kontrollierte Komponente)
+  const handleDragMove = useCallback((event: any) => {
+    isDraggingTextRef.current = true;
+    const next = { x: event.target.x(), y: event.target.y() };
+    // keine Persistierung hier – nur UI-State
+    setTextPosition(next);
+  }, []);
+
+  const handleDragStart = useCallback(() => {
+    isDraggingTextRef.current = true;
+  }, []);
+
   const handleDragEnd = useCallback(
     (event: any) => {
       const next = { x: event.target.x(), y: event.target.y() };
+      // final: UI-State & Persistierung
       setTextPosition(next);
+      isDraggingTextRef.current = false;
       const { slides, setSlides } = usePresentationState.getState();
+
       setSlides(
         slides.map((s, index) => {
           if (index !== slideIndex) return s;
@@ -27117,7 +28295,8 @@ export default function SlideCanvasBase({
             ? {
                 ...s.canvas,
                 nodes: s.canvas.nodes.map((node) =>
-                  node.type === "text" && node.id === (activeTextNode?.id ?? node.id)
+                  // Nur genau den aktiven Text-Knoten persistieren, falls vorhanden
+                  node.type === "text" && activeTextNode?.id && node.id === activeTextNode.id
                     ? { ...node, x: next.x, y: next.y }
                     : node,
                 ),
@@ -27179,6 +28358,8 @@ export default function SlideCanvasBase({
               />
             )}
             <Text
+              // Stabiler Key pro Slide, nicht pro Node-Wechsel → kein Remount beim Umschalten/Autosave
+              key={`text-slide-${slide.id}`}
               text={textContent}
               fontSize={32}
               fontFamily="TikTok Sans, sans-serif"
@@ -27186,7 +28367,24 @@ export default function SlideCanvasBase({
               x={textPosition.x}
               y={textPosition.y}
               draggable={!disableDrag}
+              // kontrolliertes Dragging:
+              onDragStart={handleDragStart}
+              onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}
+              visible={true}
+              opacity={1}
+              listening={true}
+              // verhindert "Wegschnappen" außerhalb der Bühne
+              dragBoundFunc={(pos) => ({
+                x: Math.min(
+                  Math.max(0, pos.x),
+                  stageDimensions.width - 10
+                ),
+                y: Math.min(
+                  Math.max(0, pos.y),
+                  stageDimensions.height - 10
+                ),
+              })}
               shadowColor="rgba(0,0,0,0.45)"
               shadowBlur={8}
               shadowOpacity={0.8}
@@ -40811,7 +42009,7 @@ import LayoutImageDrop from "./dnd/components/LayoutImageDrop";
 import { presentationPlugins } from "./plugins";
 import PresentationEditorStaticView from "./presentation-editor-static";
 // Canvas (Polotno-like)
-import SlideCanvas from "@/canvas/SlideCanvas";
+import SlideCanvasAdapter from "@/canvas/SlideCanvasAdapter";
 import type { CanvasDoc } from "@/canvas/types";
 
 function slideSignature(slide?: PlateSlide): string {
@@ -40962,8 +42160,8 @@ const PresentationEditor = React.memo(
             data-slide-content="true"
           >
             {/* Canvas */}
-            <SlideCanvas
-              value={initialContent.canvas as CanvasDoc}
+            <SlideCanvasAdapter
+              doc={initialContent.canvas as CanvasDoc}
               onChange={(next: CanvasDoc) => {
                 // Slides im globalen State aktualisieren (inkl. optionalem Preview)
                 const { slides, setSlides } = usePresentationState.getState();
@@ -42763,6 +43961,7 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
 }) {
   const safeCanvas: CanvasDoc =
     (slide.canvas as CanvasDoc | undefined) ?? {
+      version: DEFAULT_CANVAS.version,
       width: DEFAULT_CANVAS.width,
       height: DEFAULT_CANVAS.height,
       bg: DEFAULT_CANVAS.bg,
@@ -42786,9 +43985,27 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
                   if (i < 0) return;
                   const current = updated[i];
                   if (!current) return;
-                  // Nur setzen, wenn sich was geändert hat (verhindert Re-Mount-Bursts)
-                  if (current.canvas !== next) {
-                    updated[i] = { ...current, canvas: next };
+
+                  const currCanvas = current.canvas as CanvasDoc | undefined;
+
+                  // 🛡️ SAFETY MERGE: verliere nie Textknoten beim Update
+                  const currTextNodes = Array.isArray(currCanvas?.nodes)
+                    ? (currCanvas!.nodes.filter((n: any) => n?.type === "text"))
+                    : [];
+                  const nextTextNodes = Array.isArray(next?.nodes)
+                    ? (next!.nodes.filter((n: any) => n?.type === "text"))
+                    : [];
+
+                  let merged: CanvasDoc = next;
+                  if (currTextNodes.length > 0 && nextTextNodes.length === 0) {
+                    // Race: next hat (noch) keine Texte → Texte aus current konservieren
+                    const otherNodes = Array.isArray(next?.nodes) ? next.nodes.filter((n: any) => n?.type !== "text") : [];
+                    merged = { ...next, nodes: [...otherNodes, ...currTextNodes] };
+                  }
+
+                  // Nur setzen, wenn sich tatsächlich was geändert hat
+                  if (currCanvas !== merged) {
+                    updated[i] = { ...current, canvas: merged };
                     setSlides(updated);
                   }
                 }}
@@ -45291,15 +46508,14 @@ export function applyBackgroundImageToCanvas(
   canvas: CanvasDoc | null | undefined,
   imageUrl?: string | null,
 ): CanvasDoc {
+  // Starte IMMER vom bestehenden Canvas und erhalte ALLE Nicht-Image-Nodes
   const base: CanvasDoc = {
     version: canvas?.version ?? 1,
     width: canvas?.width ?? CANVAS_WIDTH,
     height: canvas?.height ?? CANVAS_HEIGHT,
     bg: canvas?.bg ?? DEFAULT_CANVAS.bg,
-    nodes: [...(canvas?.nodes ?? [])],
-    selection: Array.isArray(canvas?.selection)
-      ? [...(canvas?.selection ?? [])]
-      : [],
+    nodes: Array.isArray(canvas?.nodes) ? [...canvas!.nodes] : [],
+    selection: Array.isArray(canvas?.selection) ? [...(canvas!.selection as any[])] : [],
     previewDataUrl: canvas?.previewDataUrl,
   };
 
@@ -45317,26 +46533,24 @@ export function applyBackgroundImageToCanvas(
     url: imageUrl,
   };
 
-  const existingIndex = base.nodes.findIndex((node) => node.type === "image");
-  if (existingIndex >= 0) {
-    const existing = base.nodes[existingIndex] as any;
-    // 🔒 Idempotent: nur ersetzen, wenn sich die URL wirklich geändert hat
-    const sameUrl =
-      typeof existing?.url === "string" &&
-      typeof imageNode.url === "string" &&
-      existing.url === imageNode.url;
-    const sameSize =
-      existing?.width === imageNode.width && existing?.height === imageNode.height;
+  // Entferne ausschließlich den bisherigen BG-Image-Knoten (falls vorhanden),
+  // erhalte aber ALLE anderen Nodes (v. a. Text!)
+  const withoutBg = base.nodes.filter((n: any) => !(n?.type === "image" && n?.id === "canvas-background-image"));
+
+  // Prüfe Idempotenz: existiert bereits der gleiche BG?
+  const prevBg = base.nodes.find((n: any) => n?.type === "image" && n?.id === "canvas-background-image") as any;
+  if (prevBg) {
+    const sameUrl = prevBg.url === imageNode.url;
+    const sameSize = prevBg.width === imageNode.width && prevBg.height === imageNode.height;
     if (sameUrl && sameSize) {
-      // nichts ändern → kein Re-Render/Reload des Bildes
-      return base;
+      // nichts ändern
+      return { ...base, nodes: base.nodes };
     }
-    base.nodes[existingIndex] = imageNode;
-  } else {
-    base.nodes.unshift(imageNode);
   }
 
-  return base;
+  // BG-Image immer als unterstes Element einfügen
+  const mergedNodes = [imageNode, ...withoutBg];
+  return { ...base, nodes: mergedNodes };
 }
 
 export function buildCanvasDocFromSlide(
@@ -83153,6 +84367,7 @@ export const env = createEnv({
       process.env.NODE_ENV === "production"
         ? z.string()
         : z.string().optional(),
+    SLIDESCOCKPIT_API: z.string().url(),
   },
 
   runtimeEnv: {
@@ -83166,6 +84381,7 @@ export const env = createEnv({
     TOGETHER_AI_API_KEY: process.env.TOGETHER_AI_API_KEY,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+    SLIDESCOCKPIT_API: process.env.SLIDESCOCKPIT_API,
   },
 
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
@@ -85051,7 +86267,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  const isPublicPath = path === "/";
+  const publicPaths = new Set(["/"]);
+  const isPublicPath =
+    publicPaths.has(path) || path.startsWith("/integrations/social/tiktok");
 
   // If user is not authenticated and trying to access a protected route, redirect to sign-in
   if (
