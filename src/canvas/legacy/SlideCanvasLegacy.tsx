@@ -375,13 +375,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
   // Aktuelle Auswahl als Ref, damit Keydown (Capture) IMMER die sichtbare Auswahl löscht (keine stale Closure)
   const activeLayerIdRef = useRef<string | null>(null);
-  const commitActiveLayer = useCallback(
-    (id: string | null) => {
-      setActiveLayerId(id);
-      activeLayerIdRef.current = id;
-    },
-    [],
-  );
+  const commitActiveLayer = useCallback((id: string | null) => {
+    setActiveLayerId(id);
+    activeLayerIdRef.current = id;
+  }, []);
 
   // State ↔ Ref synchron halten
   useEffect(() => {
@@ -666,25 +663,29 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         if (l.id !== activeLayerId) return l;
 
         if (mode === "resize-left" || mode === "resize-right") {
-          const s =
-            1 +
-            (mode === "resize-right" ? dx : -dx) /
-              Math.max(1, layerStart.width);
-          const width = Math.max(MIN_W, Math.round(layerStart.width * s));
-          // Breite ändern → Auto-Höhe neu berechnen
-          const temp = { ...l, width } as TextLayer & { autoHeight?: boolean };
-          if (l.autoHeight) {
-            const lines = computeWrappedLinesWithDOM({
-              ...temp,
-              italic: (temp as any).italic,
-            });
-            temp.height = Math.ceil(
-              computeAutoHeightForLayer(
-                { ...temp, italic: (temp as any).italic },
-                lines,
-              ),
-            );
-          }
+          // Horizontal resize – Höhe SOFORT neu berechnen (live wrap)
+          const dx = now.x - start.x;
+          const delta = mode === "resize-left" ? -dx : dx;
+          const nextW = Math.max(40, layerStart.width + delta);
+          // Immer Auto-Höhe bei horizontalem Resize → direkte Anpassung bei Zeilenumbruch
+          const textH = computeAutoHeightFromUtil({
+            content: l.content,
+            baseFontPx: BASE_FONT_PX,
+            scale: l.scale,
+            lineHeight: l.lineHeight,
+            letterSpacing: l.letterSpacing,
+            maxWidthPx: nextW - PADDING * 2,
+            fontFamily: l.fontFamily ?? "Inter",
+            fontWeight:
+              l.weight === "bold" ? 700 : l.weight === "semibold" ? 600 : 400,
+            italic: (l as any).italic ?? false,
+          });
+          const temp = {
+            ...l,
+            width: nextW,
+            height: Math.max(40, Math.ceil(textH + PADDING * 2)),
+          } as TextLayer & { autoHeight?: boolean };
+          (temp as any).autoHeight = true;
           return temp;
         }
 
@@ -740,12 +741,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         const p0 = rotatePoint(
           start.x - center.x,
           start.y - center.y,
-          -layerStart.rotation * Math.PI / 180,
+          (-layerStart.rotation * Math.PI) / 180,
         );
         const p1 = rotatePoint(
           now.x - center.x,
           now.y - center.y,
-          -layerStart.rotation * Math.PI / 180,
+          (-layerStart.rotation * Math.PI) / 180,
         );
 
         const startLen = Math.hypot(p0.x, p0.y) || 1;
@@ -852,7 +853,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         // Wir erlauben außerdem Meta/Ctrl+Backspace, solange kein Input fokussiert ist.
         ((e.metaKey || e.ctrlKey) && e.key === "Backspace");
 
-      if (isDeleteKey && !isInputFocused && selectedId && isEditingRef.current === null) {
+      if (
+        isDeleteKey &&
+        !isInputFocused &&
+        selectedId &&
+        isEditingRef.current === null
+      ) {
         e.preventDefault();
         e.stopPropagation();
         setTextLayers((prev) => {
@@ -934,8 +940,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const top = layer.y - halfH;
       const bottom = layer.y + halfH;
 
-      const fullyOutside =
-        right < 0 || left > W || bottom < 0 || top > H;
+      const fullyOutside = right < 0 || left > W || bottom < 0 || top > H;
       if (fullyOutside) continue;
 
       const lines = computeWrappedLinesWithDOM(layer as any);
@@ -1615,8 +1620,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                   {/* === Handles (größer + modernere Hitbox) INSIDE der Box === */}
                   {isActive && !isCurrentEditing && (
                     <div
-                      className="absolute inset-0"
-                      style={{ pointerEvents: "none" }}
+                      className="absolute inset-0 overflow-visible"
+                      style={{ pointerEvents: "none", overflow: "visible" }}
                     >
                       {/* ---- Ecken (größere Handles) ---- */}
                       <div
@@ -1628,7 +1633,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                           startResize(layer.id, "resize-nw", e)
                         }
                       >
-                        <div className="h-4 w-4 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-8 w-8 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
@@ -1639,7 +1644,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                           startResize(layer.id, "resize-ne", e)
                         }
                       >
-                        <div className="h-4 w-4 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-8 w-8 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
@@ -1650,7 +1655,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                           startResize(layer.id, "resize-sw", e)
                         }
                       >
-                        <div className="h-4 w-4 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-8 w-8 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
@@ -1661,20 +1666,20 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                           startResize(layer.id, "resize-se", e)
                         }
                       >
-                        <div className="h-4 w-4 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-8 w-8 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
 
                       {/* ---- Seiten (größere Balken-Handles) ---- */}
                       <div
                         data-role="handle"
                         title="Breite ändern (links)"
-                        className="absolute left-0 top-1/2 w-7 h-10 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
+                        className="absolute left-0 top-1/2 w-9 h-10 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-left", e)
                         }
                       >
-                        <div className="h-7 w-[10px] rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-16 w-[12px] rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
@@ -1685,7 +1690,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                           startResize(layer.id, "resize-right", e)
                         }
                       >
-                        <div className="h-7 w-[10px] rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-16 w-[12px] rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
@@ -1696,7 +1701,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                           startResize(layer.id, "resize-top", e)
                         }
                       >
-                        <div className="h-[10px] w-7 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-[12px] w-16 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
@@ -1707,7 +1712,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                           startResize(layer.id, "resize-bottom", e)
                         }
                       >
-                        <div className="h-[10px] w-7 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-[12px] w-16 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                     </div>
                   )}
