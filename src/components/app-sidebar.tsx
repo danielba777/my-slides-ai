@@ -1,11 +1,5 @@
 "use client";
-import {
-  Home,
-  Images,
-  TestTube2,
-  UserPen,
-  type LucideIcon,
-} from "lucide-react";
+import { CalendarClock, Home, Images, TestTube2, UserPen, type LucideIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import {
@@ -59,6 +53,11 @@ const debugItems: SidebarItem[] = [
     title: "TikTok Posting",
     url: "/dashboard/tests/tiktok-post",
     icon: TestTube2,
+  },
+  {
+    title: "TikTok Scheduling",
+    url: "/dashboard/tests/tiktok-schedule",
+    icon: CalendarClock,
   },
 ];
 
