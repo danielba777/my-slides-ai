@@ -933,20 +933,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     for (const layer of sorted) {
       if (!layer.content) continue;
 
-      const halfW = (layer.width * layer.scale) / 2;
-      const halfH = (layer.height * layer.scale) / 2;
-      const left = layer.x - halfW;
-      const right = layer.x + halfW;
-      const top = layer.y - halfH;
-      const bottom = layer.y + halfH;
-
-      const fullyOutside = right < 0 || left > W || bottom < 0 || top > H;
-      if (fullyOutside) continue;
-
       const lines = computeWrappedLinesWithDOM(layer as any);
       const weight =
         layer.weight === "bold" ? 700 : layer.weight === "semibold" ? 600 : 400;
-      const scaledFontPx = BASE_FONT_PX * layer.scale;
       const italic = (layer as any).italic;
       const layerHeight =
         layer.height && layer.height > 0
@@ -961,11 +950,23 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               ),
             );
 
+      const scaleFactor = Math.max(0.001, layer.scale);
+      const halfW = (layer.width * scaleFactor) / 2;
+      const halfH = (layerHeight * scaleFactor) / 2;
+      const left = layer.x - halfW;
+      const right = layer.x + halfW;
+      const top = layer.y - halfH;
+      const bottom = layer.y + halfH;
+
+      const fullyOutside = right < 0 || left > W || bottom < 0 || top > H;
+      if (fullyOutside) continue;
+
       ctx.save();
       ctx.translate(layer.x, layer.y);
       ctx.rotate((layer.rotation * Math.PI) / 180);
+      ctx.scale(scaleFactor, scaleFactor);
 
-      // Clip exakt auf die Box inkl. Padding
+      // Clip exakt auf die Box inkl. Padding (Basis-Maße vor Skalierung)
       const boxLeft = -layer.width / 2;
       const boxTop = -layerHeight / 2;
       ctx.beginPath();
@@ -975,12 +976,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const contentWidth = Math.max(0, layer.width - 2 * PADDING);
       const contentHeight = Math.max(0, layerHeight - 2 * PADDING);
 
-      ctx.font = `${italic ? "italic " : ""}${weight} ${scaledFontPx}px ${layer.fontFamily}`;
+      ctx.font = `${italic ? "italic " : ""}${weight} ${BASE_FONT_PX}px ${layer.fontFamily}`;
       (ctx as any).fontKerning = "normal";
       ctx.fillStyle = layer.color;
       ctx.textBaseline = "alphabetic";
 
-      const lineHeightPx = scaledFontPx * layer.lineHeight;
+      const lineHeightPx = BASE_FONT_PX * layer.lineHeight;
       const startYTop = boxTop + PADDING + lineHeightPx;
       let y = startYTop;
 
@@ -1030,7 +1031,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         ox.strokeStyle = outlineColor;
         // Canvas-Stroke entspricht außen effektiv ~lineWidth/2.
         // Für Parität zum CSS-Preview (Radius r) setzen wir 2*r:
-        ox.lineWidth = 2 * (outlineWidth * layer.scale);
+        ox.lineWidth = 2 * outlineWidth;
 
         if (layer.letterSpacing === 0) {
           // ganze Zeile
