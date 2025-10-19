@@ -49,6 +49,7 @@ export function PresentationGenerationManager() {
     Array<{ query: string; results: unknown[] }> | null
   >(null);
   const titleExtractedRef = useRef<boolean>(false);
+  const outlineRequestInFlightRef = useRef(false);
 
   const extractTitle = (
     content: string,
@@ -240,7 +241,12 @@ export function PresentationGenerationManager() {
     const startOutlineGeneration = async (): Promise<void> => {
       if (!shouldStartOutlineGeneration) return;
 
+      if (outlineRequestInFlightRef.current) {
+        return;
+      }
+
       try {
+        outlineRequestInFlightRef.current = true;
         resetForNewGeneration();
         titleExtractedRef.current = false;
         setIsGeneratingOutline(true);
@@ -270,6 +276,7 @@ export function PresentationGenerationManager() {
         console.error("Outline generation failed:", error);
         toast.error("Unable to start outline generation.");
       } finally {
+        outlineRequestInFlightRef.current = false;
         setIsGeneratingOutline(false);
         setShouldStartOutlineGeneration(false);
       }
