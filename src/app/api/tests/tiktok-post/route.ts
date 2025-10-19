@@ -9,6 +9,8 @@ interface RequestPayload {
   mediaType?: "video" | "photo";
   thumbnailTimestampMs?: number;
   autoAddMusic?: boolean;
+  postMode?: "INBOX" | "PUBLISH" | "DIRECT_POST" | "MEDIA_UPLOAD";
+  contentPostingMethod?: "UPLOAD" | "MEDIA_UPLOAD" | "DIRECT_POST" | "URL";
 }
 
 export async function POST(request: Request) {
@@ -22,8 +24,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing openId or mediaUrl" }, { status: 400 });
   }
 
+  const inferredContentMethod =
+    body.contentPostingMethod ??
+    (body.mediaType === "photo"
+      ? body.postMode === "INBOX" || body.postMode === "MEDIA_UPLOAD"
+        ? "MEDIA_UPLOAD"
+        : "DIRECT_POST"
+      : "UPLOAD");
+
   const payload = {
     caption: body.caption ?? "",
+    postMode: body.postMode ?? (inferredContentMethod === "MEDIA_UPLOAD" ? "INBOX" : "PUBLISH"),
     media: [
       body.mediaType === "photo"
         ? {
@@ -37,8 +48,8 @@ export async function POST(request: Request) {
           },
     ],
     settings: {
-      contentPostingMethod: "UPLOAD",
-      privacyLevel: "SELF_ONLY",
+      contentPostingMethod: inferredContentMethod,
+      privacyLevel: "SELF_ONLY" as const,
       duet: false,
       comment: false,
       stitch: false,
@@ -51,7 +62,9 @@ export async function POST(request: Request) {
 
   try {
     const response = await fetch(
-      `${env.SLIDESCOCKPIT_API}/integrations/social/tiktok/${encodeURIComponent(body.openId)}/post`,
+      `${env.SLIDESCOCKPIT_API}/integrations/social/tiktok/${encodeURIComponent(
+        body.openId,
+      )}/post?async=true`,
       {
         method: "POST",
         headers: {
