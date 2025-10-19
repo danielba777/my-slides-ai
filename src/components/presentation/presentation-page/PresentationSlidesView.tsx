@@ -1,6 +1,7 @@
 "use client";
 
 import { DEFAULT_CANVAS, type CanvasDoc } from "@/canvas/types";
+import { applyBackgroundImageToCanvas } from "@/components/presentation/utils/canvas";
 import { SlideContainer } from "@/components/presentation/presentation-page/SlideContainer";
 import { usePresentationSlides } from "@/hooks/presentation/usePresentationSlides";
 import { useSlideChangeWatcher } from "@/hooks/presentation/useSlideChangeWatcher";
@@ -65,6 +66,8 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
       selection: [],
     };
   const imgUrl = slide.rootImage?.url as string | undefined;
+  // BG-Image direkt in den Canvas-Daten verankern, ohne Text zu verlieren
+  const docWithBg = applyBackgroundImageToCanvas(safeCanvas, imgUrl);
   const imageReady = useImageReady(imgUrl);
   return (
     <SortableSlide id={slide.id} key={slide.id}>
@@ -73,7 +76,7 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
           <div className={cn(`slide-container-${index}`, isPresenting && "h-screen w-screen")}>
             {imageReady ? (
               <SlideCanvas
-                doc={safeCanvas}
+                doc={docWithBg}
                 onChange={(next: CanvasDoc) => {
                   const { slides, setSlides } = usePresentationState.getState();
                   const updated = slides.slice();
@@ -107,13 +110,10 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
                 }}
               />
             ) : (
-              // Stabiler Placeholder verhindert Schwarz-Frames & Text-Flackern
-              <div
-                className={cn(
-                  "rounded-xl",
-                  isPresenting ? "h-screen w-screen" : "h-[700px] w-[420px]",
-                  "bg-black/90"
-                )}
+              // Stabiles Placeholder, aber KEIN Entfernen/Neu-Erzeugen der Nodes
+              <SlideCanvas
+                doc={docWithBg}
+                onChange={() => {}}
               />
             )}
           </div>

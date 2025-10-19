@@ -122,6 +122,13 @@ export function buildCanvasDocFromSlide(
     previewDataUrl: slide.canvas?.previewDataUrl,
   };
 
+  // 🔒 WICHTIG: Wenn bereits ein Canvas mit Nodes existiert, NIEMALS neu aufbauen.
+  // Das verhindert, dass Text/Elemente beim Rendern "zurückspringen".
+  if (Array.isArray(slide.canvas?.nodes) && slide.canvas!.nodes.length > 0) {
+    const withBg = applyBackgroundImageToCanvas(slide.canvas, slide.rootImage?.url);
+    return { canvas: withBg, position: slide.position };
+  }
+
   let textPosition: { x: number; y: number } | undefined;
   if (segments.length > 0) {
     const content = segments.join("\n\n");
