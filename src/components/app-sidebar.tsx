@@ -1,5 +1,11 @@
 "use client";
-import { Home, Images, TestTube2, UserPen, type LucideIcon } from "lucide-react";
+import {
+  Home,
+  Images,
+  TestTube2,
+  UserPen,
+  type LucideIcon,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 
 import {
@@ -37,11 +43,6 @@ const playgroundItems: SidebarItem[] = [
     url: "/dashboard/slideshows",
     icon: Images,
   },
-  {
-    title: "TikTok Posting Test",
-    url: "/dashboard/tests/tiktok-post",
-    icon: TestTube2,
-  },
 ];
 
 // Configuration items.
@@ -50,6 +51,14 @@ const configurationItems: SidebarItem[] = [
     title: "Connections",
     url: "/dashboard/connections",
     icon: UserPen,
+  },
+];
+
+const debugItems: SidebarItem[] = [
+  {
+    title: "TikTok Posting",
+    url: "/dashboard/tests/tiktok-post",
+    icon: TestTube2,
   },
 ];
 
@@ -107,6 +116,25 @@ export function AppSidebar() {
                     <a href={item.url}>
                       <item.icon className="w-5 h-5" />
                       <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-red-500">DEBUG</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {debugItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild className="font-semibold">
+                    <a href={item.url}>
+                      <item.icon className="w-5 h-5 text-red-500" />
+                      <span className="font-semibold text-red-500">
+                        {item.title}
+                      </span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
