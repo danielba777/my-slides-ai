@@ -3,11 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
 interface TikTokPostPayload {
@@ -70,7 +76,9 @@ export default function TikTokPostingTestPage() {
     const load = async () => {
       setAccountsLoading(true);
       try {
-        const response = await fetch("/api/tiktok/accounts", { cache: "no-store" });
+        const response = await fetch("/api/tiktok/accounts", {
+          cache: "no-store",
+        });
         const payload = await response.json().catch(() => null);
         if (!response.ok || !Array.isArray(payload)) {
           throw new Error(
@@ -87,7 +95,8 @@ export default function TikTokPostingTestPage() {
           }
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Unable to load TikTok accounts";
+        const message =
+          err instanceof Error ? err.message : "Unable to load TikTok accounts";
         if (active) {
           setAccounts([]);
           toast.error(message);
@@ -120,9 +129,15 @@ export default function TikTokPostingTestPage() {
     }
   }, [accounts, form.openId]);
 
-  const updateField = useCallback(<K extends keyof TikTokPostPayload>(key: K, value: TikTokPostPayload[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }, []);
+  const updateField = useCallback(
+    <K extends keyof TikTokPostPayload>(
+      key: K,
+      value: TikTokPostPayload[K],
+    ) => {
+      setForm((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
 
   const pollStatus = useCallback(
     async (openId: string, publishId: string): Promise<StatusResponse> => {
@@ -140,7 +155,10 @@ export default function TikTokPostingTestPage() {
 
         if (!response.ok || !payload || typeof payload !== "object" || !("status" in payload)) {
           const message =
-            payload && typeof payload.error === "string"
+            payload &&
+            typeof payload === "object" &&
+            "error" in payload &&
+            typeof payload.error === "string"
               ? payload.error
               : "TikTok Status konnte nicht abgefragt werden";
           throw new Error(message);
@@ -153,7 +171,9 @@ export default function TikTokPostingTestPage() {
         await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
       }
 
-      throw new Error("TikTok Status blieb im Status 'processing'. Bitte versuche es später erneut.");
+      throw new Error(
+        "TikTok Status blieb im Status 'processing'. Bitte versuche es später erneut.",
+      );
     },
     [],
   );
@@ -189,11 +209,17 @@ export default function TikTokPostingTestPage() {
         }),
       });
 
-      const payload = (await response.json().catch(() => null)) as PostStartResponse | { error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as
+        | PostStartResponse
+        | { error?: string }
+        | null;
 
       if (!response.ok || !payload || typeof payload !== "object" || !("status" in payload)) {
         const message =
-          payload && typeof payload.error === "string"
+          payload &&
+          typeof payload === "object" &&
+          "error" in payload &&
+          typeof payload.error === "string"
             ? payload.error
             : "TikTok Posting fehlgeschlagen";
         setError(message);
@@ -223,7 +249,9 @@ export default function TikTokPostingTestPage() {
           }
         } catch (pollError) {
           const message =
-            pollError instanceof Error ? pollError.message : "TikTok Status konnte nicht abgefragt werden";
+            pollError instanceof Error
+              ? pollError.message
+              : "TikTok Status konnte nicht abgefragt werden";
           setError(message);
           toast.error(message);
         }
@@ -248,7 +276,8 @@ export default function TikTokPostingTestPage() {
       <div>
         <h1 className="text-3xl font-semibold">TikTok Posting Test</h1>
         <p className="text-muted-foreground">
-          Lade ein Asset über die Pre-Sign-Route hoch und teste danach das direkte Posting zu TikTok.
+          Lade ein Asset über die Pre-Sign-Route hoch und teste danach das
+          direkte Posting zu TikTok.
         </p>
       </div>
 
@@ -272,7 +301,8 @@ export default function TikTokPostingTestPage() {
                   <option>Keine TikTok Accounts verbunden</option>
                 )}
                 {accounts.map((account) => {
-                  const label = account.username ?? account.displayName ?? account.openId;
+                  const label =
+                    account.username ?? account.displayName ?? account.openId;
                   return (
                     <option key={account.openId} value={account.openId}>
                       {label}
@@ -287,7 +317,9 @@ export default function TikTokPostingTestPage() {
                 id="mediaUrl"
                 placeholder="https://files.slidescockpit.com/..."
                 value={form.mediaUrl}
-                onChange={(event) => updateField("mediaUrl", event.target.value)}
+                onChange={(event) =>
+                  updateField("mediaUrl", event.target.value)
+                }
               />
             </div>
           </div>
@@ -300,14 +332,16 @@ export default function TikTokPostingTestPage() {
                 className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 value={form.mediaType}
                 onChange={(event) => {
-                  const nextType = event.target.value as TikTokPostPayload["mediaType"];
+                  const nextType = event.target
+                    .value as TikTokPostPayload["mediaType"];
                   setForm((prev) => ({
                     ...prev,
                     mediaType: nextType,
                     postMode:
                       nextType === "photo"
                         ? "INBOX"
-                        : prev.postMode === "INBOX" || prev.postMode === "MEDIA_UPLOAD"
+                        : prev.postMode === "INBOX" ||
+                            prev.postMode === "MEDIA_UPLOAD"
                           ? "PUBLISH"
                           : prev.postMode,
                     contentPostingMethod:
@@ -324,7 +358,9 @@ export default function TikTokPostingTestPage() {
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="thumbnailTimestamp">Thumbnail Timestamp (ms)</Label>
+              <Label htmlFor="thumbnailTimestamp">
+                Thumbnail Timestamp (ms)
+              </Label>
               <Input
                 id="thumbnailTimestamp"
                 type="number"
@@ -332,7 +368,9 @@ export default function TikTokPostingTestPage() {
                 onChange={(event) =>
                   updateField(
                     "thumbnailTimestampMs",
-                    event.target.value === "" ? undefined : Number(event.target.value),
+                    event.target.value === ""
+                      ? undefined
+                      : Number(event.target.value),
                   )
                 }
                 disabled={form.mediaType !== "video"}
@@ -348,7 +386,10 @@ export default function TikTokPostingTestPage() {
                 className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 value={form.postMode}
                 onChange={(event) =>
-                  updateField("postMode", event.target.value as TikTokPostPayload["postMode"])
+                  updateField(
+                    "postMode",
+                    event.target.value as TikTokPostPayload["postMode"],
+                  )
                 }
               >
                 <option value="INBOX">Inbox (Draft)</option>
@@ -357,7 +398,8 @@ export default function TikTokPostingTestPage() {
                 <option value="DIRECT_POST">TikTok Direct Post</option>
               </select>
               <p className="text-sm text-muted-foreground">
-                Inbox entspricht TikToks Draft-Flow. Für Direct Publish wähle PUBLISH/DIRECT_POST.
+                Inbox entspricht TikToks Draft-Flow. Für Direct Publish wähle
+                PUBLISH/DIRECT_POST.
               </p>
             </div>
             <div className="space-y-2">
@@ -369,17 +411,21 @@ export default function TikTokPostingTestPage() {
                 onChange={(event) =>
                   updateField(
                     "contentPostingMethod",
-                    event.target.value as TikTokPostPayload["contentPostingMethod"],
+                    event.target
+                      .value as TikTokPostPayload["contentPostingMethod"],
                   )
                 }
               >
                 <option value="UPLOAD">Upload (Videos)</option>
-                <option value="MEDIA_UPLOAD">Media Upload (Inbox/Drafts)</option>
+                <option value="MEDIA_UPLOAD">
+                  Media Upload (Inbox/Drafts)
+                </option>
                 <option value="DIRECT_POST">Direct Post</option>
                 <option value="URL">Pull from URL</option>
               </select>
               <p className="text-sm text-muted-foreground">
-                Muss zu TikToks post_mode passen. MEDIA_UPLOAD sendet Inhalte in den Inbox-Entwurf.
+                Muss zu TikToks post_mode passen. MEDIA_UPLOAD sendet Inhalte in
+                den Inbox-Entwurf.
               </p>
             </div>
           </div>
@@ -399,7 +445,9 @@ export default function TikTokPostingTestPage() {
             <Switch
               id="auto-music"
               checked={form.autoAddMusic}
-              onCheckedChange={(checked) => updateField("autoAddMusic", checked)}
+              onCheckedChange={(checked) =>
+                updateField("autoAddMusic", checked)
+              }
             />
             <div>
               <Label htmlFor="auto-music">Automatische Musik hinzufügen</Label>
@@ -410,7 +458,10 @@ export default function TikTokPostingTestPage() {
           </div>
         </CardContent>
         <CardFooter className="flex items-center gap-4">
-          <Button onClick={handleSubmit} disabled={submitting || accountsLoading || accounts.length === 0}>
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting || accountsLoading || accounts.length === 0}
+          >
             {submitting ? "Posting & Polling..." : "TikTok Post auslösen"}
           </Button>
           {error && <p className="text-sm text-destructive">{error}</p>}
@@ -424,7 +475,8 @@ export default function TikTokPostingTestPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             <p>
-              <span className="font-semibold">Publish ID:</span> {result.publishId}
+              <span className="font-semibold">Publish ID:</span>{" "}
+              {result.publishId}
             </p>
             {result.postId && (
               <p>
@@ -445,7 +497,8 @@ export default function TikTokPostingTestPage() {
               </p>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Keine Release URL verfügbar – bei Inbox-Posts liefert TikTok keine URL.
+                Keine Release URL verfügbar – bei Inbox-Posts liefert TikTok
+                keine URL.
               </p>
             )}
             <p>
@@ -457,4 +510,3 @@ export default function TikTokPostingTestPage() {
     </div>
   );
 }
-
