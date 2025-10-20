@@ -1,4 +1,5 @@
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { AppLogo } from "@/components/logo/AppLogo";
 import { auth } from "@/server/auth";
 import { redirect } from "next/navigation";
 
@@ -12,9 +13,12 @@ export default async function Home() {
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted">
       <header className="border-b border-border/60">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-          <span className="text-lg font-semibold tracking-tight text-foreground">
-            SlidesCockpit
-          </span>
+          <div className="flex items-center gap-2">
+            <AppLogo size={32} />
+            <span className="text-lg font-semibold tracking-tight text-foreground">
+              SlidesCockpit
+            </span>
+          </div>
           <GoogleSignInButton />
         </div>
       </header>
