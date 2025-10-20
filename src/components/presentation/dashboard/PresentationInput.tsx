@@ -17,7 +17,7 @@ export function PresentationInput({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-sm font-semibold text-foreground">
-          What would you like to present about?
+          Describe your presentation with a detailed prompt
         </h2>
         <Button
           variant="outline"
@@ -40,7 +40,7 @@ export function PresentationInput({
               handleGenerate();
             }
           }}
-          placeholder="Describe your topic or paste your content here. Our AI will structure it into a compelling presentation."
+          placeholder={`Example: "I want 6 slides about 'underrated habits that build structure' with the first slide text saying ..."`}
           className="h-40 w-full resize-none rounded-lg border border-border bg-card px-4 py-3.5 pb-14 text-base text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
         />
 
