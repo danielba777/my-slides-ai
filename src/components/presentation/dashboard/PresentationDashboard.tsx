@@ -39,7 +39,7 @@ export function PresentationDashboard({
 
   const handleGenerate = async () => {
     if (!presentationInput.trim()) {
-      toast.error("Please enter a topic for your presentation");
+      toast.error("Please enter an AI prompt for your presentation");
       return;
     }
 
@@ -48,7 +48,7 @@ export function PresentationDashboard({
 
     try {
       const result = await createEmptyPresentation(
-        presentationInput.substring(0, 50) || "Untitled Presentation",
+        derivePresentationTitleFromPrompt(presentationInput),
         theme,
         language,
       );
@@ -113,4 +113,26 @@ export function PresentationDashboard({
       </div>
     </div>
   );
+}
+
+function derivePresentationTitleFromPrompt(prompt: string): string {
+  const trimmed = prompt.trim();
+  if (!trimmed) return "Untitled Presentation";
+
+  const aboutPattern = trimmed.match(/slides?\s+(?:about|on)\s+['\"]?([^'\"\n]+)['\"]?/i);
+  if (aboutPattern && aboutPattern[1]) {
+    return toTitleCase(aboutPattern[1].trim()).slice(0, 80) || "Untitled Presentation";
+  }
+
+  const firstLine = trimmed.split(/\r?\n/)[0] ?? trimmed;
+  const firstSentence = firstLine.split(/(?<=[.!?])/)[0];
+  const fallback = firstSentence || trimmed;
+  return toTitleCase(fallback).slice(0, 80) || "Untitled Presentation";
+}
+
+function toTitleCase(input: string): string {
+  return input.replace(/\w[\w']*/g, (word) => {
+    const lower = word.toLowerCase();
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  });
 }
