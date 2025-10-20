@@ -70,10 +70,17 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
   const imgUrl = slide.rootImage?.url as string | undefined;
 
   // Bild-URL CORS-sicher machen, damit Canvas-Export nicht "tainted" ist
-  const [safeImgUrl, setSafeImgUrl] = useState<string>(imgUrl);
+  const [safeImgUrl, setSafeImgUrl] = useState<string | undefined>(imgUrl);
   useEffect(() => {
     let active = true;
     let previousBlobUrl: string | null = null;
+    if (!imgUrl) {
+      setSafeImgUrl(undefined);
+      return () => {
+        active = false;
+        if (previousBlobUrl) revokeCorsSafeImageUrl(previousBlobUrl);
+      };
+    }
     (async () => {
       const safeUrl = await getCorsSafeImageUrl(imgUrl);
       if (!active) return;
