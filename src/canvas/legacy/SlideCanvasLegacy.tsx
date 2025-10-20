@@ -122,17 +122,19 @@ function computeWrappedLinesWithDOM(
 ): string[] {
   const weight =
     layer.weight === "bold" ? 700 : layer.weight === "semibold" ? 600 : 400;
-  const scaledFontPx = BASE_FONT_PX * (layer.scale ?? 1);
-  const lineHeightPx = scaledFontPx * (layer.lineHeight ?? 1.12);
+
+  // WICHTIG: Layout/Wrap passiert vor transform:scale → immer mit Basis-Font messen
+  const baseFontPx = BASE_FONT_PX;
+  const lineHeightPx = baseFontPx * (layer.lineHeight ?? 1.12);
 
   const result = measureWrappedText({
     text: String(layer.content ?? ""),
     fontFamily: layer.fontFamily ?? "Inter",
     fontWeight: weight,
     fontStyle: (layer as any).italic ? "italic" : "normal",
-    fontSizePx: scaledFontPx,
+    fontSizePx: baseFontPx,
     lineHeightPx,
-    maxWidthPx: layer.width,
+    maxWidthPx: Math.max(8, layer.width),
     letterSpacingPx: layer.letterSpacing ?? 0,
     whiteSpaceMode: "pre-wrap",
     wordBreakMode: "normal",
@@ -142,7 +144,7 @@ function computeWrappedLinesWithDOM(
   return result.lines;
 }
 
-/** Höhe automatisch bestimmen (lokal) – nutzt ausschließlich die Utility */
+/** Höhe automatisch bestimmen (lokal) – direkt über measureWrappedText (ohne Scale) */
 function computeAutoHeightForLayer(
   layerBase: TextLayer & { italic?: boolean },
   _lines?: string[],
@@ -153,22 +155,24 @@ function computeAutoHeightForLayer(
       : layerBase.weight === "semibold"
         ? 600
         : 400;
-  const scaledFontPx = BASE_FONT_PX * (layerBase.scale ?? 1);
-  const lineHeightPx = scaledFontPx * (layerBase.lineHeight ?? 1.12);
-  return computeAutoHeightFromUtil({
+
+  // Wrap/Höhe werden mit unskaliertem Font berechnet – Skalierung passiert via transform
+  const baseFontPx = BASE_FONT_PX;
+  const lineHeightPx = baseFontPx * (layerBase.lineHeight ?? 1.12);
+  const m = measureWrappedText({
     text: String(layerBase.content ?? ""),
     fontFamily: layerBase.fontFamily ?? "Inter",
     fontWeight: weight,
     fontStyle: (layerBase as any).italic ? "italic" : "normal",
-    fontSizePx: scaledFontPx,
+    fontSizePx: baseFontPx,
     lineHeightPx,
-    maxWidthPx: layerBase.width,
+    maxWidthPx: Math.max(8, layerBase.width),
     letterSpacingPx: layerBase.letterSpacing ?? 0,
     whiteSpaceMode: "pre-wrap",
     wordBreakMode: "normal",
-    width: layerBase.width,
     paddingPx: PADDING,
   });
+  return Math.max(40, Math.ceil(m.totalHeight));
 }
 
 /** Mapping: Props-Layout -> interne TextLayer (mit optionalen Editor-Feldern) */
@@ -375,13 +379,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
   // Aktuelle Auswahl als Ref, damit Keydown (Capture) IMMER die sichtbare Auswahl löscht (keine stale Closure)
   const activeLayerIdRef = useRef<string | null>(null);
-  const commitActiveLayer = useCallback(
-    (id: string | null) => {
-      setActiveLayerId(id);
-      activeLayerIdRef.current = id;
-    },
-    [],
-  );
+  const commitActiveLayer = useCallback((id: string | null) => {
+    setActiveLayerId(id);
+    activeLayerIdRef.current = id;
+  }, []);
 
   // State ↔ Ref synchron halten
   useEffect(() => {
@@ -666,25 +667,24 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         if (l.id !== activeLayerId) return l;
 
         if (mode === "resize-left" || mode === "resize-right") {
-          const s =
-            1 +
-            (mode === "resize-right" ? dx : -dx) /
-              Math.max(1, layerStart.width);
-          const width = Math.max(MIN_W, Math.round(layerStart.width * s));
-          // Breite ändern → Auto-Höhe neu berechnen
-          const temp = { ...l, width } as TextLayer & { autoHeight?: boolean };
-          if (l.autoHeight) {
-            const lines = computeWrappedLinesWithDOM({
-              ...temp,
-              italic: (temp as any).italic,
-            });
-            temp.height = Math.ceil(
-              computeAutoHeightForLayer(
-                { ...temp, italic: (temp as any).italic },
-                lines,
-              ),
-            );
-          }
+          // Horizontal resize – Höhe SOFORT neu berechnen (live wrap)
+          const dx = now.x - start.x;
+          const delta = mode === "resize-left" ? -dx : dx;
+          const nextW = Math.max(40, layerStart.width + delta);
+          // Immer Auto-Höhe bei horizontalem Resize → direkte Anpassung bei Zeilenumbruch
+          const computedHeight = Math.ceil(
+            computeAutoHeightForLayer({
+              ...l,
+              width: nextW,
+              italic: (l as any).italic,
+            } as any),
+          );
+          const temp = {
+            ...l,
+            width: nextW,
+            height: Math.max(40, computedHeight),
+          } as TextLayer & { autoHeight?: boolean };
+          (temp as any).autoHeight = true;
           return temp;
         }
 
@@ -698,20 +698,21 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             Math.round(layerStart.height * s),
           );
 
-          // Mindesthöhe basierend auf Content-Höhe sicherstellen
+          // Mindesthöhe basierend auf Content-Höhe sicherstellen (Messung ohne Scale)
           const weight =
             l.weight === "bold" ? 700 : l.weight === "semibold" ? 600 : 400;
-          const scaledFontPx = BASE_FONT_PX * l.scale;
-          const lineHeightPx = scaledFontPx * (l.lineHeight ?? 1.12);
+
+          const baseFontPx = BASE_FONT_PX;
+          const lineHeightPx = baseFontPx * (l.lineHeight ?? 1.12);
 
           const measureResult = measureWrappedText({
             text: String(l.content ?? ""),
             fontFamily: l.fontFamily ?? "Inter",
             fontWeight: weight,
             fontStyle: (l as any).italic ? "italic" : "normal",
-            fontSizePx: scaledFontPx,
+            fontSizePx: baseFontPx,
             lineHeightPx,
-            maxWidthPx: l.width,
+            maxWidthPx: Math.max(8, l.width),
             letterSpacingPx: l.letterSpacing ?? 0,
             whiteSpaceMode: "pre-wrap",
             wordBreakMode: "normal",
@@ -728,45 +729,53 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           return { ...l, height, autoHeight: false };
         }
 
-        const sign = {
-          "resize-se": { sx: 1, sy: 1 },
-          "resize-ne": { sx: 1, sy: -1 },
-          "resize-sw": { sx: -1, sy: 1 },
-          "resize-nw": { sx: -1, sy: -1 },
-        } as const;
-        const { sx, sy } = sign[mode as keyof typeof sign];
-        const sxFactor = 1 + (sx * dx) / Math.max(1, layerStart.width);
-        const syFactor = 1 + (sy * dy) / Math.max(1, layerStart.height);
-        let s = (sxFactor + syFactor) / 2;
-        s = Math.max(0.05, s);
+        // === Corner resize: scale ONLY the text (hug width), auto-height ===
+        // Need to implement rotatePoint function here
+        const rotatePoint = (x: number, y: number, angle: number) => {
+          const cos = Math.cos(angle);
+          const sin = Math.sin(angle);
+          return { x: x * cos - y * sin, y: x * sin + y * cos };
+        };
 
-        let nextW = layerStart.width * s;
-        let nextH = layerStart.height * s;
-        if (nextW < MIN_W) nextW = MIN_W;
-        if (nextH < MIN_H) nextH = MIN_H;
+        const center = { x: layerStart.x, y: layerStart.y };
+        const p0 = rotatePoint(
+          start.x - center.x,
+          start.y - center.y,
+          (-layerStart.rotation * Math.PI) / 180,
+        );
+        const p1 = rotatePoint(
+          now.x - center.x,
+          now.y - center.y,
+          (-layerStart.rotation * Math.PI) / 180,
+        );
 
-        const nextScale = Math.max(MIN_SCALE, layerStart.scale * s);
+        const startLen = Math.hypot(p0.x, p0.y) || 1;
+        const currLen = Math.hypot(p1.x, p1.y) || 1;
+        const s = currLen / startLen;
 
+        const nextScale = Math.max(0.2, layerStart.scale * s);
+
+        // Breite bleibt fix – Text soll Box nicht aufblasen
+        const keepW = Math.max(40, layerStart.width);
         const temp = {
           ...l,
-          width: Math.round(nextW),
-          height: Math.round(nextH),
           scale: nextScale,
-          fontSize: BASE_FONT_PX * nextScale,
+          width: keepW,
         } as TextLayer & { autoHeight?: boolean };
 
-        if (l.autoHeight) {
-          const lines = computeWrappedLinesWithDOM({
-            ...temp,
-            italic: (temp as any).italic,
-          });
-          temp.height = Math.ceil(
-            computeAutoHeightForLayer(
-              { ...temp, italic: (temp as any).italic },
-              lines,
-            ),
-          );
-        }
+        // Höhe immer neu aus Text berechnen (hug content)
+        const lines = computeWrappedLinesWithDOM({
+          ...temp,
+          italic: (temp as any).italic,
+        });
+        temp.height = Math.ceil(
+          computeAutoHeightForLayer(
+            { ...temp, italic: (temp as any).italic },
+            lines,
+          ),
+        );
+        (temp as any).autoHeight = true;
+
         return temp;
       }),
     );
@@ -844,7 +853,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         // Wir erlauben außerdem Meta/Ctrl+Backspace, solange kein Input fokussiert ist.
         ((e.metaKey || e.ctrlKey) && e.key === "Backspace");
 
-      if (isDeleteKey && !isInputFocused && selectedId && isEditingRef.current === null) {
+      if (
+        isDeleteKey &&
+        !isInputFocused &&
+        selectedId &&
+        isEditingRef.current === null
+      ) {
         e.preventDefault();
         e.stopPropagation();
         setTextLayers((prev) => {
@@ -914,7 +928,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     }
     // === ENDE NEU ===
 
-    // Text
+    // Text (skip fully off-canvas)
     const sorted = [...textLayers].sort((a, b) => a.zIndex - b.zIndex);
     for (const layer of sorted) {
       if (!layer.content) continue;
@@ -922,7 +936,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const lines = computeWrappedLinesWithDOM(layer as any);
       const weight =
         layer.weight === "bold" ? 700 : layer.weight === "semibold" ? 600 : 400;
-      const scaledFontPx = BASE_FONT_PX * layer.scale;
       const italic = (layer as any).italic;
       const layerHeight =
         layer.height && layer.height > 0
@@ -937,11 +950,23 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               ),
             );
 
+      const scaleFactor = Math.max(0.001, layer.scale);
+      const halfW = (layer.width * scaleFactor) / 2;
+      const halfH = (layerHeight * scaleFactor) / 2;
+      const left = layer.x - halfW;
+      const right = layer.x + halfW;
+      const top = layer.y - halfH;
+      const bottom = layer.y + halfH;
+
+      const fullyOutside = right < 0 || left > W || bottom < 0 || top > H;
+      if (fullyOutside) continue;
+
       ctx.save();
       ctx.translate(layer.x, layer.y);
       ctx.rotate((layer.rotation * Math.PI) / 180);
+      ctx.scale(scaleFactor, scaleFactor);
 
-      // Clip exakt auf die Box inkl. Padding
+      // Clip exakt auf die Box inkl. Padding (Basis-Maße vor Skalierung)
       const boxLeft = -layer.width / 2;
       const boxTop = -layerHeight / 2;
       ctx.beginPath();
@@ -951,12 +976,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const contentWidth = Math.max(0, layer.width - 2 * PADDING);
       const contentHeight = Math.max(0, layerHeight - 2 * PADDING);
 
-      ctx.font = `${italic ? "italic " : ""}${weight} ${scaledFontPx}px ${layer.fontFamily}`;
+      ctx.font = `${italic ? "italic " : ""}${weight} ${BASE_FONT_PX}px ${layer.fontFamily}`;
       (ctx as any).fontKerning = "normal";
       ctx.fillStyle = layer.color;
       ctx.textBaseline = "alphabetic";
 
-      const lineHeightPx = scaledFontPx * layer.lineHeight;
+      const lineHeightPx = BASE_FONT_PX * layer.lineHeight;
       const startYTop = boxTop + PADDING + lineHeightPx;
       let y = startYTop;
 
@@ -1006,7 +1031,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         ox.strokeStyle = outlineColor;
         // Canvas-Stroke entspricht außen effektiv ~lineWidth/2.
         // Für Parität zum CSS-Preview (Radius r) setzen wir 2*r:
-        ox.lineWidth = 2 * (outlineWidth * layer.scale);
+        ox.lineWidth = 2 * outlineWidth;
 
         if (layer.letterSpacing === 0) {
           // ganze Zeile
@@ -1593,102 +1618,102 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                     </div>
                   )}
 
-                  {/* === Handles INSIDE the box so they inherit rotation/scale and stay attached === */}
+                  {/* === Handles (größer + modernere Hitbox) INSIDE der Box === */}
                   {isActive && !isCurrentEditing && (
                     <div
-                      className="absolute inset-0"
-                      style={{ pointerEvents: "none" }}
+                      className="absolute inset-0 overflow-visible"
+                      style={{ pointerEvents: "none", overflow: "visible" }}
                     >
-                      {/* Corners: großer klickbarer Wrapper, kleiner sichtbarer Punkt */}
+                      {/* ---- Ecken (größere Handles) ---- */}
                       <div
                         data-role="handle"
-                        title="Größe (proportional + Text)"
-                        className="absolute top-0 left-0 w-5 h-5 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
+                        title="Größe proportional ändern"
+                        className="absolute top-0 left-0 w-7 h-7 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-nw", e)
                         }
                       >
-                        <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-8 w-8 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
-                        title="Größe (proportional + Text)"
-                        className="absolute top-0 right-0 w-5 h-5 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
+                        title="Größe proportional ändern"
+                        className="absolute top-0 right-0 w-7 h-7 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-ne", e)
                         }
                       >
-                        <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-8 w-8 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
-                        title="Größe (proportional + Text)"
-                        className="absolute bottom-0 left-0 w-5 h-5 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
+                        title="Größe proportional ändern"
+                        className="absolute bottom-0 left-0 w-7 h-7 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-sw", e)
                         }
                       >
-                        <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-8 w-8 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
-                        title="Größe (proportional + Text)"
-                        className="absolute bottom-0 right-0 w-5 h-5 translate-x-1/2 translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
+                        title="Größe proportional ändern"
+                        className="absolute bottom-0 right-0 w-7 h-7 translate-x-1/2 translate-y-1/2 cursor-nwse-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-se", e)
                         }
                       >
-                        <div className="h-3 w-3 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-8 w-8 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
 
-                      {/* Sides: großer klickbarer Wrapper, schmaler sichtbarer Balken */}
+                      {/* ---- Seiten (größere Balken-Handles) ---- */}
                       <div
                         data-role="handle"
-                        title="Breite (links)"
-                        className="absolute left-0 top-1/2 w-5 h-8 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
+                        title="Breite ändern (links)"
+                        className="absolute left-0 top-1/2 w-9 h-10 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-left", e)
                         }
                       >
-                        <div className="h-6 w-2 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-16 w-[12px] rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
-                        title="Breite (rechts)"
-                        className="absolute right-0 top-1/2 w-5 h-8 translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
+                        title="Breite ändern (rechts)"
+                        className="absolute right-0 top-1/2 w-7 h-10 translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-right", e)
                         }
                       >
-                        <div className="h-6 w-2 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-16 w-[12px] rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
                         title="Höhe (oben)"
-                        className="absolute top-0 left-1/2 w-8 h-5 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize flex items-center justify-center"
+                        className="absolute top-0 left-1/2 w-10 h-7 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-top", e)
                         }
                       >
-                        <div className="h-2 w-6 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-[12px] w-16 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                       <div
                         data-role="handle"
                         title="Höhe (unten)"
-                        className="absolute bottom-0 left-1/2 w-8 h-5 -translate-x-1/2 translate-y-1/2 cursor-ns-resize flex items-center justify-center"
+                        className="absolute bottom-0 left-1/2 w-10 h-7 -translate-x-1/2 translate-y-1/2 cursor-ns-resize flex items-center justify-center"
                         style={{ pointerEvents: "auto" }}
                         onPointerDown={(e) =>
                           startResize(layer.id, "resize-bottom", e)
                         }
                       >
-                        <div className="h-2 w-6 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
+                        <div className="h-[12px] w-16 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
                     </div>
                   )}

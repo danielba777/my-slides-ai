@@ -1,5 +1,6 @@
 "use client";
 
+import React, { forwardRef, useImperativeHandle, useRef } from "react";
 import LegacySlideCanvas from "@/canvas/legacy/SlideCanvasLegacy";
 import type { CanvasDoc, CanvasTextNode } from "@/canvas/types";
 import type { SlideTextElement } from "@/lib/types";
@@ -46,12 +47,30 @@ function pxToNormY(v: number | undefined) {
   return v == null ? undefined : v / H;
 }
 
+export type SlideCanvasAdapterHandle = {
+  /** Liefert einen PNG-Blob der aktuellen Canvas in voller Auflösung */
+  exportPNG: () => Promise<Blob>;
+};
+
 type Props = {
   doc: CanvasDoc;
   onChange: (next: CanvasDoc) => void;
 };
 
-export default function SlideCanvasAdapter({ doc, onChange }: Props) {
+const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
+  ({ doc, onChange }, ref) => {
+    // LegacyCanvas kann bereits PNG exportieren – wir reichen dessen Ref durch
+    const legacyRef = useRef<any>(null);
+
+    useImperativeHandle(ref, () => ({
+      exportPNG: async () => {
+        if (legacyRef.current?.exportPNG) {
+          return legacyRef.current.exportPNG();
+        }
+        // Fallback: leeres Bild (sollte in Praxis nicht passieren)
+        return new Blob([], { type: "image/png" });
+      },
+    }));
   const imageUrl = useMemo(() => {
     const img = doc.nodes.find(
       (n): n is Extract<CanvasDoc["nodes"][number], { type: "image" }> =>
@@ -232,9 +251,13 @@ export default function SlideCanvasAdapter({ doc, onChange }: Props) {
 
   return (
     <LegacySlideCanvas
+      ref={legacyRef}
       imageUrl={imageUrl}
       layout={layout}
       onLayoutChange={handleLayoutChange}
     />
   );
-}
+});
+
+SlideCanvasAdapter.displayName = "SlideCanvasAdapter";
+export default SlideCanvasAdapter;

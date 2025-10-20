@@ -1,15 +1,18 @@
 "use client";
 
+import { generateImageAction } from "@/app/_actions/image/generate";
+import { getImageFromUnsplash } from "@/app/_actions/image/unsplash";
 import {
   getPresentation,
   updatePresentation,
 } from "@/app/_actions/presentation/presentationActions";
 import { getCustomThemeById } from "@/app/_actions/presentation/theme-actions";
-import type { CanvasDoc, CanvasTextNode } from "@/canvas/types";
+import { type CanvasDoc, type CanvasTextNode } from "@/canvas/types";
 import {
   type PlateNode,
   type PlateSlide,
 } from "@/components/presentation/utils/parser";
+import { applyBackgroundImageToCanvas } from "@/components/presentation/utils/canvas";
 import { ThinkingDisplay } from "@/components/presentation/dashboard/ThinkingDisplay";
 import { Header } from "@/components/presentation/outline/Header";
 import { OutlineList } from "@/components/presentation/outline/OutlineList";
@@ -252,34 +255,78 @@ export default function PresentationGenerateWithIdPage() {
     // Canvas-only: jedes Outline-Item wird ein Canvas-Slide
     const chosenWidth = 1080; // TODO: aus Preset/Wizard holen
     const chosenHeight = 1920; // TODO: aus Preset/Wizard holen
-    const slides: PlateSlide[] = state.outline.map((item) => {
-      const normalized = item.replace(/^#\s+/, "").trim();
-      const canvasDoc = makeCanvasFromText(
-        normalized,
-        chosenWidth,
-        chosenHeight,
-      );
-      const firstTextNode = canvasDoc.nodes.find(
-        (node) => node.type === "text",
-      ) as CanvasTextNode | undefined;
 
-      const paragraph = {
-        type: "p",
-        children: [{ text: normalized }],
-      } as unknown as PlateNode;
+    const slides: PlateSlide[] = await Promise.all(
+      state.outline.map(async (item) => {
+        const normalized = item.replace(/^#\s+/, "").trim();
+        const canvasDoc = makeCanvasFromText(
+          normalized,
+          chosenWidth,
+          chosenHeight,
+        );
+        const firstTextNode = canvasDoc.nodes.find(
+          (node) => node.type === "text",
+        ) as CanvasTextNode | undefined;
 
-      return {
-        id: nanoid(),
-        content: [paragraph],
-        bgColor: canvasDoc.bg ?? undefined,
-        position: firstTextNode
-          ? { x: firstTextNode.x, y: firstTextNode.y }
-          : undefined,
-        canvas: canvasDoc,
-      };
-    });
+        const paragraph = {
+          type: "p",
+          children: [{ text: normalized }],
+        } as unknown as PlateNode;
+
+        const query = normalized.split(/\s+/).slice(0, 10).join(" ");
+        let imageUrl: string | undefined;
+
+        if (query && state.imageSource === "stock") {
+          try {
+            const imageResult = await getImageFromUnsplash(query);
+            if (imageResult.success && imageResult.imageUrl) {
+              imageUrl = imageResult.imageUrl;
+            }
+          } catch (error) {
+            console.error("Unsplash image lookup failed:", error);
+          }
+        } else if (query && state.imageSource === "ai") {
+          try {
+            const aiResult = await generateImageAction(
+              query,
+              state.imageModel,
+            );
+            if (aiResult?.image?.url) {
+              imageUrl = aiResult.image.url;
+            }
+          } catch (error) {
+            console.error("AI image generation failed:", error);
+          }
+        }
+
+        const canvasWithBg = imageUrl
+          ? applyBackgroundImageToCanvas(canvasDoc, imageUrl)
+          : canvasDoc;
+
+        return {
+          id: nanoid(),
+          content: [paragraph],
+          bgColor: canvasWithBg.bg ?? undefined,
+          position: firstTextNode
+            ? { x: firstTextNode.x, y: firstTextNode.y }
+            : undefined,
+          canvas: canvasWithBg,
+          rootImage: query
+            ? {
+                query,
+                url: imageUrl,
+                layoutType: "background",
+              }
+            : undefined,
+        };
+      }),
+    );
 
     state.setSlides(slides);
+    const firstSlideWithImage = slides.find((slide) => slide.rootImage?.url);
+    if (firstSlideWithImage?.rootImage?.url) {
+      state.setThumbnailUrl(firstSlideWithImage.rootImage.url);
+    }
 
     const presentationTitle = state.currentPresentationTitle?.trim().length
       ? state.currentPresentationTitle
@@ -299,8 +346,8 @@ export default function PresentationGenerateWithIdPage() {
         presentationStyle: state.presentationStyle,
         language: state.language,
         searchResults: state.searchResults,
+        thumbnailUrl: firstSlideWithImage?.rootImage?.url,
       });
-      state.setShouldStartPresentationGeneration(true);
     } catch (error) {
       console.error("Failed to store presentation slides:", error);
       toast.error("Slides saved locally, but storing them failed.");

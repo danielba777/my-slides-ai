@@ -1,222 +1,105 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-Diff #1 – BG-Image-Update: nie wieder Text verlieren
-
-File: src/components/presentation/utils/canvas.ts
-
-*** a/src/components/presentation/utils/canvas.ts
---- b/src/components/presentation/utils/canvas.ts
+**_ Begin Patch
+_** Update File: src/components/presentation/presentation-page/buttons/DownloadSlidesButton.tsx
 @@
--export function applyBackgroundImageToCanvas(
--  canvas: CanvasDoc | null | undefined,
--  imageUrl?: string | null,
--): CanvasDoc {
--  const base: CanvasDoc = {
--    width: canvas?.width ?? DEFAULT_CANVAS.width,
--    height: canvas?.height ?? DEFAULT_CANVAS.height,
--    bg: canvas?.bg ?? DEFAULT_CANVAS.bg,
--    nodes: canvas?.nodes ? [...canvas.nodes] : [],
--    selection: canvas?.selection ?? [],
--  };
-+export function applyBackgroundImageToCanvas(
-+  canvas: CanvasDoc | null | undefined,
-+  imageUrl?: string | null,
-+): CanvasDoc {
-+  // Starte IMMER vom bestehenden Canvas und erhalte ALLE Nicht-Image-Nodes
-+  const base: CanvasDoc = {
-+    width: canvas?.width ?? DEFAULT_CANVAS.width,
-+    height: canvas?.height ?? DEFAULT_CANVAS.height,
-+    bg: canvas?.bg ?? DEFAULT_CANVAS.bg,
-+    nodes: Array.isArray(canvas?.nodes) ? [...canvas!.nodes] : [],
-+    selection: Array.isArray(canvas?.selection) ? [...(canvas!.selection as any[])] : [],
-+  };
- 
-   if (!imageUrl) {
-     return base;
-   }
- 
--  const imageNode = {
-+  const imageNode = {
-     id: "canvas-background-image",
-     type: "image" as const,
-     x: 0,
-     y: 0,
-     width: base.width,
-     height: base.height,
-     url: imageUrl,
-   };
- 
--  const existingIndex = base.nodes.findIndex((node) => node.type === "image");
--  if (existingIndex >= 0) {
--    const existing = base.nodes[existingIndex] as any;
--    const sameUrl =
--      typeof existing?.url === "string" &&
--      typeof imageNode.url === "string" &&
--      existing.url === imageNode.url;
--    const sameSize =
--      existing?.width === imageNode.width && existing?.height === imageNode.height;
--    if (sameUrl && sameSize) {
--      return base;
--    }
--    base.nodes[existingIndex] = imageNode;
--  } else {
--    base.nodes.unshift(imageNode);
--  }
-+  // Entferne ausschließlich den bisherigen BG-Image-Knoten (falls vorhanden),
-+  // erhalte aber ALLE anderen Nodes (v. a. Text!)
-+  const withoutBg = base.nodes.filter((n: any) => !(n?.type === "image" && n?.id === "canvas-background-image"));
-+
-+  // Prüfe Idempotenz: existiert bereits der gleiche BG?
-+  const prevBg = base.nodes.find((n: any) => n?.type === "image" && n?.id === "canvas-background-image") as any;
-+  if (prevBg) {
-+    const sameUrl = prevBg.url === imageNode.url;
-+    const sameSize = prevBg.width === imageNode.width && prevBg.height === imageNode.height;
-+    if (sameUrl && sameSize) {
-+      // nichts ändern
-+      return { ...base, nodes: base.nodes };
-+    }
-+  }
-+
-+  // BG-Image immer als unterstes Element einfügen
-+  const mergedNodes = [imageNode, ...withoutBg];
-+  return { ...base, nodes: mergedNodes };
- }
+-async function blobToJpeg(pngBlob: Blob): Promise<Blob> {
 
+- // PNG -> JPEG (ohne Größenänderung) via Offscreen Canvas
+- const dataUrl = await new Promise<string>((resolve) => {
+- const reader = new FileReader();
+- reader.onload = () => resolve(String(reader.result));
+- reader.readAsDataURL(pngBlob);
+- });
+- const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+- const i = new Image();
+- i.crossOrigin = "anonymous";
+- i.onload = () => resolve(i);
+- i.onerror = reject;
+- i.src = dataUrl;
+- });
+- const canvas = document.createElement("canvas");
+- canvas.width = img.naturalWidth;
+- canvas.height = img.naturalHeight;
+- const ctx = canvas.getContext("2d")!;
+- ctx.drawImage(img, 0, 0);
+- const blob = await new Promise<Blob | null>((resolve) =>
+- canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92),
+- );
+- return blob ?? pngBlob;
+  -}
+  +// Lädt einen Blob als HTMLImageElement
+  +async function loadBlobAsImage(blob: Blob): Promise<HTMLImageElement> {
 
-Was das verhindert: Egal wann applyBackgroundImageToCanvas aufgerufen wird – Textknoten bleiben immer erhalten, der BG-Node wird nur ge-upsertet und nie „mitgerissen“.
+* const dataUrl = await new Promise<string>((resolve) => {
+* const r = new FileReader();
+* r.onload = () => resolve(String(r.result));
+* r.readAsDataURL(blob);
+* });
+* return await new Promise<HTMLImageElement>((resolve, reject) => {
+* const img = new Image();
+* img.crossOrigin = "anonymous";
+* img.onload = () => resolve(img);
+* img.onerror = reject;
+* img.src = dataUrl;
+* });
+  +}
+* +// Erzwingt Full-Frame-Export 1080x1920 und harten Rand-Clip (kein „mittendrin“-Crop)
+  +async function normalizeToDesignPNG(pngBlob: Blob, W = 1080, H = 1920): Promise<Blob> {
+* const img = await loadBlobAsImage(pngBlob);
+* const canvas = document.createElement("canvas");
+* canvas.width = W;
+* canvas.height = H;
+* const ctx = canvas.getContext("2d")!;
+* // harter Frame-Clip (0,0,W,H)
+* ctx.save();
+* ctx.beginPath();
+* ctx.rect(0, 0, W, H);
+* ctx.clip();
+* // Wichtig: Alles 1:1 in den Frame zeichnen.
+* // Falls das Quellbild nicht exakt W×H hat (z.B. wegen Preview-Zoom),
+* // wird hier proportional auf den Ziel-Frame gelegt.
+* // Wenn deine Canvas bereits W×H ist, ist das ein 1:1 Draw ohne Shift.
+* ctx.drawImage(img, 0, 0, W, H);
+* ctx.restore();
+* const out = await new Promise<Blob | null>((resolve) =>
+* canvas.toBlob((b) => resolve(b), "image/png"),
+* );
+* return out ?? pngBlob;
+  +}
+* +async function blobToJpeg(pngBlob: Blob, W = 1080, H = 1920): Promise<Blob> {
+* // Erst sicherstellen, dass wir exakt den vollen Frame (1080×1920) haben
+* const normalized = await normalizeToDesignPNG(pngBlob, W, H);
+* const img = await loadBlobAsImage(normalized);
+* const canvas = document.createElement("canvas");
+* canvas.width = W;
+* canvas.height = H;
+* const ctx = canvas.getContext("2d")!;
+* ctx.drawImage(img, 0, 0, W, H);
+* const jpg = await new Promise<Blob | null>((resolve) =>
+* canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92),
+* );
+* return jpg ?? normalized;
+  +}
+  @@
+  const handleDownload = async () => {
+  try {
+  setDownloading(true);
+  const exporters: Map<string, () => Promise<Blob>> = (window as any).\_\_slideExporters ?? new Map();
+  // sichere Reihenfolge (aktuelle UI-Reihenfolge im State)
+  const ordered = slides.map((s, idx) => ({ id: s.id as string, idx }));
+  const jpgFiles: Array<{ name: string; blob: Blob }> = [];
+  for (const { id, idx } of ordered) {
+  const exporter = exporters.get(id);
+  if (!exporter) continue;
 
-Diff #2 – Safe-Merge beim Setzen des Canvas aus dem Editor
+-        const png = await exporter();
+-        const jpg = await blobToJpeg(png);
 
-File: src/components/presentation/presentation-page/PresentationSlidesView.tsx
-(dort, wo du dem SlideCanvas ein onChange gibst)
-
-*** a/src/components/presentation/presentation-page/PresentationSlidesView.tsx
---- b/src/components/presentation/presentation-page/PresentationSlidesView.tsx
-@@
--              <SlideCanvas
--                doc={safeCanvas}
--                onChange={(next: CanvasDoc) => {
--                  const { slides, setSlides } = usePresentationState.getState();
--                  const updated = slides.slice();
--                  const indexToUpdate = updated.findIndex((x) => x.id === slide.id);
--                  if (indexToUpdate < 0) return;
--                  const current = updated[indexToUpdate];
--                  if (!current) return;
--                  if (current.canvas !== next) {
--                    updated[indexToUpdate] = { ...current, canvas: next };
--                    setSlides(updated);
--                  }
--                }}
--              />
-+              <SlideCanvas
-+                doc={safeCanvas}
-+                onChange={(next: CanvasDoc) => {
-+                  const { slides, setSlides } = usePresentationState.getState();
-+                  const updated = slides.slice();
-+                  const i = updated.findIndex((x) => x.id === slide.id);
-+                  if (i < 0) return;
-+                  const current = updated[i];
-+                  if (!current) return;
-+
-+                  const currCanvas = current.canvas as CanvasDoc | undefined;
-+
-+                  // 🛡️ SAFETY MERGE: verliere nie Textknoten beim Update
-+                  const currTextNodes = Array.isArray(currCanvas?.nodes)
-+                    ? (currCanvas!.nodes.filter((n: any) => n?.type === "text"))
-+                    : [];
-+                  const nextTextNodes = Array.isArray(next?.nodes)
-+                    ? (next!.nodes.filter((n: any) => n?.type === "text"))
-+                    : [];
-+
-+                  let merged: CanvasDoc = next;
-+                  if (currTextNodes.length > 0 && nextTextNodes.length === 0) {
-+                    // Race: next hat (noch) keine Texte → Texte aus current konservieren
-+                    const otherNodes = Array.isArray(next?.nodes) ? next.nodes.filter((n: any) => n?.type !== "text") : [];
-+                    merged = { ...next, nodes: [...otherNodes, ...currTextNodes] };
-+                  }
-+
-+                  // Nur setzen, wenn sich tatsächlich was geändert hat
-+                  if (currCanvas !== merged) {
-+                    updated[i] = { ...current, canvas: merged };
-+                    setSlides(updated);
-+                  }
-+                }}
-+              />
-
-
-Was das verhindert: Selbst wenn irgendwo im System noch ein Update ohne Textknoten reinkommt (z. B. durch späten BG-Reflow/Resize), bewahren wir vorhandene Textknoten und verlieren sie nicht mehr.
-
-Diff #3 – Stabilität beim Drag & Render
-
-File: src/components/presentation/canvas/SlideCanvasBase.tsx
-
-Du hast hier schon vieles richtig. Zwei kleine Ergänzungen, die Remounts vermeiden und während „stillen“ Updates das UI stabil halten.
-
-*** a/src/components/presentation/canvas/SlideCanvasBase.tsx
---- b/src/components/presentation/canvas/SlideCanvasBase.tsx
-@@
--            <Text
--              key={`text-${activeTextNode?.id ?? "fallback"}`}
-+            <Text
-+              // Stabiler Key pro Slide, nicht pro Node-Wechsel → kein Remount beim Umschalten/Autosave
-+              key={`text-slide-${slide.id}`}
-               text={textContent}
-               fontSize={32}
-               fontFamily="TikTok Sans, sans-serif"
-               fill="#ffffff"
-               x={textPosition.x}
-               y={textPosition.y}
-               draggable={!disableDrag}
-               onDragStart={handleDragStart}
-               onDragMove={handleDragMove}
-               onDragEnd={handleDragEnd}
-+              visible={true}
-+              opacity={1}
-+              listening={true}
-               dragBoundFunc={(pos) => ({
-                 x: Math.min(
-                   Math.max(0, pos.x),
-                   stageDimensions.width - 10
-                 ),
-                 y: Math.min(
-                   Math.max(0, pos.y),
-                   stageDimensions.height - 10
-                 ),
-               })}
-             />
-
-
-Und zusätzlich ein Mini-Guard gegen „Positions-Resets“ genau während stiller BG-Updates:
-
-*** a/src/components/presentation/canvas/SlideCanvasBase.tsx
---- b/src/components/presentation/canvas/SlideCanvasBase.tsx
-@@
--  useEffect(() => {
--    if (isDraggingTextRef.current) return;
--    const next = slideWithExtras.position ?? defaultPosition;
--    if (next.x !== textPosition.x || next.y !== textPosition.y) {
--      setTextPosition(next);
--    }
--  }, [
--    slideWithExtras.position?.x,
--    slideWithExtras.position?.y,
--    defaultPosition,
--    textPosition.x,
--    textPosition.y,
--  ]);
-+  useEffect(() => {
-+    if (isDraggingTextRef.current) return;
-+    const next = slideWithExtras.position ?? defaultPosition;
-+    // Blockiere micro-jitters (±0.5px) durch Scale/Resize-Runden
-+    const dx = Math.abs((next.x ?? 0) - (textPosition.x ?? 0));
-+    const dy = Math.abs((next.y ?? 0) - (textPosition.y ?? 0));
-+    if (dx > 0.5 || dy > 0.5) {
-+      setTextPosition(next);
-+    }
-+  }, [
-+    slideWithExtras.position?.x,
-+    slideWithExtras.position?.y,
-+    defaultPosition,
-+    textPosition.x,
-+    textPosition.y,
-+  ]);
+*        const png = await exporter();
+*        // Erzwinge Full-Frame 1080×1920 + Rand-Clip, danach nach JPG
+*        const jpg = await blobToJpeg(png, 1080, 1920);
+           const name = `${String(idx + 1).padStart(2, "0")}.jpg`;
+           jpgFiles.push({ name, blob: jpg });
+         }
+  \*\*\* End Patch

@@ -1,6 +1,7 @@
 "use client";
 
 import { DEFAULT_CANVAS, type CanvasDoc } from "@/canvas/types";
+import { applyBackgroundImageToCanvas } from "@/components/presentation/utils/canvas";
 import { SlideContainer } from "@/components/presentation/presentation-page/SlideContainer";
 import { usePresentationSlides } from "@/hooks/presentation/usePresentationSlides";
 import { useSlideChangeWatcher } from "@/hooks/presentation/useSlideChangeWatcher";
@@ -12,14 +13,16 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import dynamic from "next/dynamic";
-import { useEffect } from "react";
-import React, { memo } from "react";
+import React, { memo, useEffect, useRef, useState } from "react";
 import { PresentModeHeader } from "../dashboard/PresentModeHeader";
 import { ThinkingDisplay } from "../dashboard/ThinkingDisplay";
 import { SortableSlide } from "./SortableSlide";
 const SlideCanvas = dynamic(() => import("@/canvas/SlideCanvasAdapter"), {
   ssr: false,
 });
+import type { SlideCanvasAdapterHandle } from "@/canvas/SlideCanvasAdapter";
+import StickyDownloadActions from "./StickyDownloadActions";
+import { getCorsSafeImageUrl, revokeCorsSafeImageUrl } from "@/lib/canvasImageCors";
 
 // -- Small utility to wait for root image decode before mounting the canvas --
 function useImageReady(url?: string) {
@@ -65,7 +68,48 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
       selection: [],
     };
   const imgUrl = slide.rootImage?.url as string | undefined;
-  const imageReady = useImageReady(imgUrl);
+
+  // Bild-URL CORS-sicher machen, damit Canvas-Export nicht "tainted" ist
+  const [safeImgUrl, setSafeImgUrl] = useState<string>(imgUrl);
+  useEffect(() => {
+    let active = true;
+    let previousBlobUrl: string | null = null;
+    (async () => {
+      const safeUrl = await getCorsSafeImageUrl(imgUrl);
+      if (!active) return;
+      // Wenn wir eine neue blob:-URL erzeugen, alte aufräumen
+      if (previousBlobUrl && previousBlobUrl !== safeUrl) {
+        revokeCorsSafeImageUrl(previousBlobUrl);
+      }
+      setSafeImgUrl(safeUrl);
+      // Merken, um beim nächsten Durchlauf zu revoken
+      if (safeUrl.startsWith("blob:")) previousBlobUrl = safeUrl;
+    })();
+    return () => {
+      active = false;
+      if (previousBlobUrl) revokeCorsSafeImageUrl(previousBlobUrl);
+    };
+  }, [imgUrl]);
+
+  // BG-Image direkt in den Canvas-Daten verankern, ohne Text zu verlieren
+  const docWithBg = applyBackgroundImageToCanvas(safeCanvas, safeImgUrl);
+  const imageReady = useImageReady(safeImgUrl);
+
+  const canvasRef = useRef<SlideCanvasAdapterHandle | null>(null);
+
+  // Registriere pro Slide einen Exporter in einer globalen Map, damit der Header
+  // zentral in der aktuellen Reihenfolge exportieren kann.
+  useEffect(() => {
+    (window as any).__slideExporters = (window as any).__slideExporters || new Map<string, () => Promise<Blob>>();
+    const map: Map<string, () => Promise<Blob>> = (window as any).__slideExporters;
+    const exporter = async () => {
+      return (await canvasRef.current?.exportPNG?.()) ?? new Blob([], { type: "image/png" });
+    };
+    map.set(slide.id, exporter);
+    return () => {
+      map.delete(slide.id);
+    };
+  }, [slide?.id]);
   return (
     <SortableSlide id={slide.id} key={slide.id}>
       <div className={cn(`slide-wrapper slide-wrapper-${index} flex-shrink-0`, !isPresenting && "max-w-full")}>
@@ -73,7 +117,8 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
           <div className={cn(`slide-container-${index}`, isPresenting && "h-screen w-screen")}>
             {imageReady ? (
               <SlideCanvas
-                doc={safeCanvas}
+                ref={canvasRef}
+                doc={docWithBg}
                 onChange={(next: CanvasDoc) => {
                   const { slides, setSlides } = usePresentationState.getState();
                   const updated = slides.slice();
@@ -107,13 +152,10 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
                 }}
               />
             ) : (
-              // Stabiler Placeholder verhindert Schwarz-Frames & Text-Flackern
-              <div
-                className={cn(
-                  "rounded-xl",
-                  isPresenting ? "h-screen w-screen" : "h-[700px] w-[420px]",
-                  "bg-black/90"
-                )}
+              // Stabiles Placeholder, aber KEIN Entfernen/Neu-Erzeugen der Nodes
+              <SlideCanvas
+                doc={docWithBg}
+                onChange={() => {}}
               />
             )}
           </div>
@@ -180,38 +222,45 @@ export const PresentationSlidesView = ({
   }, [isPresenting]);
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext
-        items={items.map((s) => s.id)}
-        strategy={horizontalListSortingStrategy}
-      >
-        <PresentModeHeader
-          presentationTitle={currentPresentationTitle}
-          showHeader={isPresenting && shouldShowExitHeader}
-        />
+    <div className="w-full h-full overflow-hidden flex flex-col">
+      {/* Fixierter Download-Button oben rechts – nur im Edit-Modus */}
+      {!isPresenting && <StickyDownloadActions />}
 
-        <ThinkingDisplay
-          thinking={usePresentationState.getState().presentationThinking}
-          isGenerating={isGeneratingPresentation}
-          title="AI is thinking about your presentation..."
-        />
-
-        <div className="flex w-full items-start gap-8">
-          {items.map((slide, index) => (
-            <SlideFrame
-              key={slide.id}
-              slide={slide}
-              index={index}
-              slidesCount={items.length}
-              isPresenting={isPresenting}
+      <div className="flex-1 overflow-auto">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={items.map((s) => s.id)}
+            strategy={horizontalListSortingStrategy}
+          >
+            <PresentModeHeader
+              presentationTitle={currentPresentationTitle}
+              showHeader={isPresenting && shouldShowExitHeader}
             />
-          ))}
-        </div>
-      </SortableContext>
-    </DndContext>
+
+            <ThinkingDisplay
+              thinking={usePresentationState.getState().presentationThinking}
+              isGenerating={isGeneratingPresentation}
+              title="AI is thinking about your presentation..."
+            />
+
+            <div className="flex items-start gap-6 px-6 py-4">
+              {items.map((slide, index) => (
+                <SlideFrame
+                  key={slide.id}
+                  slide={slide}
+                  index={index}
+                  slidesCount={items.length}
+                  isPresenting={isPresenting}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      </div>
+    </div>
   );
 };
