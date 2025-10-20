@@ -13,15 +13,12 @@ export default function PostedPostsPage() {
 
   return (
     <div className="w-full px-10 py-12 space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold">Posted TikToks</h1>
-        <p className="text-sm text-muted-foreground">
-          Every TikTok published via SlidesCockpit, including drafts kept in inbox and failed attempts for quick follow-up.
-        </p>
-      </div>
+      <header className="space-y-1">
+        <h1 className="text-3xl font-semibold">Posted</h1>
+      </header>
 
       <TikTokPostsGrid
-        title="Latest Activity"
+        title=""
         posts={posts}
         loading={loading}
         refreshing={refreshing && !loading}
