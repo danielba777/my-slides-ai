@@ -6,11 +6,11 @@ This repository powers the **My Slides AI** application. The most important part
 
 ## Branch Strategy
 
-| Branch | Purpose | Who pushes |
-|--------|---------|------------|
-| `main` | Production-ready code. This branch must always be deployable. | **Nobody pushes directly.** Only reviewed PRs are merged. |
-| `daniel` | Daniel’s integration branch. Draft and feature work starts here. | Daniel only. |
-| `artur` | Artur’s integration branch. Draft and feature work starts here. | Artur only. |
+| Branch   | Purpose                                                          | Who pushes                                                |
+| -------- | ---------------------------------------------------------------- | --------------------------------------------------------- |
+| `main`   | Production-ready code. This branch must always be deployable.    | **Nobody pushes directly.** Only reviewed PRs are merged. |
+| `daniel` | Daniel’s integration branch. Draft and feature work starts here. | Daniel only.                                              |
+| `artur`  | Artur’s integration branch. Draft and feature work starts here.  | Artur only.                                               |
 
 Both personal branches are long-lived and track `main`. Any spike branches (feature, bugfix) should branch off your personal branch and merge back into it.
 
@@ -43,6 +43,7 @@ Both personal branches are long-lived and track `main`. Any spike branches (feat
    git push origin feature/<topic>
    ```
 6. **Open a Pull Request targeting your personal branch**
+
    - Assign yourself as the owner and request review if needed.
    - Once approved, merge into your personal branch.
 
@@ -102,3 +103,5 @@ Both personal branches are long-lived and track `main`. Any spike branches (feat
 ---
 
 By sticking to this workflow, we keep `main` stable, ensure both `daniel` and `artur` stay in sync, and make it easy to understand who is responsible for each change. Happy shipping! 👍
+
+// pnpm Bug Fix

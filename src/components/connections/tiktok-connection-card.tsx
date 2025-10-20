@@ -14,73 +14,23 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
+import {
+  ConnectedTikTokAccount,
+  useTikTokAccounts,
+} from "@/hooks/use-tiktok-accounts";
 
 type ConnectionState = "idle" | "loading";
-
-type ConnectedAccount = {
-  openId: string;
-  displayName: string | null;
-  username: string | null;
-  unionId: string | null;
-  avatarUrl: string | null;
-  connectedAt: string;
-};
 
 export function TikTokConnectionCard() {
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("idle");
-  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
-  const [accountsLoading, setAccountsLoading] = useState<boolean>(true);
-
-  const fetchAccounts = useCallback(async () => {
-    setAccountsLoading(true);
-    try {
-      const response = await fetch("/api/tiktok/accounts", {
-        cache: "no-store",
-      });
-      const payload = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        const message =
-          payload && typeof payload.error === "string"
-            ? payload.error
-            : "Unable to load connected TikTok accounts";
-        throw new Error(message);
-      }
-
-      if (Array.isArray(payload)) {
-        setAccounts(
-          payload.map((item) => ({
-            openId: String(item.openId ?? item.id ?? ""),
-            displayName:
-              typeof item.displayName === "string" ? item.displayName : null,
-            username: typeof item.username === "string" ? item.username : null,
-            unionId: typeof item.unionId === "string" ? item.unionId : null,
-            avatarUrl:
-              typeof item.avatarUrl === "string" ? item.avatarUrl : null,
-            connectedAt:
-              typeof item.connectedAt === "string"
-                ? item.connectedAt
-                : new Date().toISOString(),
-          })),
-        );
-      } else {
-        setAccounts([]);
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to load TikTok accounts";
-      toast.error(message);
-    } finally {
-      setAccountsLoading(false);
-    }
-  }, []);
+  const { accounts, loading: accountsLoading, error, refresh } = useTikTokAccounts();
 
   useEffect(() => {
-    void fetchAccounts();
-  }, [fetchAccounts]);
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
 
   const sortedAccounts = useMemo(
     () =>
@@ -119,7 +69,7 @@ export function TikTokConnectionCard() {
     }
   }, []);
 
-  const renderAccountLabel = useCallback((account: ConnectedAccount) => {
+  const renderAccountLabel = useCallback((account: ConnectedTikTokAccount) => {
     return (
       account.username ??
       account.displayName ??
@@ -129,7 +79,7 @@ export function TikTokConnectionCard() {
   }, []);
 
   const renderAccountInitials = useCallback(
-    (account: ConnectedAccount) => {
+    (account: ConnectedTikTokAccount) => {
       const label = renderAccountLabel(account).trim();
       const letters = label.replace(/[^A-Za-z0-9]/g, "");
       if (letters.length === 0) {
@@ -196,6 +146,14 @@ export function TikTokConnectionCard() {
           disabled={connectionState === "loading"}
         >
           {connectionState === "loading" ? "Connecting..." : "Connect TikTok"}
+        </Button>
+        <Button
+          variant="outline"
+          className="ml-2"
+          onClick={() => void refresh()}
+          disabled={accountsLoading}
+        >
+          Refresh
         </Button>
       </CardFooter>
     </Card>
