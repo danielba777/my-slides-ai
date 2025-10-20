@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/provider/theme-provider";
 import "@/styles/globals.css";
 import { type Metadata } from "next";
 import localFont from "next/font/local";
+import Script from "next/script";
 
 const tiktokSans = localFont({
   variable: "--font-sans",
@@ -50,20 +51,20 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <TanStackQueryProvider>
-      <NextAuthProvider>
-        <html lang="en" suppressHydrationWarning>
-          <head>
-            {/* sorgt dafür, dass Browser das richtige Farbschema kennt */}
-            <meta name="color-scheme" content="light dark" />
-          </head>
-          <body
-            className={`${tiktokSans.variable} font-sans antialiased`}
-            suppressHydrationWarning
-          >
-            {/* next-themes setzt die Klasse ("dark"/"light") auf <html> clientseitig */}
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta name="color-scheme" content="light dark" />
+      </head>
+      <body
+        className={`${tiktokSans.variable} font-sans antialiased`}
+        suppressHydrationWarning
+      >
+        <TanStackQueryProvider>
+          <NextAuthProvider>
             <ThemeProvider
               attribute="class"
               defaultTheme="light"
@@ -71,9 +72,19 @@ export default function RootLayout({
             >
               {children}
             </ThemeProvider>
-          </body>
-        </html>
-      </NextAuthProvider>
-    </TanStackQueryProvider>
+          </NextAuthProvider>
+        </TanStackQueryProvider>
+
+        {/* ESM + Fallback */}
+        <Script
+          type="module"
+          src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"
+        />
+        <Script
+          noModule
+          src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"
+        />
+      </body>
+    </html>
   );
 }

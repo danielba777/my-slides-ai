@@ -6,25 +6,30 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { toast } from "sonner";
-import {
   ConnectedTikTokAccount,
   useTikTokAccounts,
 } from "@/hooks/use-tiktok-accounts";
+import IonIcon from "@reacticons/ionicons";
+import { defineCustomElements } from "ionicons/loader";
+import { toast } from "sonner";
 
 type ConnectionState = "idle" | "loading";
 
-export function TikTokConnectionCard() {
+export function ConnectionCard() {
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("idle");
-  const { accounts, loading: accountsLoading, error, refresh } = useTikTokAccounts();
+  const {
+    accounts,
+    loading: accountsLoading,
+    error,
+    refresh,
+  } = useTikTokAccounts();
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      defineCustomElements(window);
+    }
+  }, []);
 
   useEffect(() => {
     if (error) {
@@ -91,55 +96,9 @@ export function TikTokConnectionCard() {
   );
 
   return (
-    <Card className="max-w-xl">
-      <CardHeader>
-        <CardTitle>Connect TikTok</CardTitle>
-        <CardDescription>
-          Link your TikTok account to import and schedule posts directly from
-          SlidesCockpit.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          We will redirect you to TikTok to authorize access. After authorizing,
-          you will land back here automatically.
-        </p>
-
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Connected TikTok accounts</p>
-          {accountsLoading ? (
-            <p className="text-sm text-muted-foreground">Loading accounts…</p>
-          ) : sortedAccounts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No TikTok accounts connected yet.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {sortedAccounts.map((account) => (
-                <Badge
-                  key={account.openId}
-                  variant="secondary"
-                  className="flex items-center gap-2 pr-3"
-                >
-                  <Avatar className="h-6 w-6">
-                    <AvatarImage
-                      alt={renderAccountLabel(account)}
-                      src={account.avatarUrl ?? undefined}
-                    />
-                    <AvatarFallback className="text-[10px]">
-                      {renderAccountInitials(account)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-xs font-medium">
-                    {renderAccountLabel(account)}
-                  </span>
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
-      </CardContent>
-      <CardFooter>
+    <div className="max-w-xl">
+      <div className="flex items-center gap-4">
+        <IonIcon name="logo-tiktok" size="large" />
         <Button
           variant={connectionState === "loading" ? "loading" : "default"}
           onClick={handleConnect}
@@ -147,15 +106,44 @@ export function TikTokConnectionCard() {
         >
           {connectionState === "loading" ? "Connecting..." : "Connect TikTok"}
         </Button>
+        {accountsLoading ? (
+          <p className="text-sm text-muted-foreground">Loading accounts…</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {sortedAccounts.map((account) => (
+              <Badge
+                key={account.openId}
+                variant="secondary"
+                className="flex items-center gap-2 pr-3"
+              >
+                <Avatar className="h-6 w-6">
+                  <AvatarImage
+                    alt={renderAccountLabel(account)}
+                    src={account.avatarUrl ?? undefined}
+                  />
+                  <AvatarFallback className="text-[10px]">
+                    {renderAccountInitials(account)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-xs font-medium">
+                  {renderAccountLabel(account)}
+                </span>
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="py-4 border-t-2 mt-4">
         <Button
           variant="outline"
-          className="ml-2"
+          className=""
           onClick={() => void refresh()}
           disabled={accountsLoading}
         >
           Refresh
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }
