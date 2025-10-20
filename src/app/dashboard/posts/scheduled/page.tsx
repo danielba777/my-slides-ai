@@ -1,6 +1,6 @@
 "use client";
 
-import { TikTokPostsTable } from "@/components/posts/TikTokPostsTable";
+import { TikTokPostsGrid } from "@/components/posts/TikTokPostsGrid";
 import { useTikTokPosts } from "@/hooks/use-tiktok-posts";
 
 const SCHEDULED_STATUSES = ["SCHEDULED", "QUEUE", "RUNNING"] as const;
@@ -20,7 +20,7 @@ export default function ScheduledPostsPage() {
         </p>
       </div>
 
-      <TikTokPostsTable
+      <TikTokPostsGrid
         title="Upcoming Schedule"
         posts={posts}
         loading={loading}

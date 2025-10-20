@@ -1,6 +1,6 @@
 "use client";
 
-import { TikTokPostsTable } from "@/components/posts/TikTokPostsTable";
+import { TikTokPostsGrid } from "@/components/posts/TikTokPostsGrid";
 import { useTikTokPosts } from "@/hooks/use-tiktok-posts";
 
 const POSTED_STATUSES = ["PUBLISHED", "INBOX", "FAILED"] as const;
@@ -20,7 +20,7 @@ export default function PostedPostsPage() {
         </p>
       </div>
 
-      <TikTokPostsTable
+      <TikTokPostsGrid
         title="Latest Activity"
         posts={posts}
         loading={loading}
