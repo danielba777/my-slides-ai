@@ -13,15 +13,12 @@ export default function ScheduledPostsPage() {
 
   return (
     <div className="w-full px-10 py-12 space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold">Scheduled TikToks</h1>
-        <p className="text-sm text-muted-foreground">
-          Monitor upcoming TikTok posts scheduled through SlidesCockpit and track queue, running, and pending jobs in real time.
-        </p>
-      </div>
+      <header className="space-y-1">
+        <h1 className="text-3xl font-semibold">Scheduled</h1>
+      </header>
 
       <TikTokPostsGrid
-        title="Upcoming Schedule"
+        title=""
         posts={posts}
         loading={loading}
         refreshing={refreshing && !loading}

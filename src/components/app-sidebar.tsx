@@ -1,5 +1,6 @@
 "use client";
 import {
+  Calendar,
   CalendarClock,
   FileCheck,
   Home,
@@ -55,6 +56,11 @@ const configurationItems: SidebarItem[] = [
 ];
 
 const postItems: SidebarItem[] = [
+  {
+    title: "Calendar",
+    url: "/dashboard/posts/calendar",
+    icon: Calendar,
+  },
   {
     title: "Scheduled",
     url: "/dashboard/posts/scheduled",
