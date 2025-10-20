@@ -99,9 +99,3 @@ Both personal branches are long-lived and track `main`. Any spike branches (feat
 2. Tag the release (optional) – `git tag -a vX.Y.Z -m "Release notes"`.
 3. Deploy using the production pipeline.
 4. Announce the release and archive the associated work items.
-
----
-
-By sticking to this workflow, we keep `main` stable, ensure both `daniel` and `artur` stay in sync, and make it easy to understand who is responsible for each change. Happy shipping! 👍
-
-// pnpm Bug Fix
