@@ -1,5 +1,13 @@
 "use client";
-import { CalendarClock, Home, Images, TestTube2, UserPen, type LucideIcon } from "lucide-react";
+import {
+  CalendarClock,
+  FileCheck,
+  Home,
+  Images,
+  TestTube2,
+  UserPen,
+  type LucideIcon,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 
 import {
@@ -30,7 +38,6 @@ const startItems: SidebarItem[] = [
   },
 ];
 
-// Menu items.
 const playgroundItems: SidebarItem[] = [
   {
     title: "Slideshows",
@@ -39,12 +46,24 @@ const playgroundItems: SidebarItem[] = [
   },
 ];
 
-// Configuration items.
 const configurationItems: SidebarItem[] = [
   {
     title: "Connections",
     url: "/dashboard/connections",
     icon: UserPen,
+  },
+];
+
+const postItems: SidebarItem[] = [
+  {
+    title: "Scheduled",
+    url: "/dashboard/posts/scheduled",
+    icon: CalendarClock,
+  },
+  {
+    title: "Posted",
+    url: "/dashboard/posts/posted",
+    icon: FileCheck,
   },
 ];
 
@@ -110,6 +129,23 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {configurationItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild className="font-semibold">
+                    <a href={item.url}>
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Posts</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {postItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild className="font-semibold">
                     <a href={item.url}>
