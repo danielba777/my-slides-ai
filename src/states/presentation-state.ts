@@ -10,6 +10,7 @@ interface PresentationState {
   isGridView: boolean;
   isSheetOpen: boolean;
   numSlides: number;
+  slideCountMode: "manual" | "auto";
 
   theme: Themes | string;
   customThemeData: ThemeProperties | null;
@@ -68,6 +69,7 @@ interface PresentationState {
   setIsGridView: (isGrid: boolean) => void;
   setIsSheetOpen: (isOpen: boolean) => void;
   setNumSlides: (num: number) => void;
+  setSlideCountMode: (mode: "manual" | "auto") => void;
   setTheme: (
     theme: Themes | string,
     customData?: ThemeProperties | null,
@@ -133,6 +135,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
   thumbnailUrl: undefined,
   setThumbnailUrl: (url) => set({ thumbnailUrl: url }),
   numSlides: 5,
+  slideCountMode: "auto",
   language: "en-US",
   pageStyle: "default",
   showTemplates: false,
@@ -147,7 +150,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
   stockImageProvider: "unsplash",
   presentationStyle: "professional",
   modelProvider: "openai",
-  modelId: "llama3.1:8b",
+  modelId: "",
   slides: [] as PlateSlide[],
   outlineThinking: "",
   presentationThinking: "",
@@ -214,6 +217,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
   setIsGridView: (isGrid) => set({ isGridView: isGrid }),
   setIsSheetOpen: (isOpen) => set({ isSheetOpen: isOpen }),
   setNumSlides: (num) => set({ numSlides: num }),
+  setSlideCountMode: (mode) => set({ slideCountMode: mode }),
   setLanguage: (lang) => set({ language: lang }),
   setTheme: (theme, customData = null) =>
     set({

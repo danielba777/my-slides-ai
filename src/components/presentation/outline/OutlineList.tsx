@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { getEffectiveSlideCount } from "@/lib/presentation/slide-count";
 import { usePresentationState } from "@/states/presentation-state";
 import {
   closestCenter,
@@ -29,6 +30,8 @@ export function OutlineList() {
     outline: initialItems,
     setOutline,
     numSlides,
+    slideCountMode,
+    presentationInput,
     isGeneratingOutline,
     webSearchEnabled,
     outlineThinking,
@@ -49,6 +52,14 @@ export function OutlineList() {
       })),
     );
   }, [initialItems]);
+
+  const effectiveSlideCount = useMemo(
+    () =>
+      getEffectiveSlideCount(slideCountMode, numSlides, presentationInput, {
+        fallback: 5,
+      }),
+    [slideCountMode, numSlides, presentationInput],
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -106,7 +117,7 @@ export function OutlineList() {
   };
 
   const content = useMemo(() => {
-    const totalSlides = numSlides;
+    const totalSlides = effectiveSlideCount;
     const loadedCount = items.length;
     const remainingCount = Math.max(0, totalSlides - loadedCount);
 
@@ -148,7 +159,7 @@ export function OutlineList() {
     );
   }, [
     items,
-    numSlides,
+    effectiveSlideCount,
     isGeneratingOutline,
     webSearchEnabled,
     sensors,
