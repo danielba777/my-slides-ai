@@ -13,7 +13,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Home, Image as ImageIcon, type LucideIcon } from "lucide-react";
+import {
+  FileText,
+  Home,
+  Image as ImageIcon,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 
 interface SidebarItem {
@@ -35,6 +41,16 @@ const slideshowItems: SidebarItem[] = [
     title: "Imagesets",
     url: "/admin/slideshows/imagesets",
     icon: ImageIcon,
+  },
+  {
+    title: "TikTok Accounts",
+    url: "/admin/slideshow-library/accounts",
+    icon: Users,
+  },
+  {
+    title: "Posts",
+    url: "/admin/slideshow-library/posts",
+    icon: FileText,
   },
 ];
 

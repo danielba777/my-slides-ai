@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button";
 import { usePresentationState } from "@/states/presentation-state";
 import { Sparkles } from "lucide-react";
-import { WebSearchToggle } from "./WebSearchToggle";
 
 export function PresentationInput({
   handleGenerate,
@@ -36,9 +35,11 @@ export function PresentationInput({
           className="h-80 w-full resize-none rounded-lg border border-border bg-card px-4 py-3.5 pb-12 text-base text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
         />
 
+        {/*
         <div className="absolute bottom-3 right-3 z-10">
           <WebSearchToggle />
         </div>
+        */}
       </div>
     </div>
   );

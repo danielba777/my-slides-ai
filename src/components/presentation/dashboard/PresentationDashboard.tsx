@@ -7,6 +7,7 @@ import { Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { toast } from "sonner";
+import { ImageCollectionSelector } from "./ImageCollectionSelector";
 import { PresentationControls } from "./PresentationControls";
 import { PresentationInput } from "./PresentationInput";
 
@@ -83,20 +84,18 @@ export function PresentationDashboard({
       <div className="mx-auto max-w-4xl space-y-12 px-6 py-12">
         <div className="space-y-8">
           <PresentationInput handleGenerate={handleGenerate} />
-          <PresentationControls />
-
-          <div className="flex items-center justify-end">
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={handleGenerate}
-                disabled={!presentationInput.trim() || isGeneratingOutline}
-                variant={isGeneratingOutline ? "loading" : "default"}
-                className="gap-2"
-              >
-                <Wand2 className="h-4 w-4" />
-                Generate
-              </Button>
-            </div>
+          <ImageCollectionSelector />
+          <div className="grid gap-4 items-end md:grid-cols-6">
+            <PresentationControls className="md:col-span-5" />
+            <Button
+              onClick={handleGenerate}
+              disabled={!presentationInput.trim() || isGeneratingOutline}
+              variant={isGeneratingOutline ? "loading" : "default"}
+              className="w-full gap-2 md:col-span-1 md:w-auto md:justify-center"
+            >
+              <Wand2 className="h-4 w-4" />
+              Generate
+            </Button>
           </div>
         </div>
       </div>
