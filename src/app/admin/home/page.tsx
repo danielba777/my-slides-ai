@@ -1,21 +1,53 @@
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ImageIcon, Settings } from "lucide-react";
+import Link from "next/link";
+
 export default function AdminHomePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold text-foreground">Admin Home</h1>
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
         <p className="text-muted-foreground">
-          Welcome to the SlidesCockpit admin panel. Use the sidebar to navigate
-          through administrative tools as they become available.
+          Verwalte deine SlidesCockpit-Einstellungen
         </p>
       </div>
 
-      <section className="rounded-lg border border-border bg-card p-6">
-        <h2 className="text-lg font-medium text-foreground">Getting started</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          This space is ready for analytics, user management, and other admin
-          features. Reach out if you need help deciding what to build first.
-        </p>
-      </section>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ImageIcon className="h-5 w-5" />
+              Bilder-Sets
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Verwalte deine Bilder-Sets für Präsentationen
+            </p>
+            <Link href="/admin/slideshows/imagesets">
+              <Button className="w-full">Bilder-Sets verwalten</Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Einstellungen
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              System-Einstellungen und Konfiguration
+            </p>
+            <Button variant="outline" disabled className="w-full">
+              Bald verfügbar
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
