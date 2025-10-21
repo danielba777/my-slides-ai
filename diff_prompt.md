@@ -1,105 +1,208 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
 **_ Begin Patch
-_** Update File: src/components/presentation/presentation-page/buttons/DownloadSlidesButton.tsx
+_** Update File: src/canvas/legacy/SlideCanvasLegacy.tsx
 @@
--async function blobToJpeg(pngBlob: Blob): Promise<Blob> {
+const [scale, setScale] = useState(1);
+const [offset, setOffset] = useState({ x: 0, y: 0 });
+const [bgSelected, setBgSelected] = useState(false);
 
-- // PNG -> JPEG (ohne Größenänderung) via Offscreen Canvas
-- const dataUrl = await new Promise<string>((resolve) => {
-- const reader = new FileReader();
-- reader.onload = () => resolve(String(reader.result));
-- reader.readAsDataURL(pngBlob);
-- });
-- const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-- const i = new Image();
-- i.crossOrigin = "anonymous";
-- i.onload = () => resolve(i);
-- i.onerror = reject;
-- i.src = dataUrl;
-- });
-- const canvas = document.createElement("canvas");
-- canvas.width = img.naturalWidth;
-- canvas.height = img.naturalHeight;
-- const ctx = canvas.getContext("2d")!;
-- ctx.drawImage(img, 0, 0);
-- const blob = await new Promise<Blob | null>((resolve) =>
-- canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92),
-- );
-- return blob ?? pngBlob;
-  -}
-  +// Lädt einen Blob als HTMLImageElement
-  +async function loadBlobAsImage(blob: Blob): Promise<HTMLImageElement> {
-
-* const dataUrl = await new Promise<string>((resolve) => {
-* const r = new FileReader();
-* r.onload = () => resolve(String(r.result));
-* r.readAsDataURL(blob);
-* });
-* return await new Promise<HTMLImageElement>((resolve, reject) => {
-* const img = new Image();
-* img.crossOrigin = "anonymous";
-* img.onload = () => resolve(img);
-* img.onerror = reject;
-* img.src = dataUrl;
-* });
-  +}
-* +// Erzwingt Full-Frame-Export 1080x1920 und harten Rand-Clip (kein „mittendrin“-Crop)
-  +async function normalizeToDesignPNG(pngBlob: Blob, W = 1080, H = 1920): Promise<Blob> {
-* const img = await loadBlobAsImage(pngBlob);
-* const canvas = document.createElement("canvas");
-* canvas.width = W;
-* canvas.height = H;
-* const ctx = canvas.getContext("2d")!;
-* // harter Frame-Clip (0,0,W,H)
-* ctx.save();
-* ctx.beginPath();
-* ctx.rect(0, 0, W, H);
-* ctx.clip();
-* // Wichtig: Alles 1:1 in den Frame zeichnen.
-* // Falls das Quellbild nicht exakt W×H hat (z.B. wegen Preview-Zoom),
-* // wird hier proportional auf den Ziel-Frame gelegt.
-* // Wenn deine Canvas bereits W×H ist, ist das ein 1:1 Draw ohne Shift.
-* ctx.drawImage(img, 0, 0, W, H);
-* ctx.restore();
-* const out = await new Promise<Blob | null>((resolve) =>
-* canvas.toBlob((b) => resolve(b), "image/png"),
-* );
-* return out ?? pngBlob;
-  +}
-* +async function blobToJpeg(pngBlob: Blob, W = 1080, H = 1920): Promise<Blob> {
-* // Erst sicherstellen, dass wir exakt den vollen Frame (1080×1920) haben
-* const normalized = await normalizeToDesignPNG(pngBlob, W, H);
-* const img = await loadBlobAsImage(normalized);
-* const canvas = document.createElement("canvas");
-* canvas.width = W;
-* canvas.height = H;
-* const ctx = canvas.getContext("2d")!;
-* ctx.drawImage(img, 0, 0, W, H);
-* const jpg = await new Promise<Blob | null>((resolve) =>
-* canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92),
-* );
-* return jpg ?? normalized;
-  +}
+- const [imageNatural, setImageNatural] = useState<{ w: number; h: number } | null>(null);
+  const isPanning = useRef(false);
+  const lastPoint = useRef({ x: 0, y: 0 });
   @@
-  const handleDownload = async () => {
-  try {
-  setDownloading(true);
-  const exporters: Map<string, () => Promise<Blob>> = (window as any).\_\_slideExporters ?? new Map();
-  // sichere Reihenfolge (aktuelle UI-Reihenfolge im State)
-  const ordered = slides.map((s, idx) => ({ id: s.id as string, idx }));
-  const jpgFiles: Array<{ name: string; blob: Blob }> = [];
-  for (const { id, idx } of ordered) {
-  const exporter = exporters.get(id);
-  if (!exporter) continue;
 
--        const png = await exporter();
--        const jpg = await blobToJpeg(png);
+* const wheelHandler = useCallback((e: WheelEvent) => {
+* if (isEditingRef.current) return;
+* if (!bgSelected) return;
+* e.preventDefault();
+* e.stopPropagation();
+* if (!wrapRef.current) return;
+* const rect = wrapRef.current.getBoundingClientRect();
+* const canvasX = (e.clientX - rect.left) \* (W / rect.width);
+* const canvasY = (e.clientY - rect.top) \* (H / rect.height);
+* const factor = e.deltaY < 0 ? 1.06 : 0.94;
+*
+* setScale((prev) => {
+*      const newScale = Math.max(0.4, Math.min(3, prev * factor));
+*      const scaleDiff = newScale - prev;
+*      setOffset((o) => {
+*        const offsetX = ((canvasX - W / 2 - o.x) * scaleDiff) / prev;
+*        const offsetY = ((canvasY - H / 2 - o.y) * scaleDiff) / prev;
+*        return { x: o.x - offsetX, y: o.y - offsetY };
+*      });
+*      return newScale;
+* });
+* }, []);
 
-*        const png = await exporter();
-*        // Erzwinge Full-Frame 1080×1920 + Rand-Clip, danach nach JPG
-*        const jpg = await blobToJpeg(png, 1080, 1920);
-           const name = `${String(idx + 1).padStart(2, "0")}.jpg`;
-           jpgFiles.push({ name, blob: jpg });
-         }
+- const wheelHandler = useCallback((e: WheelEvent) => {
+- if (isEditingRef.current) return;
+- if (!bgSelected) return;
+- e.preventDefault();
+- e.stopPropagation();
+- if (!wrapRef.current) return;
+- const rect = wrapRef.current.getBoundingClientRect();
+- const canvasX = (e.clientX - rect.left) \* (W / rect.width);
+- const canvasY = (e.clientY - rect.top) \* (H / rect.height);
+- const factor = e.deltaY < 0 ? 1.06 : 0.94;
+-
+- setScale((prev) => {
+-      const newScale = Math.max(0.4, Math.min(3, prev * factor));
+-      const scaleDiff = newScale - prev;
+-      setOffset((o) => {
+-        const offsetX = ((canvasX - W / 2 - o.x) * scaleDiff) / prev;
+-        const offsetY = ((canvasY - H / 2 - o.y) * scaleDiff) / prev;
+-        return { x: o.x - offsetX, y: o.y - offsetY };
+-      });
+-      return newScale;
+- });
+- }, [bgSelected]);
+  @@
+  useEffect(() => {
+  const el = wrapRef.current;
+  if (!el) return;
+  el.addEventListener("wheel", wheelHandler, { passive: false });
+  return () => el.removeEventListener("wheel", wheelHandler as any);
+
+* }, [wheelHandler, bgSelected]);
+
+- }, [wheelHandler, bgSelected]);
+  @@
+
+*          {imageUrl ? (
+*            <>
+*              <img
+*                ref={imgRef}
+*                src={imageUrl}
+*                alt=""
+*                className="absolute left-1/2 top-1/2 select-none pointer-events-none"
+*                style={{
+*                  transform: `translate(-50%,-50%) translate(${offset.x}px, ${offset.y}px) scale(${Math.max(
+*                    0.001,
+*                    scale,
+*                  )})`,
+*                  transformOrigin: "center",
+*                }}
+*                draggable={false}
+*                onLoad={(e) => {
+*                  // Beim ersten Laden: Bild so skalieren, dass es KOMPLETT sichtbar ist (contain)
+*                  try {
+*                    const n = e.currentTarget as HTMLImageElement;
+*                    const fit = Math.min(W / n.naturalWidth, H / n.naturalHeight);
+*                    setScale((prev) => (prev === 1 ? fit : prev));
+*                  } catch {}
+*                }}
+*              />
+*              {bgSelected && (
+*                <div
+*                  className="absolute left-1/2 top-1/2 pointer-events-none"
+*                  style={{
+*                    transform: `translate(-50%,-50%) translate(${offset.x}px, ${offset.y}px) scale(${Math.max(
+*                      0.001,
+*                      scale,
+*                    )})`,
+*                    transformOrigin: "center",
+*                    width: W,
+*                    height: H,
+*                    boxSizing: "border-box",
+*                    border: "2px dashed rgba(59,130,246,0.9)", /* blue-500 */
+*                    borderRadius: "8px",
+*                  }}
+*                />
+*              )}
+*            </>
+*          ) : (
+
+-          {imageUrl ? (
+-            <>
+-              <img
+-                ref={imgRef}
+-                src={imageUrl}
+-                alt=""
+-                className="absolute left-1/2 top-1/2 select-none pointer-events-none"
+-                style={{
+-                  transform: `translate(-50%,-50%) translate(${offset.x}px, ${offset.y}px) scale(${Math.max(
+-                    0.001,
+-                    scale
+-                  )})`,
+-                  transformOrigin: "center",
+-                }}
+-                draggable={false}
+-                onLoad={(e) => {
+-                  try {
+-                    const n = e.currentTarget as HTMLImageElement;
+-                    setImageNatural({ w: n.naturalWidth, h: n.naturalHeight });
+-                    const fit = Math.min(W / n.naturalWidth, H / n.naturalHeight);
+-                    setScale((prev) => (prev === 1 ? fit : prev));
+-                  } catch {}
+-                }}
+-              />
+-              {bgSelected && imageNatural && (
+-                <div
+-                  className="absolute left-1/2 top-1/2 pointer-events-none"
+-                  style={{
+-                    transform: `translate(-50%,-50%) translate(${offset.x}px, ${offset.y}px) scale(${Math.max(
+-                      0.001,
+-                      scale
+-                    )})`,
+-                    transformOrigin: "center",
+-                    width: imageNatural.w,
+-                    height: imageNatural.h,
+-                    boxSizing: "border-box",
+-                    border: "2px dashed rgba(59,130,246,0.9)",
+-                    borderRadius: "8px",
+-                  }}
+-                />
+-              )}
+-            </>
+-          ) : (
+               <div className="absolute inset-0 bg-black" />
+             )}
+  @@
+
+* const centerX = W / 2;
+* const centerY = H / 2;
+
+- const centerX = W / 2;
+- const oneThirdY = Math.round(H / 3);
+  @@
+  align: "center",
+
+*      x: centerX,
+*      y: centerY,
+
+-      x: centerX,
+-      y: oneThirdY,
+       rotation: 0,
+
+*      width: 600,
+
+-      width: Math.round(W * 0.7),
+  **_ End Patch
+  diff
+  Code kopieren
+  _** Begin Patch
+  \*\*\* Update File: src/canvas/SlideCanvasAdapter.tsx
+  @@
+
+*          const pxX = Math.round((src.x ?? 0.5) * W);
+*          const pxY = Math.round((src.y ?? 0.5) * H);
+
+-          const pxX = Math.round((src.x ?? 0.5) * W);
+-          const pxY = Math.round((src.y ?? (1 / 3)) * H);
+  @@
+  rotation: src.rotation ?? 0,
+
+*            width: src.maxWidth ?? 400,
+
+-            width: src.maxWidth ?? Math.round(W * 0.7),
+             text: src.content ?? "",
+             fontFamily: src.fontFamily ?? "Inter, system-ui, sans-serif",
+             fontSize: Math.round(BASE_FONT_PX * (src.scale ?? 1)),
+             lineHeight: src.lineHeight ?? 1.12,
+             letterSpacing: src.letterSpacing ?? 0,
+
+*            align: src.align ?? "left",
+
+-            align: src.align ?? "center",
   \*\*\* End Patch
