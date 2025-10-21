@@ -132,25 +132,15 @@ export function buildCanvasDocFromSlide(
   let textPosition: { x: number; y: number } | undefined;
   if (segments.length > 0) {
     const content = segments.join("\n\n");
+
     const textWidth = Math.round(width * 0.7);
-    const margin = Math.round(width * 0.1);
-    const alignment =
-      slide.alignment === "end"
-        ? "right"
-        : slide.alignment === "center"
-          ? "center"
-          : "left";
-
-    let x = slide.position?.x ?? margin;
-    if (!slide.position) {
-      if (alignment === "center") {
-        x = Math.max(margin, Math.round((width - textWidth) / 2));
-      } else if (alignment === "right") {
-        x = Math.max(margin, width - textWidth - margin);
-      }
-    }
-
-    const y = slide.position?.y ?? Math.round(height * 0.22);
+    // Default: immer mittig (TikTok-Style)
+    const alignment = "center";
+    // Falls Position noch nicht gesetzt: zentriert platzieren
+    const x =
+      slide.position?.x ??
+      Math.max(0, Math.round((width - textWidth) / 2));
+    const y = slide.position?.y ?? Math.round(height * (1 / 3));
     const textColor = chooseTextColor(base.bg);
     base.nodes.push({
       id: `text-${nanoid()}`,

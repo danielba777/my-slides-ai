@@ -322,7 +322,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         ? crypto.randomUUID()
         : `txt-${Date.now()}`;
     const centerX = W / 2;
-    const centerY = H / 2;
+    const oneThirdY = Math.round(H / 3);
     const initial: TextLayer & { autoHeight?: boolean } = {
       id,
       content: "Neuer Text",
@@ -334,9 +334,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       letterSpacing: 0,
       align: "center",
       x: centerX,
-      y: centerY,
+      y: oneThirdY,
       rotation: 0,
-      width: 600,
+      width: Math.round(W * 0.7),
       height: 0, // auto
       zIndex: (textLayers.at(-1)?.zIndex ?? 0) + 1,
       color: "#ffffff",
@@ -363,6 +363,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   // BG pan/zoom state (Canvas-Einheiten)
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [bgSelected, setBgSelected] = useState(false);
+  const [imageNatural, setImageNatural] = useState<{ w: number; h: number } | null>(null);
   const isPanning = useRef(false);
   const lastPoint = useRef({ x: 0, y: 0 });
 
@@ -474,30 +476,32 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   };
 
   // === WHEEL: DOM-Listener mit passive:false, damit Seite NICHT scrollt ===
-  const wheelHandler = useCallback((e: WheelEvent) => {
-    if (isEditingRef.current) {
-      // im Editor-Modus kein Pan/Zoom (Seite darf scrollen)
-      return;
-    }
-    e.preventDefault();
-    e.stopPropagation();
-    if (!wrapRef.current) return;
-    const rect = wrapRef.current.getBoundingClientRect();
-    const canvasX = (e.clientX - rect.left) * (W / rect.width);
-    const canvasY = (e.clientY - rect.top) * (H / rect.height);
-    const factor = e.deltaY < 0 ? 1.06 : 0.94;
+  // Nur zoomen, wenn das Bild selektiert ist
+  const wheelHandler = useCallback(
+    (e: WheelEvent) => {
+      if (isEditingRef.current) return;
+      if (!bgSelected) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!wrapRef.current) return;
+      const rect = wrapRef.current.getBoundingClientRect();
+      const canvasX = (e.clientX - rect.left) * (W / rect.width);
+      const canvasY = (e.clientY - rect.top) * (H / rect.height);
+      const factor = e.deltaY < 0 ? 1.06 : 0.94;
 
-    setScale((prev) => {
-      const newScale = Math.max(0.4, Math.min(3, prev * factor));
-      const scaleDiff = newScale - prev;
-      setOffset((o) => {
-        const offsetX = ((canvasX - W / 2 - o.x) * scaleDiff) / prev;
-        const offsetY = ((canvasY - H / 2 - o.y) * scaleDiff) / prev;
-        return { x: o.x - offsetX, y: o.y - offsetY };
+      setScale((prev) => {
+        const newScale = Math.max(0.4, Math.min(3, prev * factor));
+        const scaleDiff = newScale - prev;
+        setOffset((o) => {
+          const offsetX = ((canvasX - W / 2 - o.x) * scaleDiff) / prev;
+          const offsetY = ((canvasY - H / 2 - o.y) * scaleDiff) / prev;
+          return { x: o.x - offsetX, y: o.y - offsetY };
+        });
+        return newScale;
       });
-      return newScale;
-    });
-  }, []);
+    },
+    [bgSelected],
+  );
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -520,10 +524,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     if (toolbarMouseDownRef.current) {
       return;
     }
-    // 3) ECHTER Hintergrundklick → Editor schließen + Pan erlauben
+    // 3) ECHTER Hintergrundklick → Editor schließen + Bild selektieren + Pan erlauben
     if (isEditingRef.current) {
       setIsEditing(null);
     }
+    setActiveLayerId(null);
+    setBgSelected(true);
     isPanning.current = true;
     lastPoint.current = { x: e.clientX, y: e.clientY };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -1461,20 +1467,47 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           }}
         >
           {imageUrl ? (
-            <img
-              ref={imgRef}
-              src={imageUrl}
-              alt=""
-              className="absolute left-1/2 top-1/2 select-none pointer-events-none"
-              style={{
-                transform: `translate(-50%,-50%) translate(${offset.x}px, ${offset.y}px) scale(${Math.max(
-                  0.001,
-                  scale,
-                )})`,
-                transformOrigin: "center",
-              }}
-              draggable={false}
-            />
+            <>
+              <img
+                ref={imgRef}
+                src={imageUrl}
+                alt=""
+                className="absolute left-1/2 top-1/2 select-none pointer-events-none"
+                style={{
+                  transform: `translate(-50%,-50%) translate(${offset.x}px, ${offset.y}px) scale(${Math.max(
+                    0.001,
+                    scale
+                  )})`,
+                  transformOrigin: "center",
+                }}
+                draggable={false}
+                onLoad={(e) => {
+                  try {
+                    const n = e.currentTarget as HTMLImageElement;
+                    setImageNatural({ w: n.naturalWidth, h: n.naturalHeight });
+                    const fit = Math.min(W / n.naturalWidth, H / n.naturalHeight);
+                    setScale((prev) => (prev === 1 ? fit : prev));
+                  } catch {}
+                }}
+              />
+              {bgSelected && imageNatural && (
+                <div
+                  className="absolute left-1/2 top-1/2 pointer-events-none"
+                  style={{
+                    transform: `translate(-50%,-50%) translate(${offset.x}px, ${offset.y}px) scale(${Math.max(
+                      0.001,
+                      scale
+                    )})`,
+                    transformOrigin: "center",
+                    width: imageNatural.w,
+                    height: imageNatural.h,
+                    boxSizing: "border-box",
+                    border: "2px dashed rgba(59,130,246,0.9)",
+                    borderRadius: "8px",
+                  }}
+                />
+              )}
+            </>
           ) : (
             <div className="absolute inset-0 bg-black" />
           )}
@@ -1513,6 +1546,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                   onPointerDown={(e) => {
                     // Im Editor-Modus keine Pointer-Blockade → Mausplatzierung/Markieren funktioniert
                     if (isCurrentEditing) return;
+                    // Klick auf Text → Bild-Selektion aufheben, Scroll-Zoom hat dann KEINE Wirkung
+                    setBgSelected(false);
                     selectLayer(layer.id, e);
                   }}
                   onDoubleClick={() => onDoubleClick(layer.id)}

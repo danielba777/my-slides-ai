@@ -86,15 +86,48 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
     return texts.map((t, i) => {
       // accept both legacy "text" and newer "content" fields for text nodes
       const rawContent: string = t.content ?? t.text ?? "";
-      // Positionslogik: nx/ny (normiert) > x/y (px)
-      const xPx = normToPxX(t.nx ?? t.x) ?? Math.round(W * 0.5);
-      const yPx = normToPxY(t.ny ?? t.y) ?? Math.round(H * 0.5);
+      const widthPx = t.width ?? Math.round(W * 0.7);
+      const lineCount =
+        rawContent.trim().length > 0
+          ? rawContent.split(/\r?\n/).length
+          : 1;
+      const approxHeightPx =
+        typeof t.height === "number" && t.height > 0
+          ? t.height
+          : Math.round(BASE_FONT_PX * (t.lineHeight ?? 1.12) * lineCount);
+
+      const normalizedXPx =
+        typeof t.nx === "number"
+          ? normToPxX(t.nx)
+          : typeof t.x === "number" && t.x >= 0 && t.x <= 1
+            ? normToPxX(t.x)
+            : undefined;
+      const normalizedYPx =
+        typeof t.ny === "number"
+          ? normToPxY(t.ny)
+          : typeof t.y === "number" && t.y >= 0 && t.y <= 1
+            ? normToPxY(t.y)
+            : undefined;
+
+      // Positionslogik: nx/ny (normiert) > x/y (px, legacy = top-left)
+      const xPx =
+        normalizedXPx ??
+        (typeof t.x === "number"
+          ? t.x + widthPx / 2
+          : Math.round(W * 0.5));
+      const yPx =
+        normalizedYPx ??
+        (typeof t.y === "number"
+          ? t.y + approxHeightPx / 2
+          : Math.round(H * 0.5));
 
       // scale aus fontSize ableiten (Basis 72px)
       const scale =
         typeof t.fontSize === "number" && t.fontSize > 0
           ? t.fontSize / BASE_FONT_PX
-          : 1;
+          : typeof t.scale === "number" && t.scale > 0
+            ? t.scale
+            : 1;
 
       // Gewicht mappen
       const weight =
@@ -111,12 +144,12 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
         y: yPx / H,
         rotation: t.rotation ?? 0,
         scale,
-        maxWidth: t.width ?? 400,
+        maxWidth: t.width ?? Math.round(W * 0.7),
         ...(t.height ? { maxHeight: t.height } : {}),
         lineHeight: t.lineHeight ?? 1.12,
         letterSpacing: t.letterSpacing ?? 0,
         zIndex: t.zIndex ?? i,
-        align: (t.align as any) ?? "left",
+        align: (t.align as any) ?? "center",
         weight,
         // Extras (optional unterstützt vom Legacy-Canvas):
         ...(t.italic !== undefined ? { italic: t.italic } : {}),
@@ -152,7 +185,7 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
         ti += 1;
 
         const pxX = Math.round((src.x ?? 0.5) * W);
-        const pxY = Math.round((src.y ?? 0.5) * H);
+        const pxY = Math.round((src.y ?? (1 / 3)) * H);
 
         const target = node as ExtendedCanvasTextNode;
         target.x = pxX;
@@ -162,12 +195,12 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
         target.rotation = src.rotation ?? 0;
         target.scale = src.scale ?? 1;
         target.fontSize = Math.round(BASE_FONT_PX * (src.scale ?? 1));
-        target.width = src.maxWidth ?? target.width ?? 400;
+        target.width = src.maxWidth ?? target.width ?? Math.round(W * 0.7);
         target.height = (src as any).maxHeight ?? target.height;
         target.lineHeight = src.lineHeight ?? 1.12;
         target.letterSpacing = src.letterSpacing ?? 0;
         target.zIndex = src.zIndex ?? target.zIndex ?? i;
-        target.align = src.align ?? "left";
+        target.align = src.align ?? "center";
         target.weight =
           src.weight === "bold"
             ? "bold"
@@ -209,13 +242,13 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
             x: pxX,
             y: pxY,
             rotation: src.rotation ?? 0,
-            width: src.maxWidth ?? 400,
+            width: src.maxWidth ?? Math.round(W * 0.7),
             text: src.content ?? "",
             fontFamily: src.fontFamily ?? "Inter, system-ui, sans-serif",
             fontSize: Math.round(BASE_FONT_PX * (src.scale ?? 1)),
             lineHeight: src.lineHeight ?? 1.12,
             letterSpacing: src.letterSpacing ?? 0,
-            align: src.align ?? "left",
+            align: src.align ?? "center",
             weight,
             color: (src as any).color ?? "#ffffff",
             // erweiterte Felder für Legacy-Canvas-Kompatibilität
@@ -229,7 +262,7 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
             outlineColor: (src as any).outlineColor ?? "#000",
             nx: pxToNormX(pxX),
             ny: pxToNormY(pxY),
-            nmaxWidth: src.maxWidth ?? 400,
+            nmaxWidth: src.maxWidth ?? Math.round(W * 0.7),
           } as ExtendedCanvasTextNode);
         }
       }

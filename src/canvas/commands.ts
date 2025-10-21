@@ -20,21 +20,27 @@ export const addText = (c: CanvasDoc, text = "Neuer Text"): CanvasDoc => ({
   ...c,
   nodes: [
     ...c.nodes,
-    {
-      id: crypto.randomUUID(),
-      type: "text",
-      x: 100,
-      y: 100,
-      text,
-      fontFamily: "Inter",
-      fontSize: 64,
-      fill: "#111",
-      stroke: "#000",
-      strokeWidth: 0,
-      padding: 8,
-      textBg: null,
-      align: "left",
-    } satisfies CanvasTextNode,
+    (() => {
+      const width = Math.round(c.width * 0.7);              // ~70% Breite
+      const x = Math.round((c.width - width) / 2);          // horizontal zentriert
+      const y = Math.round(c.height * (1 / 3));             // ~1/3 von oben
+      return {
+        id: crypto.randomUUID(),
+        type: "text",
+        x,
+        y,
+        text,
+        fontFamily: "Inter",
+        fontSize: 64,
+        fill: "#111",
+        stroke: "#000",
+        strokeWidth: 0,
+        padding: 8,
+        textBg: null,
+        align: "center",
+        width,
+      } satisfies CanvasTextNode;
+    })(),
   ],
   selection: [],
 });
