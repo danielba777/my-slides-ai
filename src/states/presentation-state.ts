@@ -45,6 +45,9 @@ interface PresentationState {
   outlineThinking: string; // Thinking content from outline generation
   presentationThinking: string; // Thinking content from presentation generation
 
+  imageSetId: string | null;
+  setImageSetId: (id: string | null) => void;
+
   // Root image generation tracking by slideId
   rootImageGeneration: Record<
     string,
@@ -173,6 +176,9 @@ export const usePresentationState = create<PresentationState>((set) => ({
   shouldStartPresentationGeneration: false,
   isGeneratingOutline: false,
   isGeneratingPresentation: false,
+
+  imageSetId: null,
+  setImageSetId: (id) => set({ imageSetId: id }),
 
   setSlides: (slides: PlateSlide[]) => set({ slides }),
   setPendingInsertNode: (node) => set({ pendingInsertNode: node }),
