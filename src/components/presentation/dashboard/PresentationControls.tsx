@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   Select,
@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { usePresentationState } from "@/states/presentation-state";
 import { useCallback, useEffect, useState } from "react";
 
@@ -19,8 +20,10 @@ interface ImageSet {
 
 export function PresentationControls({
   shouldShowLabel = true,
+  className,
 }: {
   shouldShowLabel?: boolean;
+  className?: string;
 }) {
   const {
     numSlides,
@@ -68,7 +71,7 @@ export function PresentationControls({
   }, [loadImageSets]);
 
   return (
-    <div className="grid grid-cols-5 gap-4">
+    <div className={cn("grid grid-cols-5 gap-4", className)}>
       {/* 
       <ModelPicker shouldShowLabel={shouldShowLabel} />
       */}
@@ -136,7 +139,7 @@ export function PresentationControls({
           </SelectContent>
         </Select>
       </div>
-
+      {/* 
       <div>
         {shouldShowLabel && (
           <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -169,7 +172,6 @@ export function PresentationControls({
         </Select>
       </div>
 
-      {/* 
       <div>
         {shouldShowLabel && (
           <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
