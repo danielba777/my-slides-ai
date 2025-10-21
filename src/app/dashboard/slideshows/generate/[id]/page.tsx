@@ -217,9 +217,15 @@ export default function PresentationGenerateWithIdPage() {
       }
 
       if (presentationData.presentation?.imageSource) {
-        setImageSource(
-          presentationData.presentation.imageSource as "ai" | "stock",
-        );
+        const persistedSource = presentationData.presentation
+          .imageSource as string;
+        if (
+          persistedSource === "ai" ||
+          persistedSource === "stock" ||
+          persistedSource === "imageset"
+        ) {
+          setImageSource(persistedSource);
+        }
       }
 
       // Set language if available
@@ -238,6 +244,53 @@ export default function PresentationGenerateWithIdPage() {
     setPresentationStyle,
     setLanguage,
   ]);
+
+  const getImageForSlide = async (
+    query: string,
+    state: ReturnType<typeof usePresentationState.getState>,
+  ): Promise<string | undefined> => {
+    if (!query) {
+      return undefined;
+    }
+
+    if (state.imageSource === "imageset" && state.imageSetId) {
+      try {
+        const response = await fetch(
+          `/api/imagesets/${state.imageSetId}/random-image`,
+        );
+        if (response.ok) {
+          const result = await response.json();
+          if (result?.success && result.imageUrl) {
+            return result.imageUrl as string;
+          }
+        }
+      } catch (error) {
+        console.error("Imageset image lookup failed:", error);
+      }
+    }
+
+    if (state.imageSource === "stock") {
+      try {
+        const imageResult = await getImageFromUnsplash(query);
+        if (imageResult.success && imageResult.imageUrl) {
+          return imageResult.imageUrl;
+        }
+      } catch (error) {
+        console.error("Unsplash image lookup failed:", error);
+      }
+    } else if (state.imageSource === "ai") {
+      try {
+        const aiResult = await generateImageAction(query, state.imageModel);
+        if (aiResult?.image?.url) {
+          return aiResult.image.url;
+        }
+      } catch (error) {
+        console.error("AI image generation failed:", error);
+      }
+    }
+
+    return undefined;
+  };
 
   const handleGenerate = async () => {
     const state = usePresentationState.getState();
@@ -274,30 +327,9 @@ export default function PresentationGenerateWithIdPage() {
         } as unknown as PlateNode;
 
         const query = normalized.split(/\s+/).slice(0, 10).join(" ");
-        let imageUrl: string | undefined;
-
-        if (query && state.imageSource === "stock") {
-          try {
-            const imageResult = await getImageFromUnsplash(query);
-            if (imageResult.success && imageResult.imageUrl) {
-              imageUrl = imageResult.imageUrl;
-            }
-          } catch (error) {
-            console.error("Unsplash image lookup failed:", error);
-          }
-        } else if (query && state.imageSource === "ai") {
-          try {
-            const aiResult = await generateImageAction(
-              query,
-              state.imageModel,
-            );
-            if (aiResult?.image?.url) {
-              imageUrl = aiResult.image.url;
-            }
-          } catch (error) {
-            console.error("AI image generation failed:", error);
-          }
-        }
+        const imageUrl = query
+          ? await getImageForSlide(query, state)
+          : undefined;
 
         const canvasWithBg = imageUrl
           ? applyBackgroundImageToCanvas(canvasDoc, imageUrl)

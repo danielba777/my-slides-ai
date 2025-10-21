@@ -20,10 +20,10 @@ export const IMAGE_MODELS: { value: ImageModelList; label: string }[] = [
 ];
 
 interface ImageSourceSelectorProps {
-  imageSource: "ai" | "stock";
+  imageSource: "ai" | "stock" | "imageset";
   imageModel: ImageModelList;
   stockImageProvider: "unsplash";
-  onImageSourceChange: (source: "ai" | "stock") => void;
+  onImageSourceChange: (source: "ai" | "stock" | "imageset") => void;
   onImageModelChange: (model: ImageModelList) => void;
   onStockImageProviderChange: (provider: "unsplash") => void;
   className?: string;

@@ -207,9 +207,15 @@ export default function PresentationPage() {
       }
 
       if (presentationData?.presentation?.imageSource) {
-        setImageSource(
-          presentationData.presentation.imageSource as "ai" | "stock",
-        );
+        const persistedSource = presentationData.presentation
+          .imageSource as string;
+        if (
+          persistedSource === "ai" ||
+          persistedSource === "stock" ||
+          persistedSource === "imageset"
+        ) {
+          setImageSource(persistedSource);
+        }
       }
 
       // Set presentationStyle if available

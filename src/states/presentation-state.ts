@@ -19,7 +19,7 @@ interface PresentationState {
   showTemplates: boolean;
   presentationInput: string;
   imageModel: ImageModelList;
-  imageSource: "ai" | "stock";
+  imageSource: "ai" | "stock" | "imageset";
   stockImageProvider: "unsplash";
   presentationStyle: string;
   modelProvider: "openai" | "ollama" | "lmstudio";
@@ -93,7 +93,7 @@ interface PresentationState {
   setPresentationThinking: (thinking: string) => void;
   setWebSearchEnabled: (enabled: boolean) => void;
   setImageModel: (model: ImageModelList) => void;
-  setImageSource: (source: "ai" | "stock") => void;
+  setImageSource: (source: "ai" | "stock" | "imageset") => void;
   setStockImageProvider: (provider: "unsplash") => void;
   setPresentationStyle: (style: string) => void;
   setModelProvider: (provider: "openai" | "ollama" | "lmstudio") => void;
