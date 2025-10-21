@@ -8,11 +8,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { PresentationControls } from "./PresentationControls";
-import { PresentationExamples } from "./PresentationExamples";
-import { PresentationHeader } from "./PresentationHeader";
 import { PresentationInput } from "./PresentationInput";
-import { PresentationsSidebar } from "./PresentationsSidebar";
-import { RecentPresentations } from "./RecentPresentations";
 
 export function PresentationDashboard({
   sidebarSide,
@@ -57,7 +53,8 @@ export function PresentationDashboard({
         // Setze Pending-Cookie, sodass die Zielseite sofort loslegt
         try {
           const domain =
-            typeof window !== "undefined" && window.location.hostname === "localhost"
+            typeof window !== "undefined" &&
+            window.location.hostname === "localhost"
               ? "localhost"
               : ".allweone.com";
           document.cookie =
@@ -69,9 +66,7 @@ export function PresentationDashboard({
           result.presentation.id,
           result.presentation.title,
         );
-        router.push(
-          `/dashboard/slideshows/generate/${result.presentation.id}`,
-        );
+        router.push(`/dashboard/slideshows/generate/${result.presentation.id}`);
       } else {
         setIsGeneratingOutline(false);
         toast.error(result.message || "Failed to create presentation");
@@ -85,10 +80,7 @@ export function PresentationDashboard({
 
   return (
     <div className="notebook-section relative h-full w-full">
-      <PresentationsSidebar side={sidebarSide} />
       <div className="mx-auto max-w-4xl space-y-12 px-6 py-12">
-        <PresentationHeader />
-
         <div className="space-y-8">
           <PresentationInput handleGenerate={handleGenerate} />
           <PresentationControls />
@@ -102,14 +94,11 @@ export function PresentationDashboard({
                 className="gap-2"
               >
                 <Wand2 className="h-4 w-4" />
-                Generate Presentation
+                Generate
               </Button>
             </div>
           </div>
         </div>
-
-        <PresentationExamples />
-        <RecentPresentations />
       </div>
     </div>
   );
@@ -119,9 +108,14 @@ function derivePresentationTitleFromPrompt(prompt: string): string {
   const trimmed = prompt.trim();
   if (!trimmed) return "Untitled Presentation";
 
-  const aboutPattern = trimmed.match(/slides?\s+(?:about|on)\s+['\"]?([^'\"\n]+)['\"]?/i);
+  const aboutPattern = trimmed.match(
+    /slides?\s+(?:about|on)\s+['\"]?([^'\"\n]+)['\"]?/i,
+  );
   if (aboutPattern && aboutPattern[1]) {
-    return toTitleCase(aboutPattern[1].trim()).slice(0, 80) || "Untitled Presentation";
+    return (
+      toTitleCase(aboutPattern[1].trim()).slice(0, 80) ||
+      "Untitled Presentation"
+    );
   }
 
   const firstLine = trimmed.split(/\r?\n/)[0] ?? trimmed;

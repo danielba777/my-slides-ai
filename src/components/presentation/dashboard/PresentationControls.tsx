@@ -6,8 +6,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { usePresentationState } from "@/states/presentation-state";
-import { Layout } from "lucide-react";
-import { ModelPicker } from "./ModelPicker";
+import { useEffect } from "react";
 
 export function PresentationControls({
   shouldShowLabel = true,
@@ -21,12 +20,21 @@ export function PresentationControls({
     setLanguage,
     pageStyle,
     setPageStyle,
+    slideCountMode,
+    setSlideCountMode,
   } = usePresentationState();
+
+  useEffect(() => {
+    if (pageStyle !== "default") {
+      setPageStyle("default");
+    }
+  }, [pageStyle, setPageStyle]);
 
   return (
     <div className="grid grid-cols-4 gap-4">
-      {/* Model Selection */}
+      {/* 
       <ModelPicker shouldShowLabel={shouldShowLabel} />
+      */}
 
       {/* Number of Slides */}
       <div>
@@ -36,13 +44,25 @@ export function PresentationControls({
           </label>
         )}
         <Select
-          value={String(numSlides)}
-          onValueChange={(v) => setNumSlides(Number(v))}
+          value={slideCountMode === "auto" ? "auto" : String(numSlides)}
+          onValueChange={(value) => {
+            if (value === "auto") {
+              setSlideCountMode("auto");
+              return;
+            }
+
+            setSlideCountMode("manual");
+            const parsed = Number(value);
+            if (!Number.isNaN(parsed)) {
+              setNumSlides(parsed);
+            }
+          }}
         >
           <SelectTrigger>
             <SelectValue placeholder="Select number of slides" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="auto">Auto (use prompt)</SelectItem>
             {[1, 2, 3, 4, 5, 6, 7, 8, 10, 12].map((num) => (
               <SelectItem key={num} value={String(num)}>
                 {num} slides
@@ -80,39 +100,19 @@ export function PresentationControls({
         </Select>
       </div>
 
-      {/* Page Style */}
+      {/* 
       <div>
         {shouldShowLabel && (
           <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Page style
           </label>
         )}
-        <Select value={pageStyle} onValueChange={setPageStyle}>
-          <SelectTrigger>
-            <div className="flex items-center gap-2">
-              <Layout className="h-4 w-4" />
-              <SelectValue placeholder="Select page style" />
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="default">
-              <div className="flex items-center gap-3">
-                <span>Default</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="traditional">
-              <div className="flex items-center gap-3">
-                <span>Traditional</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="tall">
-              <div className="flex items-center gap-3">
-                <span>Tall</span>
-              </div>
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex h-10 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+          <Layout className="h-4 w-4" />
+          <span className="truncate">Default</span>
+        </div>
       </div>
+      */}
     </div>
   );
 }

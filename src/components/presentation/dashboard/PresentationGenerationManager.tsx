@@ -8,14 +8,16 @@ import {
   ensureSlideCanvas,
 } from "@/components/presentation/utils/canvas";
 import { extractThinking } from "@/lib/thinking-extractor";
+import { getEffectiveSlideCount } from "@/lib/presentation/slide-count";
 import { usePresentationState } from "@/states/presentation-state";
 import { useChat } from "@ai-sdk/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
 export function PresentationGenerationManager() {
   const {
     numSlides,
+    slideCountMode,
     language,
     presentationInput,
     shouldStartOutlineGeneration,
@@ -50,6 +52,13 @@ export function PresentationGenerationManager() {
   >(null);
   const titleExtractedRef = useRef<boolean>(false);
   const outlineRequestInFlightRef = useRef(false);
+  const effectiveSlideCount = useMemo(
+    () =>
+      getEffectiveSlideCount(slideCountMode, numSlides, presentationInput, {
+        fallback: 5,
+      }),
+    [slideCountMode, numSlides, presentationInput],
+  );
 
   const extractTitle = (
     content: string,
@@ -180,7 +189,7 @@ export function PresentationGenerationManager() {
       : "/api/presentation/outline",
     body: {
       prompt: presentationInput,
-      numberOfCards: numSlides,
+      numberOfCards: effectiveSlideCount,
       language,
       modelProvider,
       modelId,
@@ -267,7 +276,7 @@ export function PresentationGenerationManager() {
           {
             body: {
               prompt: currentPrompt,
-              numberOfCards: numSlides,
+              numberOfCards: effectiveSlideCount,
               language,
             },
           },
@@ -283,7 +292,12 @@ export function PresentationGenerationManager() {
     };
 
     void startOutlineGeneration();
-  }, [shouldStartOutlineGeneration, numSlides, language, appendOutlineMessage]);
+  }, [
+    shouldStartOutlineGeneration,
+    effectiveSlideCount,
+    language,
+    appendOutlineMessage,
+  ]);
 
   useEffect(() => {
     if (isGeneratingPresentation || isGeneratingOutline) {
