@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -26,6 +27,7 @@ interface SlideshowPost {
   postId: string;
   accountId: string;
   caption?: string;
+  prompt?: string | null;
   likeCount: number;
   viewCount: number;
   commentCount: number;
@@ -61,6 +63,8 @@ export default function SlideshowPostDetailPage() {
     useState<SlideshowPost["slides"]>([]);
   const [initialOrderIds, setInitialOrderIds] = useState<string[]>([]);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
+  const [promptDraft, setPromptDraft] = useState("");
+  const [isSavingPrompt, setIsSavingPrompt] = useState(false);
 
   useEffect(() => {
     if (!postId) {
@@ -101,6 +105,7 @@ export default function SlideshowPostDetailPage() {
           normalizedSlides.map((slide) => ({ ...slide })),
         );
         setInitialOrderIds(normalizedSlides.map((slide) => slide.id));
+        setPromptDraft(data.prompt ?? "");
       } catch (error) {
         console.error("Error loading post:", error);
         toast.error("Fehler beim Laden des Posts");
@@ -113,9 +118,67 @@ export default function SlideshowPostDetailPage() {
     void loadPost();
   }, [postId]);
 
+  useEffect(() => {
+    if (post) {
+      setPromptDraft(post.prompt ?? "");
+    }
+  }, [post?.id]);
+
   const hasOrderChanged =
     slides.length === initialOrderIds.length &&
     slides.some((slide, index) => slide.id !== initialOrderIds[index]);
+
+  const promptHasChanged =
+    (post?.prompt ?? "").trim() !== promptDraft.trim();
+
+  const handlePromptSave = async () => {
+    if (!post || !promptHasChanged || isSavingPrompt) {
+      return;
+    }
+
+    try {
+      setIsSavingPrompt(true);
+      const normalizedPrompt = promptDraft.trim();
+      const response = await fetch(
+        `/api/slideshow-library/posts/${post.id}/prompt`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: normalizedPrompt.length > 0 ? normalizedPrompt : null,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.error || "Prompt konnte nicht gespeichert werden",
+        );
+      }
+
+      const updated = (await response.json()) as SlideshowPost;
+      setPost((prev) =>
+        prev
+          ? {
+              ...prev,
+              prompt: updated.prompt ?? null,
+            }
+          : prev,
+      );
+      setPromptDraft(updated.prompt ?? "");
+      toast.success("Prompt gespeichert");
+    } catch (error) {
+      console.error("Error saving prompt:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Prompt konnte nicht gespeichert werden",
+      );
+    } finally {
+      setIsSavingPrompt(false);
+    }
+  };
 
   const moveSlide = (index: number, direction: "up" | "down") => {
     setSlides((current) => {
@@ -197,6 +260,7 @@ export default function SlideshowPostDetailPage() {
       );
       setInitialOrderIds(normalizedSlides.map((slide) => slide.id));
       toast.success("Reihenfolge aktualisiert");
+      setPromptDraft(data.prompt ?? "");
     } catch (error) {
       console.error("Error saving slide order:", error);
       toast.error("Fehler beim Speichern der Reihenfolge");
@@ -481,6 +545,37 @@ export default function SlideshowPostDetailPage() {
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Post löschen
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Prompt</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Textarea
+                value={promptDraft}
+                onChange={(event) => setPromptDraft(event.target.value)}
+                rows={4}
+                placeholder="Prompt hinzufügen, um festzuhalten wie diese Slideshow erstellt wurde."
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPromptDraft(post.prompt ?? "")}
+                  disabled={!promptHasChanged || isSavingPrompt}
+                >
+                  Zurücksetzen
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handlePromptSave}
+                  disabled={!promptHasChanged || isSavingPrompt}
+                >
+                  {isSavingPrompt ? "Speichert..." : "Prompt speichern"}
                 </Button>
               </div>
             </CardContent>

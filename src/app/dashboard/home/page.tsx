@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   ChevronLeft,
@@ -15,11 +16,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 interface SlideshowPostSummary {
   id: string;
   accountId: string;
   caption?: string;
+  prompt?: string | null;
   likeCount: number;
   viewCount: number;
   slides: Array<{
@@ -62,6 +65,7 @@ interface SlideshowAccountDetail {
     id: string;
     likeCount: number;
     viewCount: number;
+    prompt?: string | null;
     slides: Array<{
       id: string;
       imageUrl: string;
@@ -75,6 +79,8 @@ const compactNumberFormatter = new Intl.NumberFormat("en", {
 });
 
 const formatCount = (value: number) => compactNumberFormatter.format(value);
+const normalizePrompt = (value: string | null | undefined) =>
+  (value ?? "").trim();
 
 export default function DashboardHome() {
   const [posts, setPosts] = useState<SlideshowPostSummary[]>([]);
@@ -94,6 +100,8 @@ export default function DashboardHome() {
   const [accountCache, setAccountCache] = useState<
     Record<string, SlideshowAccountDetail>
   >({});
+  const [promptDraft, setPromptDraft] = useState("");
+  const [isSavingPrompt, setIsSavingPrompt] = useState(false);
 
   useEffect(() => {
     const loadPosts = async () => {
@@ -132,6 +140,18 @@ export default function DashboardHome() {
     [posts],
   );
 
+  useEffect(() => {
+    if (selectedPost) {
+      setPromptDraft(selectedPost.prompt ?? "");
+    } else {
+      setPromptDraft("");
+    }
+  }, [selectedPost?.id]);
+
+  const promptHasChanged = selectedPost
+    ? normalizePrompt(selectedPost.prompt) !== normalizePrompt(promptDraft)
+    : false;
+
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedPost(null);
@@ -139,6 +159,8 @@ export default function DashboardHome() {
     setActiveSlideIndex(0);
     setModalError(null);
     setIsModalLoading(false);
+    setPromptDraft("");
+    setIsSavingPrompt(false);
   };
 
   const openPostModal = async (postId: string) => {
@@ -171,6 +193,7 @@ export default function DashboardHome() {
         id: accountPost.id,
         accountId: selectedAccount.id,
         caption: (accountPost as { caption?: string }).caption,
+        prompt: (accountPost as { prompt?: string | null }).prompt ?? null,
         likeCount: accountPost.likeCount,
         viewCount: accountPost.viewCount,
         slides: normalizedSlides,
@@ -197,6 +220,7 @@ export default function DashboardHome() {
     if (provisionalPost) {
       setSelectedPost(provisionalPost);
       setActiveSlideIndex(0);
+      setPromptDraft(provisionalPost.prompt ?? "");
       if (cachedAccount) {
         setSelectedAccount(cachedAccount);
       }
@@ -318,6 +342,93 @@ export default function DashboardHome() {
     selectedPost?.slides && selectedPost.slides[activeSlideIndex]
       ? selectedPost.slides[activeSlideIndex]
       : null;
+
+  const handlePromptSave = async () => {
+    if (!selectedPost || !promptHasChanged || isSavingPrompt) {
+      return;
+    }
+    setIsSavingPrompt(true);
+    try {
+      const normalizedDraft = normalizePrompt(promptDraft);
+      const response = await fetch(
+        `/api/slideshow-library/posts/${selectedPost.id}/prompt`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: normalizedDraft.length > 0 ? normalizedDraft : null,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.error ?? "Prompt konnte nicht gespeichert werden",
+        );
+      }
+
+      const updatedPost = (await response.json()) as SlideshowPostDetail;
+      setSelectedPost(updatedPost);
+      setPromptDraft(updatedPost.prompt ?? "");
+
+      setPostCache((prev) => ({
+        ...prev,
+        [updatedPost.id]: updatedPost,
+      }));
+
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === updatedPost.id
+            ? { ...post, prompt: updatedPost.prompt ?? null }
+            : post,
+        ),
+      );
+
+      setSelectedAccount((prev) => {
+        if (!prev || prev.id !== updatedPost.accountId) {
+          return prev;
+        }
+        return {
+          ...prev,
+          posts: prev.posts?.map((post) =>
+            post.id === updatedPost.id
+              ? { ...post, prompt: updatedPost.prompt ?? null }
+              : post,
+          ),
+        };
+      });
+
+      setAccountCache((prev) => {
+        const cached = prev[updatedPost.accountId];
+        if (!cached) {
+          return prev;
+        }
+        return {
+          ...prev,
+          [updatedPost.accountId]: {
+            ...cached,
+            posts: cached.posts?.map((post) =>
+              post.id === updatedPost.id
+                ? { ...post, prompt: updatedPost.prompt ?? null }
+                : post,
+            ),
+          },
+        };
+      });
+
+      toast.success("Prompt gespeichert");
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Prompt konnte nicht gespeichert werden",
+      );
+    } finally {
+      setIsSavingPrompt(false);
+    }
+  };
 
   return (
     <div className="flex h-full w-full flex-col items-center justify-start space-y-10 px-10 py-12">
@@ -542,6 +653,44 @@ export default function DashboardHome() {
                     {selectedAccount.bio}
                   </p>
                 )}
+
+                <div className="mt-6 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-base font-semibold">Prompt</span>
+                    {promptHasChanged && (
+                      <span className="text-xs text-muted-foreground">
+                        Nicht gespeichert
+                      </span>
+                    )}
+                  </div>
+                  <Textarea
+                    value={promptDraft}
+                    onChange={(event) => setPromptDraft(event.target.value)}
+                    rows={4}
+                    placeholder="Prompt hinzufügen, um zu dokumentieren, wie diese Slideshow erstellt wurde."
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setPromptDraft(selectedPost.prompt ?? "")
+                      }
+                      disabled={!promptHasChanged || isSavingPrompt}
+                    >
+                      Zurücksetzen
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handlePromptSave}
+                      disabled={!promptHasChanged || isSavingPrompt}
+                    >
+                      {isSavingPrompt ? "Speichert..." : "Prompt speichern"}
+                    </Button>
+                  </div>
+                </div>
 
                 <div className="mt-6 text-base font-semibold">Recent Posts</div>
                 <ScrollArea className="mt-3 flex-1 pr-1">

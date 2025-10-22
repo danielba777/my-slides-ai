@@ -44,6 +44,7 @@ export default function CreatePostPage() {
     accountId: accountIdFromUrl || "",
     postId: "",
     caption: "",
+    prompt: "",
     likeCount: 0,
     viewCount: 0,
     commentCount: 0,
@@ -152,6 +153,8 @@ export default function CreatePostPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
+          prompt:
+            formData.prompt.trim().length > 0 ? formData.prompt.trim() : null,
           publishedAt: new Date(formData.publishedAt),
           createdAt: new Date(formData.createdAt),
           slides: slidesPayload,
@@ -268,6 +271,16 @@ export default function CreatePostPage() {
                 onChange={(e) => handleInputChange("caption", e.target.value)}
                 placeholder="Post Beschreibung"
                 rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="prompt">Prompt (optional)</Label>
+              <Textarea
+                id="prompt"
+                value={formData.prompt}
+                onChange={(e) => handleInputChange("prompt", e.target.value)}
+                placeholder="Prompt für die Erstellung dieser Slideshow"
+                rows={4}
               />
             </div>
 
