@@ -27,12 +27,12 @@ interface SlideshowPost {
   publishedAt: string;
   slideCount: number;
   isActive: boolean;
-  account: {
+  account?: {
     id: string;
     username: string;
     displayName: string;
     profileImageUrl?: string;
-  };
+  } | null;
   slides: Array<{
     id: string;
     slideIndex: number;
@@ -187,96 +187,108 @@ export default function SlideshowPostsPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {posts.map((post) => (
-            <Card key={post.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    {post.account.profileImageUrl ? (
-                      <img
-                        src={post.account.profileImageUrl}
-                        alt={post.account.displayName}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                        <Users className="h-5 w-5 text-muted-foreground" />
+          {posts.map((post) => {
+            const account = post.account ?? null;
+            const profileImageUrl = account?.profileImageUrl;
+            const displayName = account?.displayName ?? "Unbekannter Account";
+            const username = account?.username
+              ? `@${account.username}`
+              : "Account unbekannt";
+
+            return (
+              <Card
+                key={post.id}
+                className="hover:shadow-md transition-shadow"
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      {profileImageUrl ? (
+                        <img
+                          src={profileImageUrl}
+                          alt={displayName}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                          <Users className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div>
+                        <CardTitle className="text-base">
+                          {displayName}
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          {username}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deletePost(post.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Slideshow Preview */}
+                  <div className="grid grid-cols-3 gap-1">
+                    {post.slides.slice(0, 3).map((slide, index) => (
+                      <div key={slide.id} className="aspect-square">
+                        <img
+                          src={slide.imageUrl}
+                          alt={`Slide ${index + 1}`}
+                          className="w-full h-full object-cover rounded border"
+                        />
+                      </div>
+                    ))}
+                    {post.slideCount > 3 && (
+                      <div className="aspect-square bg-muted rounded border flex items-center justify-center">
+                        <span className="text-xs text-muted-foreground">
+                          +{post.slideCount - 3}
+                        </span>
                       </div>
                     )}
-                    <div>
-                      <CardTitle className="text-base">
-                        {post.account.displayName}
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        @{post.account.username}
-                      </p>
-                    </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deletePost(post.id)}
+
+                  {post.caption && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {post.caption}
+                    </p>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {post.likeCount.toLocaleString()} Likes
+                    </Badge>
+                    <Badge variant="outline" className="text-xs">
+                      {post.viewCount.toLocaleString()} Views
+                    </Badge>
+                    <Badge variant="outline" className="text-xs">
+                      {post.slideCount} Slides
+                    </Badge>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground">
+                    {new Date(post.publishedAt).toLocaleDateString("de-DE")}
+                  </div>
+
+                  <Link
+                    href={`/admin/slideshow-library/posts/${post.id}`}
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "sm" }),
+                      "w-full flex items-center justify-center gap-2",
+                    )}
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {/* Slideshow Preview */}
-                <div className="grid grid-cols-3 gap-1">
-                  {post.slides.slice(0, 3).map((slide, index) => (
-                    <div key={slide.id} className="aspect-square">
-                      <img
-                        src={slide.imageUrl}
-                        alt={`Slide ${index + 1}`}
-                        className="w-full h-full object-cover rounded border"
-                      />
-                    </div>
-                  ))}
-                  {post.slideCount > 3 && (
-                    <div className="aspect-square bg-muted rounded border flex items-center justify-center">
-                      <span className="text-xs text-muted-foreground">
-                        +{post.slideCount - 3}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {post.caption && (
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {post.caption}
-                  </p>
-                )}
-
-                <div className="flex gap-2">
-                  <Badge variant="secondary" className="text-xs">
-                    {post.likeCount.toLocaleString()} Likes
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {post.viewCount.toLocaleString()} Views
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {post.slideCount} Slides
-                  </Badge>
-                </div>
-
-                <div className="text-xs text-muted-foreground">
-                  {new Date(post.publishedAt).toLocaleDateString("de-DE")}
-                </div>
-
-                <Link
-                  href={`/admin/slideshow-library/posts/${post.id}`}
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" }),
-                    "w-full flex items-center justify-center gap-2",
-                  )}
-                >
-                  <Eye className="h-4 w-4" />
-                  Details ansehen
-                </Link>
-              </CardContent>
-            </Card>
-          ))}
+                    <Eye className="h-4 w-4" />
+                    Details ansehen
+                  </Link>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
