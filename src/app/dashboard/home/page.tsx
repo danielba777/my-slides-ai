@@ -260,7 +260,8 @@ export default function DashboardHome() {
                       id: slide.id,
                       slideIndex: slide.slideIndex ?? index,
                       imageUrl: slide.imageUrl,
-                      textContent: (slide as { textContent?: string }).textContent,
+                      textContent: (slide as { textContent?: string })
+                        .textContent,
                     }),
                   );
                   next[accountPost.id] = {
