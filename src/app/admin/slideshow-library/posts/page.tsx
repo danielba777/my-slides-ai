@@ -27,6 +27,7 @@ interface SlideshowPost {
   publishedAt: string;
   slideCount: number;
   isActive: boolean;
+  accountId: string;
   account?: {
     id: string;
     username: string;
@@ -45,6 +46,7 @@ interface SlideshowAccount {
   id: string;
   username: string;
   displayName: string;
+  profileImageUrl?: string;
 }
 
 export default function SlideshowPostsPage() {
@@ -188,11 +190,22 @@ export default function SlideshowPostsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {posts.map((post) => {
-            const account = post.account ?? null;
-            const profileImageUrl = account?.profileImageUrl;
-            const displayName = account?.displayName ?? "Unbekannter Account";
-            const username = account?.username
-              ? `@${account.username}`
+            const accountFromPost = post.account ?? null;
+            const accountFromList = accounts.find(
+              (candidate) =>
+                candidate.id === (accountFromPost?.id ?? post.accountId),
+            );
+            const profileImageUrl =
+              accountFromPost?.profileImageUrl ??
+              accountFromList?.profileImageUrl;
+            const displayName =
+              accountFromPost?.displayName ??
+              accountFromList?.displayName ??
+              "Unbekannter Account";
+            const usernameValue =
+              accountFromPost?.username ?? accountFromList?.username;
+            const username = usernameValue
+              ? `@${usernameValue}`
               : "Account unbekannt";
 
             return (
