@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -27,6 +28,7 @@ interface SlideshowPost {
   publishedAt: string;
   slideCount: number;
   isActive: boolean;
+  prompt?: string | null;
   accountId: string;
   account?: {
     id: string;
@@ -54,6 +56,9 @@ export default function SlideshowPostsPage() {
   const [accounts, setAccounts] = useState<SlideshowAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [promptDraft, setPromptDraft] = useState<string>("");
+  const [savingPostId, setSavingPostId] = useState<string | null>(null);
 
   useEffect(() => {
     loadAccounts();
@@ -120,6 +125,67 @@ export default function SlideshowPostsPage() {
     } catch (error) {
       console.error("Error deleting post:", error);
       toast.error("Fehler beim Löschen des Posts");
+    }
+  };
+
+  const startEditingPrompt = (post: SlideshowPost) => {
+    setEditingPostId(post.id);
+    setPromptDraft(post.prompt ?? "");
+  };
+
+  const cancelEditingPrompt = () => {
+    setEditingPostId(null);
+    setPromptDraft("");
+  };
+
+  const savePrompt = async (post: SlideshowPost) => {
+    if (savingPostId) {
+      return;
+    }
+
+    const normalizedPrompt = promptDraft.trim();
+    const body = {
+      prompt: normalizedPrompt.length > 0 ? normalizedPrompt : null,
+    };
+
+    try {
+      setSavingPostId(post.id);
+      const response = await fetch(
+        `/api/slideshow-library/posts/${post.id}/prompt`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.error || "Prompt konnte nicht gespeichert werden",
+        );
+      }
+
+      const updated = (await response.json()) as SlideshowPost;
+      setPosts((prev) =>
+        prev.map((existing) =>
+          existing.id === post.id
+            ? { ...existing, prompt: updated.prompt ?? null }
+            : existing,
+        ),
+      );
+      toast.success("Prompt gespeichert");
+      setEditingPostId(null);
+      setPromptDraft("");
+    } catch (error) {
+      console.error("Error saving prompt:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Prompt konnte nicht gespeichert werden",
+      );
+    } finally {
+      setSavingPostId(null);
     }
   };
 
@@ -207,6 +273,9 @@ export default function SlideshowPostsPage() {
             const username = usernameValue
               ? `@${usernameValue}`
               : "Account unbekannt";
+            const isEditingPrompt = editingPostId === post.id;
+            const isSavingPrompt = savingPostId === post.id;
+            const hasPrompt = (post.prompt ?? "").trim().length > 0;
 
             return (
               <Card
@@ -286,6 +355,61 @@ export default function SlideshowPostsPage() {
 
                   <div className="text-xs text-muted-foreground">
                     {new Date(post.publishedAt).toLocaleDateString("de-DE")}
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold uppercase text-muted-foreground">
+                      Prompt
+                    </h3>
+                    {isEditingPrompt ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={promptDraft}
+                          onChange={(event) =>
+                            setPromptDraft(event.target.value)
+                          }
+                          rows={4}
+                          placeholder="Prompt hinzufügen, um festzuhalten wie dieser Post erstellt wurde."
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={cancelEditingPrompt}
+                            disabled={isSavingPrompt}
+                          >
+                            Abbrechen
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => savePrompt(post)}
+                            disabled={
+                              isSavingPrompt ||
+                              (post.prompt ?? "").trim() === promptDraft.trim()
+                            }
+                          >
+                            {isSavingPrompt ? "Speichert..." : "Speichern"}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
+                          {hasPrompt
+                            ? post.prompt
+                            : "Kein Prompt hinterlegt."}
+                        </p>
+                        <div className="flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startEditingPrompt(post)}
+                          >
+                            {hasPrompt ? "Prompt bearbeiten" : "Prompt hinzufügen"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <Link
