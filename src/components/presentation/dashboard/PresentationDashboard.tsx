@@ -2,14 +2,30 @@
 
 import { createEmptyPresentation } from "@/app/_actions/presentation/presentationActions";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Spinner } from "@/components/ui/spinner";
 import { usePresentationState } from "@/states/presentation-state";
-import { Wand2 } from "lucide-react";
+import { HeartIcon, PlayIcon, Sparkles, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ImageCollectionSelector } from "./ImageCollectionSelector";
 import { PresentationControls } from "./PresentationControls";
 import { PresentationInput } from "./PresentationInput";
+
+interface TemplatePost {
+  id: string;
+  prompt: string | null;
+  likeCount: number;
+  viewCount: number;
+  slideCount: number;
+  slides: Array<{
+    id: string;
+    imageUrl: string;
+    slideIndex?: number;
+  }>;
+}
 
 export function PresentationDashboard({
   sidebarSide,
@@ -25,7 +41,23 @@ export function PresentationDashboard({
     language,
     theme,
     setShouldStartOutlineGeneration,
+    showTemplates,
+    setShowTemplates,
+    setPresentationInput,
   } = usePresentationState();
+
+  const [templatePosts, setTemplatePosts] = useState<TemplatePost[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [templateError, setTemplateError] = useState<string | null>(null);
+  const compactFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat("en", {
+        notation: "compact",
+        maximumFractionDigits: 1,
+      }),
+    [],
+  );
+  const formatCount = (value: number) => compactFormatter.format(value);
 
   useEffect(() => {
     setCurrentPresentation("", "");
@@ -33,6 +65,56 @@ export function PresentationDashboard({
     setIsGeneratingOutline(false);
     setShouldStartOutlineGeneration(false);
   }, []);
+
+  useEffect(() => {
+    if (!showTemplates || templatePosts.length > 0 || isLoadingTemplates) {
+      return;
+    }
+
+    const fetchTemplates = async () => {
+      try {
+        setIsLoadingTemplates(true);
+        setTemplateError(null);
+        const response = await fetch("/api/slideshow-library/posts?limit=60");
+        if (!response.ok) {
+          throw new Error("Prompts konnten nicht geladen werden");
+        }
+        const data = (await response.json()) as TemplatePost[];
+        setTemplatePosts(
+          Array.isArray(data)
+            ? data.filter((post) => (post.prompt ?? "").trim().length > 0)
+            : [],
+        );
+      } catch (error) {
+        console.error("Error fetching templates:", error);
+        setTemplateError(
+          error instanceof Error
+            ? error.message
+            : "Prompts konnten nicht geladen werden",
+        );
+      } finally {
+        setIsLoadingTemplates(false);
+      }
+    };
+
+    void fetchTemplates();
+  }, [showTemplates, templatePosts.length, isLoadingTemplates]);
+
+  const promptCards = useMemo(
+    () =>
+      templatePosts.map((post) => {
+        const primarySlide =
+          post.slides?.find((slide) => slide.imageUrl)?.imageUrl ?? null;
+        return {
+          id: post.id,
+          prompt: post.prompt ?? "",
+          likeCount: post.likeCount,
+          viewCount: post.viewCount,
+          imageUrl: primarySlide,
+        };
+      }),
+    [templatePosts],
+  );
 
   const handleGenerate = async () => {
     if (!presentationInput.trim()) {
@@ -79,6 +161,12 @@ export function PresentationDashboard({
     }
   };
 
+  const handleSelectPrompt = (prompt: string) => {
+    setPresentationInput(prompt);
+    setShowTemplates(false);
+    toast.success("Prompt übernommen");
+  };
+
   return (
     <div className="notebook-section relative h-full w-full">
       <div className="mx-auto max-w-4xl space-y-12 px-6 py-12">
@@ -99,6 +187,77 @@ export function PresentationDashboard({
           </div>
         </div>
       </div>
+
+      <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
+        <DialogContent className="max-h-[85vh] w-full max-w-6xl overflow-hidden p-0 sm:rounded-xl">
+          <div className="flex h-[74vh] flex-col px-6 pb-6 pt-6 gap-6">
+            <h2 className="text-2xl font-semibold">
+              SlidesCockpit TikTok Library
+            </h2>
+            {isLoadingTemplates ? (
+              <div className="flex flex-1 items-center justify-center">
+                <Spinner text="Lade Prompts..." />
+              </div>
+            ) : templateError ? (
+              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                {templateError}
+              </div>
+            ) : promptCards.length === 0 ? (
+              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                Keine Prompts vorhanden.
+              </div>
+            ) : (
+              <ScrollArea className="flex-1 pr-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {promptCards.map((card) => (
+                    <div
+                      key={card.id}
+                      className="group relative overflow-hidden rounded-xl border bg-muted/30 transition hover:border-primary hover:shadow-lg"
+                    >
+                      <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
+                        {card.imageUrl ? (
+                          <img
+                            src={card.imageUrl}
+                            alt="Slideshow preview"
+                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+                            Keine Vorschau
+                          </div>
+                        )}
+                        <div className="absolute inset-x-0 bottom-0 p-3">
+                          <div className="rounded-xl bg-black/60 p-3 backdrop-blur-sm space-y-3">
+                            <div className="flex flex-col items-start gap-1 text-xs font-medium text-white">
+                              <span className="flex items-center gap-1">
+                                <PlayIcon className="h-3.5 w-3.5" />
+                                {formatCount(card.viewCount)} Views
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <HeartIcon className="h-3.5 w-3.5" />
+                                {formatCount(card.likeCount)} Likes
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="default"
+                              className="w-full gap-2"
+                              onClick={() => handleSelectPrompt(card.prompt)}
+                            >
+                              <Sparkles className="h-4 w-4" />
+                              + Get Prompt
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
