@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   ChevronLeft,
@@ -653,44 +652,6 @@ export default function DashboardHome() {
                     {selectedAccount.bio}
                   </p>
                 )}
-
-                <div className="mt-6 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-base font-semibold">Prompt</span>
-                    {promptHasChanged && (
-                      <span className="text-xs text-muted-foreground">
-                        Nicht gespeichert
-                      </span>
-                    )}
-                  </div>
-                  <Textarea
-                    value={promptDraft}
-                    onChange={(event) => setPromptDraft(event.target.value)}
-                    rows={4}
-                    placeholder="Prompt hinzufügen, um zu dokumentieren, wie diese Slideshow erstellt wurde."
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        setPromptDraft(selectedPost.prompt ?? "")
-                      }
-                      disabled={!promptHasChanged || isSavingPrompt}
-                    >
-                      Zurücksetzen
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handlePromptSave}
-                      disabled={!promptHasChanged || isSavingPrompt}
-                    >
-                      {isSavingPrompt ? "Speichert..." : "Prompt speichern"}
-                    </Button>
-                  </div>
-                </div>
 
                 <div className="mt-6 text-base font-semibold">Recent Posts</div>
                 <ScrollArea className="mt-3 flex-1 pr-1">

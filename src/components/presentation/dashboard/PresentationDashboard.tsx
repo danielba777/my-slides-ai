@@ -6,7 +6,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { usePresentationState } from "@/states/presentation-state";
-import { HeartIcon, PlayIcon, Sparkles, Wand2 } from "lucide-react";
+import { HeartIcon, PlayIcon, PlusIcon, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -210,46 +210,46 @@ export function PresentationDashboard({
               <ScrollArea className="flex-1 pr-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {promptCards.map((card) => (
-                    <div
-                      key={card.id}
-                      className="group relative overflow-hidden rounded-xl border bg-muted/30 transition hover:border-primary hover:shadow-lg"
-                    >
-                      <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
-                        {card.imageUrl ? (
-                          <img
-                            src={card.imageUrl}
-                            alt="Slideshow preview"
-                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
-                            Keine Vorschau
-                          </div>
-                        )}
-                        <div className="absolute inset-x-0 bottom-0 p-3">
-                          <div className="rounded-xl bg-black/60 p-3 backdrop-blur-sm space-y-3">
-                            <div className="flex flex-col items-start gap-1 text-xs font-medium text-white">
-                              <span className="flex items-center gap-1">
-                                <PlayIcon className="h-3.5 w-3.5" />
-                                {formatCount(card.viewCount)} Views
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <HeartIcon className="h-3.5 w-3.5" />
-                                {formatCount(card.likeCount)} Likes
-                              </span>
+                    <div key={card.id} className="flex flex-col gap-2">
+                      <div className="group relative overflow-hidden rounded-xl border bg-muted/30 transition hover:border-primary hover:shadow-lg">
+                        <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
+                          {card.imageUrl ? (
+                            <img
+                              src={card.imageUrl}
+                              alt="Slideshow preview"
+                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+                              Keine Vorschau
                             </div>
-                            <Button
-                              type="button"
-                              variant="default"
-                              className="w-full gap-2"
-                              onClick={() => handleSelectPrompt(card.prompt)}
-                            >
-                              <Sparkles className="h-4 w-4" />
-                              + Get Prompt
-                            </Button>
+                          )}
+                          <div className="absolute inset-x-0 bottom-0 p-3">
+                            <div className="rounded-xl backdrop-blur-sm">
+                              <div className="flex flex-col items-start gap-1 text-xs font-medium text-white">
+                                <span className="flex items-center gap-1">
+                                  <PlayIcon className="h-3.5 w-3.5" />
+                                  {formatCount(card.viewCount)} Views
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <HeartIcon className="h-3.5 w-3.5" />
+                                  {formatCount(card.likeCount)} Likes
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full gap-2 border-2 border-zinc-900"
+                        onClick={() => handleSelectPrompt(card.prompt)}
+                      >
+                        <PlusIcon className="h-4 w-4" />
+                        Get Prompt
+                      </Button>
                     </div>
                   ))}
                 </div>
