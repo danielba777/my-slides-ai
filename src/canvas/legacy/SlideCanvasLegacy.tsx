@@ -1099,8 +1099,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         lineBoxes.length > 0
           ? lineBoxes.map((ln) => ln.width)
           : lines.map((raw) => Math.max(0, ctx.measureText(raw).width));
-      const hasBackground =
-        !!bgConfig?.enabled && lineWidths.some((w) => w > 0);
+      const bgEnabled =
+        (bgConfig?.enabled ?? false) || ((bgConfig?.opacity ?? 0) > 0);
+      const hasBackground = bgEnabled && lineWidths.some((w) => w > 0);
       if (hasBackground) {
         const padX = Math.max(0, bgConfig?.paddingX ?? 12);
         const padY = Math.max(0, bgConfig?.paddingY ?? padX);
@@ -1133,7 +1134,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         ctx.fillStyle = fill;
         const effectiveRadius =
           bgConfig?.mode === "blob"
-            ? Math.max(radius, rectHeight / 2)
+            ? Math.max(radius, Math.min(radius * 1.5, 1600))
             : radius;
         drawRoundedRect(ctx, rectX, rectY, rectWidth, rectHeight, effectiveRadius);
         ctx.fill();
@@ -1188,7 +1189,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         ox.strokeStyle = outlineColor;
         // Canvas-Stroke entspricht außen effektiv ~lineWidth/2.
         // Für Parität zum CSS-Preview (Radius r) setzen wir 2*r:
-        ox.lineWidth = 2 * outlineWidth;
+        ox.lineWidth = 2 * outlineWidth * Math.max(0.001, layer.scale);
 
         if (layer.letterSpacing === 0) {
           // ganze Zeile
