@@ -60,7 +60,7 @@ export default function RootLayout({
         <meta name="color-scheme" content="light dark" />
       </head>
       <body
-        className={`${tiktokSans.variable} font-sans antialiased`}
+        className={`${tiktokSans.variable} font-sans antialiased bg-[#F3F4EF]`}
         suppressHydrationWarning
       >
         <TanStackQueryProvider>

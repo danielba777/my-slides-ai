@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
+import { usePathname } from "next/navigation";
 
 import {
   Sidebar,
@@ -88,6 +89,7 @@ const debugItems: SidebarItem[] = [
 
 export function AppSidebar() {
   const { resolvedTheme } = useTheme();
+  const pathname = usePathname();
 
   return (
     <Sidebar>
@@ -102,7 +104,11 @@ export function AppSidebar() {
             <SidebarMenu>
               {startItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="font-semibold">
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname === item.url}
+                  >
                     <a href={item.url}>
                       <item.icon className="w-5 h-5" />
                       <span className="font-semibold">{item.title}</span>
@@ -119,7 +125,11 @@ export function AppSidebar() {
             <SidebarMenu>
               {playgroundItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="font-semibold">
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname === item.url}
+                  >
                     <a href={item.url}>
                       <item.icon className="w-5 h-5" />
                       <span className="font-semibold">{item.title}</span>
@@ -136,7 +146,11 @@ export function AppSidebar() {
             <SidebarMenu>
               {configurationItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="font-semibold">
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname === item.url}
+                  >
                     <a href={item.url}>
                       <item.icon className="w-5 h-5" />
                       <span className="font-semibold">{item.title}</span>

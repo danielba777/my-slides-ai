@@ -21,6 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
+import { usePathname } from "next/navigation";
 
 interface SidebarItem {
   title: string;
@@ -56,6 +57,7 @@ const slideshowItems: SidebarItem[] = [
 
 export function AdminSidebar() {
   const { resolvedTheme } = useTheme();
+  const pathname = usePathname();
 
   return (
     <Sidebar>
@@ -70,7 +72,11 @@ export function AdminSidebar() {
             <SidebarMenu>
               {homeItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="font-semibold">
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname === item.url}
+                  >
                     <a href={item.url}>
                       <item.icon className="h-5 w-5" />
                       <span className="font-semibold">{item.title}</span>
@@ -88,7 +94,11 @@ export function AdminSidebar() {
             <SidebarMenu>
               {slideshowItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="font-semibold">
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname === item.url}
+                  >
                     <a href={item.url}>
                       <item.icon className="h-5 w-5" />
                       <span className="font-semibold">{item.title}</span>
