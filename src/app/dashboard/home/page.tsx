@@ -470,15 +470,15 @@ export default function DashboardHome() {
   }
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-start space-y-10 px-10 py-12">
-      <AppLogo size={72} />
+    <div className="flex h-full w-full flex-col items-center justify-center px-10 py-12">
+      <AppLogo size={72} borderRadius={15} />
 
-      <div className="space-y-4 text-center">
+      <div className="text-center flex flex-col items-center gap-8 mt-2">
         <h1 className="text-3xl font-semibold">What are you creating today?</h1>
 
         <Link
           href="/dashboard/slideshows"
-          className="flex h-auto flex-col items-start gap-3 rounded-md bg-background p-4 text-foreground ring-1 ring-border transition hover:bg-accent/80 hover:text-accent-foreground"
+          className="flex h-auto w-max flex-col items-start gap-3 rounded-md bg-white p-4 text-foreground ring-1 ring-border transition hover:bg-accent/80 hover:text-accent-foreground"
         >
           <Images className="h-7 w-7 text-blue-500" />
           <span className="flex flex-col items-start leading-tight">
@@ -585,19 +585,19 @@ export default function DashboardHome() {
             <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 p-10 text-center text-muted-foreground">
               <p>{modalError}</p>
               <Button variant="outline" onClick={closeModal}>
-                Schließen
+                Close
               </Button>
             </div>
           ) : selectedPost ? (
             <div className="grid h-full grid-cols-1 md:grid-cols-[1.3fr_1fr]">
               <div className="relative flex h-full min-h-[420px] flex-col gap-4 bg-background p-6">
                 <div className="relative flex flex-1 items-center justify-center">
-                  <div className="relative w-full max-w-[420px] overflow-hidden rounded-2xl border bg-muted">
+                  <div className="relative w-full aspect-[4/5] max-h-[60vh] overflow-hidden rounded-2xl border bg-muted flex items-center justify-center">
                     {activeSlide?.imageUrl ? (
                       <img
                         src={activeSlide.imageUrl}
                         alt={`Slide ${activeSlideIndex + 1}`}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-contain"
                       />
                     ) : (
                       <div className="flex h-[520px] items-center justify-center text-muted-foreground">
@@ -722,10 +722,10 @@ export default function DashboardHome() {
                 )}
 
                 <div className="mt-6 text-base font-semibold">Recent Posts</div>
-                <ScrollArea className="mt-3 flex-1 pr-1">
+                <ScrollArea className="mt-3 flex-1 pr-1 max-h-[60vh] overflow-auto">
                   {selectedAccount?.posts &&
                   selectedAccount.posts.length > 0 ? (
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 w-full">
                       {selectedAccount.posts.map((post) => {
                         const firstSlide = post.slides?.[0];
                         const isActive = post.id === selectedPost.id;
