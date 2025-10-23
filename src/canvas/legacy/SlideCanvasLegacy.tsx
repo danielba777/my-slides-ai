@@ -1429,12 +1429,14 @@ const handleAddText = useCallback(() => {
 
   return (
     <>
-      {/* Obere Toolbar (immer sichtbar) */}
-      <div className="sticky mb-2 top-0 z-50 w-full bg-transparent flex justify-center">
-        {/* Die Toolbar-Box selbst: auto-breit, mittig */}
+      {/* === Sticky Toolbar: Breite dynamisch = Canvas-Shell === */}
+      {/* Wir messen die Canvas-Shell (wrapRef) und setzen diese Breite als maxWidth der Toolbar. */}
+      <ToolbarSizedByCanvas
+        wrapRef={wrapRef}
+      >
         <LegacyEditorToolbar
           onAddText={handleAddText}
-          className="py-1 px-2 mx-auto w-full max-w-[960px] flex justify-center"
+          className="py-1 px-2"
           selectedText={
             active
               ? ({
@@ -1612,7 +1614,7 @@ const handleAddText = useCallback(() => {
 
           {/* === END: LEGACY CONTROLS === */}
         </LegacyEditorToolbar>
-      </div>
+      </ToolbarSizedByCanvas>
 
       {/* Canvas-Shell */}
       <div
@@ -1973,4 +1975,44 @@ const handleAddText = useCallback(() => {
 });
 
 export default SlideCanvas;
+
+// ---------- Helper: Toolbar an Canvas-Breite koppeln ----------
+function ToolbarSizedByCanvas({
+  wrapRef,
+  children,
+}: {
+  wrapRef: React.RefObject<HTMLDivElement | null>;
+  children: React.ReactNode;
+}) {
+  const [maxW, setMaxW] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+      if (rect?.width) setMaxW(Math.max(0, Math.floor(rect.width)));
+    });
+    ro.observe(el);
+    // Initial messen
+    setMaxW(el.getBoundingClientRect?.().width || undefined);
+    return () => ro.disconnect();
+  }, [wrapRef]);
+
+  return (
+    <div
+      className="sticky top-0 z-50 mb-2 w-full bg-transparent"
+      style={{ display: "flex", justifyContent: "center" }}
+    >
+      <div
+        className="mx-auto w-full"
+        style={{
+          maxWidth: maxW ?? "100%",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 

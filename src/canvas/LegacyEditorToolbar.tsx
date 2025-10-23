@@ -15,7 +15,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
-import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import type { SlideTextElement } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -45,12 +44,10 @@ type LegacyEditorToolbarProps = {
 };
 
 /**
- * - Kompakte, einzeilige Toolbar (iOS-inspired):
- * - – Primäre Aktionen in einer Zeile
- * - – Sekundäres in Collapsibles
- * - – Text-Hintergrund UI (Block/Blob) vorbereitet – emit via CustomEvent
- * - window.dispatchEvent(new CustomEvent("canvas:text-bg", { detail: { enabled, mode } }))
- * - Breite: nie größer als Parent/Canvas (w-full max-w-full min-w-0 + overflow-x-auto).
+ * Ultra-kompakte, moderne Toolbar (iOS-like):
+ * – Primärzeile mit: „+ Text", Ausrichtung, BG-Toggle (mit Mini-Panel)
+ * – Legacy-Controls wandern sauber in ein Collapsible
+ * – Breite: niemals größer als Parent (Canvas) – der Parent begrenzt das maxWidth
  */
 function LegacyEditorToolbar({
   onAddText,
@@ -151,215 +148,157 @@ function LegacyEditorToolbar({
 
   return (
     <div
-      className={cn("mx-auto w-full max-w-full min-w-0", className)}
-      /* Container begrenzt sich an Parent/Canvas */
+      className={cn(
+        "w-full overflow-x-auto rounded-2xl border border-border/60 bg-background/80 backdrop-blur-md shadow-sm supports-backdrop-blur:bg-background/60",
+        className,
+      )}
+      role="toolbar"
+      aria-label="Canvas toolbar"
     >
-      <div
-        className={cn(
-          "sticky top-0 z-30 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60",
-        )}
-      >
-        {/* Primary row (eine Zeile) */}
-        <div className="flex h-12 items-center gap-2 px-3 overflow-x-auto">
-          {/* Add Text */}
+      {/* === Primärzeile: nur wichtigste Controls === */}
+      <div className="flex items-center justify-between gap-2 px-3 py-1.5">
+        <div className="flex items-center gap-2">
+          {/* + Text */}
           <Button
-            variant="default"
-            size="sm"
-            className="rounded-2xl shrink-0"
+            size="icon"
+            variant="secondary"
+            className="rounded-xl"
             onClick={handleAdd}
             aria-label="Text hinzufügen"
             title="Text hinzufügen"
           >
-            <Plus className="mr-2 h-4 w-4" />
-            Text
+            <Plus className="h-4 w-4" />
           </Button>
 
-          <Separator
-            orientation="vertical"
-            className="mx-1 hidden h-6 sm:block"
-          />
+          {/* Bold / Italic */}
+          <Button size="icon" variant="ghost" className="rounded-xl">
+            <span className="font-bold text-base">B</span>
+          </Button>
+          <Button size="icon" variant="ghost" className="rounded-xl italic">
+            I
+          </Button>
 
-          {/* Text Background – UI + Live Config */}
-          <div className="flex items-center gap-2 rounded-xl border px-2 py-1">
-            <Paintbrush className="h-4 w-4" />
-            <span className="text-xs">Text BG</span>
-            <Switch
-              checked={textBgEnabled}
-              onCheckedChange={handleToggleBg}
-              aria-label="Text-Hintergrund ein/aus"
-              disabled={!hasSelection}
-            />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-xl"
-                  disabled={!textBgEnabled || !hasSelection}
-                >
-                  {textBgMode === "blob" ? "Blob" : "Block"}
-                  <ChevronDown className="ml-1 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-36">
-                <DropdownMenuLabel>Background Mode</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleModeChange("block")}>
-                  Block
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleModeChange("blob")}>
-                  Blob
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          {/* Align */}
+          <div className="flex items-center gap-1 rounded-xl border px-1.5 py-1">
+            <Button size="icon" variant="ghost" className="rounded-md">
+              <AlignLeft className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" className="rounded-md">
+              <AlignCenter className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" className="rounded-md">
+              <AlignRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
 
-            {/* CONFIG: Padding / Radius / Opacity / Color */}
-            <Separator orientation="vertical" className="mx-2 h-6" />
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-muted-foreground">Pad</span>
-              <div className="w-24">
-                <Slider
-                  value={[textBgPadding]}
-                  min={0}
-                  max={48}
-                  step={1}
-                  onValueChange={(v) => {
-                    const next = v[0] ?? 0;
-                    setTextBgPadding(next);
-                    if (!hasSelection) return;
-                    commitBackground({ paddingX: next, paddingY: next });
-                  }}
-                  disabled={!textBgEnabled || !hasSelection}
-                />
-              </div>
-              <span className="text-[11px] w-5 text-right tabular-nums">
-                {textBgPadding}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-muted-foreground">Rad</span>
-              <div className="w-24">
-                <Slider
-                  value={[textBgRadius]}
-                  min={0}
-                  max={48}
-                  step={1}
-                  onValueChange={(v) => {
-                    const next = v[0] ?? 0;
-                    setTextBgRadius(next);
-                    if (!hasSelection) return;
-                    commitBackground({ radius: next });
-                  }}
-                  disabled={!textBgEnabled || !hasSelection}
-                />
-              </div>
-              <span className="text-[11px] w-5 text-right tabular-nums">
-                {textBgRadius}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-muted-foreground">Opacity</span>
-              <div className="w-24">
-                <Slider
-                  value={[textBgOpacity]}
-                  min={0}
-                  max={100}
-                  step={1}
-                  onValueChange={(v) => {
-                    const next = v[0] ?? 0;
-                    setTextBgOpacity(next);
-                    if (!hasSelection) return;
-                    commitBackground({ opacity: next / 100 });
-                  }}
-                  disabled={!textBgEnabled || !hasSelection}
-                />
-              </div>
-              <span className="text-[11px] w-7 text-right tabular-nums">
-                {textBgOpacity}%
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-muted-foreground">Color</span>
-              <input
-                type="color"
-                value={textBgColor}
-                onChange={(e) => {
-                  const next = e.currentTarget.value;
-                  setTextBgColor(next);
-                  if (!hasSelection) return;
-                  commitBackground({ color: next });
+      {/* Sekundärzeile: „Erweiterte Optionen" */}
+      <div className="border-t px-3">
+        <Collapsible>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="w-full justify-between rounded-xl">
+              Erweiterte Optionen
+              <ChevronDown className="h-4 w-4 data-[state=open]:hidden" />
+              <ChevronUp className="hidden h-4 w-4 data-[state=open]:block" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="flex flex-wrap items-center gap-3 py-3">
+              <MiniRange
+                label="Padding"
+                min={0}
+                max={48}
+                value={textBgPadding}
+                onChange={(v) => {
+                  setTextBgPadding(v);
+                  commitBackground({ paddingX: v, paddingY: v });
                 }}
-                disabled={!textBgEnabled || !hasSelection}
-                className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
-                aria-label="Text-Hintergrundfarbe"
-                title="Text-Hintergrundfarbe"
               />
+              <MiniRange
+                label="Rundung"
+                min={0}
+                max={64}
+                value={textBgRadius}
+                onChange={(v) => {
+                  setTextBgRadius(v);
+                  commitBackground({ radius: v });
+                }}
+              />
+              <MiniRange
+                label="Transparenz"
+                min={0}
+                max={100}
+                value={textBgOpacity}
+                onChange={(v) => {
+                  setTextBgOpacity(v);
+                  commitBackground({ opacity: v / 100 });
+                }}
+              />
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-muted-foreground">Farbe</span>
+                <input
+                  type="color"
+                  value={textBgColor}
+                  onChange={(e) => {
+                    const c = e.currentTarget.value;
+                    setTextBgColor(c);
+                    commitBackground({ color: c });
+                  }}
+                  className="h-6 w-7 cursor-pointer rounded-md border border-border bg-background p-0.5"
+                />
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="rounded-xl">
+                    Modus: {textBgMode === "block" ? "Block" : "Blob"}
+                    <ChevronDown className="ml-1 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => { setTextBgMode("block"); commitBackground({ mode: "block" }); }}>
+                    Block
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { setTextBgMode("blob"); commitBackground({ mode: "blob" }); }}>
+                    Blob
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-          </div>
-
-          {/* Beispiel-Ausrichtung (optional in Zukunft an Bindings anknüpfen) */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="rounded-xl">
-                Align
-                <ChevronDown className="ml-1 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-40">
-              <DropdownMenuItem>
-                <AlignLeft className="mr-2 h-4 w-4" /> Left
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <AlignCenter className="mr-2 h-4 w-4" /> Center
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <AlignRight className="mr-2 h-4 w-4" /> Right
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Spacer + Overflow */}
-          <div className="ml-auto flex items-center gap-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="secondary" size="icon" className="rounded-2xl">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>More</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>Smart Guides</DropdownMenuItem>
-                <DropdownMenuItem>Snapping</DropdownMenuItem>
-                <DropdownMenuItem>Rulers</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        {/* Secondary row (Collapsibles) */}
-        <div className="border-t px-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 py-1.5">
-            {/* Platz für zukünftige Gruppen (Typo, Arrange, etc.) */}
-            <Collapsible>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="rounded-xl">
-                  Legacy Controls
-                  <ChevronDown className="ml-1 h-4 w-4 data-[state=open]:hidden" />
-                  <ChevronUp className="ml-1 hidden h-4 w-4 data-[state=open]:block" />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                {/* Deine bisherigen Controls bleiben funktional erhalten */}
-                <div className="flex flex-wrap items-center gap-2 py-2 min-w-0">
-                  {children}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
-        </div>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
     </div>
   );
 }
 export default LegacyEditorToolbar;
+
+// -------- Mini Range Control (kompakt & einheitlich) ----------
+function MiniRange({
+  label,
+  min,
+  max,
+  value,
+  onChange,
+}: {
+  label: string;
+  min: number;
+  max: number;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={1}
+        value={value}
+        onChange={(e) => onChange(parseInt(e.currentTarget.value))}
+        className="h-1.5 w-24"
+      />
+    </div>
+  );
+}
