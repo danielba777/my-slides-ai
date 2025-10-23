@@ -18,6 +18,7 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  Check,
   ChevronDown,
   ChevronUp,
   Plus,
@@ -64,6 +65,16 @@ function LegacyEditorToolbar({
 
   const hasSelection = !!selectedText;
   const selectedBackground = selectedText?.background;
+  const selectedFontWeight =
+    (selectedText as any)?.fontWeight ?? (selectedText as any)?.weight ?? "normal";
+  const isBold = hasSelection && selectedFontWeight === "bold";
+  const selectedFontStyle =
+    (selectedText as any)?.fontStyle ??
+    ((selectedText as any)?.italic ? "italic" : "normal");
+  const isItalic = hasSelection && selectedFontStyle === "italic";
+  const activeAlign = (
+    (selectedText as any)?.align ?? selectedText?.align ?? "left"
+  ) as "left" | "center" | "right";
 
   React.useEffect(() => {
     if (!selectedBackground) {
@@ -160,7 +171,14 @@ function LegacyEditorToolbar({
           <Button
             size="icon"
             variant="ghost"
-            className={cn("rounded-xl", hasSelection ? "" : "opacity-50")}
+            disabled={!hasSelection}
+            aria-pressed={isBold}
+            className={cn(
+              "rounded-xl transition-colors",
+              isBold
+                ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                : "hover:bg-muted",
+            )}
             onClick={() => {
               if (!hasSelection) return;
               commitBackground({}); // force rerender
@@ -178,9 +196,13 @@ function LegacyEditorToolbar({
           <Button
             size="icon"
             variant="ghost"
+            disabled={!hasSelection}
+            aria-pressed={isItalic}
             className={cn(
-              "rounded-xl italic",
-              hasSelection ? "" : "opacity-50",
+              "rounded-xl italic transition-colors",
+              isItalic
+                ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                : "hover:bg-muted",
             )}
             onClick={() => {
               if (!hasSelection) return;
@@ -201,7 +223,14 @@ function LegacyEditorToolbar({
             <Button
               size="icon"
               variant="ghost"
-              className="rounded-md"
+              disabled={!hasSelection}
+              aria-pressed={activeAlign === "left"}
+              className={cn(
+                "rounded-md transition-colors",
+                activeAlign === "left"
+                  ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                  : "hover:bg-muted",
+              )}
               onClick={() =>
                 hasSelection &&
                 onChangeSelectedText?.({
@@ -215,7 +244,14 @@ function LegacyEditorToolbar({
             <Button
               size="icon"
               variant="ghost"
-              className="rounded-md"
+              disabled={!hasSelection}
+              aria-pressed={activeAlign === "center"}
+              className={cn(
+                "rounded-md transition-colors",
+                activeAlign === "center"
+                  ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                  : "hover:bg-muted",
+              )}
               onClick={() =>
                 hasSelection &&
                 onChangeSelectedText?.({
@@ -229,7 +265,14 @@ function LegacyEditorToolbar({
             <Button
               size="icon"
               variant="ghost"
-              className="rounded-md"
+              disabled={!hasSelection}
+              aria-pressed={activeAlign === "right"}
+              className={cn(
+                "rounded-md transition-colors",
+                activeAlign === "right"
+                  ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                  : "hover:bg-muted",
+              )}
               onClick={() =>
                 hasSelection &&
                 onChangeSelectedText?.({
@@ -316,20 +359,42 @@ function LegacyEditorToolbar({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
                     <DropdownMenuItem
+                      role="menuitemradio"
+                      aria-checked={textBgMode === "block"}
+                      className={cn(
+                        "flex items-center justify-between",
+                        textBgMode === "block"
+                          ? "bg-muted font-medium text-foreground"
+                          : "",
+                      )}
                       onClick={() => {
                         setTextBgMode("block");
                         commitBackground({ mode: "block" });
                       }}
                     >
-                      Block
+                      <span>Block</span>
+                      {textBgMode === "block" && (
+                        <Check aria-hidden className="ml-2 h-4 w-4" />
+                      )}
                     </DropdownMenuItem>
                     <DropdownMenuItem
+                      role="menuitemradio"
+                      aria-checked={textBgMode === "blob"}
+                      className={cn(
+                        "flex items-center justify-between",
+                        textBgMode === "blob"
+                          ? "bg-muted font-medium text-foreground"
+                          : "",
+                      )}
                       onClick={() => {
                         setTextBgMode("blob");
                         commitBackground({ mode: "blob" });
                       }}
                     >
-                      Blob
+                      <span>Blob</span>
+                      {textBgMode === "blob" && (
+                        <Check aria-hidden className="ml-2 h-4 w-4" />
+                      )}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

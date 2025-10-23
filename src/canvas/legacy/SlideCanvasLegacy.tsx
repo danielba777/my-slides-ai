@@ -1067,83 +1067,298 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       if (fullyOutside) continue;
 
       ctx.save();
+
       ctx.translate(layer.x, layer.y);
+
       ctx.rotate((layer.rotation * Math.PI) / 180);
+
       ctx.scale(scaleFactor, scaleFactor);
 
-      // Clip exakt auf die Box inkl. Padding (Basis-Maße vor Skalierung)
+
+
       const boxLeft = -layer.width / 2;
+
       const boxTop = -layerHeight / 2;
 
-      // WICHTIG: Clip um Descender-Puffer erweitern, damit die letzte Zeile unten nicht beschnitten wird
-      const effectiveLayerHeight = layerHeight + DESCENT_PAD;
-      ctx.beginPath();
-      ctx.rect(boxLeft, boxTop, layer.width, effectiveLayerHeight);
-      ctx.clip();
+      const clipRect = {
+
+        x: boxLeft,
+
+        y: boxTop,
+
+        width: layer.width,
+
+        height: layerHeight + DESCENT_PAD,
+
+      };
+
+
 
       const contentWidth = Math.max(0, layer.width - 2 * PADDING);
+
       const contentHeight = Math.max(0, layerHeight - 2 * PADDING);
 
+
+
       ctx.font = `${italic ? "italic " : ""}${weight} ${BASE_FONT_PX}px ${layer.fontFamily}`;
+
       (ctx as any).fontKerning = "normal";
+
       ctx.fillStyle = layer.color;
+
       ctx.textBaseline = "alphabetic";
 
+
+
       const lineHeightPx = BASE_FONT_PX * layer.lineHeight;
+
       const startYTop = boxTop + PADDING + lineHeightPx;
+
       let y = startYTop;
 
+
+
       const bgConfig = layer.background;
+
       const lineBoxes = measure.lineBoxes ?? [];
+
       const lineWidths =
+
         lineBoxes.length > 0
+
           ? lineBoxes.map((ln) => ln.width)
+
           : lines.map((raw) => Math.max(0, ctx.measureText(raw).width));
+
       const bgEnabled =
+
         (bgConfig?.enabled ?? false) || ((bgConfig?.opacity ?? 0) > 0);
+
       const hasBackground = bgEnabled && lineWidths.some((w) => w > 0);
+
+      let backgroundRect:
+
+        | {
+
+            x: number;
+
+            y: number;
+
+            width: number;
+
+            height: number;
+
+            radius: number;
+
+            fill: string;
+
+          }
+
+        | null = null;
+
       if (hasBackground) {
+
         const padX = Math.max(0, bgConfig?.paddingX ?? 12);
+
         const padY = Math.max(0, bgConfig?.paddingY ?? padX);
+
         const radius = Math.max(0, bgConfig?.radius ?? 16);
+
         const fill = toCssColor(bgConfig?.color, bgConfig?.opacity);
+
         const contentW = Math.max(0, layer.width - 2 * PADDING);
+
         const maxLineWidth = Math.min(
+
           contentW,
+
           lineWidths.length > 0 ? Math.max(...lineWidths) : contentW,
+
         );
+
         const alignOffset =
+
           layer.align === "center"
+
             ? Math.max(0, (contentW - maxLineWidth) / 2)
+
             : layer.align === "right"
+
               ? Math.max(0, contentW - maxLineWidth)
+
               : 0;
+
         const firstBox = lineBoxes[0];
+
         const lastBox = lineBoxes[lineBoxes.length - 1];
+
         const textTopLocal = firstBox ? firstBox.y : PADDING;
+
         const textHeightLocal =
+
           firstBox && lastBox
+
             ? lastBox.y + lastBox.height - firstBox.y
+
             : lineHeightPx * Math.max(lines.length, 1);
+
         const rectX = boxLeft + PADDING + alignOffset - padX;
+
         const rectY = boxTop + textTopLocal - padY;
+
         const rectWidth = maxLineWidth + padX * 2;
+
         const rectHeight = textHeightLocal + padY * 2;
 
+        backgroundRect = {
+
+          x: rectX,
+
+          y: rectY,
+
+          width: rectWidth,
+
+          height: rectHeight,
+
+          radius:
+
+            bgConfig?.mode === "blob"
+
+              ? Math.max(radius, Math.min(radius * 1.5, 1600))
+
+              : radius,
+
+          fill,
+
+        };
+
+
+
         ctx.save();
+
         ctx.fillStyle = fill;
-        const effectiveRadius =
-          bgConfig?.mode === "blob"
-            ? Math.max(radius, Math.min(radius * 1.5, 1600))
-            : radius;
-        drawRoundedRect(ctx, rectX, rectY, rectWidth, rectHeight, effectiveRadius);
+
+        drawRoundedRect(
+
+          ctx,
+
+          backgroundRect.x,
+
+          backgroundRect.y,
+
+          backgroundRect.width,
+
+          backgroundRect.height,
+
+          backgroundRect.radius,
+
+        );
+
         ctx.fill();
+
         ctx.restore();
+
       }
 
+
+
       const outlineEnabled = (layer as any).outlineEnabled;
+
       const outlineWidth = (layer as any).outlineWidth ?? 6;
+
       const outlineColor = (layer as any).outlineColor ?? "#000";
+
+      const scaledOutlineRadius =
+
+        outlineEnabled && outlineWidth > 0
+
+          ? Math.max(0.001, layer.scale) * outlineWidth
+
+          : 0;
+
+      const strokeMargin =
+
+        scaledOutlineRadius > 0 ? Math.ceil(scaledOutlineRadius + 2) : 0;
+
+
+
+      const clipBaseLeft = clipRect.x;
+
+      const clipBaseTop = clipRect.y;
+
+      const clipBaseRight = clipRect.x + clipRect.width;
+
+      const clipBaseBottom = clipRect.y + clipRect.height;
+
+      const backgroundOverflowLeft = backgroundRect
+
+        ? Math.max(0, clipBaseLeft - backgroundRect.x)
+
+        : 0;
+
+      const backgroundOverflowTop = backgroundRect
+
+        ? Math.max(0, clipBaseTop - backgroundRect.y)
+
+        : 0;
+
+      const backgroundOverflowRight = backgroundRect
+
+        ? Math.max(
+
+            0,
+
+            backgroundRect.x + backgroundRect.width - clipBaseRight,
+
+          )
+
+        : 0;
+
+      const backgroundOverflowBottom = backgroundRect
+
+        ? Math.max(
+
+            0,
+
+            backgroundRect.y + backgroundRect.height - clipBaseBottom,
+
+          )
+
+        : 0;
+
+
+
+      const clipMarginLeft = Math.max(strokeMargin, backgroundOverflowLeft);
+
+      const clipMarginTop = Math.max(strokeMargin, backgroundOverflowTop);
+
+      const clipMarginRight = Math.max(strokeMargin, backgroundOverflowRight);
+
+      const clipMarginBottom = Math.max(
+
+        strokeMargin,
+
+        backgroundOverflowBottom,
+
+      );
+
+
+
+      ctx.beginPath();
+
+      ctx.rect(
+
+        clipRect.x - clipMarginLeft,
+
+        clipRect.y - clipMarginTop,
+
+        clipRect.width + clipMarginLeft + clipMarginRight,
+
+        clipRect.height + clipMarginTop + clipMarginBottom,
+
+      );
+
+      ctx.clip();
 
       // Hilfsfunktionen
       const perGlyph = (
@@ -1159,80 +1374,73 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         }
       };
 
-      const drawOuterStrokeLine = (raw: string, yPos: number) => {
-        if (!(outlineEnabled && outlineWidth > 0)) return;
-        // Offscreen in Größe der Textbox (inkl. Padding-Content-Bereich)
-        const off = document.createElement("canvas");
-        off.width = Math.max(1, Math.ceil(layer.width));
-
-        // Auch Offscreen-Canvas nach unten erweitern, damit Stroke/Shadow der Descender Platz hat
-        off.height = Math.max(1, Math.ceil(layerHeight + DESCENT_PAD));
-        const ox = off.getContext("2d")!;
-        ox.font = ctx.font;
-        ox.textBaseline = "alphabetic";
-        (ox as any).fontKerning = "normal";
-
-        // Lokale Koordinaten (Offscreen-Canvas hat Ursprung an der BOX-Links-/Oberkante)
-        const baseLeft = -layer.width / 2;
-        const baseTop = -layerHeight / 2;
-        const textW = Math.max(0, layer.width - 2 * PADDING);
-        // Start an Contentkante inkl. PADDING ausrichten (wie im Preview)
-        let startX = baseLeft + PADDING;
-        if (layer.align === "center") startX = baseLeft + PADDING + textW / 2;
-        else if (layer.align === "right") startX = baseLeft + PADDING + textW;
-        const localX = startX - baseLeft; // -> PADDING | PADDING+textW/2 | PADDING+textW
-        const localY = yPos - baseTop;
-
-        // 1) Stroke (alles) zeichnen
-        ox.lineJoin = "round";
-        ox.miterLimit = 2;
-        ox.strokeStyle = outlineColor;
-        // Canvas-Stroke entspricht außen effektiv ~lineWidth/2.
-        // Für Parität zum CSS-Preview (Radius r) setzen wir 2*r:
-        ox.lineWidth = 2 * outlineWidth * Math.max(0.001, layer.scale);
-
-        if (layer.letterSpacing === 0) {
-          // ganze Zeile
-          if (layer.align === "left") ox.textAlign = "left";
-          else if (layer.align === "right") ox.textAlign = "right";
-          else ox.textAlign = "center";
-          ox.strokeText(raw, localX, localY);
-        } else {
-          // per Glyph
-          perGlyph(
-            (ch, x, yy) => {
-              ox.strokeText(ch, x - baseLeft, yy - baseTop);
-            },
-            raw,
-            startX,
-            yPos,
-          );
-        }
-
-        // 2) Innenanteil subtrahieren
-        ox.globalCompositeOperation = "destination-out";
-        ox.fillStyle = "#000";
-        if (layer.letterSpacing === 0) {
-          if (layer.align === "left") ox.textAlign = "left";
-          else if (layer.align === "right") ox.textAlign = "right";
-          else ox.textAlign = "center";
-          ox.fillText(raw, localX, localY);
-        } else {
-          perGlyph(
-            (ch, x, yy) => {
-              ox.fillText(ch, x - baseLeft, yy - baseTop);
-            },
-            raw,
-            startX,
-            yPos,
-          );
-        }
-        ox.globalCompositeOperation = "source-over";
-
-        // 3) Offscreen auf Main einblenden (an Box-Position)
-        ctx.drawImage(off, -layer.width / 2, -layerHeight / 2);
-      };
-
+      const drawOuterStrokeLine = (raw: string, yPos: number) => {
+        if (!(outlineEnabled && outlineWidth > 0)) return;
+        const margin = strokeMargin;
+        const off = document.createElement("canvas");
+        off.width = Math.max(1, Math.ceil(layer.width + margin * 2));
+        off.height = Math.max(
+          1,
+          Math.ceil(layerHeight + DESCENT_PAD + margin * 2),
+        );
+        const ox = off.getContext("2d")!;
+        ox.font = ctx.font;
+        ox.textBaseline = "alphabetic";
+        (ox as any).fontKerning = "normal";
+
+        const baseLeft = -layer.width / 2;
+        const baseTop = -layerHeight / 2;
+        const offsetX = margin;
+        const offsetY = margin;
+        const textW = Math.max(0, layer.width - 2 * PADDING);
+        let startX = baseLeft + PADDING;
+        if (layer.align === "center") startX = baseLeft + PADDING + textW / 2;
+        else if (layer.align === "right") startX = baseLeft + PADDING + textW;
+        const localX = startX - baseLeft + offsetX;
+        const localY = yPos - baseTop + offsetY;
+
+        ox.lineJoin = "round";
+        ox.miterLimit = 2;
+        ox.strokeStyle = outlineColor;
+        ox.lineWidth = 2 * outlineWidth * Math.max(0.001, layer.scale);
+
+        if (layer.letterSpacing === 0) {
+          if (layer.align === "left") ox.textAlign = "left";
+          else if (layer.align === "right") ox.textAlign = "right";
+          else ox.textAlign = "center";
+          ox.strokeText(raw, localX, localY);
+        } else {
+          perGlyph(
+            (ch, x, yy) => {
+              ox.strokeText(ch, x - baseLeft + offsetX, yy - baseTop + offsetY);
+            },
+            raw,
+            startX,
+            yPos,
+          );
+        }
+
+        ox.globalCompositeOperation = "destination-out";
+        ox.fillStyle = "#000";
+        if (layer.letterSpacing === 0) {
+          if (layer.align === "left") ox.textAlign = "left";
+          else if (layer.align === "right") ox.textAlign = "right";
+          else ox.textAlign = "center";
+          ox.fillText(raw, localX, localY);
+        } else {
+          perGlyph(
+            (ch, x, yy) => {
+              ox.fillText(ch, x - baseLeft + offsetX, yy - baseTop + offsetY);
+            },
+            raw,
+            startX,
+            yPos,
+          );
+        }
+        ox.globalCompositeOperation = "source-over";
+
+        ctx.drawImage(off, -layer.width / 2 - offsetX, -layerHeight / 2 - offsetY);
+      };
       const drawFillLine = (raw: string, yPos: number) => {
         const textW = Math.max(0, layer.width - 2 * PADDING);
         // Soft Shadow wie im Preview: "0 2px 8px rgba(0,0,0,0.8)"
