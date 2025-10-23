@@ -1,182 +1,283 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
 **_ Begin Patch
-_** Update File: src/canvas/legacy/SlideCanvasLegacy.tsx
+_** Update File: src/canvas/LegacyEditorToolbar.tsx
 @@
-type TextLayer = {
-id: string;
-content?: string;
-fontFamily?: string;
-fontSize?: number;
-weight: "regular" | "semibold" | "bold";
-scale: number;
-lineHeight: number;
-letterSpacing: number;
-align: "left" | "center" | "right";
-x: number;
-y: number;
-rotation: number;
-width: number;
-height?: number;
-zIndex: number;
-color: string;
+-"use client";
 
-- /\*_ === Unified Line-Blob Background (zusammenhängende Form, aber pro Zeile gemessene Breite) === _/
-- bgUnifiedEnabled?: boolean; // Hintergrund an/aus
-- bgUnifiedColor?: string; // HEX, z. B. #FFFFFF
-- bgUnifiedOpacity?: number; // 0..1
-- bgUnifiedRadius?: number; // px, Rundung der Linien-Enden
-- bgUnifiedPadX?: number; // inneres Horizontal-Padding um jede Zeile
-- bgUnifiedPadY?: number; // inneres Vertikal-Padding um jede Zeile
-- bgUnifiedJoin?: number; // vertikale Überlappung zwischen Zeilen-Kapseln (px), lässt sie zu EINER Form verschmelzen
-  };
-  @@
-  const PADDING = 8;
-  const BASE_FONT_PX = 72;
-  +// Gegen abgeschnittene Unterlängen (g,y,p,q,j)
-  +const DESCENT_PAD = Math.ceil(BASE_FONT_PX \* 0.25);
+- -import React from "react";
+- -export default function LegacyEditorToolbar() {
+- return (
+- <div className="w-full border-b bg-background p-4">
+-      {/* existing, tall multi-row toolbar ... */}
+- </div>
+- );
+  -}
+  +"use client";
 
-// Export aspect ratio for responsive containers
-export const ASPECT_RATIO = 9 / 16;
-
-/\*_ Build outer-only text outline via multiple text-shadows (no inner stroke) _/
-function buildOuterTextShadow(px: number, color: string): string {
-const r = Math.max(0, Math.round(px));
-return [
-@@
-);
-
--
-- /\*_ Farb-Utils _/
-- function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
-- const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex?.trim?.() ?? "");
-- if (!m) return null;
-- return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
-- }
-- function withOpacity(hex: string, a = 1): string {
-- const rgb = hexToRgb(hex) ?? { r: 255, g: 255, b: 255 };
-- const alpha = Math.max(0, Math.min(1, Number.isFinite(a) ? a : 1));
-- return `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`;
-- }
-  @@
-  const setTextColor = (color: string) => {
-  applyToActive((l) => ({ ...l, color }));
-  };
-  const setOutlineColor = (color: string) => {
-  applyToActive((l) => ({ ...l, outlineEnabled: true, outlineColor: color }));
-  };
--
-- // === Unified Line-Blob Background Controls ===
-- const toggleUnifiedBg = () => {
-- applyToActive((l) => ({ ...l, bgUnifiedEnabled: !(l as any).bgUnifiedEnabled }));
-- };
-- const setUnifiedBgColor = (color: string) => {
-- applyToActive((l) => ({ ...l, bgUnifiedColor: color }));
-- };
-- const setUnifiedBgOpacity = (v: number) => {
-- const n = Math.max(0, Math.min(1, v));
-- applyToActive((l) => ({ ...l, bgUnifiedOpacity: n }));
-- };
-- const setUnifiedBgRadius = (px: number) => {
-- const n = Math.max(0, Math.min(64, Math.round(px)));
-- applyToActive((l) => ({ ...l, bgUnifiedRadius: n }));
-- };
-- const setUnifiedBgPadX = (px: number) => {
-- const n = Math.max(0, Math.min(200, Math.round(px)));
-- applyToActive((l) => ({ ...l, bgUnifiedPadX: n }));
-- };
-- const setUnifiedBgPadY = (px: number) => {
-- const n = Math.max(0, Math.min(200, Math.round(px)));
-- applyToActive((l) => ({ ...l, bgUnifiedPadY: n }));
-- };
-- const setUnifiedBgJoin = (px: number) => {
-- const n = Math.max(0, Math.min(100, Math.round(px)));
-- applyToActive((l) => ({ ...l, bgUnifiedJoin: n }));
-- };
-  @@
-
-* // Text (skip fully off-canvas)
-
-- // Text (skip fully off-canvas)
-  const sorted = [.textLayers].sort((a, b) => a.zIndex - b.zIndex);
-  for (const layer of sorted) {
-  if (!layer.content) continue;
-
-         const lines = computeWrappedLinesWithDOM(layer as any);
-
-  @@
-  const startYTop = boxTop + PADDING + lineHeightPx;
-  let y = startYTop;
-
--      // === Unified Line-Blob Hintergrund (Preview & Export identisch) ===
--      const drawUnifiedLineBlob = () => {
--        if (!(layer as any).bgUnifiedEnabled) return;
--        const color = (layer as any).bgUnifiedColor ?? "#ffffff";
--        const opacity = (layer as any).bgUnifiedOpacity ?? 0.84;
--        const radius = Math.max(0, (layer as any).bgUnifiedRadius ?? 14);
--        const padX = Math.max(0, (layer as any).bgUnifiedPadX ?? 12);
--        const padY = Math.max(0, (layer as any).bgUnifiedPadY ?? 8);
--        const join = Math.max(0, (layer as any).bgUnifiedJoin ?? Math.min(6, Math.round(radius * 0.5)));
--
--        const textW = Math.max(0, layer.width - 2 * PADDING);
--        // pro Zeile Breite messen (inkl. letterSpacing)
--        const measureLine = (raw: string) => {
--          if (layer.letterSpacing === 0) return ctx.measureText(raw).width;
--          let w = 0;
--          for (const ch of raw) w += ctx.measureText(ch).width + layer.letterSpacing;
--          return Math.max(0, w - (raw.length > 0 ? layer.letterSpacing : 0));
--        };
--
--        // Hintergrundpfade Zeile für Zeile als abgerundete Kapseln,
--        // vertikal leicht überlappend (join), sodass alles EIN Blob wirkt.
--        ctx.save();
--        ctx.fillStyle = withOpacity(color, opacity);
--
--        let yCursor = startYTop;
--        for (let i = 0; i < lines.length; i++) {
--          const raw = lines[i]!;
--          const lineW = measureLine(raw);
--          const pillW = Math.ceil(lineW + padX * 2);
--          const pillH = Math.ceil(lineHeightPx + padY * 2 + DESCENT_PAD * 0.4);
--
--          // Start-X je nach Ausrichtung
--          let startX = baseLeft + PADDING;
--          if (layer.align === "center") startX = baseLeft + PADDING + (textW - pillW) / 2;
--          else if (layer.align === "right") startX = baseLeft + PADDING + (textW - pillW);
--
--          // Vertikal: vorherige Kapsel leicht überlappen
--          const yTop = i === 0 ? yCursor - lineHeightPx - padY : yCursor - lineHeightPx - padY - Math.min(join, Math.floor(radius));
--
--          // Abgerundetes Rechteck zeichnen (Round-Rect Path)
--          const rx = Math.min(radius, pillH / 2);
--          const x0 = startX;
--          const y0 = yTop;
--          const x1 = startX + pillW;
--          const y1 = yTop + pillH;
--          ctx.beginPath();
--          ctx.moveTo(x0 + rx, y0);
--          ctx.lineTo(x1 - rx, y0);
--          ctx.quadraticCurveTo(x1, y0, x1, y0 + rx);
--          ctx.lineTo(x1, y1 - rx);
--          ctx.quadraticCurveTo(x1, y1, x1 - rx, y1);
--          ctx.lineTo(x0 + rx, y1);
--          ctx.quadraticCurveTo(x0, y1, x0, y1 - rx);
--          ctx.lineTo(x0, y0 + rx);
--          ctx.quadraticCurveTo(x0, y0, x0 + rx, y0);
--          ctx.closePath();
--          ctx.fill();
--
--          yCursor += lineHeightPx; // zur nächsten Textzeile
--        }
--        ctx.restore();
--      };
--
--      // Zuerst den einheitlichen Hintergrund zeichnen
--      drawUnifiedLineBlob();
--        const outlineEnabled = (layer as any).outlineEnabled;
-         const outlineWidth = (layer as any).outlineWidth ?? 6;
-         const outlineColor = (layer as any).outlineColor ?? "#000";
-  @@
-  // 2) Innenanteil subtrahieren
-  ox.globalCompositeOperation = "destination-out";
+* +import React, { useMemo } from "react";
+  +import { cn } from "@/lib/utils";
+  +import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+  +import { Button } from "@/components/ui/button";
+  +import { Switch } from "@/components/ui/switch";
+  +import {
+* DropdownMenu,
+* DropdownMenuContent,
+* DropdownMenuItem,
+* DropdownMenuLabel,
+* DropdownMenuSeparator,
+* DropdownMenuTrigger,
+  +} from "@/components/ui/dropdown-menu";
+  +import { Separator } from "@/components/ui/separator";
+  +import {
+* Bold,
+* Italic,
+* Underline,
+* Type,
+* AlignLeft,
+* AlignCenter,
+* AlignRight,
+* ChevronDown,
+* ChevronUp,
+* Layers,
+* Square,
+* Image as ImageIcon,
+* Undo2,
+* Redo2,
+* ZoomIn,
+* ZoomOut,
+* MoreHorizontal,
+* Paintbrush,
+  +} from "lucide-react";
+* +/\*\*
+* - Compact, modern, single-row toolbar (inspired by iOS 18 design language):
+* - - Primary row holds the most-used actions
+* - - Secondary controls live in collapsible groups to save vertical space
+* - - Adds "Text Background" toggle with two modes: Block / Blob (UI only for now)
+* -
+* - Backward-compatible props: all are optional. If you already handle these in a parent,
+* - pass handlers to keep state in sync. If not provided, the toolbar manages nothing functional.
+* \*/
+  +type TextBgMode = "block" | "blob";
+  +type Props = {
+* className?: string;
+* // Optional handlers for host to wire functionality
+* onBold?: () => void;
+* onItalic?: () => void;
+* onUnderline?: () => void;
+* onAlign?: (v: "left" | "center" | "right") => void;
+* onInsertShape?: () => void;
+* onInsertImage?: () => void;
+* onUndo?: () => void;
+* onRedo?: () => void;
+* onZoomIn?: () => void;
+* onZoomOut?: () => void;
+* // New: Text Background controls (UI only in this patch)
+* textBgEnabled?: boolean;
+* textBgMode?: TextBgMode;
+* onTextBgChange?: (enabled: boolean, mode: TextBgMode) => void;
+  +};
+* +export default function LegacyEditorToolbar({
+* className,
+* onBold,
+* onItalic,
+* onUnderline,
+* onAlign,
+* onInsertShape,
+* onInsertImage,
+* onUndo,
+* onRedo,
+* onZoomIn,
+* onZoomOut,
+* textBgEnabled = false,
+* textBgMode = "block",
+* onTextBgChange,
+  +}: Props) {
+* const AlignIcon = useMemo(() => {
+* switch (true) {
+*      default:
+*        return AlignLeft;
+* }
+* }, []);
+*
+* // Local helpers for text background UI
+* const handleToggleTextBg = (val: boolean) => {
+* onTextBgChange?.(val, textBgMode);
+* };
+* const handleModeChange = (mode: TextBgMode) => {
+* onTextBgChange?.(textBgEnabled, mode);
+* };
+*
+* return (
+* <div
+*      className={cn(
+*        "sticky top-0 z-30 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+*        className,
+*      )}
+* >
+*      {/* Primary Row — one line, dense controls */}
+*      <div className="flex h-12 items-center gap-2 px-3">
+*        {/* Left cluster: Insert */}
+*        <div className="flex items-center gap-1">
+*          <Button variant="secondary" size="sm" className="rounded-2xl" onClick={onInsertShape}>
+*            <Square className="mr-1 h-4 w-4" />
+*            Shape
+*          </Button>
+*          <Button variant="secondary" size="sm" className="rounded-2xl" onClick={onInsertImage}>
+*            <ImageIcon className="mr-1 h-4 w-4" />
+*            Image
+*          </Button>
+*        </div>
+*
+*        <Separator orientation="vertical" className="mx-1 h-6" />
+*
+*        {/* Typography quick actions */}
+*        <div className="flex items-center gap-1">
+*          <Button variant="ghost" size="icon" className="rounded-xl" onClick={onBold} aria-label="Bold">
+*            <Bold className="h-4 w-4" />
+*          </Button>
+*          <Button variant="ghost" size="icon" className="rounded-xl" onClick={onItalic} aria-label="Italic">
+*            <Italic className="h-4 w-4" />
+*          </Button>
+*          <Button variant="ghost" size="icon" className="rounded-xl" onClick={onUnderline} aria-label="Underline">
+*            <Underline className="h-4 w-4" />
+*          </Button>
+*
+*          <DropdownMenu>
+*            <DropdownMenuTrigger asChild>
+*              <Button variant="ghost" size="sm" className="rounded-xl">
+*                <Type className="mr-2 h-4 w-4" />
+*                Align
+*                <ChevronDown className="ml-1 h-4 w-4" />
+*              </Button>
+*            </DropdownMenuTrigger>
+*            <DropdownMenuContent align="start" className="w-40">
+*              <DropdownMenuItem onClick={() => onAlign?.("left")}>
+*                <AlignLeft className="mr-2 h-4 w-4" />
+*                Left
+*              </DropdownMenuItem>
+*              <DropdownMenuItem onClick={() => onAlign?.("center")}>
+*                <AlignCenter className="mr-2 h-4 w-4" />
+*                Center
+*              </DropdownMenuItem>
+*              <DropdownMenuItem onClick={() => onAlign?.("right")}>
+*                <AlignRight className="mr-2 h-4 w-4" />
+*                Right
+*              </DropdownMenuItem>
+*            </DropdownMenuContent>
+*          </DropdownMenu>
+*        </div>
+*
+*        <Separator orientation="vertical" className="mx-1 h-6" />
+*
+*        {/* Text Background — NEW */}
+*        <div className="flex items-center gap-2 rounded-xl border px-2 py-1">
+*          <Paintbrush className="h-4 w-4" />
+*          <span className="text-xs">Text BG</span>
+*          <Switch
+*            checked={textBgEnabled}
+*            onCheckedChange={handleToggleTextBg}
+*            aria-label="Toggle text background"
+*          />
+*          <DropdownMenu>
+*            <DropdownMenuTrigger asChild>
+*              <Button variant="ghost" size="sm" className="rounded-xl" disabled={!textBgEnabled}>
+*                {textBgMode === "blob" ? "Blob" : "Block"}
+*                <ChevronDown className="ml-1 h-4 w-4" />
+*              </Button>
+*            </DropdownMenuTrigger>
+*            <DropdownMenuContent align="start" className="w-36">
+*              <DropdownMenuLabel>Background Mode</DropdownMenuLabel>
+*              <DropdownMenuSeparator />
+*              <DropdownMenuItem onClick={() => handleModeChange("block")}>Block</DropdownMenuItem>
+*              <DropdownMenuItem onClick={() => handleModeChange("blob")}>Blob</DropdownMenuItem>
+*            </DropdownMenuContent>
+*          </DropdownMenu>
+*        </div>
+*
+*        <div className="ml-auto flex items-center gap-1">
+*          {/* Canvas controls */}
+*          <Button variant="ghost" size="icon" className="rounded-xl" onClick={onZoomOut} aria-label="Zoom out">
+*            <ZoomOut className="h-4 w-4" />
+*          </Button>
+*          <Button variant="ghost" size="icon" className="rounded-xl" onClick={onZoomIn} aria-label="Zoom in">
+*            <ZoomIn className="h-4 w-4" />
+*          </Button>
+*          <Separator orientation="vertical" className="mx-1 h-6" />
+*          <Button variant="ghost" size="icon" className="rounded-xl" onClick={onUndo} aria-label="Undo">
+*            <Undo2 className="h-4 w-4" />
+*          </Button>
+*          <Button variant="ghost" size="icon" className="rounded-xl" onClick={onRedo} aria-label="Redo">
+*            <Redo2 className="h-4 w-4" />
+*          </Button>
+*
+*          {/* Overflow / More */}
+*          <DropdownMenu>
+*            <DropdownMenuTrigger asChild>
+*              <Button variant="secondary" size="icon" className="ml-1 rounded-2xl">
+*                <MoreHorizontal className="h-4 w-4" />
+*              </Button>
+*            </DropdownMenuTrigger>
+*            <DropdownMenuContent align="end" className="w-56">
+*              <DropdownMenuLabel>More</DropdownMenuLabel>
+*              <DropdownMenuSeparator />
+*              <DropdownMenuItem>
+*                <Layers className="mr-2 h-4 w-4" />
+*                Arrange / Layers
+*              </DropdownMenuItem>
+*              <DropdownMenuItem>Smart Guides</DropdownMenuItem>
+*              <DropdownMenuItem>Snapping</DropdownMenuItem>
+*              <DropdownMenuItem>Rulers</DropdownMenuItem>
+*            </DropdownMenuContent>
+*          </DropdownMenu>
+*        </div>
+*      </div>
+*
+*      {/* Secondary Row — collapsible groups keep it airy and compact */}
+*      <div className="border-t px-3">
+*        <div className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+*          <Collapsible>
+*            <div className="flex items-center gap-1">
+*              <CollapsibleTrigger asChild>
+*                <Button variant="ghost" size="sm" className="rounded-xl">
+*                  Typography
+*                  <ChevronDown className="ml-1 h-4 w-4 data-[state=open]:hidden" />
+*                  <ChevronUp className="ml-1 hidden h-4 w-4 data-[state=open]:block" />
+*                </Button>
+*              </CollapsibleTrigger>
+*            </div>
+*            <CollapsibleContent>
+*              <div className="flex flex-wrap items-center gap-2 py-2">
+*                {/* Place existing font family / size / line-height controls here if you have them.
+*                    Keeping UI placeholders minimal to avoid breaking existing logic. */}
+*                <Button size="sm" variant="outline" className="rounded-xl">Font</Button>
+*                <Button size="sm" variant="outline" className="rounded-xl">Size</Button>
+*                <Button size="sm" variant="outline" className="rounded-xl">Line</Button>
+*                <Button size="sm" variant="outline" className="rounded-xl">Spacing</Button>
+*              </div>
+*            </CollapsibleContent>
+*          </Collapsible>
+*
+*          <Collapsible>
+*            <CollapsibleTrigger asChild>
+*              <Button variant="ghost" size="sm" className="rounded-xl">
+*                Arrange
+*                <ChevronDown className="ml-1 h-4 w-4 data-[state=open]:hidden" />
+*                <ChevronUp className="ml-1 hidden h-4 w-4 data-[state=open]:block" />
+*              </Button>
+*            </CollapsibleTrigger>
+*            <CollapsibleContent>
+*              <div className="flex flex-wrap items-center gap-2 py-2">
+*                <Button size="sm" variant="outline" className="rounded-xl">Forward</Button>
+*                <Button size="sm" variant="outline" className="rounded-xl">Backward</Button>
+*                <Button size="sm" variant="outline" className="rounded-xl">To Front</Button>
+*                <Button size="sm" variant="outline" className="rounded-xl">To Back</Button>
+*              </div>
+*            </CollapsibleContent>
+*          </Collapsible>
+*        </div>
+*      </div>
+* </div>
+* );
+  +}
   \*\*\* End Patch

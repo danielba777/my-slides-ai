@@ -13,15 +13,7 @@ import {
   type PlateSlide,
 } from "@/components/presentation/utils/parser";
 import { applyBackgroundImageToCanvas } from "@/components/presentation/utils/canvas";
-import { ThinkingDisplay } from "@/components/presentation/dashboard/ThinkingDisplay";
-import { Header } from "@/components/presentation/outline/Header";
-import { OutlineList } from "@/components/presentation/outline/OutlineList";
-import { PromptInput } from "@/components/presentation/outline/PromptInput";
-import { ToolCallDisplay } from "@/components/presentation/outline/ToolCallDisplay";
-import { ThemeBackground } from "@/components/presentation/theme/ThemeBackground";
-import { ThemeSettings } from "@/components/presentation/theme/ThemeSettings";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { LoadingState } from "@/components/presentation/presentation-page/Loading";
 import {
   themes,
   type ThemeProperties,
@@ -29,7 +21,6 @@ import {
 } from "@/lib/presentation/themes";
 import { usePresentationState } from "@/states/presentation-state";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Wand2 } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
@@ -82,7 +73,6 @@ export default function PresentationGenerateWithIdPage() {
     setPresentationInput,
     isGeneratingPresentation,
     isGeneratingOutline,
-    outlineThinking,
     setOutline,
     setSearchResults,
     setShouldStartOutlineGeneration,
@@ -91,11 +81,13 @@ export default function PresentationGenerateWithIdPage() {
     setPresentationStyle,
     setLanguage,
     setWebSearchEnabled,
+    outline,
   } = usePresentationState();
 
   // Track if this is a fresh navigation or a revisit
   const initialLoadComplete = useRef(false);
   const generationStarted = useRef(false);
+  const slidesGenerationTriggered = useRef(false);
 
   // Use React Query to fetch presentation data
   const { data: presentationData, isLoading: isLoadingPresentation } = useQuery(
@@ -149,6 +141,19 @@ export default function PresentationGenerateWithIdPage() {
       }, 100);
     }
   }, [isGeneratingOutline, setShouldStartOutlineGeneration]);
+
+  /**
+   * Sobald die Outline fertig ist, direkt die Slides generieren
+   * und auf die Slides-Page weiterleiten — ohne dass die Outline-Seite sichtbar wird.
+   */
+  useEffect(() => {
+    if (slidesGenerationTriggered.current) return;
+    const outlineReady = !isGeneratingOutline && Array.isArray(outline) && outline.length > 0;
+    if (outlineReady && !isGeneratingPresentation) {
+      slidesGenerationTriggered.current = true;
+      void handleGenerate();
+    }
+  }, [outline, isGeneratingOutline, isGeneratingPresentation]);
 
   // Update presentation state when data is fetched
   useEffect(() => {
@@ -389,68 +394,7 @@ export default function PresentationGenerateWithIdPage() {
     }
   };
 
-  if (isLoadingPresentation) {
-    return (
-      <ThemeBackground>
-        <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center">
-          <div className="relative">
-            <Spinner className="h-10 w-10 text-primary" />
-          </div>
-          <div className="space-y-2 text-center">
-            <h2 className="text-2xl font-bold">Loading Presentation Outline</h2>
-            <p className="text-muted-foreground">Please wait a moment...</p>
-          </div>
-        </div>
-      </ThemeBackground>
-    );
-  }
-  return (
-    <ThemeBackground>
-      <Button
-        variant="ghost"
-        className="absolute left-4 top-4 flex items-center gap-2 text-muted-foreground hover:text-foreground"
-        onClick={() => router.back()}
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back
-      </Button>
-
-      <div className="flex flex-row justify-center">
-        {/* <GoogleAdsBanner isVertical={true} /> */}
-
-        <div className="max-w-4xl space-y-8 p-8 pt-6">
-          <div className="space-y-8">
-            <Header />
-            <PromptInput />
-            <ThinkingDisplay
-              thinking={outlineThinking}
-              isGenerating={isGeneratingOutline}
-              title="AI is thinking about your outline..."
-            />
-            <ToolCallDisplay />
-            <OutlineList />
-
-            <div className="!mb-32 space-y-4 rounded-lg border bg-muted/30 p-6">
-              <h2 className="text-lg font-semibold">Customize Theme</h2>
-              <ThemeSettings />
-            </div>
-          </div>
-        </div>
-
-        {/* <GoogleAdsBanner isVertical={true} /> */}
-      </div>
-
-      <div className="absolute bottom-0 left-0 right-0 flex justify-center border-t bg-background/80 p-4 backdrop-blur-sm">
-        <Button
-          size="lg"
-          className="gap-2 px-8"
-          onClick={handleGenerate}
-          disabled={isGeneratingPresentation}
-        >
-          <Wand2 className="h-5 w-5" />
-          {isGeneratingPresentation ? "Generating..." : "Generate Presentation"}
-        </Button>
-      </div>
-    </ThemeBackground>
-  );
+  // Immer Ladezustand anzeigen, während automatisch generiert wird
+  if (isLoadingPresentation) return <LoadingState />;
+  return <LoadingState />;
 }
