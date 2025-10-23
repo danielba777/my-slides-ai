@@ -1,127 +1,53 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-*** src/canvas/legacy/SlideCanvasLegacy.tsx
-@@
--  const handleBackgroundPatch = useCallback(
--    (patch: Partial<SlideTextElement>) => {
--      if (!patch.background) return;
--      const nextBackground = {
--        ...patch.background,
--        paddingX: patch.background.paddingX ?? patch.background.paddingY ?? 12,
--        paddingY: patch.background.paddingY ?? patch.background.paddingX ?? 12,
--      };
--      applyToActive((l) => ({
--        ...l,
--        background: nextBackground,
--      }));
--    },
--    [applyToActive],
--  );
-+  // Nimmt Patches aus der Toolbar entgegen und mapped sie auf das aktive Layer
-+  const handleToolbarPatch = useCallback(
-+    (patch: Partial<SlideTextElement>) => {
-+      // 1) Hintergrund
-+      if (patch.background) {
-+        const nextBackground = {
-+          ...patch.background,
-+          paddingX:
-+            patch.background.paddingX ?? patch.background.paddingY ?? 12,
-+          paddingY:
-+            patch.background.paddingY ?? patch.background.paddingX ?? 12,
-+        };
-+        applyToActive((l) => ({ ...l, background: nextBackground }));
-+      }
-+
-+      // 2) Typografie / Layout
-+      if (typeof patch.lineHeight === "number") {
-+        applyToActive((l) => ({ ...l, lineHeight: patch.lineHeight! }));
-+      }
-+      if (typeof patch.letterSpacing === "number") {
-+        applyToActive((l) => ({ ...l, letterSpacing: patch.letterSpacing! }));
-+      }
-+      if (patch.align) {
-+        applyToActive((l) => ({ ...l, align: patch.align as any }));
-+      }
-+      // Toolbar liefert "fontSize" → wir mappen auf scale (BASE_FONT_PX * scale)
-+      if (typeof patch.fontSize === "number" && Number.isFinite(patch.fontSize)) {
-+        const nextScale = Math.max(0.2, Math.min(4, patch.fontSize / BASE_FONT_PX));
-+        applyToActive((l) => ({ ...l, scale: nextScale }));
-+      }
-+
-+      // Farben
-+      if (typeof (patch as any).fill === "string") {
-+        const c = (patch as any).fill as string;
-+        applyToActive((l) => ({ ...l, color: c }));
-+      }
-+      if (typeof (patch as any).strokeWidth === "number") {
-+        const w = (patch as any).strokeWidth as number;
-+        applyToActive((l: any) => ({
-+          ...l,
-+          outlineEnabled: w > 0,
-+          outlineWidth: w,
-+        }));
-+      }
-+      if (typeof (patch as any).stroke === "string") {
-+        const c = (patch as any).stroke as string;
-+        applyToActive((l: any) => ({
-+          ...l,
-+          outlineEnabled: true,
-+          outlineColor: c,
-+        }));
-+      }
-+
-+      // Bold / Italic (Toolbar nutzt fontWeight / fontStyle)
-+      if (typeof (patch as any).fontWeight === "string") {
-+        const isBold = ((patch as any).fontWeight as string) === "bold";
-+        applyToActive((l) => ({ ...l, weight: isBold ? "bold" : "regular" }));
-+      }
-+      if (typeof (patch as any).fontStyle === "string") {
-+        const isItalic = ((patch as any).fontStyle as string) === "italic";
-+        applyToActive((l: any) => ({ ...l, italic: isItalic }));
-+      }
-+    },
-+    [applyToActive],
-+  );
-@@
--        <LegacyEditorToolbar
--          onAddText={handleAddText}
--          className="py-1 px-2"
--          selectedText={
--            active
--              ? ({
--                  id: active.id,
--                  background: active.background,
--                } as SlideTextElement)
--              : null
--          }
--          onChangeSelectedText={handleBackgroundPatch}
--        >
-+        <LegacyEditorToolbar
-+          onAddText={handleAddText}
-+          className="py-1 px-2"
-+          selectedText={
-+            active
-+              ? ({
-+                  id: active.id,
-+                  // Werte so liefern, wie die Toolbar sie erwartet:
-+                  // fontSize = BASE_FONT_PX * scale
-+                  fontSize: Math.round(BASE_FONT_PX * (Number.isFinite(active.scale) ? active.scale : 1)),
-+                  lineHeight: active.lineHeight,
-+                  letterSpacing: active.letterSpacing,
-+                  align: active.align,
-+                  // Farbe(n)
-+                  // Toolbar liest 'fill' für Textfarbe
-+                  fill: (active as any).color ?? "#ffffff",
-+                  // Toolbar liest 'stroke' + 'strokeWidth' für Kontur
-+                  stroke: (active as any).outlineColor ?? "#000000",
-+                  strokeWidth: (active as any).outlineWidth ?? 0,
-+                  // Bold / Italic
-+                  fontWeight: active.weight === "bold" ? ("bold" as any) : ("normal" as any),
-+                  fontStyle: (active as any).italic ? ("italic" as any) : ("normal" as any),
-+                  // Hintergrund
-+                  background: active.background,
-+                } as unknown as SlideTextElement)
-+              : null
-+          }
-+          onChangeSelectedText={handleToolbarPatch}
-+        >
+1. Hintergrund-Box wirklich einschalten (gleiche Logik wie Preview)
+
+Im Export wird die Box nur gezeichnet, wenn background.enabled === true. In der Preview reicht es, wenn die Opazität > 0 ist. Passe das so an:
+
+Ändern (Export-Code – SlideCanvasLegacy.tsx):
+Suche die hasBackground Berechnung und ersetze sie:
+
+// ALT
+const hasBackground =
+!!bgConfig?.enabled && lineWidths.some((w) => w > 0);
+
+// NEU (wie in der Preview)
+const bgEnabled =
+(bgConfig?.enabled ?? false) || ((bgConfig?.opacity ?? 0) > 0);
+const hasBackground = bgEnabled && lineWidths.some((w) => w > 0);
+
+Stelle im selben Block sicher, dass padX/padY/radius/fill/... unverändert bleiben. Die Stelle findest du hier (Bereich mit rectX/rectY/rectWidth/rectHeight):
+
+codebase
+
+2. Radius der Blob-Box wie die Preview clampen
+
+Die Preview clamped für „Blob“ so: max(bgRadius, min(bgRadius\*1.5, 1600)). Im Export wurde stattdessen rectHeight/2 verwendet – dadurch weicht die Form ab. Ersetze die effectiveRadius-Logik:
+
+// ALT
+const effectiveRadius =
+bgConfig?.mode === "blob"
+? Math.max(radius, rectHeight / 2)
+: radius;
+
+// NEU – exakt wie Preview
+const effectiveRadius =
+bgConfig?.mode === "blob"
+? Math.max(radius, Math.min(radius \* 1.5, 1600))
+: radius;
+
+Das ist in derselben Box-Zeichenroutine (Export) wie oben. (Zur Kontrolle: In der Preview wird der Radius genau so berechnet, siehe borderRadius in der Text-Box.)
+
+codebase
+
+codebase
+
+3. Kontur-Dicke an die Skalierung koppeln (sonst zu dünn im Export)
+
+Die Preview skaliert den Outline-Ring mit outlineWidth \* layer.scale. Im Export wird die Stroke-Breite aktuell ohne Scale gesetzt und wirkt dadurch dünner. Korrigiere die Zeile im Offscreen-Stroke:
+
+// ALT
+ox.lineWidth = 2 \* outlineWidth;
+
+// NEU – paritätisch zur Preview (Text-Shadow-Ring):
+ox.lineWidth = 2 _ outlineWidth _ Math.max(0.001, layer.scale);

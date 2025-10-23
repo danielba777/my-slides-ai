@@ -55,11 +55,11 @@ function LegacyEditorToolbar({
     window.dispatchEvent(new CustomEvent("canvas:add-text"));
   }, [onAddText]);
 
-  const [textBgEnabled, setTextBgEnabled] = React.useState(false);
   const [textBgMode, setTextBgMode] = React.useState<TextBgMode>("block");
   const [textBgPadding, setTextBgPadding] = React.useState(12);
   const [textBgRadius, setTextBgRadius] = React.useState(12);
-  const [textBgOpacity, setTextBgOpacity] = React.useState(55); // 0-100
+  // Default: 0 => Hintergrund aus
+  const [textBgOpacity, setTextBgOpacity] = React.useState(0); // 0-100
   const [textBgColor, setTextBgColor] = React.useState<string>("#000000");
 
   const hasSelection = !!selectedText;
@@ -67,23 +67,20 @@ function LegacyEditorToolbar({
 
   React.useEffect(() => {
     if (!selectedBackground) {
-      setTextBgEnabled(false);
       setTextBgMode("block");
       setTextBgPadding(12);
       setTextBgRadius(12);
-      setTextBgOpacity(55);
+      setTextBgOpacity(0);
       setTextBgColor("#000000");
       return;
     }
-    setTextBgEnabled(!!selectedBackground.enabled);
     setTextBgMode(selectedBackground.mode ?? "block");
     setTextBgPadding(selectedBackground.paddingX ?? 12);
     setTextBgRadius(selectedBackground.radius ?? 12);
-    setTextBgOpacity(Math.round((selectedBackground.opacity ?? 0.55) * 100));
+    setTextBgOpacity(Math.round((selectedBackground.opacity ?? 0) * 100));
     setTextBgColor(selectedBackground.color ?? "#000000");
   }, [
     selectedText?.id,
-    selectedBackground?.enabled,
     selectedBackground?.mode,
     selectedBackground?.paddingX,
     selectedBackground?.radius,
@@ -92,19 +89,22 @@ function LegacyEditorToolbar({
   ]);
 
   const buildBackground = useCallback(
-    (overrides?: Partial<SlideTextElement["background"]>) => ({
-      enabled: overrides?.enabled ?? textBgEnabled,
-      mode: overrides?.mode ?? textBgMode,
-      color: overrides?.color ?? textBgColor,
-      opacity: overrides?.opacity ?? textBgOpacity / 100,
-      paddingX: overrides?.paddingX ?? textBgPadding,
-      paddingY: overrides?.paddingY ?? textBgPadding,
-      radius: overrides?.radius ?? textBgRadius,
-      lineOverlap:
-        overrides?.lineOverlap ?? selectedBackground?.lineOverlap ?? 0,
-    }),
+    (overrides?: Partial<SlideTextElement["background"]>) => {
+      const nextOpacity = overrides?.opacity ?? textBgOpacity / 100;
+      return {
+        // "enabled" wird implizit über Opazität gesteuert:
+        enabled: nextOpacity > 0,
+        mode: overrides?.mode ?? textBgMode,
+        color: overrides?.color ?? textBgColor,
+        opacity: nextOpacity,
+        paddingX: overrides?.paddingX ?? textBgPadding,
+        paddingY: overrides?.paddingY ?? textBgPadding,
+        radius: overrides?.radius ?? textBgRadius,
+        lineOverlap:
+          overrides?.lineOverlap ?? selectedBackground?.lineOverlap ?? 0,
+      };
+    },
     [
-      textBgEnabled,
       textBgMode,
       textBgColor,
       textBgOpacity,
@@ -122,14 +122,7 @@ function LegacyEditorToolbar({
     [buildBackground, onChangeSelectedText],
   );
 
-  const handleToggleBg = useCallback(
-    (v: boolean) => {
-      setTextBgEnabled(v);
-      if (!hasSelection) return;
-      commitBackground({ enabled: v });
-    },
-    [commitBackground, hasSelection],
-  );
+  // Kein expliziter Toggle mehr nötig – Opazität 0 = aus, >0 = an
 
   const handleModeChange = useCallback(
     (mode: TextBgMode) => {
@@ -267,75 +260,80 @@ function LegacyEditorToolbar({
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div className="flex flex-wrap items-center gap-3 py-3">
-              {/* Einheitliche Regler und Eingaben */}
-              <MiniRange
-                label="Textgröße"
-                min={8}
-                max={128}
-                value={(selectedText as any)?.fontSize ?? 32}
-                onChange={(v) =>
-                  hasSelection &&
-                  onChangeSelectedText?.({ ...selectedText!, fontSize: v })
-                }
-              />
-
-              <MiniRange
-                label="Zeilenhöhe"
-                min={80}
-                max={200}
-                value={(selectedText as any)?.lineHeight ?? 120}
-                onChange={(v) =>
-                  hasSelection &&
-                  onChangeSelectedText?.({
-                    ...selectedText!,
-                    lineHeight: v / 100,
-                  })
-                }
-              />
-
-              <MiniRange
-                label="Buchstabenabstand"
-                min={0}
-                max={20}
-                value={(selectedText as any)?.letterSpacing ?? 0}
-                onChange={(v) =>
-                  hasSelection &&
-                  onChangeSelectedText?.({ ...selectedText!, letterSpacing: v })
-                }
-              />
-
-              <MiniRange
-                label="Padding"
-                min={0}
-                max={48}
-                value={textBgPadding}
-                onChange={(v) => {
-                  setTextBgPadding(v);
-                  commitBackground({ paddingX: v, paddingY: v });
-                }}
-              />
-
-              <MiniRange
-                label="Rundung"
-                min={0}
-                max={64}
-                value={textBgRadius}
-                onChange={(v) => {
-                  setTextBgRadius(v);
-                  commitBackground({ radius: v });
-                }}
-              />
-
-              <MiniRange
-                label="Transparenz"
-                min={0}
-                max={100}
-                value={textBgOpacity}
-                onChange={(v) => {
-                  setTextBgOpacity(v);
-                  commitBackground({ opacity: v / 100 });
-                }}
-              />
+              {/* === Gruppe: Texthintergrund (Padding, Rundung, Opazität, Farbe, Modus) === */}
+              <div className="flex items-center gap-4">
+                <MiniRange
+                  label="Padding"
+                  min={0}
+                  max={48}
+                  value={textBgPadding}
+                  onChange={(v) => {
+                    setTextBgPadding(v);
+                    commitBackground({ paddingX: v, paddingY: v });
+                  }}
+                />
+                <MiniRange
+                  label="Rundung"
+                  min={0}
+                  max={64}
+                  value={textBgRadius}
+                  onChange={(v) => {
+                    setTextBgRadius(v);
+                    commitBackground({ radius: v });
+                  }}
+                />
+                <MiniRange
+                  label="Opazität"
+                  min={0}
+                  max={100}
+                  value={textBgOpacity}
+                  onChange={(v) => {
+                    setTextBgOpacity(v);
+                    commitBackground({ opacity: v / 100 });
+                  }}
+                />
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground">
+                    Hintergrund
+                  </span>
+                  <input
+                    type="color"
+                    value={textBgColor}
+                    onChange={(e) => {
+                      const c = e.currentTarget.value;
+                      setTextBgColor(c);
+                      commitBackground({ color: c });
+                    }}
+                    className="h-6 w-7 cursor-pointer rounded-md border border-border bg-background p-0.5"
+                  />
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="rounded-xl">
+                      Modus: {textBgMode === "block" ? "Block" : "Blob"}
+                      <ChevronDown className="ml-1 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setTextBgMode("block");
+                        commitBackground({ mode: "block" });
+                      }}
+                    >
+                      Block
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setTextBgMode("blob");
+                        commitBackground({ mode: "blob" });
+                      }}
+                    >
+                      Blob
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
 
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-muted-foreground">
@@ -351,22 +349,6 @@ function LegacyEditorToolbar({
                       fill: e.currentTarget.value,
                     })
                   }
-                  className="h-6 w-7 cursor-pointer rounded-md border border-border bg-background p-0.5"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground">
-                  Hintergrund
-                </span>
-                <input
-                  type="color"
-                  value={textBgColor}
-                  onChange={(e) => {
-                    const c = e.currentTarget.value;
-                    setTextBgColor(c);
-                    commitBackground({ color: c });
-                  }}
                   className="h-6 w-7 cursor-pointer rounded-md border border-border bg-background p-0.5"
                 />
               </div>
@@ -403,33 +385,6 @@ function LegacyEditorToolbar({
                   className="h-6 w-7 cursor-pointer rounded-md border border-border bg-background p-0.5"
                 />
               </div>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="rounded-xl">
-                    Modus: {textBgMode === "block" ? "Block" : "Blob"}
-                    <ChevronDown className="ml-1 h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setTextBgMode("block");
-                      commitBackground({ mode: "block" });
-                    }}
-                  >
-                    Block
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setTextBgMode("blob");
-                      commitBackground({ mode: "blob" });
-                    }}
-                  >
-                    Blob
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
           </CollapsibleContent>
         </Collapsible>

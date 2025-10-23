@@ -1764,7 +1764,8 @@ const handleAddText = useCallback(() => {
                   ? 600
                   : 400;
             const background = layer.background;
-            const bgEnabled = !!background?.enabled;
+            // Kein Toggle mehr nötig: Opazität steuert Sichtbarkeit
+            const bgEnabled = (background?.enabled ?? false) || ((background?.opacity ?? 0) > 0);
             const bgPadX = Math.max(0, background?.paddingX ?? 12);
             const bgPadY = Math.max(0, background?.paddingY ?? bgPadX);
             const bgRadius = Math.max(0, background?.radius ?? 16);
