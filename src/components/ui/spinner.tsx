@@ -13,7 +13,7 @@ export const Spinner = ({
   const segmentWidth = 2;
 
   return (
-    <div className={cn("flex items-center gap-1", className)}>
+    <div className={cn("flex flex-col items-center gap-1", className)}>
       <svg
         className={`animate-spin`}
         viewBox="0 0 50 50"

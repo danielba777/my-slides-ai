@@ -3,6 +3,12 @@
 import { AppLogo } from "@/components/logo/AppLogo";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
@@ -12,6 +18,7 @@ import {
   HeartIcon,
   Images,
   PlayIcon,
+  SlidersHorizontal,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -84,6 +91,7 @@ const normalizePrompt = (value: string | null | undefined) =>
 export default function DashboardHome() {
   const [posts, setPosts] = useState<SlideshowPostSummary[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<SlideshowPostDetail | null>(
     null,
@@ -101,6 +109,9 @@ export default function DashboardHome() {
   >({});
   const [promptDraft, setPromptDraft] = useState("");
   const [isSavingPrompt, setIsSavingPrompt] = useState(false);
+  const [sortOption, setSortOption] = useState<
+    "views-desc" | "views-asc" | "likes-desc" | "likes-asc"
+  >("views-desc");
 
   useEffect(() => {
     const loadPosts = async () => {
@@ -126,18 +137,35 @@ export default function DashboardHome() {
     };
 
     void loadPosts();
+    const timer = setTimeout(() => setIsPageLoading(false), 600);
+    return () => clearTimeout(timer);
   }, []);
+  useEffect(() => {
+    if (!isLoadingPosts) {
+      setIsPageLoading(false);
+    }
+  }, [isLoadingPosts]);
 
-  const postCards = useMemo(
-    () =>
-      posts.map((post) => ({
-        id: post.id,
-        likeCount: post.likeCount,
-        viewCount: post.viewCount,
-        imageUrl: post.slides?.[0]?.imageUrl ?? null,
-      })),
-    [posts],
-  );
+  const postCards = useMemo(() => {
+    const mapped = posts.map((post) => ({
+      id: post.id,
+      likeCount: post.likeCount,
+      viewCount: post.viewCount,
+      imageUrl: post.slides?.[0]?.imageUrl ?? null,
+    }));
+
+    switch (sortOption) {
+      case "views-asc":
+        return [...mapped].sort((a, b) => a.viewCount - b.viewCount);
+      case "likes-desc":
+        return [...mapped].sort((a, b) => b.likeCount - a.likeCount);
+      case "likes-asc":
+        return [...mapped].sort((a, b) => a.likeCount - b.likeCount);
+      case "views-desc":
+      default:
+        return [...mapped].sort((a, b) => b.viewCount - a.viewCount);
+    }
+  }, [posts, sortOption]);
 
   useEffect(() => {
     if (selectedPost) {
@@ -429,6 +457,18 @@ export default function DashboardHome() {
     }
   };
 
+  if (isPageLoading) {
+    return (
+      <div className="flex h-[80vh] w-full items-center justify-center">
+        <Spinner
+          className="text-primary"
+          size={42}
+          text="Loading SlidesCockpit..."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full w-full flex-col items-center justify-start space-y-10 px-10 py-12">
       <AppLogo size={72} />
@@ -451,13 +491,41 @@ export default function DashboardHome() {
       </div>
 
       <section className="flex w-full max-w-7xl flex-col gap-6">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold">
-            SlidesCockpit Slideshow Library
-          </h2>
-          <p className="text-muted-foreground">
-            See what TikToks businesses are posting
-          </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-left">
+            <h2 className="text-2xl font-semibold">
+              SlidesCockpit Slideshow Library
+            </h2>
+            <p className="text-muted-foreground">
+              See what TikToks businesses are posting
+            </p>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="sm:w-auto gap-2 bg-card text-foreground hover:text-foreground border border-border shadow-sm hover:bg-card/90 active:bg-card/80"
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                Sort
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setSortOption("views-desc")}>
+                Views (Most)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortOption("views-asc")}>
+                Views (Least)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortOption("likes-desc")}>
+                Likes (Most)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortOption("likes-asc")}>
+                Likes (Least)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {isLoadingPosts ? (
