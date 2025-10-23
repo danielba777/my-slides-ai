@@ -24,6 +24,7 @@ type ExtendedCanvasTextNode = CanvasTextNode & {
   nx?: number;
   ny?: number;
   nmaxWidth?: number;
+  background?: SlideTextElement["background"];
 };
 
 const W = 1080;
@@ -163,6 +164,7 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
           ? { outlineColor: t.outlineColor }
           : {}),
         ...(t.color !== undefined ? { color: t.color } : {}),
+        ...(t.background ? { background: t.background } : {}),
       } as SlideTextElement;
     });
   }, [doc]);
@@ -222,6 +224,8 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
           target.outlineColor = (src as any).outlineColor;
         if ((src as any).color !== undefined)
           target.color = (src as any).color;
+        if ((src as any).background !== undefined)
+          target.background = (src as any).background as SlideTextElement["background"];
       }
 
       // 2) Falls Legacy-Canvas MEHR Text-Layer hat als doc-Textknoten:
@@ -263,6 +267,7 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
             nx: pxToNormX(pxX),
             ny: pxToNormY(pxY),
             nmaxWidth: src.maxWidth ?? Math.round(W * 0.7),
+            background: (src as any).background ?? undefined,
           } as ExtendedCanvasTextNode);
         }
       }

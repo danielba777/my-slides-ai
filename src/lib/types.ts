@@ -20,4 +20,16 @@ export type SlideTextElement = {
   outlineEnabled?: boolean;
   outlineWidth?: number;
   outlineColor?: string;
+  background?: SlideTextBackground;
+};
+
+export type SlideTextBackground = {
+  enabled: boolean;
+  mode: "block" | "blob";
+  color: string;
+  opacity: number;
+  paddingX: number;
+  paddingY: number;
+  radius: number;
+  lineOverlap?: number;
 };

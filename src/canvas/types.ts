@@ -1,3 +1,5 @@
+import type { SlideTextElement } from "@/lib/types";
+
 export type CanvasTextNode = {
   id: string;
   type: "text";
@@ -19,6 +21,7 @@ export type CanvasTextNode = {
   textBg?: string | null;
   link?: string | null;
   locked?: boolean;
+  background?: SlideTextElement["background"];
 };
 
 export type CanvasImageNode = {

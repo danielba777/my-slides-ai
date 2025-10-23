@@ -17,10 +17,20 @@ export interface TextMeasureOptions {
   paddingPx: number;
 }
 
+export interface TextLineBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  text: string;
+}
+
 export interface TextMeasureResult {
   lines: string[];
+  lineBoxes: TextLineBox[];
   contentHeight: number;
   totalHeight: number;
+  lineHeight: number;
 }
 
 /**
@@ -44,14 +54,25 @@ export function measureWrappedText(
     paddingPx,
   } = options;
 
+  const contentWidth = Math.max(0, maxWidthPx - 2 * paddingPx);
+
   if (typeof document === "undefined") {
-    // Fallback für SSR
+    // Fallback fuer SSR
     const fallbackLines = text.split("\n");
     const contentHeight = fallbackLines.length * lineHeightPx;
+    const lineBoxes: TextLineBox[] = fallbackLines.map((line, index) => ({
+      text: line,
+      x: paddingPx,
+      y: paddingPx + index * lineHeightPx,
+      width: contentWidth,
+      height: lineHeightPx,
+    }));
     return {
       lines: fallbackLines,
+      lineBoxes,
       contentHeight,
       totalHeight: Math.ceil(contentHeight + 2 * paddingPx),
+      lineHeight: lineHeightPx,
     };
   }
 
@@ -64,7 +85,6 @@ export function measureWrappedText(
   container.style.pointerEvents = "none";
   container.style.boxSizing = "content-box";
 
-  const contentWidth = Math.max(0, maxWidthPx - 2 * paddingPx);
   container.style.width = `${contentWidth}px`;
   container.style.whiteSpace = whiteSpaceMode;
   container.style.wordBreak = wordBreakMode;
@@ -123,6 +143,28 @@ export function measureWrappedText(
     lines.push(bucket.join(" ").trimEnd());
   }
 
+  const measureLineWidth = (() => {
+    const canvas = document.createElement("canvas");
+    const ctx2d = canvas.getContext("2d");
+    if (!ctx2d) {
+      return (_line: string) => contentWidth;
+    }
+    const weight =
+      typeof fontWeight === "number" ? `${fontWeight}` : fontWeight;
+    const fontParts: string[] = [];
+    if (fontStyle && fontStyle !== "normal") fontParts.push(fontStyle);
+    if (weight) fontParts.push(weight);
+    fontParts.push(`${fontSizePx}px`);
+    fontParts.push(fontFamily);
+    ctx2d.font = fontParts.join(" ");
+    return (line: string) => {
+      if (!line) return 0;
+      const metrics = ctx2d.measureText(line);
+      const spacing = letterSpacingPx * Math.max(line.length - 1, 0);
+      return Math.max(0, metrics.width + spacing);
+    };
+  })();
+
   // Container aufräumen
   try {
     document.body.removeChild(container);
@@ -131,11 +173,20 @@ export function measureWrappedText(
   // Höhen berechnen
   const contentHeight = lines.length * lineHeightPx;
   const totalHeight = Math.ceil(contentHeight + 2 * paddingPx);
+  const lineBoxes: TextLineBox[] = lines.map((line, index) => ({
+    text: line,
+    x: paddingPx,
+    y: paddingPx + index * lineHeightPx,
+    width: measureLineWidth(line),
+    height: lineHeightPx,
+  }));
 
   return {
     lines,
+    lineBoxes,
     contentHeight,
     totalHeight,
+    lineHeight: lineHeightPx,
   };
 }
 

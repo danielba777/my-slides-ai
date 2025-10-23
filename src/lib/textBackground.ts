@@ -1,79 +1,91 @@
-import type { TextMeasureResult } from "./textMetrics";
+// Utilitys zur Erzeugung von Text-Hintergründen (Block/Blob) auf Basis gemessener Zeilen.
+// Erwartet Messwerte aus measureWrappedText (lines, lineHeight, widths pro Zeile).
 
-/**
- * Build a rounded-rect path for a single line.
- */
-function roundedRectPath(x: number, y: number, w: number, h: number, r: number) {
-  const rr = Math.max(0, Math.min(r, Math.min(w, h) / 2));
-  const x2 = x + w;
-  const y2 = y + h;
-  return [
-    `M ${x + rr} ${y}`,
-    `H ${x2 - rr}`,
-    `A ${rr} ${rr} 0 0 1 ${x2} ${y + rr}`,
-    `V ${y2 - rr}`,
-    `A ${rr} ${rr} 0 0 1 ${x2 - rr} ${y2}`,
-    `H ${x + rr}`,
-    `A ${rr} ${rr} 0 0 1 ${x} ${y2 - rr}`,
-    `V ${y + rr}`,
-    `A ${rr} ${rr} 0 0 1 ${x + rr} ${y}`,
-    "Z",
-  ].join(" ");
+export type BlobInput = {
+  lineWidths: number[]; // Breite je sichtbarer Zeile (ohne Padding)
+  lineHeight: number; // Zeilenhöhe (px)
+  padding: number; // Innenabstand (px)
+  radius: number; // Außenradius (px) – nur für außen, nicht für innere „Kerben"
+};
+
+/* Liefert die Außenmaße des Block-Rect basierend auf der längsten Zeile */
+export function getBlockRectDims(
+  lineWidths: number[],
+  lineHeight: number,
+  padding: number,
+) {
+  const maxW = Math.max(0, ...lineWidths);
+  const h = lineWidths.length * lineHeight;
+  return {
+    x: -padding,
+    y: 0,
+    width: maxW + padding * 2,
+    height: h,
+  };
 }
 
 /**
- * Creates a unified "blob" by stacking per-line rounded rects with vertical overlap.
- * The overlap removes inner roundings so the outer contour looks like one shape.
+ * - Erzeugt einen zusammenhängenden Blob-Pfad:
+ * - - Außen (oben/unten) abgerundet
+ * - - Zwischen den Zeilen fließende Übergänge (konkav/konvex) abhängig von der Breitenänderung
+ * - - Nur EINE Form, keine einzelnen pill-förmigen Zeilen
+ *
+ * - Geometrie:
+ * - Wir laufen rechts von oben nach unten, verbinden Zeilenbreiten über weiche Quadratic-Beziers
+ * - (am Zeilen-„Übergang"; Kontrollpunkt liegt leicht versetzt), unten runden wir ab, laufen links
+ * - wieder hoch und schließen am oben links.
  */
-export function buildUnifiedBlobPath(
-  lineBoxes: TextMeasureResult["lineBoxes"],
-  opts: {
-    paddingX: number;
-    paddingY: number;
-    radius: number;
-    lineOverlap?: number;
-  },
-) {
-  const { paddingX, paddingY, radius, lineOverlap = 0 } = opts;
-  if (!lineBoxes?.length) return "";
+export function buildBlobPath({
+  lineWidths,
+  lineHeight,
+  padding,
+  radius,
+}: BlobInput): string {
+  const n = lineWidths.length;
+  if (n === 0) return "";
 
-  const segments: string[] = [];
-  lineBoxes.forEach((line, index) => {
-    const width = line.width + paddingX * 2;
-    const height = line.height + paddingY * 2;
-    const x = line.x - paddingX;
-    const y =
-      line.y -
-      paddingY -
-      (index > 0 ? lineOverlap : 0);
-    const overlapBottom = index < lineBoxes.length - 1 ? lineOverlap : 0;
-    const effectiveHeight = height + overlapBottom + (index > 0 ? lineOverlap : 0);
-    segments.push(roundedRectPath(x, y, width, effectiveHeight, radius));
-  });
+  const right = (i: number) => (lineWidths[i] ?? 0) + padding; // rechte Kante pro Zeile
+  const left = () => -padding; // linke Kante ist fix (Text startet bei 0)
+  const yTop = (i: number) => i * lineHeight;
+  const yBot = (i: number) => (i + 1) * lineHeight;
 
-  return segments.join(" ");
-}
+  const r = Math.max(0, Math.min(radius, lineHeight * 0.5)); // begrenze Radius sinnvoll
+  const curveDepth = Math.min(lineHeight * 0.45, Math.max(6, r)); // Tiefe der Übergangs-Bezier
 
-/**
- * Creates a single block box around the whole paragraph.
- */
-export function buildBlockBox(
-  lineBoxes: TextMeasureResult["lineBoxes"],
-  opts: { paddingX: number; paddingY: number; radius: number },
-) {
-  const { paddingX, paddingY, radius } = opts;
-  if (!lineBoxes?.length) return "";
+  // Start: oben rechts mit Außenradius
+  let d = "";
+  // Move zum Startpunkt (oben rechts, nach Radius)
+  d += `M ${right(0) - r}, ${yTop(0)} `;
+  // Oben rechts Rundung
+  d += `Q ${right(0)}, ${yTop(0)} ${right(0)}, ${yTop(0) + r} `;
 
-  const first = lineBoxes[0]!;
-  const minX = lineBoxes.reduce((acc, line) => Math.min(acc, line.x), first.x) - paddingX;
-  const maxX = lineBoxes.reduce(
-    (acc, line) => Math.max(acc, line.x + line.width),
-    first.x + first.width,
-  ) + paddingX;
-  const topY = first.y - paddingY;
-  const last = lineBoxes[lineBoxes.length - 1]!;
-  const bottomY = last.y + last.height + paddingY;
-  const width = maxX - minX;
-  const height = bottomY - topY;
-  return roundedRectPath(minX, topY, width, height, radius);
+  // Rechtskante: Zeile für Zeile runter
+  for (let i = 0; i < n; i++) {
+    // bis unteres Ende der Zeile
+    d += `L ${right(i)}, ${yBot(i) - (i === n - 1 ? r : 0)} `;
+    if (i < n - 1) {
+      // Übergang zu Zeile i+1 (Breitenänderung ausgleichen)
+      const curr = right(i);
+      const next = right(i + 1);
+      const midY = yBot(i); // Übergangs-Y
+      const ctrlX = curr + (next - curr) * 0.5; // weicher Übergang
+      // leichte „Bucht"/"Bauch" durch vertikale Tiefe:
+      d += `Q ${ctrlX}, ${midY + curveDepth * Math.sign(next - curr)} ${next}, ${midY} `;
+    }
+  }
+
+  // Unten rechts Außenradius
+  d += `Q ${right(n - 1)}, ${yBot(n - 1)} ${right(n - 1) - r}, ${yBot(n - 1)} `;
+
+  // Unterkante nach links
+  d += `L ${left() + r}, ${yBot(n - 1)} `;
+  // Unten links Rundung
+  d += `Q ${left()}, ${yBot(n - 1)} ${left()}, ${yBot(n - 1) - r} `;
+
+  // Linke Kante nach oben (glatt, da linke Textkante fix ist)
+  d += `L ${left()}, ${yTop(0) + r} `;
+  // Oben links Rundung und Schließen
+  d += `Q ${left()}, ${yTop(0)} ${left() + r}, ${yTop(0)} Z`;
+
+  return d;
 }

@@ -11,7 +11,7 @@ export function LoadingState() {
           <Spinner className="h-10 w-10 text-primary" />
         </div>
         <div className="space-y-2 text-center">
-          <h2 className="text-2xl font-bold">Loading Presentation</h2>
+          <h2 className="text-2xl font-bold">Loading Slides</h2>
           <p className="text-muted-foreground">Getting your slides ready...</p>
         </div>
       </div>
