@@ -220,7 +220,7 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
           ti += 1;
 
           const pxX = Math.round((src.x ?? 0.5) * W);
-          const pxY = Math.round((src.y ?? 1 / 3) * H);
+          const pxY = Math.round((src.y ?? 0.5) * H); // Vertikal mittig
 
           const target = node as ExtendedCanvasTextNode;
           target.x = pxX;
@@ -285,6 +285,8 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
               type: "text",
               x: pxX,
               y: pxY,
+              nx: pxToNormX(pxX), // Normalisierte Koordinaten
+              ny: pxToNormY(pxY), // Normalisierte Koordinaten
               rotation: src.rotation ?? 0,
               width: src.maxWidth ?? Math.round(W * 0.7),
               text: src.content ?? "",

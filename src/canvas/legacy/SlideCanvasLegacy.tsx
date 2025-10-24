@@ -315,9 +315,9 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
       content: el.content ?? "",
       zIndex: el.zIndex ?? i,
       italic: (el as any).italic ?? false,
-      outlineEnabled: (el as any).outlineEnabled ?? false,
+      outlineEnabled: (el as any).outlineEnabled ?? true,
       outlineWidth: (el as any).outlineWidth ?? 6,
-      outlineColor: (el as any).outlineColor ?? "#000",
+      outlineColor: (el as any).outlineColor ?? "#000000",
       background: el.background
         ? {
             enabled: el.background.enabled ?? false,
@@ -455,8 +455,14 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         ? crypto.randomUUID()
         : `txt-${Date.now()}`;
     const centerX = W / 2;
-    const oneThirdY = Math.round(H / 3);
-    const initial: TextLayer & { autoHeight?: boolean } = {
+    const centerY = H / 2;
+    const initial: TextLayer & {
+      autoHeight?: boolean;
+      italic?: boolean;
+      outlineEnabled?: boolean;
+      outlineWidth?: number;
+      outlineColor?: string;
+    } = {
       id,
       content: "New Text",
       fontFamily: "Inter, system-ui, sans-serif",
@@ -467,13 +473,17 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       letterSpacing: 0,
       align: "center",
       x: centerX,
-      y: oneThirdY,
+      y: centerY,
       rotation: 0,
       width: Math.round(W * 0.7),
       height: 0, // auto
       zIndex: (textLayers.at(-1)?.zIndex ?? 0) + 1,
       color: "#ffffff",
       autoHeight: true,
+      italic: false,
+      outlineEnabled: true,
+      outlineWidth: 6,
+      outlineColor: "#000000",
     };
     const lines = computeWrappedLinesWithDOM(initial);
     initial.height = Math.ceil(computeAutoHeightForLayer(initial, lines));

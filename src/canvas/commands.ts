@@ -22,13 +22,14 @@ export const addText = (c: CanvasDoc, text = "Neuer Text"): CanvasDoc => ({
     ...c.nodes,
     (() => {
       const width = Math.round(c.width * 0.7); // ~70% Breite
-      const x = Math.round((c.width - width) / 2); // horizontal zentriert
-      const y = Math.round(c.height * (1 / 3)); // ~1/3 von oben
+      // Verwende normalisierte Koordinaten (0-1) für korrekte Zentrierung
+      const nx = 0.5; // horizontal zentriert
+      const ny = 0.5; // vertikal zentriert
       return {
         id: crypto.randomUUID(),
         type: "text",
-        x,
-        y,
+        nx,
+        ny,
         text,
         fontFamily: "Inter",
         fontSize: 64,

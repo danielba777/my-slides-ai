@@ -68,7 +68,9 @@ export function applyBackgroundImageToCanvas(
     height: canvas?.height ?? CANVAS_HEIGHT,
     bg: canvas?.bg ?? DEFAULT_CANVAS.bg,
     nodes: Array.isArray(canvas?.nodes) ? [...canvas!.nodes] : [],
-    selection: Array.isArray(canvas?.selection) ? [...(canvas!.selection as any[])] : [],
+    selection: Array.isArray(canvas?.selection)
+      ? [...(canvas!.selection as any[])]
+      : [],
     previewDataUrl: canvas?.previewDataUrl,
   };
 
@@ -88,13 +90,18 @@ export function applyBackgroundImageToCanvas(
 
   // Entferne ausschließlich den bisherigen BG-Image-Knoten (falls vorhanden),
   // erhalte aber ALLE anderen Nodes (v. a. Text!)
-  const withoutBg = base.nodes.filter((n: any) => !(n?.type === "image" && n?.id === "canvas-background-image"));
+  const withoutBg = base.nodes.filter(
+    (n: any) => !(n?.type === "image" && n?.id === "canvas-background-image"),
+  );
 
   // Prüfe Idempotenz: existiert bereits der gleiche BG?
-  const prevBg = base.nodes.find((n: any) => n?.type === "image" && n?.id === "canvas-background-image") as any;
+  const prevBg = base.nodes.find(
+    (n: any) => n?.type === "image" && n?.id === "canvas-background-image",
+  ) as any;
   if (prevBg) {
     const sameUrl = prevBg.url === imageNode.url;
-    const sameSize = prevBg.width === imageNode.width && prevBg.height === imageNode.height;
+    const sameSize =
+      prevBg.width === imageNode.width && prevBg.height === imageNode.height;
     if (sameUrl && sameSize) {
       // nichts ändern
       return { ...base, nodes: base.nodes };
@@ -106,9 +113,10 @@ export function applyBackgroundImageToCanvas(
   return { ...base, nodes: mergedNodes };
 }
 
-export function buildCanvasDocFromSlide(
-  slide: PlateSlide,
-): { canvas: CanvasDoc; position?: { x: number; y: number } } {
+export function buildCanvasDocFromSlide(slide: PlateSlide): {
+  canvas: CanvasDoc;
+  position?: { x: number; y: number };
+} {
   const segments = collectTextSegments(slide.content);
   const width = slide.canvas?.width ?? CANVAS_WIDTH;
   const height = slide.canvas?.height ?? CANVAS_HEIGHT;
@@ -125,7 +133,10 @@ export function buildCanvasDocFromSlide(
   // 🔒 WICHTIG: Wenn bereits ein Canvas mit Nodes existiert, NIEMALS neu aufbauen.
   // Das verhindert, dass Text/Elemente beim Rendern "zurückspringen".
   if (Array.isArray(slide.canvas?.nodes) && slide.canvas!.nodes.length > 0) {
-    const withBg = applyBackgroundImageToCanvas(slide.canvas, slide.rootImage?.url);
+    const withBg = applyBackgroundImageToCanvas(
+      slide.canvas,
+      slide.rootImage?.url,
+    );
     return { canvas: withBg, position: slide.position };
   }
 
@@ -136,17 +147,15 @@ export function buildCanvasDocFromSlide(
     const textWidth = Math.round(width * 0.7);
     // Default: immer mittig (TikTok-Style)
     const alignment = "center";
-    // Falls Position noch nicht gesetzt: zentriert platzieren
-    const x =
-      slide.position?.x ??
-      Math.max(0, Math.round((width - textWidth) / 2));
-    const y = slide.position?.y ?? Math.round(height * (1 / 3));
+    // Falls Position noch nicht gesetzt: zentriert platzieren (normalisierte Koordinaten 0-1)
+    const nx = slide.position?.x != null ? slide.position.x / width : 0.5;
+    const ny = slide.position?.y != null ? slide.position.y / height : 0.5;
     const textColor = chooseTextColor(base.bg);
     base.nodes.push({
       id: `text-${nanoid()}`,
       type: "text",
-      x,
-      y,
+      nx,
+      ny,
       width: textWidth,
       text: content,
       fontFamily: "Inter",
@@ -178,6 +187,39 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
       ...slide,
       canvas,
       position: slide.position ?? position,
+    };
+  }
+
+  // Konvertiere alte absolute x/y Koordinaten zu normalisierten nx/ny Koordinaten
+  // Dies stellt sicher, dass alle Texte vertikal und horizontal mittig sind
+  if (slide.canvas?.nodes) {
+    const updatedNodes = slide.canvas.nodes.map((node) => {
+      if (node.type !== "text") return node;
+      const textNode = node as any;
+
+      // Wenn bereits nx/ny vorhanden sind, nichts ändern
+      if (textNode.nx != null && textNode.ny != null) {
+        return node;
+      }
+
+      // Für alle Text-Nodes ohne nx/ny: Setze auf Mitte (0.5, 0.5)
+      // Dies migriert alte Slides mit top-left Positionierung zur Zentrierung
+      return {
+        ...textNode,
+        nx: 0.5, // Horizontal mittig
+        ny: 0.5, // Vertikal mittig
+        // Behalte alte x/y für Fallback-Kompatibilität, falls benötigt
+        x: textNode.x,
+        y: textNode.y,
+      };
+    });
+
+    slide = {
+      ...slide,
+      canvas: {
+        ...slide.canvas,
+        nodes: updatedNodes,
+      },
     };
   }
 

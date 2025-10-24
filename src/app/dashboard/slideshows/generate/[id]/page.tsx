@@ -55,8 +55,8 @@ function makeCanvasFromText(text: string, w = 1080, h = 1620): CanvasDoc {
       {
         id: nanoid(),
         type: "text",
-        x: 120,
-        y: 160,
+        nx: 0.5, // Horizontal mittig (normalisierte Koordinaten)
+        ny: 0.5, // Vertikal mittig (normalisierte Koordinaten)
         text,
         fontFamily: "Inter",
         fontSize: 72,
