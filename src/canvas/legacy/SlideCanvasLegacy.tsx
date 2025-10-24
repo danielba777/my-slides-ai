@@ -441,7 +441,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     const oneThirdY = Math.round(H / 3);
     const initial: TextLayer & { autoHeight?: boolean } = {
       id,
-      content: "Neuer Text",
+      content: "New Text",
       fontFamily: "Inter, system-ui, sans-serif",
       fontSize: BASE_FONT_PX,
       weight: "semibold",

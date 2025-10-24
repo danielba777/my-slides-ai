@@ -1,10 +1,20 @@
 "use client";
 
-import { DEFAULT_CANVAS, type CanvasDoc, type CanvasImageNode } from "@/canvas/types";
-import { applyBackgroundImageToCanvas } from "@/components/presentation/utils/canvas";
+import type { SlideCanvasAdapterHandle } from "@/canvas/SlideCanvasAdapter";
+import {
+  DEFAULT_CANVAS,
+  type CanvasDoc,
+  type CanvasImageNode,
+} from "@/canvas/types";
 import { SlideContainer } from "@/components/presentation/presentation-page/SlideContainer";
+import { applyBackgroundImageToCanvas } from "@/components/presentation/utils/canvas";
+import { Button } from "@/components/ui/button";
 import { usePresentationSlides } from "@/hooks/presentation/usePresentationSlides";
 import { useSlideChangeWatcher } from "@/hooks/presentation/useSlideChangeWatcher";
+import {
+  getCorsSafeImageUrl,
+  revokeCorsSafeImageUrl,
+} from "@/lib/canvasImageCors";
 import { cn } from "@/lib/utils";
 import { usePresentationState } from "@/states/presentation-state";
 import { DndContext, closestCenter } from "@dnd-kit/core";
@@ -17,18 +27,10 @@ import React, { memo, useEffect, useRef, useState } from "react";
 import { PresentModeHeader } from "../dashboard/PresentModeHeader";
 import { ThinkingDisplay } from "../dashboard/ThinkingDisplay";
 import { SortableSlide } from "./SortableSlide";
-import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import StickyDownloadActions from "./StickyDownloadActions";
 const SlideCanvas = dynamic(() => import("@/canvas/SlideCanvasAdapter"), {
   ssr: false,
 });
-import type { SlideCanvasAdapterHandle } from "@/canvas/SlideCanvasAdapter";
-import StickyDownloadActions from "./StickyDownloadActions";
-import { getCorsSafeImageUrl, revokeCorsSafeImageUrl } from "@/lib/canvasImageCors";
 
 // -- Small utility to wait for root image decode before mounting the canvas --
 function useImageReady(url?: string) {
@@ -45,10 +47,7 @@ function useImageReady(url?: string) {
     // Prefer decode() to avoid showing half-rendered frames (Chrome/Firefox)
     img.src = url;
     if (typeof (img as any).decode === "function") {
-      (img as any)
-        .decode()
-        .then(markReady)
-        .catch(markReady);
+      (img as any).decode().then(markReady).catch(markReady);
     } else {
       img.onload = markReady;
       img.onerror = markReady;
@@ -61,18 +60,27 @@ function useImageReady(url?: string) {
 }
 
 // ✅ Child-Komponente, damit der Hook NICHT in einer Schleife aufgerufen wird
-const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slidesCount, isReadOnly = false }: {
-  slide: any; index: number; isPresenting: boolean; slidesCount: number; isReadOnly?: boolean;
+const SlideFrame = memo(function SlideFrame({
+  slide,
+  index,
+  isPresenting,
+  slidesCount,
+  isReadOnly = false,
+}: {
+  slide: any;
+  index: number;
+  isPresenting: boolean;
+  slidesCount: number;
+  isReadOnly?: boolean;
 }) {
-  const safeCanvas: CanvasDoc =
-    (slide.canvas as CanvasDoc | undefined) ?? {
-      version: DEFAULT_CANVAS.version,
-      width: DEFAULT_CANVAS.width,
-      height: DEFAULT_CANVAS.height,
-      bg: DEFAULT_CANVAS.bg,
-      nodes: [],
-      selection: [],
-    };
+  const safeCanvas: CanvasDoc = (slide.canvas as CanvasDoc | undefined) ?? {
+    version: DEFAULT_CANVAS.version,
+    width: DEFAULT_CANVAS.width,
+    height: DEFAULT_CANVAS.height,
+    bg: DEFAULT_CANVAS.bg,
+    nodes: [],
+    selection: [],
+  };
   const imgUrl = slide.rootImage?.url as string | undefined;
 
   // Bild-URL CORS-sicher machen, damit Canvas-Export nicht "tainted" ist
@@ -113,10 +121,16 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
   // Registriere pro Slide einen Exporter in einer globalen Map, damit der Header
   // zentral in der aktuellen Reihenfolge exportieren kann.
   useEffect(() => {
-    (window as any).__slideExporters = (window as any).__slideExporters || new Map<string, () => Promise<Blob>>();
-    const map: Map<string, () => Promise<Blob>> = (window as any).__slideExporters;
+    (window as any).__slideExporters =
+      (window as any).__slideExporters ||
+      new Map<string, () => Promise<Blob>>();
+    const map: Map<string, () => Promise<Blob>> = (window as any)
+      .__slideExporters;
     const exporter = async () => {
-      return (await canvasRef.current?.exportPNG?.()) ?? new Blob([], { type: "image/png" });
+      return (
+        (await canvasRef.current?.exportPNG?.()) ??
+        new Blob([], { type: "image/png" })
+      );
     };
     map.set(slide.id, exporter);
     return () => {
@@ -125,9 +139,24 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
   }, [slide?.id]);
   return (
     <SortableSlide id={slide.id} key={slide.id}>
-      <div className={cn(`slide-wrapper slide-wrapper-${index} flex-shrink-0`, !isPresenting && "max-w-full")}>
-        <SlideContainer index={index} id={slide.id} slideWidth={undefined} slidesCount={slidesCount}>
-          <div className={cn(`slide-container-${index}`, isPresenting && "h-screen w-screen")}>
+      <div
+        className={cn(
+          `slide-wrapper slide-wrapper-${index} flex-shrink-0`,
+          !isPresenting && "max-w-full",
+        )}
+      >
+        <SlideContainer
+          index={index}
+          id={slide.id}
+          slideWidth={undefined}
+          slidesCount={slidesCount}
+        >
+          <div
+            className={cn(
+              `slide-container-${index}`,
+              isPresenting && "h-screen w-screen",
+            )}
+          >
             {imageReady ? (
               <SlideCanvas
                 ref={canvasRef}
@@ -144,17 +173,22 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
 
                   // 🛡️ SAFETY MERGE: verliere nie Textknoten beim Update
                   const currTextNodes = Array.isArray(currCanvas?.nodes)
-                    ? (currCanvas!.nodes.filter((n: any) => n?.type === "text"))
+                    ? currCanvas!.nodes.filter((n: any) => n?.type === "text")
                     : [];
                   const nextTextNodes = Array.isArray(next?.nodes)
-                    ? (next!.nodes.filter((n: any) => n?.type === "text"))
+                    ? next!.nodes.filter((n: any) => n?.type === "text")
                     : [];
 
                   let merged: CanvasDoc = next;
                   if (currTextNodes.length > 0 && nextTextNodes.length === 0) {
                     // Race: next hat (noch) keine Texte → Texte aus current konservieren
-                    const otherNodes = Array.isArray(next?.nodes) ? next.nodes.filter((n: any) => n?.type !== "text") : [];
-                    merged = { ...next, nodes: [...otherNodes, ...currTextNodes] };
+                    const otherNodes = Array.isArray(next?.nodes)
+                      ? next.nodes.filter((n: any) => n?.type !== "text")
+                      : [];
+                    merged = {
+                      ...next,
+                      nodes: [...otherNodes, ...currTextNodes],
+                    };
                   }
 
                   // Nur setzen, wenn sich tatsächlich was geändert hat
@@ -166,23 +200,18 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
               />
             ) : (
               // Stabiles Placeholder, aber KEIN Entfernen/Neu-Erzeugen der Nodes
-              <SlideCanvas
-                doc={docWithBg}
-                onChange={() => {}}
-              />
+              <SlideCanvas doc={docWithBg} onChange={() => {}} />
             )}
           </div>
 
           {/* Untere Toolbar unter dem Canvas */}
           {!isPresenting && !isReadOnly && (
             <div
-              className={cn(
-                "z-[1001] mt-3 w-full",
-              )}
+              className={cn("z-[1001] mt-3 w-full")}
               aria-label="Slide toolbar"
             >
               <div className="mx-auto flex w-full max-w-[760px] items-center justify-center gap-2 rounded-md bg-background/95 p-2 shadow-sm backdrop-blur">
-                {/* ➕ Bild einfügen (Overlay) */}
+                {/* ➕ Insert Image (Overlay) */}
                 <input
                   id={`overlay-upload-${slide.id}`}
                   type="file"
@@ -192,11 +221,14 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
                     const file = e.currentTarget.files?.[0];
                     if (!file) return;
                     const url = URL.createObjectURL(file);
-                    const { slides, setSlides } = usePresentationState.getState();
+                    const { slides, setSlides } =
+                      usePresentationState.getState();
                     const updated = slides.slice();
                     const i = updated.findIndex((x) => x.id === slide.id);
                     if (i < 0) return;
-                    const c = (updated[i].canvas as CanvasDoc) ?? {
+                    const currentSlide = updated[i];
+                    if (!currentSlide) return;
+                    const c = (currentSlide.canvas as CanvasDoc) ?? {
                       ...DEFAULT_CANVAS,
                       width: DEFAULT_CANVAS.width,
                       height: DEFAULT_CANVAS.height,
@@ -212,7 +244,7 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
                       url,
                     };
                     updated[i] = {
-                      ...updated[i],
+                      ...currentSlide,
                       canvas: {
                         ...c,
                         nodes: [...(c.nodes ?? []), newNode],
@@ -220,7 +252,7 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
                       },
                     };
                     setSlides(updated);
-                    // Reset input so selecting das gleiche File erneut möglich ist
+                    // Reset input so selecting the same file again is possible
                     e.currentTarget.value = "";
                   }}
                 />
@@ -229,12 +261,14 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
                   size="sm"
                   className="h-9 px-3 rounded-md"
                   onClick={() => {
-                    const el = document.getElementById(`overlay-upload-${slide.id}`) as HTMLInputElement | null;
+                    const el = document.getElementById(
+                      `overlay-upload-${slide.id}`,
+                    ) as HTMLInputElement | null;
                     el?.click();
                   }}
-                  title="Bild (Overlay) einfügen"
+                  title="Insert Image (Overlay)"
                 >
-                  Bild einfügen
+                  Insert Image
                 </Button>
               </div>
             </div>
