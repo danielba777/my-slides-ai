@@ -126,6 +126,10 @@ interface PresentationState {
   // Palette → Editor communication
   pendingInsertNode: TElement | null;
   setPendingInsertNode: (node: TElement | null) => void;
+
+  // Slide editing state
+  editingSlideId: string | null;
+  setEditingSlideId: (id: string | null) => void;
 }
 
 export const usePresentationState = create<PresentationState>((set) => ({
@@ -164,6 +168,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
   isThemeCreatorOpen: false,
   config: {},
   pendingInsertNode: null,
+  editingSlideId: null,
 
   // Sidebar states
   isSidebarCollapsed: false,
@@ -183,6 +188,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
   setSlides: (slides: PlateSlide[]) => set({ slides }),
   setPendingInsertNode: (node) => set({ pendingInsertNode: node }),
   setConfig: (config) => set({ config }),
+  setEditingSlideId: (id) => set({ editingSlideId: id }),
   startRootImageGeneration: (slideId, query) =>
     set((state) => ({
       rootImageGeneration: {

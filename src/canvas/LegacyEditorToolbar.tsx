@@ -19,6 +19,7 @@ import {
   AlignLeft,
   AlignRight,
   Check,
+  CheckIcon,
   ChevronDown,
   ChevronUp,
   Plus,
@@ -39,6 +40,8 @@ type LegacyEditorToolbarProps = {
   onChangeSelectedText?: (
     patch: Partial<SlideTextElement> & Record<string, unknown>,
   ) => void;
+  /** Callback zum Schließen der Toolbar */
+  onClose?: () => void;
 };
 
 /**
@@ -53,6 +56,7 @@ function LegacyEditorToolbar({
   className,
   selectedText,
   onChangeSelectedText,
+  onClose,
 }: LegacyEditorToolbarProps) {
   const handleAdd = useCallback(() => {
     if (onAddText) return onAddText();
@@ -290,6 +294,20 @@ function LegacyEditorToolbar({
             </Button>
           </div>
         </div>
+
+        {/* Done Button - rechts oben */}
+        {onClose && (
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={onClose}
+            className="rounded-full bg-green-500 hover:bg-green-600"
+            aria-label="Done editing"
+            title="Done editing"
+          >
+            <CheckIcon className="h-5 w-5 text-white" />
+          </Button>
+        )}
       </div>
 
       {/* Secondary row: "Advanced Options" */}

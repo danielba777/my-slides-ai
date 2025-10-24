@@ -17,6 +17,7 @@ import {
   SortableContext,
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { ImageIcon, Type } from "lucide-react";
 import dynamic from "next/dynamic";
 import React, { memo, useEffect, useRef, useState } from "react";
 import { PresentModeHeader } from "../dashboard/PresentModeHeader";
@@ -114,7 +115,8 @@ const SlideFrame = memo(function SlideFrame({
   const canvasRef = useRef<SlideCanvasAdapterHandle | null>(null);
 
   // Edit-Modus State: nur wenn aktiv, wird die Toolbar angezeigt
-  const [isEditingText, setIsEditingText] = useState(false);
+  const { editingSlideId, setEditingSlideId } = usePresentationState();
+  const isEditingText = editingSlideId === slide.id;
   const [isHovering, setIsHovering] = useState(false);
 
   // Registriere pro Slide einen Exporter in einer globalen Map, damit der Header
@@ -136,6 +138,13 @@ const SlideFrame = memo(function SlideFrame({
       map.delete(slide.id);
     };
   }, [slide?.id]);
+
+  // Entferne Text-Fokus, wenn der Edit-Modus dieser Slide beendet wird
+  useEffect(() => {
+    if (!isEditingText) {
+      canvasRef.current?.clearTextFocus();
+    }
+  }, [isEditingText]);
   return (
     <SortableSlide id={slide.id} key={slide.id}>
       <div
@@ -156,11 +165,20 @@ const SlideFrame = memo(function SlideFrame({
               isPresenting && "h-screen w-screen",
             )}
             onMouseEnter={() =>
-              !isPresenting && !isReadOnly && setIsHovering(true)
+              !isPresenting &&
+              !isReadOnly &&
+              !editingSlideId &&
+              setIsHovering(true)
             }
             onMouseLeave={() =>
               !isPresenting && !isReadOnly && setIsHovering(false)
             }
+            onClick={() => {
+              // Wenn eine andere Slide im Edit-Modus ist, schließe diesen
+              if (editingSlideId && editingSlideId !== slide.id) {
+                setEditingSlideId(null);
+              }
+            }}
           >
             {imageReady ? (
               <SlideCanvas
@@ -171,16 +189,21 @@ const SlideFrame = memo(function SlideFrame({
                   !isPresenting &&
                   !isReadOnly &&
                   isHovering &&
-                  !isEditingText ? (
+                  !editingSlideId ? (
                     <div className="flex flex-col h-full pointer-events-none">
                       {/* Top Half: Edit Text */}
                       <button
                         onClick={() => {
-                          setIsEditingText(true);
+                          setEditingSlideId(slide.id);
                           setIsHovering(false);
+                          // Focus first text element after a short delay
+                          setTimeout(() => {
+                            canvasRef.current?.focusFirstText();
+                          }, 100);
                         }}
-                        className="flex-1 flex items-center justify-center bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
+                        className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
                       >
+                        <Type aria-hidden className="h-6 w-6 text-white" />
                         <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
                           Edit Text
                         </span>
@@ -192,8 +215,9 @@ const SlideFrame = memo(function SlideFrame({
                           console.log("Edit Image clicked");
                           setIsHovering(false);
                         }}
-                        className="flex-1 flex items-center justify-center bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
+                        className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
                       >
+                        <ImageIcon aria-hidden className="h-6 w-6 text-white" />
                         <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
                           Edit Image
                         </span>
@@ -201,6 +225,11 @@ const SlideFrame = memo(function SlideFrame({
                     </div>
                   ) : undefined
                 }
+                onCloseToolbar={() => {
+                  setEditingSlideId(null);
+                  // Remove focus from text
+                  canvasRef.current?.clearTextFocus();
+                }}
                 onChange={(next: CanvasDoc) => {
                   const { slides, setSlides } = usePresentationState.getState();
                   const updated = slides.slice();
@@ -247,16 +276,17 @@ const SlideFrame = memo(function SlideFrame({
                   !isPresenting &&
                   !isReadOnly &&
                   isHovering &&
-                  !isEditingText ? (
+                  !editingSlideId ? (
                     <div className="flex flex-col h-full pointer-events-none">
                       {/* Top Half: Edit Text */}
                       <button
                         onClick={() => {
-                          setIsEditingText(true);
+                          setEditingSlideId(slide.id);
                           setIsHovering(false);
                         }}
-                        className="flex-1 flex items-center justify-center bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
+                        className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
                       >
+                        <Type aria-hidden className="h-6 w-6 text-white" />
                         <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
                           Edit Text
                         </span>
@@ -268,8 +298,9 @@ const SlideFrame = memo(function SlideFrame({
                           console.log("Edit Image clicked");
                           setIsHovering(false);
                         }}
-                        className="flex-1 flex items-center justify-center bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
+                        className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
                       >
+                        <ImageIcon aria-hidden className="h-6 w-6 text-white" />
                         <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
                           Edit Image
                         </span>

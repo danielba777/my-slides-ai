@@ -43,6 +43,8 @@ type TextLayer = {
 export type SlideCanvasHandle = {
   getLayout: () => SlideTextElement[];
   exportPNG: () => Promise<Blob>;
+  focusFirstText: () => void;
+  clearTextFocus: () => void;
 };
 
 type Props = {
@@ -57,6 +59,8 @@ type Props = {
   showToolbar?: boolean;
   /* ➕ neu: Overlay für Edit-Modus */
   overlayContent?: React.ReactNode;
+  /* ➕ neu: Callback zum Schließen der Toolbar */
+  onCloseToolbar?: () => void;
 };
 
 const W = 1080;
@@ -394,6 +398,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     onOverlaysChange,
     showToolbar = true,
     overlayContent,
+    onCloseToolbar,
   },
   ref,
 ) {
@@ -1610,8 +1615,17 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     () => ({
       getLayout: () => mapLayersToLayout(textLayers as any),
       exportPNG,
+      focusFirstText: () => {
+        if (textLayers.length > 0 && !activeLayerId) {
+          setActiveLayerId(textLayers[0]!.id);
+        }
+      },
+      clearTextFocus: () => {
+        setActiveLayerId(null);
+        setIsEditing(null);
+      },
     }),
-    [textLayers, exportPNG],
+    [textLayers, exportPNG, activeLayerId],
   );
 
   // Render
@@ -1844,6 +1858,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                 : null
             }
             onChangeSelectedText={handleToolbarPatch}
+            onClose={onCloseToolbar}
           >
             {/* === BEGIN: LEGACY CONTROLS (NEU ANGERICHTET) === */}
 

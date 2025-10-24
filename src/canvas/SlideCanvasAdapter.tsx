@@ -60,6 +60,10 @@ function pxToNormY(v: number | undefined) {
 export type SlideCanvasAdapterHandle = {
   /** Liefert einen PNG-Blob der aktuellen Canvas in voller Auflösung */
   exportPNG: () => Promise<Blob>;
+  /** Fokussiert den ersten Text im Canvas */
+  focusFirstText: () => void;
+  /** Entfernt den Fokus von allen Texten */
+  clearTextFocus: () => void;
 };
 
 type Props = {
@@ -67,10 +71,14 @@ type Props = {
   onChange: (next: CanvasDoc) => void;
   showToolbar?: boolean;
   overlayContent?: React.ReactNode;
+  onCloseToolbar?: () => void;
 };
 
 const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
-  ({ doc, onChange, showToolbar = true, overlayContent }, ref) => {
+  (
+    { doc, onChange, showToolbar = true, overlayContent, onCloseToolbar },
+    ref,
+  ) => {
     // LegacyCanvas kann bereits PNG exportieren – wir reichen dessen Ref durch
     const legacyRef = useRef<any>(null);
 
@@ -81,6 +89,16 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
         }
         // Fallback: leeres Bild (sollte in Praxis nicht passieren)
         return new Blob([], { type: "image/png" });
+      },
+      focusFirstText: () => {
+        if (legacyRef.current?.focusFirstText) {
+          legacyRef.current.focusFirstText();
+        }
+      },
+      clearTextFocus: () => {
+        if (legacyRef.current?.clearTextFocus) {
+          legacyRef.current.clearTextFocus();
+        }
       },
     }));
     const imageUrl = useMemo(() => {
@@ -317,6 +335,7 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
         overlays={overlayImages}
         showToolbar={showToolbar}
         overlayContent={overlayContent}
+        onCloseToolbar={onCloseToolbar}
         onOverlaysChange={(nextOverlays) => {
           const otherNodes = doc.nodes.filter(
             (n) =>
