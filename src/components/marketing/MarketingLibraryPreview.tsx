@@ -81,14 +81,14 @@ export function MarketingLibraryPreview() {
           viewport={{ once: true }}
           className="text-center space-y-6 mb-16"
         >
-          <div className="inline-flex items-center gap-2 px-4 bg-gradient-to-r from-[#304674]/10 to-[#304674]/5 rounded-full text-sm font-medium text-[#304674] mb-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-100 to-[#c2d5ff] rounded-full text-sm font-medium text-indigo-700 mb-4">
             <TrendingUpIcon className="w-4 h-4" />
             Trending Slides
           </div>
 
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 leading-tight">
             Entdecke echte
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
+            <span className="block text-transparent bg-clip-text text-[#304674]">
               virale Slides
             </span>
           </h2>
@@ -209,4 +209,3 @@ export function MarketingLibraryPreview() {
     </section>
   );
 }
-

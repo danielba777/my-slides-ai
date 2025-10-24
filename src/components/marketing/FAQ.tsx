@@ -5,9 +5,15 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Section } from "./Section";
 import { motion } from "framer-motion";
-import { HelpCircleIcon, MessageCircleIcon, UsersIcon, BookOpenIcon, TrendingUpIcon } from "lucide-react";
+import {
+  BookOpenIcon,
+  HelpCircleIcon,
+  MessageCircleIcon,
+  TrendingUpIcon,
+  UsersIcon,
+} from "lucide-react";
+import { Section } from "./Section";
 
 export function MarketingFAQ() {
   const items = [
@@ -50,7 +56,6 @@ export function MarketingFAQ() {
 
   return (
     <Section id="faq">
-
       <div className="relative mx-auto max-w-5xl">
         {/* Header */}
         <motion.div
@@ -59,7 +64,7 @@ export function MarketingFAQ() {
           viewport={{ once: true }}
           className="text-center space-y-6 mb-12"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-full text-sm font-medium text-indigo-700 mb-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-100 to-[#c2d5ff] rounded-full text-sm font-medium text-indigo-700 mb-4">
             <HelpCircleIcon className="w-4 h-4" />
             Häufige Fragen
           </div>
@@ -72,7 +77,9 @@ export function MarketingFAQ() {
           </h2>
 
           <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-            Finden Sie Antworten auf die wichtigsten Fragen zu <span className="font-bold text-[#304674]">SlidesCockpit</span> und starten Sie erfolgreich durch.
+            Finden Sie Antworten auf die wichtigsten Fragen zu{" "}
+            <span className="font-bold text-[#304674]">SlidesCockpit</span> und
+            starten Sie erfolgreich durch.
           </p>
         </motion.div>
 
@@ -100,7 +107,7 @@ export function MarketingFAQ() {
                   >
                     <AccordionTrigger className="text-left text-gray-900 hover:no-underline hover:bg-gradient-to-r hover:from-indigo-50/50 hover:to-purple-50/50 rounded-none px-6 py-5 transition-all duration-200 group">
                       <div className="flex items-center gap-4 w-full">
-                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-100 to-[#c2d5ff] flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
                           <it.icon className="w-5 h-5 text-[#304674]" />
                         </div>
                         <span className="text-base sm:text-lg font-semibold leading-tight">
@@ -131,7 +138,8 @@ export function MarketingFAQ() {
               Bereit, durchzustarten?
             </h3>
             <p className="text-lg text-white/80 mb-8 max-w-2xl mx-auto">
-              Join tausenden erfolgreicher Creator und starten Sie noch heute Ihre TikTok-Karriere.
+              Join tausenden erfolgreicher Creator und starten Sie noch heute
+              Ihre TikTok-Karriere.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <a

@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { AppLogo } from "@/components/logo/AppLogo";
 import { Button } from "@/components/ui/button";
-import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
 export function MarketingNavbar({ session }: { session: boolean }) {
   const [scrolled, setScrolled] = useState(false);
@@ -14,38 +14,62 @@ export function MarketingNavbar({ session }: { session: boolean }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
   return (
-    <header
-      className={[
-        "sticky top-0 z-40 w-full transition",
-        scrolled
-          ? "border-b border-border/60 bg-white/90 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80"
-          : "bg-white/95"
-      ].join(" ")}
-    >
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-5 sm:px-6 py-3 sm:py-4">
-         <Link href="/" className="flex items-center gap-2">
-           <AppLogo size={28} />
-          <span className="text-base sm:text-lg font-semibold tracking-tight text-foreground">
-             SlidesCockpit
-           </span>
-         </Link>
-        <nav className="hidden sm:flex items-center gap-6 text-sm text-muted-foreground">
-           <a href="#library" className="hover:text-foreground">Library</a>
-           <a href="#pricing" className="hover:text-foreground">Pricing</a>
-           <a href="#faq" className="hover:text-foreground">FAQ</a>
-         </nav>
-         <div className="flex items-center gap-2">
-           {session ? (
-             <Link href="/dashboard/home">
-              <Button size="sm" className="rounded-full bg-[#304674] text-white hover:opacity-90">
-                   Go to app
-                 </Button>
-            </Link>
-          ) : (
-            <GoogleSignInButton />
-          )}
-           </div>
-         </div>
-       </header>
+    <header className="fixed inset-x-0 top-4 z-50 w-full px-4 sm:px-6 transition-[transform,opacity]">
+      <div
+        className={[
+          "mx-auto max-w-6xl",
+          scrolled ? "translate-y-0 opacity-100" : "translate-y-0 opacity-100",
+        ].join(" ")}
+      >
+        {/* Insel/Pill-Container */}
+        <div
+          className={[
+            "flex items-center justify-between",
+            "rounded-2xl border shadow-sm backdrop-blur supports-[backdrop-filter]:backdrop-blur",
+            "px-4 sm:px-4 py-4",
+            // Light/Dark & subtiler Akzent
+            "bg-white/70 supports-[backdrop-filter]:bg-white/55",
+            "dark:bg-slate-900/60",
+            "border-[#304674]/15 ring-1 ring-[#304674]/10",
+          ].join(" ")}
+          style={{
+            WebkitBackdropFilter: "blur(10px)",
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          {/* Left: Logo + Name */}
+          <Link href="/" className="flex items-center gap-2 lg:pl-4 pl-0">
+            <AppLogo size={26} />
+            <span className="text-sm sm:text-base font-semibold tracking-tight text-foreground">
+              SlidesCockpit
+            </span>
+          </Link>
+
+          {/* Right: Pricing + Auth */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <a
+              href="#pricing"
+              className="hidden sm:inline-flex text-sm font-medium text-foreground/80 hover:text-foreground"
+            >
+              Pricing
+            </a>
+            {session ? (
+              <Link href="/dashboard/home">
+                <Button
+                  size="sm"
+                  className="rounded-full bg-[#304674] text-white hover:opacity-90"
+                >
+                  Go to app
+                </Button>
+              </Link>
+            ) : (
+              <div className="scale-95 sm:scale-100 lg:pr-4 pl-2 pr-0">
+                <GoogleSignInButton />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </header>
   );
 }

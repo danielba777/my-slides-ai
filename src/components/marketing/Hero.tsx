@@ -27,7 +27,7 @@ export function MarketingHero({ session }: { session: boolean }) {
         }}
       />
 
-      <div className="relative z-10 flex min-h-[92vh] flex-col justify-center px-5 sm:px-6 pt-4 sm:pt-6 pb-10">
+      <div className="relative z-10 flex min-h-[92vh] flex-col justify-center px-5 sm:px-6 lg:pt-20 pt-20 pb-10">
         <div className="mx-auto max-w-5xl text-center">
           {/* Status badge */}
           <motion.div
@@ -59,7 +59,7 @@ export function MarketingHero({ session }: { session: boolean }) {
             <span className="block sm:inline sm:whitespace-nowrap">
               die wirklich&nbsp;
             </span>
-            <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-300 bg-clip-text text-transparent drop-shadow-sm">
+            <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
               Traffic bringen
             </span>
           </motion.h1>
@@ -117,7 +117,7 @@ export function MarketingHero({ session }: { session: boolean }) {
           >
             <div className="bg-white/5 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-white/10 transition-all duration-300">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
                   <ZapIcon className="w-5 h-5 text-white" />
                 </div>
                 <h3 className="text-white font-semibold">In 10 Min. live</h3>
@@ -129,7 +129,7 @@ export function MarketingHero({ session }: { session: boolean }) {
 
             <div className="bg-white/5 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-white/10 transition-all duration-300">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500 to-orange-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
                   <BarChart3Icon className="w-5 h-5 text-white" />
                 </div>
                 <h3 className="text-white font-semibold">
@@ -143,7 +143,7 @@ export function MarketingHero({ session }: { session: boolean }) {
 
             <div className="bg-white/5 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-white/10 transition-all duration-300">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
                   <CheckCircle2Icon className="w-5 h-5 text-white" />
                 </div>
                 <h3 className="text-white font-semibold">
@@ -166,7 +166,7 @@ export function MarketingHero({ session }: { session: boolean }) {
             <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-5 sm:p-6">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                 <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-pink-300 mb-1">
+                  <div className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 mb-1">
                     250M+
                   </div>
                   <div className="text-sm text-gray-300/90">TikTok Views</div>
@@ -201,5 +201,3 @@ export function MarketingHero({ session }: { session: boolean }) {
     </Section>
   );
 }
-
-
