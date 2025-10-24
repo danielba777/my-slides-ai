@@ -5,14 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { ArrowLeft, Save, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { Spinner } from "@/components/ui/spinner";
 
 export default function CreateAccountPage() {
   const router = useRouter();
@@ -76,7 +76,9 @@ export default function CreateAccountPage() {
 
     const file = files[0];
     const uploadData = new FormData();
-    uploadData.append("profileImage", file);
+    if (file) {
+      uploadData.append("profileImage", file);
+    }
 
     setIsUploadingImage(true);
     try {

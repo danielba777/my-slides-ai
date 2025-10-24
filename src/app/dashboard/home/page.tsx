@@ -210,7 +210,10 @@ export default function DashboardHome() {
       const normalizedSlides = (accountPost.slides ?? []).map(
         (slide, index) => ({
           id: slide.id,
-          slideIndex: slide.slideIndex ?? index,
+          slideIndex:
+            "slideIndex" in slide
+              ? ((slide as any).slideIndex ?? index)
+              : index,
           imageUrl: slide.imageUrl,
           textContent: (slide as { textContent?: string }).textContent,
         }),
@@ -309,7 +312,10 @@ export default function DashboardHome() {
                   const normalizedSlides = (accountPost.slides ?? []).map(
                     (slide, index) => ({
                       id: slide.id,
-                      slideIndex: slide.slideIndex ?? index,
+                      slideIndex:
+                        "slideIndex" in slide
+                          ? ((slide as any).slideIndex ?? index)
+                          : index,
                       imageUrl: slide.imageUrl,
                       textContent: (slide as { textContent?: string })
                         .textContent,
