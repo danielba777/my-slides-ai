@@ -1,14 +1,9 @@
 "use client";
 
 import type { SlideCanvasAdapterHandle } from "@/canvas/SlideCanvasAdapter";
-import {
-  DEFAULT_CANVAS,
-  type CanvasDoc,
-  type CanvasImageNode,
-} from "@/canvas/types";
+import { DEFAULT_CANVAS, type CanvasDoc } from "@/canvas/types";
 import { SlideContainer } from "@/components/presentation/presentation-page/SlideContainer";
 import { applyBackgroundImageToCanvas } from "@/components/presentation/utils/canvas";
-import { Button } from "@/components/ui/button";
 import { usePresentationSlides } from "@/hooks/presentation/usePresentationSlides";
 import { useSlideChangeWatcher } from "@/hooks/presentation/useSlideChangeWatcher";
 import {
@@ -118,6 +113,10 @@ const SlideFrame = memo(function SlideFrame({
 
   const canvasRef = useRef<SlideCanvasAdapterHandle | null>(null);
 
+  // Edit-Modus State: nur wenn aktiv, wird die Toolbar angezeigt
+  const [isEditingText, setIsEditingText] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+
   // Registriere pro Slide einen Exporter in einer globalen Map, damit der Header
   // zentral in der aktuellen Reihenfolge exportieren kann.
   useEffect(() => {
@@ -156,11 +155,52 @@ const SlideFrame = memo(function SlideFrame({
               `slide-container-${index}`,
               isPresenting && "h-screen w-screen",
             )}
+            onMouseEnter={() =>
+              !isPresenting && !isReadOnly && setIsHovering(true)
+            }
+            onMouseLeave={() =>
+              !isPresenting && !isReadOnly && setIsHovering(false)
+            }
           >
             {imageReady ? (
               <SlideCanvas
                 ref={canvasRef}
                 doc={docWithBg}
+                showToolbar={isEditingText}
+                overlayContent={
+                  !isPresenting &&
+                  !isReadOnly &&
+                  isHovering &&
+                  !isEditingText ? (
+                    <div className="flex flex-col h-full pointer-events-none">
+                      {/* Top Half: Edit Text */}
+                      <button
+                        onClick={() => {
+                          setIsEditingText(true);
+                          setIsHovering(false);
+                        }}
+                        className="flex-1 flex items-center justify-center bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
+                      >
+                        <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
+                          Edit Text
+                        </span>
+                      </button>
+                      {/* Bottom Half: Edit Image */}
+                      <button
+                        onClick={() => {
+                          // TODO: Implement Edit Image functionality
+                          console.log("Edit Image clicked");
+                          setIsHovering(false);
+                        }}
+                        className="flex-1 flex items-center justify-center bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
+                      >
+                        <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
+                          Edit Image
+                        </span>
+                      </button>
+                    </div>
+                  ) : undefined
+                }
                 onChange={(next: CanvasDoc) => {
                   const { slides, setSlides } = usePresentationState.getState();
                   const updated = slides.slice();
@@ -200,79 +240,47 @@ const SlideFrame = memo(function SlideFrame({
               />
             ) : (
               // Stabiles Placeholder, aber KEIN Entfernen/Neu-Erzeugen der Nodes
-              <SlideCanvas doc={docWithBg} onChange={() => {}} />
+              <SlideCanvas
+                doc={docWithBg}
+                showToolbar={isEditingText}
+                overlayContent={
+                  !isPresenting &&
+                  !isReadOnly &&
+                  isHovering &&
+                  !isEditingText ? (
+                    <div className="flex flex-col h-full pointer-events-none">
+                      {/* Top Half: Edit Text */}
+                      <button
+                        onClick={() => {
+                          setIsEditingText(true);
+                          setIsHovering(false);
+                        }}
+                        className="flex-1 flex items-center justify-center bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
+                      >
+                        <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
+                          Edit Text
+                        </span>
+                      </button>
+                      {/* Bottom Half: Edit Image */}
+                      <button
+                        onClick={() => {
+                          // TODO: Implement Edit Image functionality
+                          console.log("Edit Image clicked");
+                          setIsHovering(false);
+                        }}
+                        className="flex-1 flex items-center justify-center bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
+                      >
+                        <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
+                          Edit Image
+                        </span>
+                      </button>
+                    </div>
+                  ) : undefined
+                }
+                onChange={() => {}}
+              />
             )}
           </div>
-
-          {/* Untere Toolbar unter dem Canvas */}
-          {!isPresenting && !isReadOnly && (
-            <div
-              className={cn("z-[1001] mt-3 w-full")}
-              aria-label="Slide toolbar"
-            >
-              <div className="mx-auto flex w-full max-w-[760px] items-center justify-center gap-2 rounded-md bg-background/95 p-2 shadow-sm backdrop-blur">
-                {/* ➕ Insert Image (Overlay) */}
-                <input
-                  id={`overlay-upload-${slide.id}`}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.currentTarget.files?.[0];
-                    if (!file) return;
-                    const url = URL.createObjectURL(file);
-                    const { slides, setSlides } =
-                      usePresentationState.getState();
-                    const updated = slides.slice();
-                    const i = updated.findIndex((x) => x.id === slide.id);
-                    if (i < 0) return;
-                    const currentSlide = updated[i];
-                    if (!currentSlide) return;
-                    const c = (currentSlide.canvas as CanvasDoc) ?? {
-                      ...DEFAULT_CANVAS,
-                      width: DEFAULT_CANVAS.width,
-                      height: DEFAULT_CANVAS.height,
-                    };
-                    const id = crypto.randomUUID();
-                    const newNode: CanvasImageNode = {
-                      id,
-                      type: "image",
-                      x: Math.round(c.width * 0.5 - 150),
-                      y: Math.round(c.height * 0.7 - 150),
-                      width: 300,
-                      height: 300,
-                      url,
-                    };
-                    updated[i] = {
-                      ...currentSlide,
-                      canvas: {
-                        ...c,
-                        nodes: [...(c.nodes ?? []), newNode],
-                        selection: [id],
-                      },
-                    };
-                    setSlides(updated);
-                    // Reset input so selecting the same file again is possible
-                    e.currentTarget.value = "";
-                  }}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 px-3 rounded-md"
-                  onClick={() => {
-                    const el = document.getElementById(
-                      `overlay-upload-${slide.id}`,
-                    ) as HTMLInputElement | null;
-                    el?.click();
-                  }}
-                  title="Insert Image (Overlay)"
-                >
-                  Insert Image
-                </Button>
-              </div>
-            </div>
-          )}
         </SlideContainer>
       </div>
     </SortableSlide>

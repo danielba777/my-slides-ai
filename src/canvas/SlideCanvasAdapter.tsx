@@ -65,10 +65,12 @@ export type SlideCanvasAdapterHandle = {
 type Props = {
   doc: CanvasDoc;
   onChange: (next: CanvasDoc) => void;
+  showToolbar?: boolean;
+  overlayContent?: React.ReactNode;
 };
 
 const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
-  ({ doc, onChange }, ref) => {
+  ({ doc, onChange, showToolbar = true, overlayContent }, ref) => {
     // LegacyCanvas kann bereits PNG exportieren – wir reichen dessen Ref durch
     const legacyRef = useRef<any>(null);
 
@@ -313,6 +315,8 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
         imageUrl={imageUrl}
         layout={layout}
         overlays={overlayImages}
+        showToolbar={showToolbar}
+        overlayContent={overlayContent}
         onOverlaysChange={(nextOverlays) => {
           const otherNodes = doc.nodes.filter(
             (n) =>

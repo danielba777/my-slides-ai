@@ -53,6 +53,10 @@ type Props = {
   overlays?: CanvasImageNode[];
   /* ➕ neu: Callback, wenn Overlays (Position/Größe) geändert wurden */
   onOverlaysChange?: (next: CanvasImageNode[]) => void;
+  /* ➕ neu: Toolbar Sichtbarkeit steuern */
+  showToolbar?: boolean;
+  /* ➕ neu: Overlay für Edit-Modus */
+  overlayContent?: React.ReactNode;
 };
 
 const W = 1080;
@@ -382,7 +386,15 @@ function mapLayersToLayout(
 }
 
 const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
-  { imageUrl, layout, onLayoutChange, overlays = [], onOverlaysChange },
+  {
+    imageUrl,
+    layout,
+    onLayoutChange,
+    overlays = [],
+    onOverlaysChange,
+    showToolbar = true,
+    overlayContent,
+  },
   ref,
 ) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -1792,213 +1804,223 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
   return (
     <>
-      {/* === Sticky Toolbar: Breite dynamisch = Canvas-Shell === */}
+      {/* === Toolbar-Bereich: Immer gerendert für konsistente Höhe === */}
       {/* Wir messen die Canvas-Shell (wrapRef) und setzen diese Breite als maxWidth der Toolbar. */}
       <ToolbarSizedByCanvas wrapRef={wrapRef}>
-        <LegacyEditorToolbar
-          onAddText={handleAddText}
-          className="py-1 px-2"
-          selectedText={
-            active
-              ? ({
-                  id: active.id,
-                  // Werte so liefern, wie die Toolbar sie erwartet:
-                  // fontSize = BASE_FONT_PX * scale
-                  fontSize: Math.round(
-                    BASE_FONT_PX *
-                      (Number.isFinite(active.scale) ? active.scale : 1),
-                  ),
-                  lineHeight: active.lineHeight,
-                  letterSpacing: active.letterSpacing,
-                  align: active.align,
-                  // Farbe(n)
-                  // Toolbar liest 'fill' für Textfarbe
-                  fill: (active as any).color ?? "#ffffff",
-                  // Toolbar liest 'stroke' + 'strokeWidth' für Kontur
-                  stroke: (active as any).outlineColor ?? "#000000",
-                  strokeWidth: (active as any).outlineWidth ?? 0,
-                  // Bold / Italic
-                  fontWeight:
-                    active.weight === "bold"
-                      ? ("bold" as any)
+        {showToolbar ? (
+          <LegacyEditorToolbar
+            onAddText={handleAddText}
+            className="py-1 px-2"
+            selectedText={
+              active
+                ? ({
+                    id: active.id,
+                    // Werte so liefern, wie die Toolbar sie erwartet:
+                    // fontSize = BASE_FONT_PX * scale
+                    fontSize: Math.round(
+                      BASE_FONT_PX *
+                        (Number.isFinite(active.scale) ? active.scale : 1),
+                    ),
+                    lineHeight: active.lineHeight,
+                    letterSpacing: active.letterSpacing,
+                    align: active.align,
+                    // Farbe(n)
+                    // Toolbar liest 'fill' für Textfarbe
+                    fill: (active as any).color ?? "#ffffff",
+                    // Toolbar liest 'stroke' + 'strokeWidth' für Kontur
+                    stroke: (active as any).outlineColor ?? "#000000",
+                    strokeWidth: (active as any).outlineWidth ?? 0,
+                    // Bold / Italic
+                    fontWeight:
+                      active.weight === "bold"
+                        ? ("bold" as any)
+                        : ("normal" as any),
+                    fontStyle: (active as any).italic
+                      ? ("italic" as any)
                       : ("normal" as any),
-                  fontStyle: (active as any).italic
-                    ? ("italic" as any)
-                    : ("normal" as any),
-                  // Hintergrund
-                  background: active.background,
-                } as unknown as SlideTextElement)
-              : null
-          }
-          onChangeSelectedText={handleToolbarPatch}
-        >
-          {/* === BEGIN: LEGACY CONTROLS (NEU ANGERICHTET) === */}
+                    // Hintergrund
+                    background: active.background,
+                  } as unknown as SlideTextElement)
+                : null
+            }
+            onChangeSelectedText={handleToolbarPatch}
+          >
+            {/* === BEGIN: LEGACY CONTROLS (NEU ANGERICHTET) === */}
 
-          {/* --- ZEILE 1: Typo & Ausrichtung & Größe --- */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleBoldUI}
-              aria-pressed={uiBold}
-              className={
-                "inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-medium shadow-sm transition-colors " +
-                (uiBold
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border/80 bg-background/90 hover:bg-muted")
-              }
-              aria-label="Fett"
-              title="Fett"
+            {/* --- ZEILE 1: Typo & Ausrichtung & Größe --- */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleBoldUI}
+                aria-pressed={uiBold}
+                className={
+                  "inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-medium shadow-sm transition-colors " +
+                  (uiBold
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border/80 bg-background/90 hover:bg-muted")
+                }
+                aria-label="Fett"
+                title="Fett"
+              >
+                B
+              </button>
+              <button
+                onClick={toggleItalicUI}
+                aria-pressed={uiItalic}
+                className={
+                  "inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-medium shadow-sm transition-colors " +
+                  (uiItalic
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border/80 bg-background/90 hover:bg-muted")
+                }
+                aria-label="Kursiv"
+                title="Kursiv"
+              >
+                <span className="italic">I</span>
+              </button>
+            </div>
+
+            {/* Ausrichtung mit "mehrzeiligen" Icons */}
+            <div
+              className="flex items-center gap-2"
+              aria-label="Textausrichtung"
             >
-              B
-            </button>
-            <button
-              onClick={toggleItalicUI}
-              aria-pressed={uiItalic}
-              className={
-                "inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-medium shadow-sm transition-colors " +
-                (uiItalic
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border/80 bg-background/90 hover:bg-muted")
-              }
-              aria-label="Kursiv"
-              title="Kursiv"
-            >
-              <span className="italic">I</span>
-            </button>
-          </div>
+              <button
+                aria-pressed={uiAlign === "left"}
+                className={
+                  "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
+                  (uiAlign === "left"
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border/80 bg-background/90 hover:bg-muted")
+                }
+                aria-label="Links ausrichten"
+                title="Links ausrichten"
+                onClick={() => setAlignUI("left")}
+              >
+                <AlignLeft className="h-4 w-4" />
+              </button>
+              <button
+                aria-pressed={uiAlign === "center"}
+                className={
+                  "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
+                  (uiAlign === "center"
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border/80 bg-background/90 hover:bg-muted")
+                }
+                aria-label="Zentrieren"
+                title="Zentrieren"
+                onClick={() => setAlignUI("center")}
+              >
+                <AlignCenter className="h-4 w-4" />
+              </button>
+              <button
+                aria-pressed={uiAlign === "right"}
+                className={
+                  "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
+                  (uiAlign === "right"
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border/80 bg-background/90 hover:bg-muted")
+                }
+                aria-label="Rechts ausrichten"
+                title="Rechts ausrichten"
+                onClick={() => setAlignUI("right")}
+              >
+                <AlignRight className="h-4 w-4" />
+              </button>
+            </div>
 
-          {/* Ausrichtung mit "mehrzeiligen" Icons */}
-          <div className="flex items-center gap-2" aria-label="Textausrichtung">
-            <button
-              aria-pressed={uiAlign === "left"}
-              className={
-                "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
-                (uiAlign === "left"
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border/80 bg-background/90 hover:bg-muted")
-              }
-              aria-label="Links ausrichten"
-              title="Links ausrichten"
-              onClick={() => setAlignUI("left")}
-            >
-              <AlignLeft className="h-4 w-4" />
-            </button>
-            <button
-              aria-pressed={uiAlign === "center"}
-              className={
-                "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
-                (uiAlign === "center"
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border/80 bg-background/90 hover:bg-muted")
-              }
-              aria-label="Zentrieren"
-              title="Zentrieren"
-              onClick={() => setAlignUI("center")}
-            >
-              <AlignCenter className="h-4 w-4" />
-            </button>
-            <button
-              aria-pressed={uiAlign === "right"}
-              className={
-                "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
-                (uiAlign === "right"
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border/80 bg-background/90 hover:bg-muted")
-              }
-              aria-label="Rechts ausrichten"
-              title="Rechts ausrichten"
-              onClick={() => setAlignUI("right")}
-            >
-              <AlignRight className="h-4 w-4" />
-            </button>
-          </div>
+            {/* Größe × (Scale) */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">Größe ×</label>
+              <input
+                type="number"
+                step="0.05"
+                min="0.2"
+                max="4"
+                value={uiScale}
+                onChange={(e) =>
+                  handleScaleChange(parseFloat(e.currentTarget.value))
+                }
+                className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
+              />
+            </div>
 
-          {/* Größe × (Scale) */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">Größe ×</label>
-            <input
-              type="number"
-              step="0.05"
-              min="0.2"
-              max="4"
-              value={uiScale}
-              onChange={(e) =>
-                handleScaleChange(parseFloat(e.currentTarget.value))
-              }
-              className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
-            />
-          </div>
+            {/* Zeilenumbruch zu Zeile 2 */}
+            <div className="basis-full h-0" />
 
-          {/* Zeilenumbruch zu Zeile 2 */}
-          <div className="basis-full h-0" />
+            {/* --- ZEILE 2: Abstände & Farben --- */}
+            {/* Zeilenhöhe (Input) */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">
+                Zeilenhöhe
+              </label>
+              <input
+                type="number"
+                min="0.8"
+                max="2"
+                step="0.02"
+                value={uiLineHeight}
+                onChange={handleLineHeightChange}
+                className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
+              />
+            </div>
 
-          {/* --- ZEILE 2: Abstände & Farben --- */}
-          {/* Zeilenhöhe (Input) */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">Zeilenhöhe</label>
-            <input
-              type="number"
-              min="0.8"
-              max="2"
-              step="0.02"
-              value={uiLineHeight}
-              onChange={handleLineHeightChange}
-              className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
-            />
-          </div>
+            {/* Kontur-Schalter */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">Kontur an</label>
+              <input
+                type="checkbox"
+                checked={uiOutlineOn}
+                onChange={handleToggleOutlineOn}
+                className="h-4 w-4 accent-primary"
+              />
+            </div>
 
-          {/* Kontur-Schalter */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">Kontur an</label>
-            <input
-              type="checkbox"
-              checked={uiOutlineOn}
-              onChange={handleToggleOutlineOn}
-              className="h-4 w-4 accent-primary"
-            />
-          </div>
+            {/* Konturbreite (Slider) */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">
+                Konturbreite
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="12"
+                step="0.5"
+                value={uiOutlineWidth}
+                onChange={handleOutlineWidthChange}
+                disabled={!uiOutlineOn}
+                className="h-1.5 w-32 accent-primary disabled:opacity-40"
+              />
+            </div>
 
-          {/* Konturbreite (Slider) */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">
-              Konturbreite
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="12"
-              step="0.5"
-              value={uiOutlineWidth}
-              onChange={handleOutlineWidthChange}
-              disabled={!uiOutlineOn}
-              className="h-1.5 w-32 accent-primary disabled:opacity-40"
-            />
-          </div>
+            {/* Textfarbe */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">Text</label>
+              <input
+                type="color"
+                value={uiTextColor}
+                onChange={(e) => setTextColorUI(e.currentTarget.value)}
+                className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
+              />
+            </div>
 
-          {/* Textfarbe */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">Text</label>
-            <input
-              type="color"
-              value={uiTextColor}
-              onChange={(e) => setTextColorUI(e.currentTarget.value)}
-              className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
-            />
-          </div>
+            {/* Konturfarbe */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">Kontur</label>
+              <input
+                type="color"
+                value={uiOutlineColor}
+                onChange={(e) => setOutlineColorUI(e.currentTarget.value)}
+                disabled={!uiOutlineOn}
+                className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5 disabled:opacity-40"
+              />
+            </div>
 
-          {/* Konturfarbe */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">Kontur</label>
-            <input
-              type="color"
-              value={uiOutlineColor}
-              onChange={(e) => setOutlineColorUI(e.currentTarget.value)}
-              disabled={!uiOutlineOn}
-              className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5 disabled:opacity-40"
-            />
-          </div>
-
-          {/* === END: LEGACY CONTROLS === */}
-        </LegacyEditorToolbar>
+            {/* === END: LEGACY CONTROLS === */}
+          </LegacyEditorToolbar>
+        ) : (
+          // Leerer Platzhalter, damit alle Slides die gleiche Höhe haben
+          <div className="w-full" />
+        )}
       </ToolbarSizedByCanvas>
 
       {/* Canvas-Shell */}
@@ -2415,6 +2437,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             style={{ display: "none" }}
           />
         </div>
+
+        {/* Overlay Content (z.B. Edit-Buttons) */}
+        {overlayContent && (
+          <div className="absolute inset-0 z-50">{overlayContent}</div>
+        )}
       </div>
       {/* ^ obere Canvas-Hülle */}
     </>
@@ -2448,8 +2475,12 @@ function ToolbarSizedByCanvas({
 
   return (
     <div
-      className="sticky top-0 z-50 mb-2 w-full bg-transparent"
-      style={{ display: "flex", justifyContent: "center" }}
+      className="w-full bg-transparent mb-2"
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        minHeight: "120px", // Feste Höhe für den Platzhalter (angepasst an Toolbar-Höhe)
+      }}
     >
       <div
         className="mx-auto w-full"
