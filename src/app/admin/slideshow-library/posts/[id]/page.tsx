@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
-  ArrowLeft,
   ArrowDown,
+  ArrowLeft,
   ArrowUp,
   CalendarDays,
   Eye,
@@ -18,7 +18,7 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -59,8 +59,9 @@ export default function SlideshowPostDetailPage() {
   const [post, setPost] = useState<SlideshowPost | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [slides, setSlides] = useState<SlideshowPost["slides"]>([]);
-  const [initialSlides, setInitialSlides] =
-    useState<SlideshowPost["slides"]>([]);
+  const [initialSlides, setInitialSlides] = useState<SlideshowPost["slides"]>(
+    [],
+  );
   const [initialOrderIds, setInitialOrderIds] = useState<string[]>([]);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [promptDraft, setPromptDraft] = useState("");
@@ -101,9 +102,7 @@ export default function SlideshowPostDetailPage() {
           slideCount: normalizedSlides.length,
         });
         setSlides(normalizedSlides);
-        setInitialSlides(
-          normalizedSlides.map((slide) => ({ ...slide })),
-        );
+        setInitialSlides(normalizedSlides.map((slide) => ({ ...slide })));
         setInitialOrderIds(normalizedSlides.map((slide) => slide.id));
         setPromptDraft(data.prompt ?? "");
       } catch (error) {
@@ -128,8 +127,7 @@ export default function SlideshowPostDetailPage() {
     slides.length === initialOrderIds.length &&
     slides.some((slide, index) => slide.id !== initialOrderIds[index]);
 
-  const promptHasChanged =
-    (post?.prompt ?? "").trim() !== promptDraft.trim();
+  const promptHasChanged = (post?.prompt ?? "").trim() !== promptDraft.trim();
 
   const handlePromptSave = async () => {
     if (!post || !promptHasChanged || isSavingPrompt) {
@@ -188,10 +186,12 @@ export default function SlideshowPostDetailPage() {
       }
 
       const swapped = [...current];
-      [swapped[index], swapped[targetIndex]] = [
-        swapped[targetIndex],
-        swapped[index],
-      ];
+      if (swapped[index] && swapped[targetIndex]) {
+        [swapped[index], swapped[targetIndex]] = [
+          swapped[targetIndex]!,
+          swapped[index]!,
+        ];
+      }
 
       const normalized = swapped.map((slide, idx) => ({
         ...slide,
@@ -215,7 +215,9 @@ export default function SlideshowPostDetailPage() {
     }));
     setSlides(resetSlides);
     setPost((prev) =>
-      prev ? { ...prev, slides: resetSlides, slideCount: resetSlides.length } : prev,
+      prev
+        ? { ...prev, slides: resetSlides, slideCount: resetSlides.length }
+        : prev,
     );
   };
 
@@ -255,9 +257,7 @@ export default function SlideshowPostDetailPage() {
         slideCount: normalizedSlides.length,
       });
       setSlides(normalizedSlides);
-      setInitialSlides(
-        normalizedSlides.map((slide) => ({ ...slide })),
-      );
+      setInitialSlides(normalizedSlides.map((slide) => ({ ...slide })));
       setInitialOrderIds(normalizedSlides.map((slide) => slide.id));
       toast.success("Reihenfolge aktualisiert");
       setPromptDraft(data.prompt ?? "");
@@ -366,23 +366,38 @@ export default function SlideshowPostDetailPage() {
           <CardHeader className="flex flex-col gap-2">
             <CardTitle className="text-xl">Post Übersicht</CardTitle>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary" className="flex items-center gap-1 text-xs">
+              <Badge
+                variant="secondary"
+                className="flex items-center gap-1 text-xs"
+              >
                 <ThumbsUp className="h-3 w-3" />
                 {post.likeCount.toLocaleString()} Likes
               </Badge>
-              <Badge variant="outline" className="flex items-center gap-1 text-xs">
+              <Badge
+                variant="outline"
+                className="flex items-center gap-1 text-xs"
+              >
                 <Eye className="h-3 w-3" />
                 {post.viewCount.toLocaleString()} Views
               </Badge>
-              <Badge variant="outline" className="flex items-center gap-1 text-xs">
+              <Badge
+                variant="outline"
+                className="flex items-center gap-1 text-xs"
+              >
                 <MessageSquare className="h-3 w-3" />
                 {post.commentCount.toLocaleString()} Kommentare
               </Badge>
-              <Badge variant="outline" className="flex items-center gap-1 text-xs">
+              <Badge
+                variant="outline"
+                className="flex items-center gap-1 text-xs"
+              >
                 <Share2 className="h-3 w-3" />
                 {post.shareCount.toLocaleString()} Shares
               </Badge>
-              <Badge variant="outline" className="flex items-center gap-1 text-xs">
+              <Badge
+                variant="outline"
+                className="flex items-center gap-1 text-xs"
+              >
                 <CalendarDays className="h-3 w-3" />
                 {new Date(post.publishedAt).toLocaleDateString("de-DE")}
               </Badge>
@@ -394,7 +409,9 @@ export default function SlideshowPostDetailPage() {
                 Caption
               </h2>
               <p className="mt-2 text-sm">
-                {post.caption?.length ? post.caption : "Keine Caption hinterlegt"}
+                {post.caption?.length
+                  ? post.caption
+                  : "Keine Caption hinterlegt"}
               </p>
             </div>
 
@@ -474,7 +491,9 @@ export default function SlideshowPostDetailPage() {
                         onClick={handleSaveOrder}
                         disabled={!hasOrderChanged || isSavingOrder}
                       >
-                        {isSavingOrder ? "Speichern..." : "Reihenfolge speichern"}
+                        {isSavingOrder
+                          ? "Speichern..."
+                          : "Reihenfolge speichern"}
                       </Button>
                     </div>
                   )}

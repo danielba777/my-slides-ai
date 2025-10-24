@@ -11,14 +11,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { ArrowLeft, Save, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 interface SlideshowAccount {
   id: string;
@@ -83,13 +83,10 @@ export default function CreatePostPage() {
 
     setIsUploadingSlides(true);
     try {
-      const response = await fetch(
-        "/api/slideshow-library/posts/upload",
-        {
-          method: "POST",
-          body: formData,
-        },
-      );
+      const response = await fetch("/api/slideshow-library/posts/upload", {
+        method: "POST",
+        body: formData,
+      });
 
       if (!response.ok) {
         toast.error("Fehler beim Hochladen der Slides");
@@ -155,8 +152,12 @@ export default function CreatePostPage() {
           ...formData,
           prompt:
             formData.prompt.trim().length > 0 ? formData.prompt.trim() : null,
-          publishedAt: new Date(formData.publishedAt),
-          createdAt: new Date(formData.createdAt),
+          publishedAt: formData.publishedAt
+            ? new Date(formData.publishedAt)
+            : undefined,
+          createdAt: formData.createdAt
+            ? new Date(formData.createdAt)
+            : undefined,
           slides: slidesPayload,
         }),
       });

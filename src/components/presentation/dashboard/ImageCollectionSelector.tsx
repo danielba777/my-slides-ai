@@ -29,7 +29,7 @@ interface ImageSet {
   isOwnedByUser?: boolean;
 }
 
-export function ImageCollectionSelector(): JSX.Element {
+export const ImageCollectionSelector: React.FC = () => {
   const { imageSetId, setImageSetId, setImageSource } = usePresentationState();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -291,4 +291,4 @@ export function ImageCollectionSelector(): JSX.Element {
       </Dialog>
     </div>
   );
-}
+};

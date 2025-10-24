@@ -95,7 +95,7 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <div className="flex justify-center items-center gap-2 py-4">
-          <AppLogo size={32} dark={resolvedTheme === "dark"} />
+          <AppLogo size={32} borderRadius={6} dark={resolvedTheme === "dark"} />
           <p className="text-lg font-bold">SlidesCockpit</p>
         </div>
 
@@ -167,8 +167,15 @@ export function AppSidebar() {
             <SidebarMenu>
               {postItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="font-semibold">
-                    <a href={item.url}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname.startsWith(item.url)}
+                  >
+                    <a
+                      href={item.url}
+                      data-active={pathname.startsWith(item.url)}
+                    >
                       <item.icon className="w-5 h-5" />
                       <span className="font-semibold">{item.title}</span>
                     </a>
@@ -184,8 +191,15 @@ export function AppSidebar() {
             <SidebarMenu>
               {debugItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="font-semibold">
-                    <a href={item.url}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname.startsWith(item.url)}
+                  >
+                    <a
+                      href={item.url}
+                      data-active={pathname.startsWith(item.url)}
+                    >
                       <item.icon className="w-5 h-5 text-red-500" />
                       <span className="font-semibold text-red-500">
                         {item.title}

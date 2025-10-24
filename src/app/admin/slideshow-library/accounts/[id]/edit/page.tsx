@@ -5,14 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
-import { ArrowLeft, Save, Upload, Trash2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { ArrowLeft, Save, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 interface SlideshowAccount {
   id: string;
@@ -54,7 +54,9 @@ export default function EditAccountPage() {
   const loadAccount = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/slideshow-library/accounts/${accountId}`);
+      const response = await fetch(
+        `/api/slideshow-library/accounts/${accountId}`,
+      );
       if (!response.ok) {
         toast.error("Account konnte nicht geladen werden");
         router.push("/admin/slideshow-library/accounts");
@@ -80,7 +82,10 @@ export default function EditAccountPage() {
     }
   };
 
-  const handleInputChange = (field: string, value: string | number | boolean) => {
+  const handleInputChange = (
+    field: string,
+    value: string | number | boolean,
+  ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -89,14 +94,19 @@ export default function EditAccountPage() {
 
     const file = files[0];
     const uploadData = new FormData();
-    uploadData.append("profileImage", file);
+    if (file) {
+      uploadData.append("profileImage", file);
+    }
 
     setIsUploadingImage(true);
     try {
-      const response = await fetch("/api/slideshow-library/accounts/upload-profile", {
-        method: "POST",
-        body: uploadData,
-      });
+      const response = await fetch(
+        "/api/slideshow-library/accounts/upload-profile",
+        {
+          method: "POST",
+          body: uploadData,
+        },
+      );
       const data = await response.json();
       if (!response.ok || !data?.success || !data?.url) {
         toast.error(data?.error ?? "Fehler beim Hochladen des Profilbilds");
@@ -129,15 +139,20 @@ export default function EditAccountPage() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/slideshow-library/accounts/${accountId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+      const response = await fetch(
+        `/api/slideshow-library/accounts/${accountId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        },
+      );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.error ?? "Fehler beim Aktualisieren des Accounts");
+        toast.error(
+          errorData.error ?? "Fehler beim Aktualisieren des Accounts",
+        );
         return;
       }
 
@@ -167,7 +182,10 @@ export default function EditAccountPage() {
       <div className="flex items-center gap-4">
         <Link
           href={`/admin/slideshow-library/accounts/${accountId}`}
-          className={cn(buttonVariants({ variant: "outline" }), "inline-flex items-center gap-2")}
+          className={cn(
+            buttonVariants({ variant: "outline" }),
+            "inline-flex items-center gap-2",
+          )}
         >
           <ArrowLeft className="h-4 w-4" />
           Zurück
@@ -187,7 +205,9 @@ export default function EditAccountPage() {
                 <Input
                   id="username"
                   value={formData.username}
-                  onChange={(e) => handleInputChange("username", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("username", e.target.value)
+                  }
                   placeholder="@username"
                   required
                 />
@@ -198,7 +218,9 @@ export default function EditAccountPage() {
                 <Input
                   id="displayName"
                   value={formData.displayName}
-                  onChange={(e) => handleInputChange("displayName", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("displayName", e.target.value)
+                  }
                   placeholder="Anzeigename"
                   required
                 />
@@ -226,7 +248,9 @@ export default function EditAccountPage() {
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={(event) => handleProfileImageUpload(event.target.files)}
+                      onChange={(event) =>
+                        handleProfileImageUpload(event.target.files)
+                      }
                     />
                     <Button
                       type="button"
