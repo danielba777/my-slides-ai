@@ -3,7 +3,7 @@
 import type { ElementType } from "react";
 
 import { format } from "date-fns";
-import { CalendarClock, ImageIcon, RefreshCcw, Video } from "lucide-react";
+import { ImageIcon, RefreshCcw, Video } from "lucide-react";
 
 import { TikTokPostStatusBadge } from "@/components/posts/TikTokPostStatusBadge";
 import { Badge } from "@/components/ui/badge";
@@ -59,7 +59,7 @@ export function TikTokPostsGrid({
 
       {loading && !hasContent ? (
         <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-dashed border-muted-foreground/30">
-          <Spinner text="Loading posts..." />
+          <Spinner className="h-8 w-8" />
         </div>
       ) : hasContent ? (
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -83,11 +83,14 @@ interface TikTokPostCardProps {
 
 function TikTokPostCard({ post, mode }: TikTokPostCardProps) {
   const referenceDate =
-    mode === "scheduled" ? post.runAt ?? post.createdAt : post.updatedAt ?? post.createdAt;
+    mode === "scheduled"
+      ? (post.runAt ?? post.createdAt)
+      : (post.updatedAt ?? post.createdAt);
 
   const { dateLabel, timeLabel } = buildDateTime(referenceDate);
   const caption =
-    typeof post.payload.caption === "string" && post.payload.caption.trim().length > 0
+    typeof post.payload.caption === "string" &&
+    post.payload.caption.trim().length > 0
       ? post.payload.caption.trim()
       : "No description provided.";
 
@@ -102,7 +105,9 @@ function TikTokPostCard({ post, mode }: TikTokPostCardProps) {
         <MediaPreview media={post.payload.media ?? []} />
       </div>
 
-      <p className="mt-4 line-clamp-3 text-sm text-muted-foreground">{caption}</p>
+      <p className="mt-4 line-clamp-3 text-sm text-muted-foreground">
+        {caption}
+      </p>
 
       <div className="mt-6 flex items-center justify-between">
         <PlatformBadge platform={post.platform} />
@@ -112,7 +117,10 @@ function TikTokPostCard({ post, mode }: TikTokPostCardProps) {
   );
 }
 
-function buildDateTime(value: string | null | undefined): { dateLabel: string; timeLabel: string } {
+function buildDateTime(value: string | null | undefined): {
+  dateLabel: string;
+  timeLabel: string;
+} {
   if (!value) {
     return {
       dateLabel: "-",
@@ -200,7 +208,11 @@ function PlatformBadge({ platform }: { platform: string }) {
     return (
       <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-          <IonIcon name="logo-tiktok" style={{ fontSize: "1.4rem" }} aria-hidden="true" />
+          <IonIcon
+            name="logo-tiktok"
+            style={{ fontSize: "1.4rem" }}
+            aria-hidden="true"
+          />
           <span className="sr-only">TikTok</span>
         </span>
         TikTok

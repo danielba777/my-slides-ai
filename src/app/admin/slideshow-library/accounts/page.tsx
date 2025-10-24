@@ -3,11 +3,12 @@
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
 import { Edit, Eye, Plus, RefreshCw, Trash2, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 interface SlideshowAccount {
   id: string;
@@ -105,7 +106,7 @@ export default function SlideshowAccountsPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <Spinner className="h-8 w-8 mx-auto mb-4" />
           <p className="text-muted-foreground">Lade Accounts...</p>
         </div>
       </div>
@@ -123,7 +124,10 @@ export default function SlideshowAccountsPage() {
         </div>
         <Link
           href="/admin/slideshow-library/accounts/new"
-          className={cn(buttonVariants({ variant: "default" }), "flex items-center gap-2")}
+          className={cn(
+            buttonVariants({ variant: "default" }),
+            "flex items-center gap-2",
+          )}
         >
           <Plus className="h-4 w-4" />
           Neuer Account

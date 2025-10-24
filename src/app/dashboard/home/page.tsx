@@ -466,11 +466,7 @@ export default function DashboardHome() {
   if (isPageLoading) {
     return (
       <div className="flex h-[80vh] w-full items-center justify-center">
-        <Spinner
-          className="text-primary"
-          size={42}
-          text="Loading SlidesCockpit..."
-        />
+        <Spinner className="h-8 w-8 text-primary" />
       </div>
     );
   }
@@ -585,7 +581,7 @@ export default function DashboardHome() {
         <DialogContent className="h-[80vh] max-h-[85vh] w-full max-w-6xl overflow-hidden p-0 sm:rounded-xl">
           {isModalLoading && !selectedPost ? (
             <div className="flex min-h-[420px] items-center justify-center p-10">
-              <Spinner text="Lade Slideshow..." />
+              <Spinner className="h-8 w-8" />
             </div>
           ) : modalError && !selectedPost ? (
             <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 p-10 text-center text-muted-foreground">

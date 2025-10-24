@@ -23,6 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { usePresentationState } from "@/states/presentation-state";
@@ -32,7 +33,6 @@ import {
   Check,
   Copy,
   EllipsisVertical,
-  Loader2,
   Pencil,
   Presentation,
   Trash2,
@@ -220,7 +220,7 @@ export function PresentationItem({
           ) : (
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 overflow-hidden">
               {isLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <Spinner className="h-5 w-5 text-primary" />
               ) : presentation.thumbnailUrl ? (
                 <Image
                   src={presentation.thumbnailUrl}
