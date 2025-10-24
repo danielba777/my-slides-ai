@@ -11,26 +11,50 @@ interface OutlineRequest {
   modelId?: string;
 }
 
-const outlineTemplate = `Given the following topic and requirements, generate a TikTok slideshow script with exactly {numberOfCards} slides in {language}.
+const outlineTemplate = `You are an expert TikTok slideshow script writer. Create a compelling script with exactly {numberOfCards} slides in {language}.
 
 Current Date: {currentDate}
-Topic (may include tone/style directives you MUST follow): {prompt}
+User Request (MUST follow all tone/style/format directives): {prompt}
 
-Rules:
-1) Each slide is ONE short sentence only (max 12 words, ≤60 characters).
-2) No paragraphs. No extra commentary. No hashtags. No emojis. No quotes.
-3) Do NOT include a title unless the topic explicitly asks for one.
-4) Keep wording punchy, conversational, and easy to read (≈ Grade 6–8).
-5) Avoid repeating the same words across multiple slides where possible.
-6) Respect any sequencing in the topic (e.g., progression from A to B to C).
-7) No numbering inside the sentence itself.
-8) Start every line with "<index>. " (number, period, space) and continue numbering sequentially.
+## YOUR TASK:
+Analyze the user's request carefully. They may specify:
+- A specific tone (e.g., authoritative, coaching, conversational)
+- A particular structure (e.g., numbered habits, steps, tips)
+- Content format (e.g., bullet points, short sentences, paragraphs)
+- Reading level and style preferences
 
-Output format (return ONLY this numbered list, nothing else):
-1. <slide 1 sentence>
-2. <slide 2 sentence>
-...
-{numberOfCards}. <slide {numberOfCards} sentence>
+## CRITICAL RULES:
+1. **RESPECT THE USER'S INSTRUCTIONS**: If they want bullet points, provide bullet points. If they want numbered items with sub-points, provide that exact structure.
+2. **FOLLOW THE SPECIFIED FORMAT**: The user may request specific patterns (e.g., "habit name followed by 3 bullet points"). Follow this precisely.
+3. **MAINTAIN CONSISTENCY**: If slide 2 has a certain structure, slides 3-7 should follow the same pattern (unless the user specifies otherwise).
+4. **HONOR TONE & STYLE**: Match the requested tone exactly (authoritative, coaching, casual, etc.).
+5. **SLIDE COUNT**: Generate EXACTLY {numberOfCards} slides. First slide is typically a title/hook, last slide is typically a conclusion/CTA.
+6. **LINE NUMBERING**: Start every line with "<number>. " (e.g., "1. ", "2. ", etc.) and continue sequentially.
+
+## CONTENT GUIDELINES:
+- Keep text concise but impactful (2-4 lines per slide is ideal for TikTok)
+- Use line breaks within a slide content when appropriate for readability
+- If the user requests bullet points, use "•" or "-" for bullets
+- If the user requests numbered sub-items, include them (e.g., "1. Main point")
+- Avoid hashtags, emojis, or excessive punctuation UNLESS the user requests them
+- First slide should be a compelling hook/title
+- Last slide should provide closure (conclusion, CTA, or motivational message)
+
+## OUTPUT FORMAT:
+Return ONLY a numbered list. Each number represents one slide. The content after each number is what appears on that slide.
+
+Example for a habit-breaking topic:
+1. 7 habits that are secretly killing your potential
+2. 1. Constant self-doubt
+• You talk yourself out of opportunities before trying
+• You assume others are more qualified than you
+• You replay past mistakes more than past successes
+3. 2. Waiting for perfect timing
+• You delay important decisions waiting for the moment
+• You let opportunities pass while preparing endlessly
+• You mistake hesitation for being thorough
+
+Now generate exactly {numberOfCards} slides following the user's instructions:
 `;
 
 export async function POST(req: Request) {

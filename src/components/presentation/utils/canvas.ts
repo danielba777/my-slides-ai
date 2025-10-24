@@ -144,26 +144,92 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
   if (segments.length > 0) {
     const content = segments.join("\n\n");
 
+    // Versuche, den Content in Titel und Bullet Points zu splitten
+    const lines = content
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    // Erkenne: Erste Zeile = Titel, Rest = Bullet Points
+    const hasTitle =
+      lines.length > 0 &&
+      !lines[0]?.startsWith("•") &&
+      !lines[0]?.startsWith("-");
+    const title = hasTitle ? lines[0] : null;
+    const bulletPoints = hasTitle ? lines.slice(1) : lines;
+
     const textWidth = Math.round(width * 0.7);
-    // Default: immer mittig (TikTok-Style)
     const alignment = "center";
-    // Falls Position noch nicht gesetzt: zentriert platzieren (normalisierte Koordinaten 0-1)
-    const nx = slide.position?.x != null ? slide.position.x / width : 0.5;
-    const ny = slide.position?.y != null ? slide.position.y / height : 0.5;
     const textColor = chooseTextColor(base.bg);
-    base.nodes.push({
-      id: `text-${nanoid()}`,
-      type: "text",
-      nx,
-      ny,
-      width: textWidth,
-      text: content,
-      fontFamily: "Inter",
-      fontSize: pickFontSize(content.length),
-      align: alignment,
-      fill: textColor,
-    });
-    textPosition = { x, y };
+
+    // Falls Position noch nicht gesetzt: zentriert platzieren (normalisierte Koordinaten 0-1)
+    const baseNx = slide.position?.x != null ? slide.position.x / width : 0.5;
+    const baseNy = slide.position?.y != null ? slide.position.y / height : 0.5;
+
+    if (title) {
+      // Titel-Node (größer, oben)
+      base.nodes.push({
+        id: `text-title-${nanoid()}`,
+        type: "text",
+        nx: baseNx,
+        ny: 0.25, // Weiter oben positionieren
+        width: textWidth,
+        text: title,
+        fontFamily: "Inter",
+        fontSize: pickFontSize(title.length) + 10, // Etwas größer für Titel
+        align: alignment,
+        fill: textColor,
+      });
+
+      textPosition = {
+        x: Math.round(baseNx * width),
+        y: Math.round(0.25 * height),
+      };
+    }
+
+    if (bulletPoints.length > 0) {
+      // Bullet Points Node (kleiner, unten)
+      const bulletsText = bulletPoints.join("\n");
+      base.nodes.push({
+        id: `text-bullets-${nanoid()}`,
+        type: "text",
+        nx: baseNx,
+        ny: title ? 0.55 : baseNy, // Wenn Titel vorhanden, weiter unten
+        width: textWidth,
+        text: bulletsText,
+        fontFamily: "Inter",
+        fontSize: pickFontSize(bulletsText.length), // Normale Größe für Bullets
+        align: "left", // Linksbündig für Bullet Points
+        fill: textColor,
+      });
+
+      if (!textPosition) {
+        textPosition = {
+          x: Math.round(baseNx * width),
+          y: Math.round(0.55 * height),
+        };
+      }
+    }
+
+    // Fallback: Wenn keine Struktur erkannt wurde, verwende den gesamten Content
+    if (base.nodes.length === 0) {
+      base.nodes.push({
+        id: `text-${nanoid()}`,
+        type: "text",
+        nx: baseNx,
+        ny: baseNy,
+        width: textWidth,
+        text: content,
+        fontFamily: "Inter",
+        fontSize: pickFontSize(content.length),
+        align: alignment,
+        fill: textColor,
+      });
+      textPosition = {
+        x: Math.round(baseNx * width),
+        y: Math.round(baseNy * height),
+      };
+    }
   }
 
   const canvas = applyBackgroundImageToCanvas(base, slide.rootImage?.url);
