@@ -22,6 +22,7 @@ import dynamic from "next/dynamic";
 import React, { memo, useEffect, useRef, useState } from "react";
 import { PresentModeHeader } from "../dashboard/PresentModeHeader";
 import { ThinkingDisplay } from "../dashboard/ThinkingDisplay";
+import { SingleSlideImageSelector } from "./SingleSlideImageSelector";
 import { SortableSlide } from "./SortableSlide";
 import StickyDownloadActions from "./StickyDownloadActions";
 const SlideCanvas = dynamic(() => import("@/canvas/SlideCanvasAdapter"), {
@@ -118,6 +119,7 @@ const SlideFrame = memo(function SlideFrame({
   const { editingSlideId, setEditingSlideId } = usePresentationState();
   const isEditingText = editingSlideId === slide.id;
   const [isHovering, setIsHovering] = useState(false);
+  const [isImageSelectorOpen, setIsImageSelectorOpen] = useState(false);
 
   // Registriere pro Slide einen Exporter in einer globalen Map, damit der Header
   // zentral in der aktuellen Reihenfolge exportieren kann.
@@ -145,176 +147,211 @@ const SlideFrame = memo(function SlideFrame({
       canvasRef.current?.clearTextFocus();
     }
   }, [isEditingText]);
+
+  // Handler für die Bild-Auswahl
+  const handleImageSelect = (imageUrl: string) => {
+    const { slides, setSlides } = usePresentationState.getState();
+    const updated = slides.slice();
+    const i = updated.findIndex((x) => x.id === slide.id);
+    if (i < 0) return;
+
+    const currentSlide = updated[i];
+    if (!currentSlide) return;
+
+    // Update nur das rootImage dieser Slide
+    updated[i] = {
+      ...currentSlide,
+      rootImage: { url: imageUrl, query: "" },
+    };
+    setSlides(updated);
+  };
+
   return (
-    <SortableSlide id={slide.id} key={slide.id}>
-      <div
-        className={cn(
-          `slide-wrapper slide-wrapper-${index} flex-shrink-0`,
-          !isPresenting && "max-w-full",
-        )}
-      >
-        <SlideContainer
-          index={index}
-          id={slide.id}
-          slideWidth={undefined}
-          slidesCount={slidesCount}
+    <>
+      {/* Image Selector Modal */}
+      <SingleSlideImageSelector
+        isOpen={isImageSelectorOpen}
+        onClose={() => setIsImageSelectorOpen(false)}
+        onSelectImage={handleImageSelect}
+      />
+      <SortableSlide id={slide.id} key={slide.id}>
+        <div
+          className={cn(
+            `slide-wrapper slide-wrapper-${index} flex-shrink-0`,
+            !isPresenting && "max-w-full",
+          )}
         >
-          <div
-            className={cn(
-              `slide-container-${index}`,
-              isPresenting && "h-screen w-screen",
-            )}
-            onMouseEnter={() =>
-              !isPresenting &&
-              !isReadOnly &&
-              !editingSlideId &&
-              setIsHovering(true)
-            }
-            onMouseLeave={() =>
-              !isPresenting && !isReadOnly && setIsHovering(false)
-            }
-            onClick={() => {
-              // Wenn eine andere Slide im Edit-Modus ist, schließe diesen
-              if (editingSlideId && editingSlideId !== slide.id) {
-                setEditingSlideId(null);
-              }
-            }}
+          <SlideContainer
+            index={index}
+            id={slide.id}
+            slideWidth={undefined}
+            slidesCount={slidesCount}
           >
-            {imageReady ? (
-              <SlideCanvas
-                ref={canvasRef}
-                doc={docWithBg}
-                showToolbar={isEditingText}
-                overlayContent={
-                  !isPresenting &&
-                  !isReadOnly &&
-                  isHovering &&
-                  !editingSlideId ? (
-                    <div className="flex flex-col h-full pointer-events-none">
-                      {/* Top Half: Edit Text */}
-                      <button
-                        onClick={() => {
-                          setEditingSlideId(slide.id);
-                          setIsHovering(false);
-                          // Focus first text element after a short delay
-                          setTimeout(() => {
-                            canvasRef.current?.focusFirstText();
-                          }, 100);
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
-                      >
-                        <Type aria-hidden className="h-6 w-6 text-white" />
-                        <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
-                          Edit Text
-                        </span>
-                      </button>
-                      {/* Bottom Half: Edit Image */}
-                      <button
-                        onClick={() => {
-                          // TODO: Implement Edit Image functionality
-                          console.log("Edit Image clicked");
-                          setIsHovering(false);
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
-                      >
-                        <ImageIcon aria-hidden className="h-6 w-6 text-white" />
-                        <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
-                          Edit Image
-                        </span>
-                      </button>
-                    </div>
-                  ) : undefined
-                }
-                onCloseToolbar={() => {
+            <div
+              className={cn(
+                `slide-container-${index}`,
+                isPresenting && "h-screen w-screen",
+              )}
+              onMouseEnter={() =>
+                !isPresenting &&
+                !isReadOnly &&
+                !editingSlideId &&
+                setIsHovering(true)
+              }
+              onMouseLeave={() =>
+                !isPresenting && !isReadOnly && setIsHovering(false)
+              }
+              onClick={() => {
+                // Wenn eine andere Slide im Edit-Modus ist, schließe diesen
+                if (editingSlideId && editingSlideId !== slide.id) {
                   setEditingSlideId(null);
-                  // Remove focus from text
-                  canvasRef.current?.clearTextFocus();
-                }}
-                onChange={(next: CanvasDoc) => {
-                  const { slides, setSlides } = usePresentationState.getState();
-                  const updated = slides.slice();
-                  const i = updated.findIndex((x) => x.id === slide.id);
-                  if (i < 0) return;
-                  const current = updated[i];
-                  if (!current) return;
-
-                  const currCanvas = current.canvas as CanvasDoc | undefined;
-
-                  // 🛡️ SAFETY MERGE: verliere nie Textknoten beim Update
-                  const currTextNodes = Array.isArray(currCanvas?.nodes)
-                    ? currCanvas!.nodes.filter((n: any) => n?.type === "text")
-                    : [];
-                  const nextTextNodes = Array.isArray(next?.nodes)
-                    ? next!.nodes.filter((n: any) => n?.type === "text")
-                    : [];
-
-                  let merged: CanvasDoc = next;
-                  if (currTextNodes.length > 0 && nextTextNodes.length === 0) {
-                    // Race: next hat (noch) keine Texte → Texte aus current konservieren
-                    const otherNodes = Array.isArray(next?.nodes)
-                      ? next.nodes.filter((n: any) => n?.type !== "text")
-                      : [];
-                    merged = {
-                      ...next,
-                      nodes: [...otherNodes, ...currTextNodes],
-                    };
-                  }
-
-                  // Nur setzen, wenn sich tatsächlich was geändert hat
-                  if (currCanvas !== merged) {
-                    updated[i] = { ...current, canvas: merged };
-                    setSlides(updated);
-                  }
-                }}
-              />
-            ) : (
-              // Stabiles Placeholder, aber KEIN Entfernen/Neu-Erzeugen der Nodes
-              <SlideCanvas
-                doc={docWithBg}
-                showToolbar={isEditingText}
-                overlayContent={
-                  !isPresenting &&
-                  !isReadOnly &&
-                  isHovering &&
-                  !editingSlideId ? (
-                    <div className="flex flex-col h-full pointer-events-none">
-                      {/* Top Half: Edit Text */}
-                      <button
-                        onClick={() => {
-                          setEditingSlideId(slide.id);
-                          setIsHovering(false);
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
-                      >
-                        <Type aria-hidden className="h-6 w-6 text-white" />
-                        <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
-                          Edit Text
-                        </span>
-                      </button>
-                      {/* Bottom Half: Edit Image */}
-                      <button
-                        onClick={() => {
-                          // TODO: Implement Edit Image functionality
-                          console.log("Edit Image clicked");
-                          setIsHovering(false);
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
-                      >
-                        <ImageIcon aria-hidden className="h-6 w-6 text-white" />
-                        <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
-                          Edit Image
-                        </span>
-                      </button>
-                    </div>
-                  ) : undefined
                 }
-                onChange={() => {}}
-              />
-            )}
-          </div>
-        </SlideContainer>
-      </div>
-    </SortableSlide>
+              }}
+            >
+              {imageReady ? (
+                <SlideCanvas
+                  ref={canvasRef}
+                  doc={docWithBg}
+                  showToolbar={isEditingText}
+                  overlayContent={
+                    !isPresenting &&
+                    !isReadOnly &&
+                    isHovering &&
+                    !editingSlideId ? (
+                      <div className="flex flex-col h-full pointer-events-none">
+                        {/* Top Half: Edit Text */}
+                        <button
+                          onClick={() => {
+                            setEditingSlideId(slide.id);
+                            setIsHovering(false);
+                            // Focus first text element after a short delay
+                            setTimeout(() => {
+                              canvasRef.current?.focusFirstText();
+                            }, 100);
+                          }}
+                          className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
+                        >
+                          <Type aria-hidden className="h-6 w-6 text-white" />
+                          <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
+                            Edit Text
+                          </span>
+                        </button>
+                        {/* Bottom Half: Edit Image */}
+                        <button
+                          onClick={() => {
+                            setIsImageSelectorOpen(true);
+                            setIsHovering(false);
+                          }}
+                          className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
+                        >
+                          <ImageIcon
+                            aria-hidden
+                            className="h-6 w-6 text-white"
+                          />
+                          <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
+                            Edit Image
+                          </span>
+                        </button>
+                      </div>
+                    ) : undefined
+                  }
+                  onCloseToolbar={() => {
+                    setEditingSlideId(null);
+                    // Remove focus from text
+                    canvasRef.current?.clearTextFocus();
+                  }}
+                  onChange={(next: CanvasDoc) => {
+                    const { slides, setSlides } =
+                      usePresentationState.getState();
+                    const updated = slides.slice();
+                    const i = updated.findIndex((x) => x.id === slide.id);
+                    if (i < 0) return;
+                    const current = updated[i];
+                    if (!current) return;
+
+                    const currCanvas = current.canvas as CanvasDoc | undefined;
+
+                    // 🛡️ SAFETY MERGE: verliere nie Textknoten beim Update
+                    const currTextNodes = Array.isArray(currCanvas?.nodes)
+                      ? currCanvas!.nodes.filter((n: any) => n?.type === "text")
+                      : [];
+                    const nextTextNodes = Array.isArray(next?.nodes)
+                      ? next!.nodes.filter((n: any) => n?.type === "text")
+                      : [];
+
+                    let merged: CanvasDoc = next;
+                    if (
+                      currTextNodes.length > 0 &&
+                      nextTextNodes.length === 0
+                    ) {
+                      // Race: next hat (noch) keine Texte → Texte aus current konservieren
+                      const otherNodes = Array.isArray(next?.nodes)
+                        ? next.nodes.filter((n: any) => n?.type !== "text")
+                        : [];
+                      merged = {
+                        ...next,
+                        nodes: [...otherNodes, ...currTextNodes],
+                      };
+                    }
+
+                    // Nur setzen, wenn sich tatsächlich was geändert hat
+                    if (currCanvas !== merged) {
+                      updated[i] = { ...current, canvas: merged };
+                      setSlides(updated);
+                    }
+                  }}
+                />
+              ) : (
+                // Stabiles Placeholder, aber KEIN Entfernen/Neu-Erzeugen der Nodes
+                <SlideCanvas
+                  doc={docWithBg}
+                  showToolbar={isEditingText}
+                  overlayContent={
+                    !isPresenting &&
+                    !isReadOnly &&
+                    isHovering &&
+                    !editingSlideId ? (
+                      <div className="flex flex-col h-full pointer-events-none">
+                        {/* Top Half: Edit Text */}
+                        <button
+                          onClick={() => {
+                            setEditingSlideId(slide.id);
+                            setIsHovering(false);
+                          }}
+                          className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
+                        >
+                          <Type aria-hidden className="h-6 w-6 text-white" />
+                          <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
+                            Edit Text
+                          </span>
+                        </button>
+                        {/* Bottom Half: Edit Image */}
+                        <button
+                          onClick={() => {
+                            setIsImageSelectorOpen(true);
+                            setIsHovering(false);
+                          }}
+                          className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
+                        >
+                          <ImageIcon
+                            aria-hidden
+                            className="h-6 w-6 text-white"
+                          />
+                          <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
+                            Edit Image
+                          </span>
+                        </button>
+                      </div>
+                    ) : undefined
+                  }
+                  onChange={() => {}}
+                />
+              )}
+            </div>
+          </SlideContainer>
+        </div>
+      </SortableSlide>
+    </>
   );
 });
 
