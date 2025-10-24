@@ -1111,156 +1111,67 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
 
       const lineHeightPx = BASE_FONT_PX * layer.lineHeight;
-
-      const startYTop = boxTop + PADDING + lineHeightPx;
-
+      const sampleMetrics = ctx.measureText("Mg");
+      const ascentEstimate =
+        sampleMetrics.actualBoundingBoxAscent ?? BASE_FONT_PX * 0.72;
+      const descentEstimate =
+        sampleMetrics.actualBoundingBoxDescent ?? BASE_FONT_PX * 0.28;
+      const lineGap = Math.max(0, lineHeightPx - (ascentEstimate + descentEstimate));
+      const startYTop =
+        boxTop + PADDING + ascentEstimate + lineGap / 2;
       let y = startYTop;
 
 
 
       const bgConfig = layer.background;
-
-      const lineBoxes = measure.lineBoxes ?? [];
-
-      const lineWidths =
-
-        lineBoxes.length > 0
-
-          ? lineBoxes.map((ln) => ln.width)
-
-          : lines.map((raw) => Math.max(0, ctx.measureText(raw).width));
-
       const bgEnabled =
-
         (bgConfig?.enabled ?? false) || ((bgConfig?.opacity ?? 0) > 0);
-
-      const hasBackground = bgEnabled && lineWidths.some((w) => w > 0);
-
       let backgroundRect:
-
         | {
-
             x: number;
-
             y: number;
-
             width: number;
-
             height: number;
-
             radius: number;
-
             fill: string;
-
           }
-
         | null = null;
-
-      if (hasBackground) {
-
+      if (bgEnabled) {
         const padX = Math.max(0, bgConfig?.paddingX ?? 12);
-
         const padY = Math.max(0, bgConfig?.paddingY ?? padX);
-
         const radius = Math.max(0, bgConfig?.radius ?? 16);
-
         const fill = toCssColor(bgConfig?.color, bgConfig?.opacity);
-
         const contentW = Math.max(0, layer.width - 2 * PADDING);
-
-        const maxLineWidth = Math.min(
-
-          contentW,
-
-          lineWidths.length > 0 ? Math.max(...lineWidths) : contentW,
-
-        );
-
-        const alignOffset =
-
-          layer.align === "center"
-
-            ? Math.max(0, (contentW - maxLineWidth) / 2)
-
-            : layer.align === "right"
-
-              ? Math.max(0, contentW - maxLineWidth)
-
-              : 0;
-
-        const firstBox = lineBoxes[0];
-
-        const lastBox = lineBoxes[lineBoxes.length - 1];
-
-        const textTopLocal = firstBox ? firstBox.y : PADDING;
-
-        const textHeightLocal =
-
-          firstBox && lastBox
-
-            ? lastBox.y + lastBox.height - firstBox.y
-
-            : lineHeightPx * Math.max(lines.length, 1);
-
-        const rectX = boxLeft + PADDING + alignOffset - padX;
-
-        const rectY = boxTop + textTopLocal - padY;
-
-        const rectWidth = maxLineWidth + padX * 2;
-
-        const rectHeight = textHeightLocal + padY * 2;
-
+        const contentH = Math.max(0, layerHeight - 2 * PADDING);
+        const rectX = boxLeft + PADDING - padX;
+        const rectY = boxTop + PADDING - padY;
+        const rectWidth = contentW + padX * 2;
+        const rectHeight = contentH + padY * 2;
         backgroundRect = {
-
           x: rectX,
-
           y: rectY,
-
           width: rectWidth,
-
           height: rectHeight,
-
           radius:
-
             bgConfig?.mode === "blob"
-
               ? Math.max(radius, Math.min(radius * 1.5, 1600))
-
               : radius,
-
           fill,
-
         };
 
-
-
         ctx.save();
-
         ctx.fillStyle = fill;
-
         drawRoundedRect(
-
           ctx,
-
           backgroundRect.x,
-
           backgroundRect.y,
-
           backgroundRect.width,
-
           backgroundRect.height,
-
           backgroundRect.radius,
-
         );
-
         ctx.fill();
-
         ctx.restore();
-
       }
-
-
 
       const outlineEnabled = (layer as any).outlineEnabled;
 

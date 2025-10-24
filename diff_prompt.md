@@ -1,53 +1,148 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-1. Hintergrund-Box wirklich einschalten (gleiche Logik wie Preview)
+**_ Begin Patch
+_** Update File: src/app/admin/slideshow-library/accounts/[id]/edit/page.tsx
+@@
 
-Im Export wird die Box nur gezeichnet, wenn background.enabled === true. In der Preview reicht es, wenn die Opazität > 0 ist. Passe das so an:
+- uploadData.append("profileImage", file);
 
-Ändern (Export-Code – SlideCanvasLegacy.tsx):
-Suche die hasBackground Berechnung und ersetze sie:
+* if (file) {
+*      uploadData.append("profileImage", file);
+* }
+  **_ End Patch
+  diff
+  Code kopieren
+  _** Begin Patch
+  \*\*\* Update File: src/app/admin/slideshow-library/accounts/new/page.tsx
+  @@
 
-// ALT
-const hasBackground =
-!!bgConfig?.enabled && lineWidths.some((w) => w > 0);
+- uploadData.append("profileImage", file);
 
-// NEU (wie in der Preview)
-const bgEnabled =
-(bgConfig?.enabled ?? false) || ((bgConfig?.opacity ?? 0) > 0);
-const hasBackground = bgEnabled && lineWidths.some((w) => w > 0);
+* if (file) {
+*      uploadData.append("profileImage", file);
+* }
+  **_ End Patch
+  diff
+  Code kopieren
+  _** Begin Patch
+  \*\*\* Update File: src/app/admin/slideshow-library/posts/new/page.tsx
+  @@
 
-Stelle im selben Block sicher, dass padX/padY/radius/fill/... unverändert bleiben. Die Stelle findest du hier (Bereich mit rectX/rectY/rectWidth/rectHeight):
+-          publishedAt: new Date(formData.publishedAt),
+-          createdAt: new Date(formData.createdAt),
+
+*          publishedAt: formData.publishedAt ? new Date(formData.publishedAt) : undefined,
+*          createdAt: formData.createdAt ? new Date(formData.createdAt) : undefined,
+  **_ End Patch
+  diff
+  Code kopieren
+  _** Begin Patch
+  \*\*\* Update File: src/canvas/legacy/SlideCanvasLegacy.tsx
+  @@
+
+-      // Toolbar liefert "fontSize" → wir mappen auf scale (BASE_FONT_PX * scale)
+-      if (typeof patch.fontSize === "number" && Number.isFinite(patch.fontSize)) {
+-        const nextScale = Math.max(0.2, Math.min(4, patch.fontSize / BASE_FONT_PX));
+
+*      // Toolbar liefert "fontSize" → mappen auf scale (BASE_FONT_PX * scale)
+*      if (typeof (patch as any).fontSize === "number" && Number.isFinite((patch as any).fontSize)) {
+*        const nextScale = Math.max(0.2, Math.min(4, (patch as any).fontSize / BASE_FONT_PX));
+           applyToActive((l) => ({ ...l, scale: nextScale }));
+         }
+  \*\*\* End Patch
+  Die Stelle ist bereits sehr ähnlich bei dir; hier die minimal nötige Umstellung auf as any, damit fontSize (nicht Teil von SlideTextElement) akzeptiert wird.
+  codebase
+
+diff
+Code kopieren
+**_ Begin Patch
+_** Update File: src/canvas/LegacyEditorToolbar.tsx
+@@
+type LegacyEditorToolbarProps = {
+@@
+
+- onChangeSelectedText?: (patch: Partial<SlideTextElement>) => void;
+
+* // Patch kommt teils mit Zusatzfeldern aus der Toolbar (fill, stroke, fontWeight etc.)
+* onChangeSelectedText?: (patch: Partial<SlideTextElement> & Record<string, unknown>) => void;
+  };
+  \*\*\* End Patch
+  Damit verschwinden die Fehler zu fontWeight, fontStyle, fill, strokeWidth, stroke beim Aufruf. Siehe die Aufrufe innerhalb der Toolbar, z.B. Farbe/Kontur u.ä.
+  codebase
 
 codebase
 
-2. Radius der Blob-Box wie die Preview clampen
+diff
+Code kopieren
+**_ Begin Patch
+_** Update File: src/components/plate/ui/import-toolbar-button.tsx
+@@
 
-Die Preview clamped für „Blob“ so: max(bgRadius, min(bgRadius\*1.5, 1600)). Im Export wurde stattdessen rectHeight/2 verwendet – dadurch weicht die Form ab. Ersetze die effectiveRadius-Logik:
+- const { openFilePicker: openMdFilePicker } = useFilePicker({
 
-// ALT
-const effectiveRadius =
-bgConfig?.mode === "blob"
-? Math.max(radius, rectHeight / 2)
-: radius;
+* const { openFilePicker: openMdFilePicker } = useFilePicker({
+  accept: [".md", ".mdx"],
+  multiple: false,
 
-// NEU – exakt wie Preview
-const effectiveRadius =
-bgConfig?.mode === "blob"
-? Math.max(radius, Math.min(radius \* 1.5, 1600))
-: radius;
+- onFilesSelected: async ({ plainFiles }) => {
+-      const text = await plainFiles[0].text();
 
-Das ist in derselben Box-Zeichenroutine (Export) wie oben. (Zur Kontrolle: In der Preview wird der Radius genau so berechnet, siehe borderRadius in der Text-Box.)
+* onFilesSelected: async (data) => {
+*      const { plainFiles } = data as any;
+*      const text = await (plainFiles?.[0]?.text?.() ?? Promise.resolve(""));
+  @@
 
-codebase
+- const { openFilePicker: openHtmlFilePicker } = useFilePicker({
 
-codebase
+* const { openFilePicker: openHtmlFilePicker } = useFilePicker({
+  accept: ["text/html"],
+  multiple: false,
 
-3. Kontur-Dicke an die Skalierung koppeln (sonst zu dünn im Export)
+- onFilesSelected: async ({ plainFiles }) => {
+-      const text = await plainFiles[0].text();
 
-Die Preview skaliert den Outline-Ring mit outlineWidth \* layer.scale. Im Export wird die Stroke-Breite aktuell ohne Scale gesetzt und wirkt dadurch dünner. Korrigiere die Zeile im Offscreen-Stroke:
+* onFilesSelected: async (data) => {
+*      const { plainFiles } = data as any;
+*      const text = await (plainFiles?.[0]?.text?.() ?? Promise.resolve(""));
+  \*\*\* End Patch
+  Die Komponente nutzt use-file-picker; dessen Callback-Typ erwartet ein Sammelobjekt statt destrukturiertem Param. Minimal gelöst durch neutrales data + Cast.
+  codebase
 
-// ALT
-ox.lineWidth = 2 \* outlineWidth;
+diff
+Code kopieren
+**_ Begin Patch
+_** Update File: src/components/plate/ui/media-placeholder-node.tsx
+@@
 
-// NEU – paritätisch zur Preview (Text-Shadow-Ring):
-ox.lineWidth = 2 _ outlineWidth _ Math.max(0.001, layer.scale);
+-      onFilesSelected: ({ plainFiles: updatedFiles }) => {
+
+*      onFilesSelected: (data) => {
+*        const { plainFiles: updatedFiles } = data as any;
+           // ...
+         }
+  **_ End Patch
+  diff
+  Code kopieren
+  _** Begin Patch
+  \*\*\* Update File: src/components/plate/ui/media-toolbar-button.tsx
+  @@
+
+- onFilesSelected: ({ plainFiles: updatedFiles }) => {
+
+* onFilesSelected: (data) => {
+*      const { plainFiles: updatedFiles } = data as any;
+         // ...
+       }
+  \*\*\* End Patch
+  Die beiden haben denselben Mismatch wie oben. (Gleiches Muster anwenden.)
+  codebase
+
+diff
+Code kopieren
+**_ Begin Patch
+_** Update File: src/components/presentation/dashboard/ImageCollectionSelector.tsx
+@@
+-import { useCallback, useEffect, useMemo, useState } from "react";
++import { useCallback, useEffect, useMemo, useState } from "react";
++import type { JSX } from "react";
+\*\*\* End Patch
