@@ -2082,6 +2082,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                 alt=""
                 className="absolute left-1/2 top-1/2 select-none pointer-events-none"
                 style={{
+                  width: imageNatural ? `${imageNatural.w}px` : "auto",
+                  height: imageNatural ? `${imageNatural.h}px` : "auto",
                   transform: `translate(-50%,-50%) translate(${offset.x}px, ${offset.y}px) scale(${Math.max(
                     0.001,
                     scale,
