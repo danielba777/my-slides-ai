@@ -1,11 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 import { Section } from "./Section";
-import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 const tiers = [
   {
@@ -72,7 +70,11 @@ export function MarketingPricing({ session }: { session: boolean }) {
             <CardHeader>
               <CardTitle className="flex items-center justify-between text-base">
                 <span className="text-foreground">{t.name}</span>
-                {t.badge && <Badge variant="secondary">{t.badge}</Badge>}
+                {t.badge && (
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-indigo-100 to-[#c2d5ff] rounded-full text-sm font-medium text-indigo-700">
+                    {t.badge}
+                  </div>
+                )}
               </CardTitle>
               <div className="mt-1 text-3xl font-semibold">{t.price}</div>
             </CardHeader>

@@ -18,7 +18,7 @@ export function MarketingHero({ session }: { session: boolean }) {
   const [email, setEmail] = useState("");
 
   return (
-    <Section className="relative min-h-[92vh] overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-900">
+    <Section className="relative min-h-[92vh] overflow-hidden bg-slate-950">
       {/* Background decorations */}
       <div
         className="absolute inset-0 opacity-30 bg-repeat"
@@ -26,6 +26,37 @@ export function MarketingHero({ session }: { session: boolean }) {
           backgroundImage: `url("data:image/svg+xml,%3Csvg%20width='80'%20height='80'%20viewBox='0%200%2080%2080'%20xmlns='http://www.w3.org/2000/svg'%3E%3Cg%20fill='%23304674'%20fill-opacity='0.05'%3E%3Cpath%20d='M40%200h40v40H40z'/%3E%3Cpath%20d='M0%2040h40v40H0z'/%3E%3C/g%3E%3C/svg%3E")`,
         }}
       />
+
+      {/* Accent glow */}
+      <div
+        className="absolute inset-0 opacity-40"
+        style={{
+          background: "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(48, 70, 116, 0.25) 0%, rgba(48, 70, 116, 0.12) 30%, transparent 70%)",
+        }}
+      />
+
+      {/* Grid */}
+      <svg
+        className="absolute inset-0 h-full w-full opacity-30"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <pattern
+            id="grid"
+            width="80"
+            height="80"
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d="M 80 0 L 0 0 0 80"
+              fill="none"
+              stroke="rgba(48,70,116,0.15)"
+              strokeWidth="1"
+            />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid)" />
+      </svg>
 
       <div className="relative z-10 flex min-h-[92vh] flex-col justify-center px-5 sm:px-6 lg:pt-20 pt-20 pb-10">
         <div className="mx-auto max-w-5xl text-center">

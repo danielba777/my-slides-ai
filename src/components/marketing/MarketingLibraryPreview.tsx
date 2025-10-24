@@ -88,7 +88,7 @@ export function MarketingLibraryPreview() {
 
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 leading-tight">
             Entdecke echte
-            <span className="block text-transparent bg-clip-text text-[#304674]">
+            <span className="block bg-clip-text text-[#304674]">
               virale Slides
             </span>
           </h2>
