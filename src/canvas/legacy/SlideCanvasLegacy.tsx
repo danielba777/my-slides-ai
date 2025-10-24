@@ -1470,9 +1470,9 @@ const handleAddText = useCallback(() => {
       if (patch.align) {
         applyToActive((l) => ({ ...l, align: patch.align as any }));
       }
-      // Toolbar liefert "fontSize" → wir mappen auf scale (BASE_FONT_PX * scale)
-      if (typeof patch.fontSize === "number" && Number.isFinite(patch.fontSize)) {
-        const nextScale = Math.max(0.2, Math.min(4, patch.fontSize / BASE_FONT_PX));
+      // Toolbar liefert "fontSize" → mappen auf scale (BASE_FONT_PX * scale)
+      if (typeof (patch as any).fontSize === "number" && Number.isFinite((patch as any).fontSize)) {
+        const nextScale = Math.max(0.2, Math.min(4, (patch as any).fontSize / BASE_FONT_PX));
         applyToActive((l) => ({ ...l, scale: nextScale }));
       }
 

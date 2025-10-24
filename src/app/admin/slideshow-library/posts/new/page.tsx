@@ -152,12 +152,8 @@ export default function CreatePostPage() {
           ...formData,
           prompt:
             formData.prompt.trim().length > 0 ? formData.prompt.trim() : null,
-          publishedAt: formData.publishedAt
-            ? new Date(formData.publishedAt)
-            : undefined,
-          createdAt: formData.createdAt
-            ? new Date(formData.createdAt)
-            : undefined,
+          publishedAt: formData?.publishedAt ? new Date(formData.publishedAt) : undefined,
+          createdAt: formData?.createdAt ? new Date(formData.createdAt) : undefined,
           slides: slidesPayload,
         }),
       });

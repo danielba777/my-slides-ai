@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { usePresentationState } from "@/states/presentation-state";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { JSX } from "react";
 
 interface ImageSetImage {
   id?: string;

@@ -23,8 +23,17 @@ try {
     process.exit(2);
   }
 
+  // Entferne inkrementelle Build-Flags schon VOR dem Parsen der tsconfig
+  const sanitizedConfig = (() => {
+    const cfg = { ...configFile.config, compilerOptions: { ...(configFile.config?.compilerOptions ?? {}) } };
+    delete cfg.compilerOptions.incremental;
+    delete cfg.compilerOptions.tsBuildInfoFile;
+    delete cfg.compilerOptions.composite;
+    return cfg;
+  })();
+
   const parsed = ts.parseJsonConfigFileContent(
-    configFile.config,
+    sanitizedConfig,
     {
       useCaseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
       readDirectory: ts.sys.readDirectory,
@@ -34,9 +43,11 @@ try {
     path.dirname(configPath),
   );
 
+  const compilerOptions = { ...parsed.options, noEmit: true };
+
   const program = ts.createProgram({
     rootNames: parsed.fileNames,
-    options: { ...parsed.options, noEmit: true },
+    options: compilerOptions,
   });
 
   const diagnostics = ts.getPreEmitDiagnostics(program);

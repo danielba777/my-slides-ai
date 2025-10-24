@@ -29,13 +29,14 @@ import { useCallback } from "react";
 type TextBgMode = "block" | "blob";
 
 type LegacyEditorToolbarProps = {
-  /** Wird beim Klick auf „Text +“ aufgerufen */
+  /** Wird beim Klick auf „Text +" aufgerufen */
   onAddText?: () => void;
   /** Vorhandene (legacy) Controls werden hier gerendert */
   children: React.ReactNode;
   className?: string;
   selectedText?: SlideTextElement | null;
-  onChangeSelectedText?: (patch: Partial<SlideTextElement>) => void;
+  // Patch kommt teils mit Zusatzfeldern aus der Toolbar (fill, stroke, fontWeight etc.)
+  onChangeSelectedText?: (patch: Partial<SlideTextElement> & Record<string, unknown>) => void;
 };
 
 /**
