@@ -129,7 +129,7 @@ export function MarketingHero({ session }: { session: boolean }) {
 
             <div className="bg-white/5 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-white/10 transition-all duration-300">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500 to-orange-500 flex items-center justify-center">
                   <BarChart3Icon className="w-5 h-5 text-white" />
                 </div>
                 <h3 className="text-white font-semibold">
@@ -143,7 +143,7 @@ export function MarketingHero({ session }: { session: boolean }) {
 
             <div className="bg-white/5 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-white/10 transition-all duration-300">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500 to-orange-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
                   <CheckCircle2Icon className="w-5 h-5 text-white" />
                 </div>
                 <h3 className="text-white font-semibold">
@@ -201,3 +201,5 @@ export function MarketingHero({ session }: { session: boolean }) {
     </Section>
   );
 }
+
+

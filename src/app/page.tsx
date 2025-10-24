@@ -12,21 +12,17 @@ export default async function Home() {
   const session = await auth();
 
   return (
-    <>
+    <MarketingPageBackground>
       <MarketingNavbar session={!!session} />
-      <main>
-        {/* Hero bleibt ohne globales Pattern */}
+      <main className="flex-1">
         <MarketingHero session={!!session} />
 
-        {/* Ab hier globaler Pattern-Background für alle Sections (ohne SocialProof) */}
-        <MarketingPageBackground>
-          <MarketingLibraryPreview />
-          <MarketingTestimonials />
-          <MarketingPricing session={!!session} />
-          <MarketingFAQ />
-        </MarketingPageBackground>
+        <MarketingLibraryPreview />
+        <MarketingTestimonials />
+        <MarketingPricing session={!!session} />
+        <MarketingFAQ />
       </main>
       <MarketingFooter />
-    </>
+    </MarketingPageBackground>
   );
 }

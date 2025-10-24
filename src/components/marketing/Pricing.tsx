@@ -56,12 +56,12 @@ const tiers = [
 
 export function MarketingPricing({ session }: { session: boolean }) {
   return (
-    <Section id="pricing" className="bg-white/60">
+    <Section id="pricing">
       <h2 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">
         Preise
       </h2>
       <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-         {tiers.map((t) => (
+        {tiers.map((t) => (
           <Card
             key={t.name}
             className={`${t.highlight ? "relative border-primary/30 shadow-lg" : ""} overflow-hidden`}
@@ -105,8 +105,8 @@ export function MarketingPricing({ session }: { session: boolean }) {
               </div>
             </CardContent>
           </Card>
-           ))}
-         </div>
-       </Section>
+        ))}
+      </div>
+    </Section>
   );
 }

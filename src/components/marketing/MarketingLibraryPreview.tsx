@@ -71,7 +71,7 @@ export function MarketingLibraryPreview() {
   return (
     <section
       id="library"
-      className="relative pb-20 pt-16 sm:pb-32 px-5 sm:px-6 bg-gradient-to-br from-slate-50 via-[#304674]/5 to-[#304674]/10 overflow-hidden"
+      className="relative pb-20 pt-16 sm:pb-32 px-5 sm:px-6 overflow-hidden"
     >
       <div className="relative mx-auto max-w-7xl">
         {/* Header */}
@@ -209,3 +209,4 @@ export function MarketingLibraryPreview() {
     </section>
   );
 }
+

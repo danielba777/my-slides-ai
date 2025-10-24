@@ -49,7 +49,7 @@ export function MarketingFAQ() {
   ];
 
   return (
-    <Section id="faq" className="relative bg-gradient-to-br from-slate-50 via-[#304674]/5 to-[#304674]/10">
+    <Section id="faq">
 
       <div className="relative mx-auto max-w-5xl">
         {/* Header */}
