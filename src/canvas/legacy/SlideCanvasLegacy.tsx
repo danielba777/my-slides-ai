@@ -51,7 +51,7 @@ export type SlideCanvasHandle = {
 type Props = {
   imageUrl: string; // "" = schwarz
   layout: SlideTextElement[];
-  onLayoutChange: (next: SlideTextElement[]) => void;
+  onLayoutChange?: (next: SlideTextElement[]) => void;
   /* ➕ neu: zusätzliche Overlay-Images (Logo etc.) */
   overlays?: CanvasImageNode[];
   /* ➕ neu: Callback, wenn Overlays (Position/Größe) geändert wurden */
@@ -389,6 +389,13 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const wrapRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Sicherer Wrapper: nur aufrufen, wenn wirklich eine Funktion übergeben wurde
+  const onLayout = useCallback((next: SlideTextElement[]) => {
+    if (typeof onLayoutChange === "function") {
+      onLayoutChange(next);
+    }
+  }, [onLayoutChange]);
 
   // === Helpers: aktives/editiertes Layer finden & patchen ===
   const getActiveId = () => isEditingRef.current ?? activeLayerId;
@@ -783,11 +790,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const newLayout = mapLayersToLayout(textLayers as any);
       const sig = layoutSignature(newLayout);
       lastSentLayoutSigRef.current = sig;
-      onLayoutChange(newLayout);
+      onLayout(newLayout);
     };
     window.addEventListener("pointerup", onWindowPointerUp);
     return () => window.removeEventListener("pointerup", onWindowPointerUp);
-  }, [textLayers, onLayoutChange]);
+  }, [textLayers, onLayout]);
 
   // Layer Interaktionen
   const selectLayer = (layerId: string, e: React.PointerEvent) => {
@@ -1009,7 +1016,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     const newLayout = mapLayersToLayout(textLayers as any);
     const sig = layoutSignature(newLayout);
     lastSentLayoutSigRef.current = sig;
-    onLayoutChange(newLayout);
+    onLayout(newLayout);
     try {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     } catch {}
@@ -1052,7 +1059,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     const newLayout = mapLayersToLayout(textLayers as any);
     const sig = layoutSignature(newLayout);
     lastSentLayoutSigRef.current = sig;
-    onLayoutChange(newLayout);
+    onLayout(newLayout);
   };
 
   // Delete/Backspace: selektierten Text-Layer löschen (Capture-Phase, global)
@@ -1088,7 +1095,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           const newLayout = mapLayersToLayout(updated as any);
           const sig = layoutSignature(newLayout);
           lastSentLayoutSigRef.current = sig;
-          onLayoutChange(newLayout);
+          onLayout(newLayout);
           commitActiveLayer(null);
           return updated;
         });
@@ -1098,7 +1105,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
     // WICHTIG: keine Abhängigkeit von activeLayerId, sonst bekommt der Listener wieder eine neue (stale) Closure.
-  }, [onLayoutChange]);
+  }, [onLayout]);
 
   // Debounced Parent-Sync
   const layoutChangeTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -1111,13 +1118,13 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const sig = layoutSignature(newLayout);
       if (sig !== lastSentLayoutSigRef.current) {
         lastSentLayoutSigRef.current = sig;
-        onLayoutChange(newLayout);
+        onLayout(newLayout);
       }
     }, 100);
     return () =>
       layoutChangeTimeoutRef.current &&
       clearTimeout(layoutChangeTimeoutRef.current);
-  }, [textLayers, onLayoutChange]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [textLayers, onLayout]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Export PNG — 1:1 wie Preview + Outline
   const exportPNG = useCallback(async (): Promise<Blob> => {
