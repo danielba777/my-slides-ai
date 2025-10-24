@@ -284,18 +284,21 @@ export default function CanvasToolbar({
               label="Linksbuendig"
               onClick={() => handleAlign("left")}
               disabled={!selectedIsText}
+              active={selectedIsText && selected?.align === "left"}
             />
             <ToolbarIconButton
               icon={AlignCenter}
               label="Zentriert"
               onClick={() => handleAlign("center")}
               disabled={!selectedIsText}
+              active={selectedIsText && (selected?.align ?? "center") === "center"}
             />
             <ToolbarIconButton
               icon={AlignRight}
               label="Rechtsbuendig"
               onClick={() => handleAlign("right")}
               disabled={!selectedIsText}
+              active={selectedIsText && selected?.align === "right"}
             />
           </div>
 
@@ -386,3 +389,4 @@ export default function CanvasToolbar({
     </TooltipProvider>
   );
 }
+

@@ -1278,7 +1278,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       const strokeMargin =
 
-        scaledOutlineRadius > 0 ? Math.ceil(scaledOutlineRadius + 2) : 0;
+        scaledOutlineRadius > 0 ? Math.ceil(scaledOutlineRadius + 4) : 0;
 
 
 
@@ -1328,22 +1328,32 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
 
 
-      const clipMarginLeft = Math.max(strokeMargin, backgroundOverflowLeft);
+      const clipMarginLeft = Math.max(
+        strokeMargin,
+        Math.ceil(backgroundOverflowLeft + 1),
+      );
 
-      const clipMarginTop = Math.max(strokeMargin, backgroundOverflowTop);
+      const clipMarginTop = Math.max(
+        strokeMargin,
+        Math.ceil(backgroundOverflowTop + 1),
+      );
 
-      const clipMarginRight = Math.max(strokeMargin, backgroundOverflowRight);
+      const clipMarginRight = Math.max(
+        strokeMargin,
+        Math.ceil(backgroundOverflowRight + 1),
+      );
 
       const clipMarginBottom = Math.max(
 
         strokeMargin,
 
-        backgroundOverflowBottom,
+        Math.ceil(backgroundOverflowBottom + 1),
 
       );
 
 
 
+      ctx.save();
       ctx.beginPath();
 
       ctx.rect(
@@ -1376,7 +1386,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       const drawOuterStrokeLine = (raw: string, yPos: number) => {
         if (!(outlineEnabled && outlineWidth > 0)) return;
-        const margin = strokeMargin;
+        const baseStroke = outlineWidth * Math.max(0.001, layer.scale);
+        const effectiveLineWidth = 2 * (baseStroke + 1);
+        const margin = Math.max(
+          strokeMargin,
+          Math.ceil(effectiveLineWidth / 2),
+        );
         const off = document.createElement("canvas");
         off.width = Math.max(1, Math.ceil(layer.width + margin * 2));
         off.height = Math.max(
@@ -1399,10 +1414,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         const localX = startX - baseLeft + offsetX;
         const localY = yPos - baseTop + offsetY;
 
-        ox.lineJoin = "round";
-        ox.miterLimit = 2;
-        ox.strokeStyle = outlineColor;
-        ox.lineWidth = 2 * outlineWidth * Math.max(0.001, layer.scale);
+        ox.lineJoin = "round";
+        ox.miterLimit = 2;
+        ox.strokeStyle = outlineColor;
+        ox.lineWidth = effectiveLineWidth;
 
         if (layer.letterSpacing === 0) {
           if (layer.align === "left") ox.textAlign = "left";
@@ -1484,6 +1499,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         y += lineHeightPx;
       }
 
+      ctx.restore();
       ctx.restore();
     }
 
@@ -2291,4 +2307,3 @@ function ToolbarSizedByCanvas({
     </div>
   );
 }
-
