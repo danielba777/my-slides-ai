@@ -1,15 +1,15 @@
 "use client";
 import {
   CanvasDoc,
-  CanvasNode,
   CanvasImageNode,
+  CanvasNode,
   CanvasTextNode,
 } from "./types";
 
 export const withDefaults = (c?: CanvasDoc): CanvasDoc => ({
   version: 1,
   width: c?.width ?? 1080,
-  height: c?.height ?? 1920,
+  height: c?.height ?? 1620, // 2:3 aspect ratio
   bg: c?.bg ?? "#ffffff",
   nodes: c?.nodes ?? [],
   selection: c?.selection ?? [],
@@ -21,9 +21,9 @@ export const addText = (c: CanvasDoc, text = "Neuer Text"): CanvasDoc => ({
   nodes: [
     ...c.nodes,
     (() => {
-      const width = Math.round(c.width * 0.7);              // ~70% Breite
-      const x = Math.round((c.width - width) / 2);          // horizontal zentriert
-      const y = Math.round(c.height * (1 / 3));             // ~1/3 von oben
+      const width = Math.round(c.width * 0.7); // ~70% Breite
+      const x = Math.round((c.width - width) / 2); // horizontal zentriert
+      const y = Math.round(c.height * (1 / 3)); // ~1/3 von oben
       return {
         id: crypto.randomUUID(),
         type: "text",

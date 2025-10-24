@@ -8,12 +8,12 @@ import {
 } from "@/app/_actions/presentation/presentationActions";
 import { getCustomThemeById } from "@/app/_actions/presentation/theme-actions";
 import { type CanvasDoc, type CanvasTextNode } from "@/canvas/types";
+import { LoadingState } from "@/components/presentation/presentation-page/Loading";
+import { applyBackgroundImageToCanvas } from "@/components/presentation/utils/canvas";
 import {
   type PlateNode,
   type PlateSlide,
 } from "@/components/presentation/utils/parser";
-import { applyBackgroundImageToCanvas } from "@/components/presentation/utils/canvas";
-import { LoadingState } from "@/components/presentation/presentation-page/Loading";
 import {
   themes,
   type ThemeProperties,
@@ -30,7 +30,9 @@ export const PRESENTATION_GENERATION_COOKIE = "presentation_generation_pending";
 
 function hasPendingCookie() {
   if (typeof document === "undefined") return false;
-  return document.cookie.split(";").some((c) => c.trim().startsWith(`${PRESENTATION_GENERATION_COOKIE}=`));
+  return document.cookie
+    .split(";")
+    .some((c) => c.trim().startsWith(`${PRESENTATION_GENERATION_COOKIE}=`));
 }
 
 function clearPendingCookie() {
@@ -42,7 +44,8 @@ function clearPendingCookie() {
   }SameSite=Lax`;
 }
 
-function makeCanvasFromText(text: string, w = 1080, h = 1920): CanvasDoc {
+function makeCanvasFromText(text: string, w = 1080, h = 1620): CanvasDoc {
+  // 2:3 aspect ratio
   return {
     version: 1,
     width: w,
@@ -128,7 +131,10 @@ export default function PresentationGenerateWithIdPage() {
     initialLoadComplete.current = true;
 
     // Start, wenn Store-Flag ODER Pending-Cookie gesetzt ist
-    if ((isGeneratingOutline || hasPendingCookie()) && !generationStarted.current) {
+    if (
+      (isGeneratingOutline || hasPendingCookie()) &&
+      !generationStarted.current
+    ) {
       console.log("Starting outline generation after navigation");
       generationStarted.current = true;
 
@@ -148,7 +154,8 @@ export default function PresentationGenerateWithIdPage() {
    */
   useEffect(() => {
     if (slidesGenerationTriggered.current) return;
-    const outlineReady = !isGeneratingOutline && Array.isArray(outline) && outline.length > 0;
+    const outlineReady =
+      !isGeneratingOutline && Array.isArray(outline) && outline.length > 0;
     if (outlineReady && !isGeneratingPresentation) {
       slidesGenerationTriggered.current = true;
       void handleGenerate();
@@ -174,9 +181,7 @@ export default function PresentationGenerateWithIdPage() {
             presentationData.presentation.searchResults,
           )
             ? presentationData.presentation.searchResults
-            : JSON.parse(
-                presentationData.presentation.searchResults as string,
-              );
+            : JSON.parse(presentationData.presentation.searchResults as string);
           setWebSearchEnabled(true);
           setSearchResults(searchResults);
         } catch (error) {
