@@ -196,7 +196,7 @@ export function PresentationDashboard({
             </h2>
             {isLoadingTemplates ? (
               <div className="flex flex-1 items-center justify-center">
-                <Spinner text="Lade Prompts..." />
+                <Spinner className="h-8 w-8" />
               </div>
             ) : templateError ? (
               <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">

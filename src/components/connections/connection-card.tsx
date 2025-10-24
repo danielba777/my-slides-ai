@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   ConnectedTikTokAccount,
   useTikTokAccounts,
@@ -107,7 +108,9 @@ export function ConnectionCard() {
           {connectionState === "loading" ? "Connecting..." : "Connect TikTok"}
         </Button>
         {accountsLoading ? (
-          <p className="text-sm text-muted-foreground">Loading accounts…</p>
+          <div className="flex items-center justify-center py-4">
+            <Spinner className="h-8 w-8" />
+          </div>
         ) : (
           <div className="flex flex-wrap gap-2">
             {sortedAccounts.map((account) => (

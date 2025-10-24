@@ -3,7 +3,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -11,11 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { Eye, FileText, Plus, Trash2, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 interface SlideshowPost {
   id: string;
@@ -193,7 +194,7 @@ export default function SlideshowPostsPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <Spinner className="h-8 w-8 mx-auto mb-4" />
           <p className="text-muted-foreground">Lade Posts...</p>
         </div>
       </div>
@@ -278,10 +279,7 @@ export default function SlideshowPostsPage() {
             const hasPrompt = (post.prompt ?? "").trim().length > 0;
 
             return (
-              <Card
-                key={post.id}
-                className="hover:shadow-md transition-shadow"
-              >
+              <Card key={post.id} className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
@@ -395,9 +393,7 @@ export default function SlideshowPostsPage() {
                     ) : (
                       <div className="space-y-2">
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
-                          {hasPrompt
-                            ? post.prompt
-                            : "Kein Prompt hinterlegt."}
+                          {hasPrompt ? post.prompt : "Kein Prompt hinterlegt."}
                         </p>
                         <div className="flex justify-end">
                           <Button
@@ -405,7 +401,9 @@ export default function SlideshowPostsPage() {
                             size="sm"
                             onClick={() => startEditingPrompt(post)}
                           >
-                            {hasPrompt ? "Prompt bearbeiten" : "Prompt hinzufügen"}
+                            {hasPrompt
+                              ? "Prompt bearbeiten"
+                              : "Prompt hinzufügen"}
                           </Button>
                         </div>
                       </div>
