@@ -2,12 +2,9 @@
 "use client";
 
 import LegacyEditorToolbar from "@/canvas/LegacyEditorToolbar";
-import {
-  computeAutoHeight as computeAutoHeightFromUtil,
-  measureWrappedText,
-} from "@/lib/textMetrics";
-import type { SlideTextElement } from "@/lib/types";
 import type { CanvasImageNode } from "@/canvas/types";
+import { measureWrappedText } from "@/lib/textMetrics";
+import type { SlideTextElement } from "@/lib/types";
 import { AlignCenter, AlignLeft, AlignRight } from "lucide-react";
 import React, {
   forwardRef,
@@ -46,6 +43,8 @@ type TextLayer = {
 export type SlideCanvasHandle = {
   getLayout: () => SlideTextElement[];
   exportPNG: () => Promise<Blob>;
+  focusFirstText: () => void;
+  clearTextFocus: () => void;
 };
 
 type Props = {
@@ -56,17 +55,25 @@ type Props = {
   overlays?: CanvasImageNode[];
   /* ➕ neu: Callback, wenn Overlays (Position/Größe) geändert wurden */
   onOverlaysChange?: (next: CanvasImageNode[]) => void;
+  /* ➕ neu: Toolbar Sichtbarkeit steuern */
+  showToolbar?: boolean;
+  /* ➕ neu: Overlay für Edit-Modus */
+  overlayContent?: React.ReactNode;
+  /* ➕ neu: Callback zum Schließen der Toolbar */
+  onCloseToolbar?: () => void;
 };
 
 const W = 1080;
-const H = 1920;
+const H = 1620; // 2:3 aspect ratio
 const PADDING = 8;
 const BASE_FONT_PX = 72;
 // Zusätzlicher Puffer für Descender (z. B. g, y, p, q, j), damit beim Export nichts abgeschnitten wird
 const DESCENT_PAD = Math.ceil(BASE_FONT_PX * 0.25); // ~25 % der Basis-Fonthöhe
 
 function hexToRgba(hex: string, alpha: number): string {
-  const clampedAlpha = Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 1;
+  const clampedAlpha = Number.isFinite(alpha)
+    ? Math.max(0, Math.min(1, alpha))
+    : 1;
   let normalized = hex.trim().replace(/^#/, "");
   if (normalized.length === 3) {
     normalized = normalized
@@ -82,9 +89,14 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${clampedAlpha})`;
 }
 
-function toCssColor(color: string | undefined, opacity: number | undefined): string {
+function toCssColor(
+  color: string | undefined,
+  opacity: number | undefined,
+): string {
   const effectiveOpacity =
-    opacity === undefined || Number.isNaN(opacity) ? 0.5 : Math.max(0, Math.min(1, opacity));
+    opacity === undefined || Number.isNaN(opacity)
+      ? 0.5
+      : Math.max(0, Math.min(1, opacity));
   if (!color) return `rgba(0, 0, 0, ${effectiveOpacity})`;
   const trimmed = color.trim();
   if (trimmed.startsWith("#")) return hexToRgba(trimmed, effectiveOpacity);
@@ -100,12 +112,7 @@ function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
 
-function fitContain(
-  dstW: number,
-  dstH: number,
-  natW: number,
-  natH: number,
-) {
+function fitContain(dstW: number, dstH: number, natW: number, natH: number) {
   const r = Math.min(dstW / natW, dstH / natH);
   const w = natW * r;
   const h = natH * r;
@@ -136,8 +143,8 @@ function drawRoundedRect(
   ctx.closePath();
 }
 
-// Export aspect ratio for responsive containers
-export const ASPECT_RATIO = 9 / 16;
+// Export aspect ratio for responsive containers (2:3 format)
+export const ASPECT_RATIO = 2 / 3;
 
 /** Build outer-only text outline via multiple text-shadows (no inner stroke) */
 function buildOuterTextShadow(px: number, color: string): string {
@@ -308,9 +315,9 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
       content: el.content ?? "",
       zIndex: el.zIndex ?? i,
       italic: (el as any).italic ?? false,
-      outlineEnabled: (el as any).outlineEnabled ?? false,
+      outlineEnabled: (el as any).outlineEnabled ?? true,
       outlineWidth: (el as any).outlineWidth ?? 6,
-      outlineColor: (el as any).outlineColor ?? "#000",
+      outlineColor: (el as any).outlineColor ?? "#000000",
       background: el.background
         ? {
             enabled: el.background.enabled ?? false,
@@ -383,7 +390,16 @@ function mapLayersToLayout(
 }
 
 const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
-  { imageUrl, layout, onLayoutChange, overlays = [], onOverlaysChange },
+  {
+    imageUrl,
+    layout,
+    onLayoutChange,
+    overlays = [],
+    onOverlaysChange,
+    showToolbar = true,
+    overlayContent,
+    onCloseToolbar,
+  },
   ref,
 ) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -391,11 +407,14 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Sicherer Wrapper: nur aufrufen, wenn wirklich eine Funktion übergeben wurde
-  const onLayout = useCallback((next: SlideTextElement[]) => {
-    if (typeof onLayoutChange === "function") {
-      onLayoutChange(next);
-    }
-  }, [onLayoutChange]);
+  const onLayout = useCallback(
+    (next: SlideTextElement[]) => {
+      if (typeof onLayoutChange === "function") {
+        onLayoutChange(next);
+      }
+    },
+    [onLayoutChange],
+  );
 
   // === Helpers: aktives/editiertes Layer finden & patchen ===
   const getActiveId = () => isEditingRef.current ?? activeLayerId;
@@ -436,10 +455,16 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         ? crypto.randomUUID()
         : `txt-${Date.now()}`;
     const centerX = W / 2;
-    const oneThirdY = Math.round(H / 3);
-    const initial: TextLayer & { autoHeight?: boolean } = {
+    const centerY = H / 2;
+    const initial: TextLayer & {
+      autoHeight?: boolean;
+      italic?: boolean;
+      outlineEnabled?: boolean;
+      outlineWidth?: number;
+      outlineColor?: string;
+    } = {
       id,
-      content: "Neuer Text",
+      content: "New Text",
       fontFamily: "Inter, system-ui, sans-serif",
       fontSize: BASE_FONT_PX,
       weight: "semibold",
@@ -448,13 +473,17 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       letterSpacing: 0,
       align: "center",
       x: centerX,
-      y: oneThirdY,
+      y: centerY,
       rotation: 0,
       width: Math.round(W * 0.7),
       height: 0, // auto
       zIndex: (textLayers.at(-1)?.zIndex ?? 0) + 1,
       color: "#ffffff",
       autoHeight: true,
+      italic: false,
+      outlineEnabled: true,
+      outlineWidth: 6,
+      outlineColor: "#000000",
     };
     const lines = computeWrappedLinesWithDOM(initial);
     initial.height = Math.ceil(computeAutoHeightForLayer(initial, lines));
@@ -478,15 +507,24 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [bgSelected, setBgSelected] = useState(false);
-  const [imageNatural, setImageNatural] = useState<{ w: number; h: number } | null>(null);
+  const [imageNatural, setImageNatural] = useState<{
+    w: number;
+    h: number;
+  } | null>(null);
   const isPanning = useRef(false);
   const lastPoint = useRef({ x: 0, y: 0 });
 
   // ---------- Overlays: lokaler State + Naturgrößen-Cache ----------
-  const [overlayNodes, setOverlayNodes] = useState<CanvasImageNode[]>(() => overlays);
-  useEffect(() => { setOverlayNodes(overlays); }, [overlays]);
+  const [overlayNodes, setOverlayNodes] = useState<CanvasImageNode[]>(
+    () => overlays,
+  );
+  useEffect(() => {
+    setOverlayNodes(overlays);
+  }, [overlays]);
 
-  const [natSizeMap, setNatSizeMap] = useState<Record<string, { w: number; h: number }>>({});
+  const [natSizeMap, setNatSizeMap] = useState<
+    Record<string, { w: number; h: number }>
+  >({});
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -505,20 +543,25 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           const w = (img2 as any).naturalWidth || 1;
           const h = (img2 as any).naturalHeight || 1;
           return [n.id, { w, h }] as const;
-        })
+        }),
       );
       if (!alive) return;
       const map: Record<string, { w: number; h: number }> = {};
       for (const [id, s] of entries) map[id] = s;
       setNatSizeMap(map);
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [overlays]);
 
-  const commitOverlays = useCallback((next: CanvasImageNode[]) => {
-    setOverlayNodes(next);
-    onOverlaysChange?.(next);
-  }, [onOverlaysChange]);
+  const commitOverlays = useCallback(
+    (next: CanvasImageNode[]) => {
+      setOverlayNodes(next);
+      onOverlaysChange?.(next);
+    },
+    [onOverlaysChange],
+  );
 
   // ---------- Dragging (Overlay verschieben) ----------
   const dragRef = useRef<{
@@ -529,45 +572,62 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     nodeStartY: number;
   }>({ id: null, startX: 0, startY: 0, nodeStartX: 0, nodeStartY: 0 });
 
-  const onOverlayPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>, node: CanvasImageNode) => {
-    e.stopPropagation();
-    setBgSelected(false);
-    setActiveLayerId(node.id);
-    const rect = wrapRef.current?.getBoundingClientRect();
-    const scaleFactor = rect ? W / rect.width : 1;
-    dragRef.current = {
-      id: node.id,
-      startX: e.clientX * scaleFactor,
-      startY: e.clientY * scaleFactor,
-      nodeStartX: node.x,
-      nodeStartY: node.y,
-    };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  }, []);
+  const onOverlayPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>, node: CanvasImageNode) => {
+      e.stopPropagation();
+      setBgSelected(false);
+      setActiveLayerId(node.id);
+      const rect = wrapRef.current?.getBoundingClientRect();
+      const scaleFactor = rect ? W / rect.width : 1;
+      dragRef.current = {
+        id: node.id,
+        startX: e.clientX * scaleFactor,
+        startY: e.clientY * scaleFactor,
+        nodeStartX: node.x,
+        nodeStartY: node.y,
+      };
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [],
+  );
 
-  const onOverlayPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const d = dragRef.current;
-    if (!d.id) return;
-    const rect = wrapRef.current?.getBoundingClientRect();
-    const scaleFactor = rect ? W / rect.width : 1;
-    const curX = e.clientX * scaleFactor;
-    const curY = e.clientY * scaleFactor;
-    const dx = curX - d.startX;
-    const dy = curY - d.startY;
-    const id = d.id;
-    setOverlayNodes((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, x: clamp(d.nodeStartX + dx, -W, 2 * W), y: clamp(d.nodeStartY + dy, -H, 2 * H) } : n)),
-    );
-  }, []);
+  const onOverlayPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const d = dragRef.current;
+      if (!d.id) return;
+      const rect = wrapRef.current?.getBoundingClientRect();
+      const scaleFactor = rect ? W / rect.width : 1;
+      const curX = e.clientX * scaleFactor;
+      const curY = e.clientY * scaleFactor;
+      const dx = curX - d.startX;
+      const dy = curY - d.startY;
+      const id = d.id;
+      setOverlayNodes((prev) =>
+        prev.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                x: clamp(d.nodeStartX + dx, -W, 2 * W),
+                y: clamp(d.nodeStartY + dy, -H, 2 * H),
+              }
+            : n,
+        ),
+      );
+    },
+    [],
+  );
 
-  const onOverlayPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const had = dragRef.current.id;
-    dragRef.current.id = null;
-    if (had) commitOverlays(overlayNodes);
-    if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    }
-  }, [commitOverlays, overlayNodes]);
+  const onOverlayPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const had = dragRef.current.id;
+      dragRef.current.id = null;
+      if (had) commitOverlays(overlayNodes);
+      if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      }
+    },
+    [commitOverlays, overlayNodes],
+  );
 
   // Text layers — lokale Source of Truth
   const [textLayers, setTextLayers] = useState<
@@ -707,22 +767,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         return;
       }
 
-      // 🔍 2) Andernfalls (BG selektiert) → bisherigen BG-Zoom
-      if (!bgSelected) return;
-      e.preventDefault();
-      e.stopPropagation();
-      setScale((prev) => {
-        const newScale = Math.max(0.4, Math.min(3, prev * factor));
-        const scaleDiff = newScale - prev;
-        setOffset((o) => {
-          const offsetX = ((canvasX - W / 2 - o.x) * scaleDiff) / prev;
-          const offsetY = ((canvasY - H / 2 - o.y) * scaleDiff) / prev;
-          return { x: o.x - offsetX, y: o.y - offsetY };
-        });
-        return newScale;
-      });
+      // 🔍 2) BG-Zoom DEAKTIVIERT (Hintergrundbild ist fixiert im Cover-Modus)
+      // Hintergrundbild kann nicht mehr gezoomt werden
+      return;
     },
-    [bgSelected, activeLayerId, overlayNodes, commitOverlays],
+    [activeLayerId, overlayNodes, commitOverlays],
   );
 
   useEffect(() => {
@@ -732,7 +781,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     return () => el.removeEventListener("wheel", wheelHandler as any);
   }, [wheelHandler]);
 
-  // BG pan
+  // BG pan (DEAKTIVIERT - Hintergrundbild ist fixiert)
   const onBGPointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
     // 1) Klicks auf Text- oder Handle-Flächen: NICHT den Editor schließen
@@ -746,33 +795,23 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     if (toolbarMouseDownRef.current) {
       return;
     }
-    // 3) ECHTER Hintergrundklick → Editor schließen + Bild selektieren + Pan erlauben
+    // 3) ECHTER Hintergrundklick → Editor schließen (KEIN Panning mehr)
     if (isEditingRef.current) {
       setIsEditing(null);
     }
     setActiveLayerId(null);
-    setBgSelected(true);
-    isPanning.current = true;
-    lastPoint.current = { x: e.clientX, y: e.clientY };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setBgSelected(false); // Hintergrundbild kann nicht mehr selektiert werden
+    // isPanning und pointer capture NICHT mehr aktivieren
   };
 
   const onBGPointerMove = (e: React.PointerEvent) => {
-    if (!isPanning.current || isInteracting.current) return;
-    const dxPx = e.clientX - lastPoint.current.x;
-    const dyPx = e.clientY - lastPoint.current.y;
-    lastPoint.current = { x: e.clientX, y: e.clientY };
-    const rect = wrapRef.current!.getBoundingClientRect();
-    const dx = dxPx * (W / rect.width);
-    const dy = dyPx * (H / rect.height);
-    setOffset((o) => ({ x: o.x + dx, y: o.y + dy }));
+    // Panning deaktiviert
+    return;
   };
 
   const onBGPointerUp = (e: React.PointerEvent) => {
-    isPanning.current = false;
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {}
+    // Panning deaktiviert
+    return;
   };
 
   // Canvas-Hintergrund-Klick: Auswahl aufheben (State + Ref immer gemeinsam!)
@@ -1165,7 +1204,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const measure = measureWrappedText({
         text: String(layer.content ?? ""),
         fontFamily: layer.fontFamily ?? "Inter",
-        fontWeight: layer.weight === "bold" ? 700 : layer.weight === "semibold" ? 600 : 400,
+        fontWeight:
+          layer.weight === "bold"
+            ? 700
+            : layer.weight === "semibold"
+              ? 600
+              : 400,
         fontStyle: (layer as any).italic ? "italic" : "normal",
         fontSizePx: BASE_FONT_PX,
         lineHeightPx: BASE_FONT_PX * (layer.lineHeight ?? 1.12),
@@ -1212,14 +1256,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       ctx.scale(scaleFactor, scaleFactor);
 
-
-
       const boxLeft = -layer.width / 2;
 
       const boxTop = -layerHeight / 2;
 
       const clipRect = {
-
         x: boxLeft,
 
         y: boxTop,
@@ -1227,16 +1268,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         width: layer.width,
 
         height: layerHeight + DESCENT_PAD,
-
       };
-
-
 
       const contentWidth = Math.max(0, layer.width - 2 * PADDING);
 
       const contentHeight = Math.max(0, layerHeight - 2 * PADDING);
-
-
 
       ctx.font = `${italic ? "italic " : ""}${weight} ${BASE_FONT_PX}px ${layer.fontFamily}`;
 
@@ -1246,34 +1282,30 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       ctx.textBaseline = "alphabetic";
 
-
-
       const lineHeightPx = BASE_FONT_PX * layer.lineHeight;
       const sampleMetrics = ctx.measureText("Mg");
       const ascentEstimate =
         sampleMetrics.actualBoundingBoxAscent ?? BASE_FONT_PX * 0.72;
       const descentEstimate =
         sampleMetrics.actualBoundingBoxDescent ?? BASE_FONT_PX * 0.28;
-      const lineGap = Math.max(0, lineHeightPx - (ascentEstimate + descentEstimate));
-      const startYTop =
-        boxTop + PADDING + ascentEstimate + lineGap / 2;
+      const lineGap = Math.max(
+        0,
+        lineHeightPx - (ascentEstimate + descentEstimate),
+      );
+      const startYTop = boxTop + PADDING + ascentEstimate + lineGap / 2;
       let y = startYTop;
-
-
 
       const bgConfig = layer.background;
       const bgEnabled =
-        (bgConfig?.enabled ?? false) || ((bgConfig?.opacity ?? 0) > 0);
-      let backgroundRect:
-        | {
-            x: number;
-            y: number;
-            width: number;
-            height: number;
-            radius: number;
-            fill: string;
-          }
-        | null = null;
+        (bgConfig?.enabled ?? false) || (bgConfig?.opacity ?? 0) > 0;
+      let backgroundRect: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        radius: number;
+        fill: string;
+      } | null = null;
       if (bgEnabled) {
         const padX = Math.max(0, bgConfig?.paddingX ?? 12);
         const padY = Math.max(0, bgConfig?.paddingY ?? padX);
@@ -1318,18 +1350,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const outlineColor = (layer as any).outlineColor ?? "#000";
 
       const scaledOutlineRadius =
-
         outlineEnabled && outlineWidth > 0
-
           ? Math.max(0.001, layer.scale) * outlineWidth
-
           : 0;
 
       const strokeMargin =
-
         scaledOutlineRadius > 0 ? Math.ceil(scaledOutlineRadius + 4) : 0;
-
-
 
       const clipBaseLeft = clipRect.x;
 
@@ -1340,42 +1366,28 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const clipBaseBottom = clipRect.y + clipRect.height;
 
       const backgroundOverflowLeft = backgroundRect
-
         ? Math.max(0, clipBaseLeft - backgroundRect.x)
-
         : 0;
 
       const backgroundOverflowTop = backgroundRect
-
         ? Math.max(0, clipBaseTop - backgroundRect.y)
-
         : 0;
 
       const backgroundOverflowRight = backgroundRect
-
         ? Math.max(
-
             0,
 
             backgroundRect.x + backgroundRect.width - clipBaseRight,
-
           )
-
         : 0;
 
       const backgroundOverflowBottom = backgroundRect
-
         ? Math.max(
-
             0,
 
             backgroundRect.y + backgroundRect.height - clipBaseBottom,
-
           )
-
         : 0;
-
-
 
       const clipMarginLeft = Math.max(
         strokeMargin,
@@ -1393,20 +1405,15 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       );
 
       const clipMarginBottom = Math.max(
-
         strokeMargin,
 
         Math.ceil(backgroundOverflowBottom + 1),
-
       );
-
-
 
       ctx.save();
       ctx.beginPath();
 
       ctx.rect(
-
         clipRect.x - clipMarginLeft,
 
         clipRect.y - clipMarginTop,
@@ -1414,7 +1421,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         clipRect.width + clipMarginLeft + clipMarginRight,
 
         clipRect.height + clipMarginTop + clipMarginBottom,
-
       );
 
       ctx.clip();
@@ -1433,78 +1439,110 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         }
       };
 
-      const drawOuterStrokeLine = (raw: string, yPos: number) => {
-        if (!(outlineEnabled && outlineWidth > 0)) return;
+      const drawOuterStrokeLine = (raw: string, yPos: number) => {
+        if (!(outlineEnabled && outlineWidth > 0)) return;
+
         const baseStroke = outlineWidth * Math.max(0.001, layer.scale);
         const effectiveLineWidth = 2 * (baseStroke + 1);
         const margin = Math.max(
           strokeMargin,
           Math.ceil(effectiveLineWidth / 2),
         );
-        const off = document.createElement("canvas");
-        off.width = Math.max(1, Math.ceil(layer.width + margin * 2));
-        off.height = Math.max(
-          1,
-          Math.ceil(layerHeight + DESCENT_PAD + margin * 2),
-        );
-        const ox = off.getContext("2d")!;
-        ox.font = ctx.font;
-        ox.textBaseline = "alphabetic";
-        (ox as any).fontKerning = "normal";
-
-        const baseLeft = -layer.width / 2;
-        const baseTop = -layerHeight / 2;
-        const offsetX = margin;
-        const offsetY = margin;
-        const textW = Math.max(0, layer.width - 2 * PADDING);
-        let startX = baseLeft + PADDING;
-        if (layer.align === "center") startX = baseLeft + PADDING + textW / 2;
-        else if (layer.align === "right") startX = baseLeft + PADDING + textW;
-        const localX = startX - baseLeft + offsetX;
-        const localY = yPos - baseTop + offsetY;
-
+        const off = document.createElement("canvas");
+
+        off.width = Math.max(1, Math.ceil(layer.width + margin * 2));
+
+        off.height = Math.max(
+          1,
+
+          Math.ceil(layerHeight + DESCENT_PAD + margin * 2),
+        );
+
+        const ox = off.getContext("2d")!;
+
+        ox.font = ctx.font;
+
+        ox.textBaseline = "alphabetic";
+
+        (ox as any).fontKerning = "normal";
+
+        const baseLeft = -layer.width / 2;
+
+        const baseTop = -layerHeight / 2;
+
+        const offsetX = margin;
+
+        const offsetY = margin;
+
+        const textW = Math.max(0, layer.width - 2 * PADDING);
+
+        let startX = baseLeft + PADDING;
+
+        if (layer.align === "center") startX = baseLeft + PADDING + textW / 2;
+        else if (layer.align === "right") startX = baseLeft + PADDING + textW;
+
+        const localX = startX - baseLeft + offsetX;
+
+        const localY = yPos - baseTop + offsetY;
+
         ox.lineJoin = "round";
         ox.miterLimit = 2;
         ox.strokeStyle = outlineColor;
         ox.lineWidth = effectiveLineWidth;
-
-        if (layer.letterSpacing === 0) {
-          if (layer.align === "left") ox.textAlign = "left";
-          else if (layer.align === "right") ox.textAlign = "right";
-          else ox.textAlign = "center";
-          ox.strokeText(raw, localX, localY);
-        } else {
-          perGlyph(
-            (ch, x, yy) => {
-              ox.strokeText(ch, x - baseLeft + offsetX, yy - baseTop + offsetY);
-            },
-            raw,
-            startX,
-            yPos,
-          );
-        }
-
-        ox.globalCompositeOperation = "destination-out";
-        ox.fillStyle = "#000";
-        if (layer.letterSpacing === 0) {
-          if (layer.align === "left") ox.textAlign = "left";
-          else if (layer.align === "right") ox.textAlign = "right";
-          else ox.textAlign = "center";
-          ox.fillText(raw, localX, localY);
-        } else {
-          perGlyph(
-            (ch, x, yy) => {
-              ox.fillText(ch, x - baseLeft + offsetX, yy - baseTop + offsetY);
-            },
-            raw,
-            startX,
-            yPos,
-          );
-        }
-        ox.globalCompositeOperation = "source-over";
-
-        ctx.drawImage(off, -layer.width / 2 - offsetX, -layerHeight / 2 - offsetY);
-      };
+
+        if (layer.letterSpacing === 0) {
+          if (layer.align === "left") ox.textAlign = "left";
+          else if (layer.align === "right") ox.textAlign = "right";
+          else ox.textAlign = "center";
+
+          ox.strokeText(raw, localX, localY);
+        } else {
+          perGlyph(
+            (ch, x, yy) => {
+              ox.strokeText(ch, x - baseLeft + offsetX, yy - baseTop + offsetY);
+            },
+
+            raw,
+
+            startX,
+
+            yPos,
+          );
+        }
+
+        ox.globalCompositeOperation = "destination-out";
+
+        ox.fillStyle = "#000";
+
+        if (layer.letterSpacing === 0) {
+          if (layer.align === "left") ox.textAlign = "left";
+          else if (layer.align === "right") ox.textAlign = "right";
+          else ox.textAlign = "center";
+
+          ox.fillText(raw, localX, localY);
+        } else {
+          perGlyph(
+            (ch, x, yy) => {
+              ox.fillText(ch, x - baseLeft + offsetX, yy - baseTop + offsetY);
+            },
+
+            raw,
+
+            startX,
+
+            yPos,
+          );
+        }
+
+        ox.globalCompositeOperation = "source-over";
+
+        ctx.drawImage(
+          off,
+          -layer.width / 2 - offsetX,
+          -layerHeight / 2 - offsetY,
+        );
+      };
+
       const drawFillLine = (raw: string, yPos: number) => {
         const textW = Math.max(0, layer.width - 2 * PADDING);
         // Soft Shadow wie im Preview: "0 2px 8px rgba(0,0,0,0.8)"
@@ -1563,7 +1601,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       await new Promise<void>((res) => {
         const img = new Image();
         img.onload = () => {
-          try { ctx.drawImage(img, left, top, w, h); } catch {}
+          try {
+            ctx.drawImage(img, left, top, w, h);
+          } catch {}
           res();
         };
         img.onerror = () => res();
@@ -1585,8 +1625,17 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     () => ({
       getLayout: () => mapLayersToLayout(textLayers as any),
       exportPNG,
+      focusFirstText: () => {
+        if (textLayers.length > 0 && !activeLayerId) {
+          setActiveLayerId(textLayers[0]!.id);
+        }
+      },
+      clearTextFocus: () => {
+        setActiveLayerId(null);
+        setIsEditing(null);
+      },
     }),
-    [textLayers, exportPNG],
+    [textLayers, exportPNG, activeLayerId],
   );
 
   // Render
@@ -1599,7 +1648,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         outlineColor?: string;
       })
     | undefined;
-const handleAddText = useCallback(() => {
+  const handleAddText = useCallback(() => {
     addNewTextLayer();
   }, [textLayers]);
 
@@ -1629,8 +1678,14 @@ const handleAddText = useCallback(() => {
         applyToActive((l) => ({ ...l, align: patch.align as any }));
       }
       // Toolbar liefert "fontSize" → mappen auf scale (BASE_FONT_PX * scale)
-      if (typeof (patch as any).fontSize === "number" && Number.isFinite((patch as any).fontSize)) {
-        const nextScale = Math.max(0.2, Math.min(4, (patch as any).fontSize / BASE_FONT_PX));
+      if (
+        typeof (patch as any).fontSize === "number" &&
+        Number.isFinite((patch as any).fontSize)
+      ) {
+        const nextScale = Math.max(
+          0.2,
+          Math.min(4, (patch as any).fontSize / BASE_FONT_PX),
+        );
         applyToActive((l) => ({ ...l, scale: nextScale }));
       }
 
@@ -1773,207 +1828,224 @@ const handleAddText = useCallback(() => {
 
   return (
     <>
-      {/* === Sticky Toolbar: Breite dynamisch = Canvas-Shell === */}
+      {/* === Toolbar-Bereich: Immer gerendert für konsistente Höhe === */}
       {/* Wir messen die Canvas-Shell (wrapRef) und setzen diese Breite als maxWidth der Toolbar. */}
-      <ToolbarSizedByCanvas
-        wrapRef={wrapRef}
-      >
-        <LegacyEditorToolbar
-          onAddText={handleAddText}
-          className="py-1 px-2"
-          selectedText={
-            active
-              ? ({
-                  id: active.id,
-                  // Werte so liefern, wie die Toolbar sie erwartet:
-                  // fontSize = BASE_FONT_PX * scale
-                  fontSize: Math.round(BASE_FONT_PX * (Number.isFinite(active.scale) ? active.scale : 1)),
-                  lineHeight: active.lineHeight,
-                  letterSpacing: active.letterSpacing,
-                  align: active.align,
-                  // Farbe(n)
-                  // Toolbar liest 'fill' für Textfarbe
-                  fill: (active as any).color ?? "#ffffff",
-                  // Toolbar liest 'stroke' + 'strokeWidth' für Kontur
-                  stroke: (active as any).outlineColor ?? "#000000",
-                  strokeWidth: (active as any).outlineWidth ?? 0,
-                  // Bold / Italic
-                  fontWeight: active.weight === "bold" ? ("bold" as any) : ("normal" as any),
-                  fontStyle: (active as any).italic ? ("italic" as any) : ("normal" as any),
-                  // Hintergrund
-                  background: active.background,
-                } as unknown as SlideTextElement)
-              : null
-          }
-          onChangeSelectedText={handleToolbarPatch}
-        >
-          {/* === BEGIN: LEGACY CONTROLS (NEU ANGERICHTET) === */}
+      <ToolbarSizedByCanvas wrapRef={wrapRef}>
+        {showToolbar ? (
+          <LegacyEditorToolbar
+            onAddText={handleAddText}
+            className="py-1 px-2"
+            selectedText={
+              active
+                ? ({
+                    id: active.id,
+                    // Werte so liefern, wie die Toolbar sie erwartet:
+                    // fontSize = BASE_FONT_PX * scale
+                    fontSize: Math.round(
+                      BASE_FONT_PX *
+                        (Number.isFinite(active.scale) ? active.scale : 1),
+                    ),
+                    lineHeight: active.lineHeight,
+                    letterSpacing: active.letterSpacing,
+                    align: active.align,
+                    // Farbe(n)
+                    // Toolbar liest 'fill' für Textfarbe
+                    fill: (active as any).color ?? "#ffffff",
+                    // Toolbar liest 'stroke' + 'strokeWidth' für Kontur
+                    stroke: (active as any).outlineColor ?? "#000000",
+                    strokeWidth: (active as any).outlineWidth ?? 0,
+                    // Bold / Italic
+                    fontWeight:
+                      active.weight === "bold"
+                        ? ("bold" as any)
+                        : ("normal" as any),
+                    fontStyle: (active as any).italic
+                      ? ("italic" as any)
+                      : ("normal" as any),
+                    // Hintergrund
+                    background: active.background,
+                  } as unknown as SlideTextElement)
+                : null
+            }
+            onChangeSelectedText={handleToolbarPatch}
+            onClose={onCloseToolbar}
+          >
+            {/* === BEGIN: LEGACY CONTROLS (NEU ANGERICHTET) === */}
 
-          {/* --- ZEILE 1: Typo & Ausrichtung & Größe --- */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleBoldUI}
-              aria-pressed={uiBold}
-              className={
-                "inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-medium shadow-sm transition-colors " +
-                (uiBold
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border/80 bg-background/90 hover:bg-muted")
-              }
-              aria-label="Fett"
-              title="Fett"
+            {/* --- ZEILE 1: Typo & Ausrichtung & Größe --- */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleBoldUI}
+                aria-pressed={uiBold}
+                className={
+                  "inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-medium shadow-sm transition-colors " +
+                  (uiBold
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border/80 bg-background/90 hover:bg-muted")
+                }
+                aria-label="Fett"
+                title="Fett"
+              >
+                B
+              </button>
+              <button
+                onClick={toggleItalicUI}
+                aria-pressed={uiItalic}
+                className={
+                  "inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-medium shadow-sm transition-colors " +
+                  (uiItalic
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border/80 bg-background/90 hover:bg-muted")
+                }
+                aria-label="Kursiv"
+                title="Kursiv"
+              >
+                <span className="italic">I</span>
+              </button>
+            </div>
+
+            {/* Ausrichtung mit "mehrzeiligen" Icons */}
+            <div
+              className="flex items-center gap-2"
+              aria-label="Textausrichtung"
             >
-              B
-            </button>
-            <button
-              onClick={toggleItalicUI}
-              aria-pressed={uiItalic}
-              className={
-                "inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-medium shadow-sm transition-colors " +
-                (uiItalic
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border/80 bg-background/90 hover:bg-muted")
-              }
-              aria-label="Kursiv"
-              title="Kursiv"
-            >
-              <span className="italic">I</span>
-            </button>
-          </div>
+              <button
+                aria-pressed={uiAlign === "left"}
+                className={
+                  "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
+                  (uiAlign === "left"
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border/80 bg-background/90 hover:bg-muted")
+                }
+                aria-label="Links ausrichten"
+                title="Links ausrichten"
+                onClick={() => setAlignUI("left")}
+              >
+                <AlignLeft className="h-4 w-4" />
+              </button>
+              <button
+                aria-pressed={uiAlign === "center"}
+                className={
+                  "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
+                  (uiAlign === "center"
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border/80 bg-background/90 hover:bg-muted")
+                }
+                aria-label="Zentrieren"
+                title="Zentrieren"
+                onClick={() => setAlignUI("center")}
+              >
+                <AlignCenter className="h-4 w-4" />
+              </button>
+              <button
+                aria-pressed={uiAlign === "right"}
+                className={
+                  "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
+                  (uiAlign === "right"
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border/80 bg-background/90 hover:bg-muted")
+                }
+                aria-label="Rechts ausrichten"
+                title="Rechts ausrichten"
+                onClick={() => setAlignUI("right")}
+              >
+                <AlignRight className="h-4 w-4" />
+              </button>
+            </div>
 
-          {/* Ausrichtung mit "mehrzeiligen" Icons */}
-          <div className="flex items-center gap-2" aria-label="Textausrichtung">
-            <button
-              aria-pressed={uiAlign === "left"}
-              className={
-                "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
-                (uiAlign === "left"
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border/80 bg-background/90 hover:bg-muted")
-              }
-              aria-label="Links ausrichten"
-              title="Links ausrichten"
-              onClick={() => setAlignUI("left")}
-            >
-              <AlignLeft className="h-4 w-4" />
-            </button>
-            <button
-              aria-pressed={uiAlign === "center"}
-              className={
-                "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
-                (uiAlign === "center"
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border/80 bg-background/90 hover:bg-muted")
-              }
-              aria-label="Zentrieren"
-              title="Zentrieren"
-              onClick={() => setAlignUI("center")}
-            >
-              <AlignCenter className="h-4 w-4" />
-            </button>
-            <button
-              aria-pressed={uiAlign === "right"}
-              className={
-                "inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-colors " +
-                (uiAlign === "right"
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border/80 bg-background/90 hover:bg-muted")
-              }
-              aria-label="Rechts ausrichten"
-              title="Rechts ausrichten"
-              onClick={() => setAlignUI("right")}
-            >
-              <AlignRight className="h-4 w-4" />
-            </button>
-          </div>
+            {/* Größe × (Scale) */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">Größe ×</label>
+              <input
+                type="number"
+                step="0.05"
+                min="0.2"
+                max="4"
+                value={uiScale}
+                onChange={(e) =>
+                  handleScaleChange(parseFloat(e.currentTarget.value))
+                }
+                className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
+              />
+            </div>
 
-          {/* Größe × (Scale) */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">Größe ×</label>
-            <input
-              type="number"
-              step="0.05"
-              min="0.2"
-              max="4"
-              value={uiScale}
-              onChange={(e) =>
-                handleScaleChange(parseFloat(e.currentTarget.value))
-              }
-              className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
-            />
-          </div>
+            {/* Zeilenumbruch zu Zeile 2 */}
+            <div className="basis-full h-0" />
 
-          {/* Zeilenumbruch zu Zeile 2 */}
-          <div className="basis-full h-0" />
+            {/* --- ZEILE 2: Abstände & Farben --- */}
+            {/* Zeilenhöhe (Input) */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">
+                Zeilenhöhe
+              </label>
+              <input
+                type="number"
+                min="0.8"
+                max="2"
+                step="0.02"
+                value={uiLineHeight}
+                onChange={handleLineHeightChange}
+                className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
+              />
+            </div>
 
-          {/* --- ZEILE 2: Abstände & Farben --- */}
-          {/* Zeilenhöhe (Input) */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">Zeilenhöhe</label>
-            <input
-              type="number"
-              min="0.8"
-              max="2"
-              step="0.02"
-              value={uiLineHeight}
-              onChange={handleLineHeightChange}
-              className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
-            />
-          </div>
+            {/* Kontur-Schalter */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">Kontur an</label>
+              <input
+                type="checkbox"
+                checked={uiOutlineOn}
+                onChange={handleToggleOutlineOn}
+                className="h-4 w-4 accent-primary"
+              />
+            </div>
 
-          {/* Kontur-Schalter */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">Kontur an</label>
-            <input
-              type="checkbox"
-              checked={uiOutlineOn}
-              onChange={handleToggleOutlineOn}
-              className="h-4 w-4 accent-primary"
-            />
-          </div>
+            {/* Konturbreite (Slider) */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">
+                Konturbreite
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="12"
+                step="0.5"
+                value={uiOutlineWidth}
+                onChange={handleOutlineWidthChange}
+                disabled={!uiOutlineOn}
+                className="h-1.5 w-32 accent-primary disabled:opacity-40"
+              />
+            </div>
 
-          {/* Konturbreite (Slider) */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">
-              Konturbreite
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="12"
-              step="0.5"
-              value={uiOutlineWidth}
-              onChange={handleOutlineWidthChange}
-              disabled={!uiOutlineOn}
-              className="h-1.5 w-32 accent-primary disabled:opacity-40"
-            />
-          </div>
+            {/* Textfarbe */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">Text</label>
+              <input
+                type="color"
+                value={uiTextColor}
+                onChange={(e) => setTextColorUI(e.currentTarget.value)}
+                className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
+              />
+            </div>
 
-          {/* Textfarbe */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">Text</label>
-            <input
-              type="color"
-              value={uiTextColor}
-              onChange={(e) => setTextColorUI(e.currentTarget.value)}
-              className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
-            />
-          </div>
+            {/* Konturfarbe */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">Kontur</label>
+              <input
+                type="color"
+                value={uiOutlineColor}
+                onChange={(e) => setOutlineColorUI(e.currentTarget.value)}
+                disabled={!uiOutlineOn}
+                className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5 disabled:opacity-40"
+              />
+            </div>
 
-          {/* Konturfarbe */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">Kontur</label>
-            <input
-              type="color"
-              value={uiOutlineColor}
-              onChange={(e) => setOutlineColorUI(e.currentTarget.value)}
-              disabled={!uiOutlineOn}
-              className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5 disabled:opacity-40"
-            />
-          </div>
-
-          {/* === END: LEGACY CONTROLS === */}
-        </LegacyEditorToolbar>
+            {/* === END: LEGACY CONTROLS === */}
+          </LegacyEditorToolbar>
+        ) : (
+          // Leerer Platzhalter, damit alle Slides die gleiche Höhe haben
+          <div className="w-full" />
+        )}
       </ToolbarSizedByCanvas>
 
       {/* Canvas-Shell */}
@@ -2010,9 +2082,11 @@ const handleAddText = useCallback(() => {
                 alt=""
                 className="absolute left-1/2 top-1/2 select-none pointer-events-none"
                 style={{
+                  width: imageNatural ? `${imageNatural.w}px` : "auto",
+                  height: imageNatural ? `${imageNatural.h}px` : "auto",
                   transform: `translate(-50%,-50%) translate(${offset.x}px, ${offset.y}px) scale(${Math.max(
                     0.001,
-                    scale
+                    scale,
                   )})`,
                   transformOrigin: "center",
                 }}
@@ -2021,18 +2095,25 @@ const handleAddText = useCallback(() => {
                   try {
                     const n = e.currentTarget as HTMLImageElement;
                     setImageNatural({ w: n.naturalWidth, h: n.naturalHeight });
-                    const fit = Math.min(W / n.naturalWidth, H / n.naturalHeight);
-                    setScale((prev) => (prev === 1 ? fit : prev));
+                    // Cover-Mode: Bild füllt Canvas komplett (nicht contain)
+                    const coverScale = Math.max(
+                      W / n.naturalWidth,
+                      H / n.naturalHeight,
+                    );
+                    setScale(coverScale);
+                    // Offset auf 0 setzen für zentriertes Bild
+                    setOffset({ x: 0, y: 0 });
                   } catch {}
                 }}
               />
-              {bgSelected && imageNatural && (
+              {/* Hintergrund-Overlay deaktiviert - Bild ist fixiert */}
+              {false && bgSelected && imageNatural && (
                 <div
                   className="absolute left-1/2 top-1/2 pointer-events-none"
                   style={{
                     transform: `translate(-50%,-50%) translate(${offset.x}px, ${offset.y}px) scale(${Math.max(
                       0.001,
-                      scale
+                      scale,
                     )})`,
                     transformOrigin: "center",
                     width: imageNatural.w,
@@ -2106,7 +2187,8 @@ const handleAddText = useCallback(() => {
                   : 400;
             const background = layer.background;
             // Kein Toggle mehr nötig: Opazität steuert Sichtbarkeit
-            const bgEnabled = (background?.enabled ?? false) || ((background?.opacity ?? 0) > 0);
+            const bgEnabled =
+              (background?.enabled ?? false) || (background?.opacity ?? 0) > 0;
             const bgPadX = Math.max(0, background?.paddingX ?? 12);
             const bgPadY = Math.max(0, background?.paddingY ?? bgPadX);
             const bgRadius = Math.max(0, background?.radius ?? 16);
@@ -2177,90 +2259,96 @@ const handleAddText = useCallback(() => {
                           background: bgColor,
                           borderRadius:
                             bgMode === "blob"
-                              ? Math.max(bgRadius, Math.min(bgRadius * 1.5, 1600))
+                              ? Math.max(
+                                  bgRadius,
+                                  Math.min(bgRadius * 1.5, 1600),
+                                )
                               : bgRadius,
                         }}
                       />
                     )}
                     {isCurrentEditing ? (
                       <textarea
-                      ref={(el) => {
-                        if (isCurrentEditing) editorActiveRef.current = el;
-                      }}
-                      autoFocus
-                      value={layer.content}
-                      onChange={(e) => onTextareaChange(layer.id, e)}
-                      onBlur={() => onTextBlur(layer.id)}
-                      spellCheck={false}
-                      className="relative z-10 outline-none w-full h-full"
-                      style={{
-                        resize: "none",
-                        overflow: "auto",
-                        userSelect: "text",
-                        WebkitUserSelect: "text" as any,
-                        background: "transparent",
-                        color: layer.color,
-                        fontSize: `${BASE_FONT_PX}px`,
-                        fontFamily: layer.fontFamily ?? "Inter",
-                        fontWeight: cssFontWeight as any,
-                        fontStyle: (layer as any).italic ? "italic" : "normal",
-                        lineHeight: layer.lineHeight,
-                        letterSpacing: `${layer.letterSpacing}px`,
-                        textAlign: layer.align as any,
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "normal",
-                        overflowWrap: "normal",
-                        boxSizing: "border-box",
-                        fontKerning: "normal" as any,
-                        /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
-                        textShadow:
-                          (layer as any).outlineEnabled &&
-                          ((layer as any).outlineWidth || 0) > 0
-                            ? buildOuterTextShadow(
-                                Math.round(
-                                  ((layer as any).outlineWidth || 6) *
-                                    layer.scale,
-                                ),
-                                (layer as any).outlineColor || "#000",
-                              ) + ", 0 2px 8px rgba(0,0,0,0.8)"
-                            : "0 2px 8px rgba(0,0,0,0.8)",
-                      }}
-                    />
-                  ) : (
+                        ref={(el) => {
+                          if (isCurrentEditing) editorActiveRef.current = el;
+                        }}
+                        autoFocus
+                        value={layer.content}
+                        onChange={(e) => onTextareaChange(layer.id, e)}
+                        onBlur={() => onTextBlur(layer.id)}
+                        spellCheck={false}
+                        className="relative z-10 outline-none w-full h-full"
+                        style={{
+                          resize: "none",
+                          overflow: "auto",
+                          userSelect: "text",
+                          WebkitUserSelect: "text" as any,
+                          background: "transparent",
+                          color: layer.color,
+                          fontSize: `${BASE_FONT_PX}px`,
+                          fontFamily: layer.fontFamily ?? "Inter",
+                          fontWeight: cssFontWeight as any,
+                          fontStyle: (layer as any).italic
+                            ? "italic"
+                            : "normal",
+                          lineHeight: layer.lineHeight,
+                          letterSpacing: `${layer.letterSpacing}px`,
+                          textAlign: layer.align as any,
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "normal",
+                          overflowWrap: "normal",
+                          boxSizing: "border-box",
+                          fontKerning: "normal" as any,
+                          /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
+                          textShadow:
+                            (layer as any).outlineEnabled &&
+                            ((layer as any).outlineWidth || 0) > 0
+                              ? buildOuterTextShadow(
+                                  Math.round(
+                                    ((layer as any).outlineWidth || 6) *
+                                      layer.scale,
+                                  ),
+                                  (layer as any).outlineColor || "#000",
+                                ) + ", 0 2px 8px rgba(0,0,0,0.8)"
+                              : "0 2px 8px rgba(0,0,0,0.8)",
+                        }}
+                      />
+                    ) : (
                       <div
-                      className="relative z-10 w-full h-full"
-                      style={{
-                        color: layer.color,
-                        fontSize: `${BASE_FONT_PX}px`,
-                        fontFamily: layer.fontFamily ?? "Inter",
-                        fontWeight: cssFontWeight,
-                        fontStyle: (layer as any).italic ? "italic" : "normal",
-                        textAlign: layer.align,
-                        lineHeight: layer.lineHeight,
-                        letterSpacing: `${layer.letterSpacing}px`,
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "normal",
-                        overflowWrap: "normal",
-                        boxSizing: "border-box",
-                        fontKerning: "normal" as any,
-                        /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
-                        textShadow:
-                          (layer as any).outlineEnabled &&
-                          ((layer as any).outlineWidth || 0) > 0
-                            ? buildOuterTextShadow(
-                                Math.round(
-                                  ((layer as any).outlineWidth || 6) *
-                                    layer.scale,
-                                ),
-                                (layer as any).outlineColor || "#000",
-                              ) + ", 0 2px 8px rgba(0,0,0,0.8)"
-                            : "0 2px 8px rgba(0,0,0,0.8)",
-                      }}
+                        className="relative z-10 w-full h-full"
+                        style={{
+                          color: layer.color,
+                          fontSize: `${BASE_FONT_PX}px`,
+                          fontFamily: layer.fontFamily ?? "Inter",
+                          fontWeight: cssFontWeight,
+                          fontStyle: (layer as any).italic
+                            ? "italic"
+                            : "normal",
+                          textAlign: layer.align,
+                          lineHeight: layer.lineHeight,
+                          letterSpacing: `${layer.letterSpacing}px`,
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "normal",
+                          overflowWrap: "normal",
+                          boxSizing: "border-box",
+                          fontKerning: "normal" as any,
+                          /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
+                          textShadow:
+                            (layer as any).outlineEnabled &&
+                            ((layer as any).outlineWidth || 0) > 0
+                              ? buildOuterTextShadow(
+                                  Math.round(
+                                    ((layer as any).outlineWidth || 6) *
+                                      layer.scale,
+                                  ),
+                                  (layer as any).outlineColor || "#000",
+                                ) + ", 0 2px 8px rgba(0,0,0,0.8)"
+                              : "0 2px 8px rgba(0,0,0,0.8)",
+                        }}
                       >
-                      {layer.content}
-                    </div>
-                  )}
-
+                        {layer.content}
+                      </div>
+                    )}
                   </div>
                   {/* === Handles (größer + modernere Hitbox) INSIDE der Box === */}
                   {isActive && !isCurrentEditing && (
@@ -2359,9 +2447,9 @@ const handleAddText = useCallback(() => {
                       >
                         <div className="h-[12px] w-16 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -2376,6 +2464,11 @@ const handleAddText = useCallback(() => {
             style={{ display: "none" }}
           />
         </div>
+
+        {/* Overlay Content (z.B. Edit-Buttons) */}
+        {overlayContent && (
+          <div className="absolute inset-0 z-50">{overlayContent}</div>
+        )}
       </div>
       {/* ^ obere Canvas-Hülle */}
     </>
@@ -2409,8 +2502,12 @@ function ToolbarSizedByCanvas({
 
   return (
     <div
-      className="sticky top-0 z-50 mb-2 w-full bg-transparent"
-      style={{ display: "flex", justifyContent: "center" }}
+      className="w-full bg-transparent mb-2"
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        minHeight: "120px", // Feste Höhe für den Platzhalter (angepasst an Toolbar-Höhe)
+      }}
     >
       <div
         className="mx-auto w-full"

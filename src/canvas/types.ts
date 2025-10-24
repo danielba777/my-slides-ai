@@ -51,7 +51,7 @@ export type CanvasDoc = {
 export const DEFAULT_CANVAS: CanvasDoc = {
   version: 1,
   width: 1080,
-  height: 1920,
+  height: 1620, // 2:3 aspect ratio (1080 * 3 / 2 = 1620)
   bg: "#ffffff",
   nodes: [],
   selection: [],
