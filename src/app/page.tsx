@@ -1,13 +1,11 @@
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { AppLogo } from "@/components/logo/AppLogo";
+import { Button } from "@/components/ui/button";
 import { auth } from "@/server/auth";
-import { redirect } from "next/navigation";
+import Link from "next/link";
 
 export default async function Home() {
   const session = await auth();
-  if (session) {
-    redirect("/dashboard/home");
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted">
@@ -19,7 +17,13 @@ export default async function Home() {
               SlidesCockpit
             </span>
           </div>
-          <GoogleSignInButton />
+          {session ? (
+            <Link href="/dashboard/home">
+              <Button>Go to app</Button>
+            </Link>
+          ) : (
+            <GoogleSignInButton />
+          )}
         </div>
       </header>
 
@@ -29,6 +33,16 @@ export default async function Home() {
           <br className="hidden sm:block" />
           traffic to your website
         </h1>
+
+        <div className="flex justify-center">
+          {session ? (
+            <Link href="/dashboard/home">
+              <Button size="lg">Go to app</Button>
+            </Link>
+          ) : (
+            <GoogleSignInButton />
+          )}
+        </div>
       </main>
     </div>
   );

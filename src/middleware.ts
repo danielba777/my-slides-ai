@@ -6,11 +6,6 @@ export async function middleware(request: NextRequest) {
   const isAuthPage = request.nextUrl.pathname.startsWith("/auth");
   const path = request.nextUrl.pathname;
 
-  // If user hits the landing page while authenticated, send them to the app
-  if (session && path === "/") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
   // If user is on auth page but already signed in, redirect to home page
   if (isAuthPage && session) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
