@@ -740,22 +740,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         return;
       }
 
-      // 🔍 2) Andernfalls (BG selektiert) → bisherigen BG-Zoom
-      if (!bgSelected) return;
-      e.preventDefault();
-      e.stopPropagation();
-      setScale((prev) => {
-        const newScale = Math.max(0.4, Math.min(3, prev * factor));
-        const scaleDiff = newScale - prev;
-        setOffset((o) => {
-          const offsetX = ((canvasX - W / 2 - o.x) * scaleDiff) / prev;
-          const offsetY = ((canvasY - H / 2 - o.y) * scaleDiff) / prev;
-          return { x: o.x - offsetX, y: o.y - offsetY };
-        });
-        return newScale;
-      });
+      // 🔍 2) BG-Zoom DEAKTIVIERT (Hintergrundbild ist fixiert im Cover-Modus)
+      // Hintergrundbild kann nicht mehr gezoomt werden
+      return;
     },
-    [bgSelected, activeLayerId, overlayNodes, commitOverlays],
+    [activeLayerId, overlayNodes, commitOverlays],
   );
 
   useEffect(() => {
@@ -765,7 +754,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     return () => el.removeEventListener("wheel", wheelHandler as any);
   }, [wheelHandler]);
 
-  // BG pan
+  // BG pan (DEAKTIVIERT - Hintergrundbild ist fixiert)
   const onBGPointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
     // 1) Klicks auf Text- oder Handle-Flächen: NICHT den Editor schließen
@@ -779,33 +768,23 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     if (toolbarMouseDownRef.current) {
       return;
     }
-    // 3) ECHTER Hintergrundklick → Editor schließen + Bild selektieren + Pan erlauben
+    // 3) ECHTER Hintergrundklick → Editor schließen (KEIN Panning mehr)
     if (isEditingRef.current) {
       setIsEditing(null);
     }
     setActiveLayerId(null);
-    setBgSelected(true);
-    isPanning.current = true;
-    lastPoint.current = { x: e.clientX, y: e.clientY };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setBgSelected(false); // Hintergrundbild kann nicht mehr selektiert werden
+    // isPanning und pointer capture NICHT mehr aktivieren
   };
 
   const onBGPointerMove = (e: React.PointerEvent) => {
-    if (!isPanning.current || isInteracting.current) return;
-    const dxPx = e.clientX - lastPoint.current.x;
-    const dyPx = e.clientY - lastPoint.current.y;
-    lastPoint.current = { x: e.clientX, y: e.clientY };
-    const rect = wrapRef.current!.getBoundingClientRect();
-    const dx = dxPx * (W / rect.width);
-    const dy = dyPx * (H / rect.height);
-    setOffset((o) => ({ x: o.x + dx, y: o.y + dy }));
+    // Panning deaktiviert
+    return;
   };
 
   const onBGPointerUp = (e: React.PointerEvent) => {
-    isPanning.current = false;
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {}
+    // Panning deaktiviert
+    return;
   };
 
   // Canvas-Hintergrund-Klick: Auswahl aufheben (State + Ref immer gemeinsam!)
@@ -2067,15 +2046,19 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                   try {
                     const n = e.currentTarget as HTMLImageElement;
                     setImageNatural({ w: n.naturalWidth, h: n.naturalHeight });
-                    const fit = Math.min(
+                    // Cover-Mode: Bild füllt Canvas komplett (nicht contain)
+                    const coverScale = Math.max(
                       W / n.naturalWidth,
                       H / n.naturalHeight,
                     );
-                    setScale((prev) => (prev === 1 ? fit : prev));
+                    setScale(coverScale);
+                    // Offset auf 0 setzen für zentriertes Bild
+                    setOffset({ x: 0, y: 0 });
                   } catch {}
                 }}
               />
-              {bgSelected && imageNatural && (
+              {/* Hintergrund-Overlay deaktiviert - Bild ist fixiert */}
+              {false && bgSelected && imageNatural && (
                 <div
                   className="absolute left-1/2 top-1/2 pointer-events-none"
                   style={{
