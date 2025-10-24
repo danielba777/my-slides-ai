@@ -1,6 +1,6 @@
 "use client";
 
-import { DEFAULT_CANVAS, type CanvasDoc } from "@/canvas/types";
+import { DEFAULT_CANVAS, type CanvasDoc, type CanvasImageNode } from "@/canvas/types";
 import { applyBackgroundImageToCanvas } from "@/components/presentation/utils/canvas";
 import { SlideContainer } from "@/components/presentation/presentation-page/SlideContainer";
 import { usePresentationSlides } from "@/hooks/presentation/usePresentationSlides";
@@ -17,6 +17,12 @@ import React, { memo, useEffect, useRef, useState } from "react";
 import { PresentModeHeader } from "../dashboard/PresentModeHeader";
 import { ThinkingDisplay } from "../dashboard/ThinkingDisplay";
 import { SortableSlide } from "./SortableSlide";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 const SlideCanvas = dynamic(() => import("@/canvas/SlideCanvasAdapter"), {
   ssr: false,
 });
@@ -55,8 +61,8 @@ function useImageReady(url?: string) {
 }
 
 // ✅ Child-Komponente, damit der Hook NICHT in einer Schleife aufgerufen wird
-const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slidesCount }: {
-  slide: any; index: number; isPresenting: boolean; slidesCount: number;
+const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slidesCount, isReadOnly = false }: {
+  slide: any; index: number; isPresenting: boolean; slidesCount: number; isReadOnly?: boolean;
 }) {
   const safeCanvas: CanvasDoc =
     (slide.canvas as CanvasDoc | undefined) ?? {
@@ -166,6 +172,73 @@ const SlideFrame = memo(function SlideFrame({ slide, index, isPresenting, slides
               />
             )}
           </div>
+
+          {/* Untere Toolbar unter dem Canvas */}
+          {!isPresenting && !isReadOnly && (
+            <div
+              className={cn(
+                "z-[1001] mt-3 w-full",
+              )}
+              aria-label="Slide toolbar"
+            >
+              <div className="mx-auto flex w-full max-w-[760px] items-center justify-center gap-2 rounded-md bg-background/95 p-2 shadow-sm backdrop-blur">
+                {/* ➕ Bild einfügen (Overlay) */}
+                <input
+                  id={`overlay-upload-${slide.id}`}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.currentTarget.files?.[0];
+                    if (!file) return;
+                    const url = URL.createObjectURL(file);
+                    const { slides, setSlides } = usePresentationState.getState();
+                    const updated = slides.slice();
+                    const i = updated.findIndex((x) => x.id === slide.id);
+                    if (i < 0) return;
+                    const c = (updated[i].canvas as CanvasDoc) ?? {
+                      ...DEFAULT_CANVAS,
+                      width: DEFAULT_CANVAS.width,
+                      height: DEFAULT_CANVAS.height,
+                    };
+                    const id = crypto.randomUUID();
+                    const newNode: CanvasImageNode = {
+                      id,
+                      type: "image",
+                      x: Math.round(c.width * 0.5 - 150),
+                      y: Math.round(c.height * 0.7 - 150),
+                      width: 300,
+                      height: 300,
+                      url,
+                    };
+                    updated[i] = {
+                      ...updated[i],
+                      canvas: {
+                        ...c,
+                        nodes: [...(c.nodes ?? []), newNode],
+                        selection: [id],
+                      },
+                    };
+                    setSlides(updated);
+                    // Reset input so selecting das gleiche File erneut möglich ist
+                    e.currentTarget.value = "";
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 px-3 rounded-md"
+                  onClick={() => {
+                    const el = document.getElementById(`overlay-upload-${slide.id}`) as HTMLInputElement | null;
+                    el?.click();
+                  }}
+                  title="Bild (Overlay) einfügen"
+                >
+                  Bild einfügen
+                </Button>
+              </div>
+            </div>
+          )}
         </SlideContainer>
       </div>
     </SortableSlide>
@@ -262,6 +335,7 @@ export const PresentationSlidesView = ({
                   index={index}
                   slidesCount={items.length}
                   isPresenting={isPresenting}
+                  isReadOnly={false}
                 />
               ))}
             </div>

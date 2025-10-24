@@ -7,6 +7,7 @@ import {
   measureWrappedText,
 } from "@/lib/textMetrics";
 import type { SlideTextElement } from "@/lib/types";
+import type { CanvasImageNode } from "@/canvas/types";
 import { AlignCenter, AlignLeft, AlignRight } from "lucide-react";
 import React, {
   forwardRef,
@@ -51,6 +52,10 @@ type Props = {
   imageUrl: string; // "" = schwarz
   layout: SlideTextElement[];
   onLayoutChange: (next: SlideTextElement[]) => void;
+  /* ➕ neu: zusätzliche Overlay-Images (Logo etc.) */
+  overlays?: CanvasImageNode[];
+  /* ➕ neu: Callback, wenn Overlays (Position/Größe) geändert wurden */
+  onOverlaysChange?: (next: CanvasImageNode[]) => void;
 };
 
 const W = 1080;
@@ -89,6 +94,24 @@ function toCssColor(color: string | undefined, opacity: number | undefined): str
     return `rgba(${inner}, ${effectiveOpacity})`;
   }
   return trimmed;
+}
+
+function clamp(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v));
+}
+
+function fitContain(
+  dstW: number,
+  dstH: number,
+  natW: number,
+  natH: number,
+) {
+  const r = Math.min(dstW / natW, dstH / natH);
+  const w = natW * r;
+  const h = natH * r;
+  const x = (dstW - w) / 2;
+  const y = (dstH - h) / 2;
+  return { w, h, x, y };
 }
 
 function drawRoundedRect(
@@ -360,7 +383,7 @@ function mapLayersToLayout(
 }
 
 const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
-  { imageUrl, layout, onLayoutChange },
+  { imageUrl, layout, onLayoutChange, overlays = [], onOverlaysChange },
   ref,
 ) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -451,6 +474,93 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const [imageNatural, setImageNatural] = useState<{ w: number; h: number } | null>(null);
   const isPanning = useRef(false);
   const lastPoint = useRef({ x: 0, y: 0 });
+
+  // ---------- Overlays: lokaler State + Naturgrößen-Cache ----------
+  const [overlayNodes, setOverlayNodes] = useState<CanvasImageNode[]>(() => overlays);
+  useEffect(() => { setOverlayNodes(overlays); }, [overlays]);
+
+  const [natSizeMap, setNatSizeMap] = useState<Record<string, { w: number; h: number }>>({});
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const entries = await Promise.all(
+        overlays.map(async (n) => {
+          if (!n.url) return [n.id, { w: 1, h: 1 }] as const;
+          await new Promise<void>((res) => {
+            const img = new Image();
+            img.onload = () => res();
+            img.onerror = () => res();
+            img.src = n.url;
+          });
+          // zweiter Load um natürliche Größe sicher zu greifen
+          const img2 = new Image();
+          img2.src = n.url;
+          const w = (img2 as any).naturalWidth || 1;
+          const h = (img2 as any).naturalHeight || 1;
+          return [n.id, { w, h }] as const;
+        })
+      );
+      if (!alive) return;
+      const map: Record<string, { w: number; h: number }> = {};
+      for (const [id, s] of entries) map[id] = s;
+      setNatSizeMap(map);
+    })();
+    return () => { alive = false; };
+  }, [overlays]);
+
+  const commitOverlays = useCallback((next: CanvasImageNode[]) => {
+    setOverlayNodes(next);
+    onOverlaysChange?.(next);
+  }, [onOverlaysChange]);
+
+  // ---------- Dragging (Overlay verschieben) ----------
+  const dragRef = useRef<{
+    id: string | null;
+    startX: number;
+    startY: number;
+    nodeStartX: number;
+    nodeStartY: number;
+  }>({ id: null, startX: 0, startY: 0, nodeStartX: 0, nodeStartY: 0 });
+
+  const onOverlayPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>, node: CanvasImageNode) => {
+    e.stopPropagation();
+    setBgSelected(false);
+    setActiveLayerId(node.id);
+    const rect = wrapRef.current?.getBoundingClientRect();
+    const scaleFactor = rect ? W / rect.width : 1;
+    dragRef.current = {
+      id: node.id,
+      startX: e.clientX * scaleFactor,
+      startY: e.clientY * scaleFactor,
+      nodeStartX: node.x,
+      nodeStartY: node.y,
+    };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const onOverlayPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current;
+    if (!d.id) return;
+    const rect = wrapRef.current?.getBoundingClientRect();
+    const scaleFactor = rect ? W / rect.width : 1;
+    const curX = e.clientX * scaleFactor;
+    const curY = e.clientY * scaleFactor;
+    const dx = curX - d.startX;
+    const dy = curY - d.startY;
+    const id = d.id;
+    setOverlayNodes((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, x: clamp(d.nodeStartX + dx, -W, 2 * W), y: clamp(d.nodeStartY + dy, -H, 2 * H) } : n)),
+    );
+  }, []);
+
+  const onOverlayPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const had = dragRef.current.id;
+    dragRef.current.id = null;
+    if (had) commitOverlays(overlayNodes);
+    if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    }
+  }, [commitOverlays, overlayNodes]);
 
   // Text layers — lokale Source of Truth
   const [textLayers, setTextLayers] = useState<
@@ -564,15 +674,36 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const wheelHandler = useCallback(
     (e: WheelEvent) => {
       if (isEditingRef.current) return;
-      if (!bgSelected) return;
-      e.preventDefault();
-      e.stopPropagation();
       if (!wrapRef.current) return;
       const rect = wrapRef.current.getBoundingClientRect();
       const canvasX = (e.clientX - rect.left) * (W / rect.width);
       const canvasY = (e.clientY - rect.top) * (H / rect.height);
       const factor = e.deltaY < 0 ? 1.06 : 0.94;
 
+      // 🔍 1) Wenn ein Overlay-Image selektiert ist → das Bild selbst zoomen
+      if (activeLayerId && overlayNodes.some((n) => n.id === activeLayerId)) {
+        e.preventDefault();
+        e.stopPropagation();
+        commitOverlays(
+          overlayNodes.map((n) => {
+            if (n.id !== activeLayerId) return n;
+            // Zoomen um den Cursor: Breite/Höhe skalieren
+            const cx = n.x + n.width / 2;
+            const cy = n.y + n.height / 2;
+            const nextW = clamp(n.width * factor, 40, W * 2);
+            const scale = nextW / n.width;
+            const nextH = clamp(n.height * scale, 40, H * 2);
+            // optional: leichtes "Pivot"-Gefühl — hier belassen wir x/y konstant (einfach)
+            return { ...n, width: nextW, height: nextH, x: n.x, y: n.y };
+          }),
+        );
+        return;
+      }
+
+      // 🔍 2) Andernfalls (BG selektiert) → bisherigen BG-Zoom
+      if (!bgSelected) return;
+      e.preventDefault();
+      e.stopPropagation();
       setScale((prev) => {
         const newScale = Math.max(0.4, Math.min(3, prev * factor));
         const scaleDiff = newScale - prev;
@@ -584,7 +715,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         return newScale;
       });
     },
-    [bgSelected],
+    [bgSelected, activeLayerId, overlayNodes, commitOverlays],
   );
 
   useEffect(() => {
@@ -1414,13 +1545,33 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       ctx.restore();
     }
 
+    // ➕ Overlays ins PNG rendern (1:1 wie Preview, mit contain-Fit)
+    for (const n of overlayNodes) {
+      const nat = natSizeMap[n.id] || { w: 1, h: 1 };
+      const f = fitContain(n.width, n.height, nat.w, nat.h);
+      const left = Math.round(n.x + f.x);
+      const top = Math.round(n.y + f.y);
+      const w = Math.round(f.w);
+      const h = Math.round(f.h);
+      await new Promise<void>((res) => {
+        const img = new Image();
+        img.onload = () => {
+          try { ctx.drawImage(img, left, top, w, h); } catch {}
+          res();
+        };
+        img.onerror = () => res();
+        img.crossOrigin = "anonymous";
+        img.src = n.url;
+      });
+    }
+
     return new Promise((resolve, reject) => {
       canvas.toBlob(
         (blob) => (blob ? resolve(blob) : reject(new Error("toBlob failed"))),
         "image/png",
       );
     });
-  }, [textLayers, imageUrl, scale, offset]);
+  }, [textLayers, imageUrl, scale, offset, overlayNodes, natSizeMap]);
 
   useImperativeHandle(
     ref,
@@ -1889,6 +2040,53 @@ const handleAddText = useCallback(() => {
           ) : (
             <div className="absolute inset-0 bg-black" />
           )}
+
+          {/* ➕ Overlay-Images (klick-selektierbar & dragbar)
+              Selektionsrahmen entspricht exakt dem sichtbaren (contain-gefitteten) Bild */}
+          {overlayNodes.map((node) => {
+            const isActive = activeLayerId === node.id;
+            const nat = natSizeMap[node.id] || { w: 1, h: 1 };
+            const fit = fitContain(node.width, node.height, nat.w, nat.h);
+            const left = Math.round(node.x + fit.x);
+            const top = Math.round(node.y + fit.y);
+            const w = Math.round(fit.w);
+            const h = Math.round(fit.h);
+            return (
+              <div
+                key={node.id}
+                className="absolute"
+                style={{ left, top, width: w, height: h, touchAction: "none" }}
+                onPointerDown={(e) => onOverlayPointerDown(e, node)}
+                onPointerMove={onOverlayPointerMove}
+                onPointerUp={onOverlayPointerUp}
+              >
+                <img
+                  src={node.url}
+                  alt=""
+                  draggable={false}
+                  className="select-none"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "fill", // Container ist bereits passend gefittet
+                    userSelect: "none",
+                    pointerEvents: "none",
+                  }}
+                />
+                {isActive && (
+                  <div
+                    className="pointer-events-none"
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      border: "2px dashed rgba(59,130,246,0.9)",
+                      borderRadius: 8,
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })}
 
           {textLayers.map((layer) => {
             const isActive = activeLayerId === layer.id;

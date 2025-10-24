@@ -2,7 +2,7 @@
 
 import React, { forwardRef, useImperativeHandle, useRef } from "react";
 import LegacySlideCanvas from "@/canvas/legacy/SlideCanvasLegacy";
-import type { CanvasDoc, CanvasTextNode } from "@/canvas/types";
+import type { CanvasDoc, CanvasTextNode, CanvasImageNode } from "@/canvas/types";
 import type { SlideTextElement } from "@/lib/types";
 import { useCallback, useMemo } from "react";
 
@@ -75,9 +75,17 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
   const imageUrl = useMemo(() => {
     const img = doc.nodes.find(
       (n): n is Extract<CanvasDoc["nodes"][number], { type: "image" }> =>
-        n.type === "image",
+        n.type === "image" && (n as any).id === "canvas-background-image",
     );
     return img?.url ?? "";
+  }, [doc]);
+
+  // ✅ Alle zusätzlichen (Overlay-)Bilder neben dem Hintergrund
+  const overlayImages = useMemo<CanvasImageNode[]>(() => {
+    return doc.nodes.filter(
+      (n): n is CanvasImageNode =>
+        n.type === "image" && (n as any).id !== "canvas-background-image",
+    );
   }, [doc]);
 
   const layout = useMemo<SlideTextElement[]>(() => {
@@ -292,7 +300,19 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
       ref={legacyRef}
       imageUrl={imageUrl}
       layout={layout}
-      onLayoutChange={handleLayoutChange}
+      overlays={overlayImages}
+      onOverlaysChange={(nextOverlays) => {
+        const otherNodes = doc.nodes.filter(
+          (n) => !(n.type === "image" && (n as any).id !== "canvas-background-image"),
+        );
+        onChange({
+          ...doc,
+          nodes: [
+            ...otherNodes,
+            ...nextOverlays,
+          ],
+        });
+      }}
     />
   );
 });
