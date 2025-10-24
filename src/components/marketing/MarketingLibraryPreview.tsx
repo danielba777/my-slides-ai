@@ -71,7 +71,7 @@ export function MarketingLibraryPreview() {
   return (
     <section
       id="library"
-      className="relative pb-20 pt-16 sm:pb-32 px-5 sm:px-6 overflow-hidden"
+      className="relative pt-16 px-5 sm:px-6 overflow-hidden"
     >
       <div className="relative mx-auto max-w-7xl">
         {/* Header */}

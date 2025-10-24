@@ -1,8 +1,8 @@
 "use client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Section } from "./Section";
 import { motion } from "framer-motion";
 import { Star } from "lucide-react";
+import { Section } from "./Section";
 
 const testimonials = [
   {
@@ -39,14 +39,21 @@ export function MarketingTestimonials() {
   return (
     <Section>
       {/* Header */}
-      <div className="text-center mb-10">
-        <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-foreground">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="text-center space-y-6 mb-8"
+      >
+        <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 leading-tight">
           Was unsere Nutzer sagen
         </h2>
-        <p className="mt-3 text-muted-foreground text-base max-w-xl mx-auto">
-          Echte Stimmen von Creators, die mit SlidesCockpit arbeiten.
+        <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+          Echte Stimmen von Creators, die mit{" "}
+          <span className="font-bold text-[#304674]">SlidesCockpit</span>{" "}
+          arbeiten.
         </p>
-      </div>
+      </motion.div>
 
       {/* Testimonials Grid */}
       <div className="grid gap-6 sm:grid-cols-2">
@@ -72,7 +79,9 @@ export function MarketingTestimonials() {
                     <Star
                       key={idx}
                       className={`h-4 w-4 ${
-                        idx < t.rating ? "fill-[#304674] text-[#304674]" : "text-gray-300"
+                        idx < t.rating
+                          ? "fill-[#304674] text-[#304674]"
+                          : "text-gray-300"
                       }`}
                     />
                   ))}
@@ -107,4 +116,3 @@ export function MarketingTestimonials() {
     </Section>
   );
 }
-
