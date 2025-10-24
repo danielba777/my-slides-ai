@@ -132,7 +132,114 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
 
   // 🔒 WICHTIG: Wenn bereits ein Canvas mit Nodes existiert, NIEMALS neu aufbauen.
   // Das verhindert, dass Text/Elemente beim Rendern "zurückspringen".
+  // ABER: Wir müssen alte "kombinierte" Text-Nodes in separate Nodes aufsplitten
   if (Array.isArray(slide.canvas?.nodes) && slide.canvas!.nodes.length > 0) {
+    const hasMultiLineTextNode = slide.canvas.nodes.some((node) => {
+      if (node.type !== "text") return false;
+      const text = (node as any).text || (node as any).content || "";
+      // Prüfe ob es ein Multi-Line Text mit Bullets ist
+      return text.includes("\n") && (text.includes("•") || text.includes("-"));
+    });
+
+    // Wenn ein Multi-Line Text-Node gefunden wurde, splitte ihn auf
+    if (hasMultiLineTextNode) {
+      console.log(
+        "🔄 Migration: Splitting multi-line text node into separate elements",
+      );
+      const newNodes: any[] = [];
+      let hasProcessedMultiLine = false;
+
+      slide.canvas.nodes.forEach((node) => {
+        if (node.type !== "text") {
+          newNodes.push(node);
+          return;
+        }
+
+        const textNode = node as any;
+        const text = textNode.text || textNode.content || "";
+
+        // Prüfe ob dies ein Multi-Line Node mit Bullets ist
+        if (
+          text.includes("\n") &&
+          (text.includes("•") || text.includes("-")) &&
+          !hasProcessedMultiLine
+        ) {
+          hasProcessedMultiLine = true;
+
+          // Splitte in Zeilen
+          const lines = text
+            .split("\n")
+            .map((l: string) => l.trim())
+            .filter(Boolean);
+
+          // Erkenne Titel und Bullets
+          const hasTitle =
+            lines.length > 0 &&
+            !lines[0]?.startsWith("•") &&
+            !lines[0]?.startsWith("-");
+          const title = hasTitle ? lines[0] : null;
+          const bulletPoints = hasTitle ? lines.slice(1) : lines;
+
+          const baseNx = textNode.nx ?? 0.5;
+          const textColor = textNode.fill || chooseTextColor(base.bg);
+          const textWidth = textNode.width ?? Math.round(width * 0.7);
+
+          // Erstelle Titel-Node
+          if (title) {
+            newNodes.push({
+              id: `text-title-${nanoid()}`,
+              type: "text",
+              nx: baseNx,
+              ny: 0.25,
+              width: textWidth,
+              text: title,
+              fontFamily: textNode.fontFamily || "Inter",
+              fontSize: (textNode.fontSize || 72) + 10,
+              align: "center",
+              fill: textColor,
+            });
+          }
+
+          // Erstelle separate Bullet-Nodes
+          if (bulletPoints.length > 0) {
+            const startY = title ? 0.4 : 0.3;
+            const bulletSpacing = 0.08;
+
+            bulletPoints.forEach((bullet: string, index: number) => {
+              const bulletY = startY + index * bulletSpacing;
+
+              newNodes.push({
+                id: `text-bullet-${index}-${nanoid()}`,
+                type: "text",
+                nx: baseNx,
+                ny: bulletY,
+                width: textWidth,
+                text: bullet,
+                fontFamily: textNode.fontFamily || "Inter",
+                fontSize: 50,
+                align: "left",
+                fill: textColor,
+              });
+            });
+          }
+        } else {
+          // Behalte andere Text-Nodes unverändert
+          newNodes.push(node);
+        }
+      });
+
+      const updatedCanvas = {
+        ...slide.canvas,
+        nodes: newNodes,
+      };
+
+      const withBg = applyBackgroundImageToCanvas(
+        updatedCanvas,
+        slide.rootImage?.url,
+      );
+      return { canvas: withBg, position: slide.position };
+    }
+
     const withBg = applyBackgroundImageToCanvas(
       slide.canvas,
       slide.rootImage?.url,
@@ -144,26 +251,99 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
   if (segments.length > 0) {
     const content = segments.join("\n\n");
 
+    // Versuche, den Content in Titel und Bullet Points zu splitten
+    const lines = content
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    // Erkenne: Erste Zeile = Titel, Rest = Bullet Points
+    const hasTitle =
+      lines.length > 0 &&
+      !lines[0]?.startsWith("•") &&
+      !lines[0]?.startsWith("-");
+    const title = hasTitle ? lines[0] : null;
+    const bulletPoints = hasTitle ? lines.slice(1) : lines;
+
     const textWidth = Math.round(width * 0.7);
-    // Default: immer mittig (TikTok-Style)
     const alignment = "center";
-    // Falls Position noch nicht gesetzt: zentriert platzieren (normalisierte Koordinaten 0-1)
-    const nx = slide.position?.x != null ? slide.position.x / width : 0.5;
-    const ny = slide.position?.y != null ? slide.position.y / height : 0.5;
     const textColor = chooseTextColor(base.bg);
-    base.nodes.push({
-      id: `text-${nanoid()}`,
-      type: "text",
-      nx,
-      ny,
-      width: textWidth,
-      text: content,
-      fontFamily: "Inter",
-      fontSize: pickFontSize(content.length),
-      align: alignment,
-      fill: textColor,
-    });
-    textPosition = { x, y };
+
+    // Falls Position noch nicht gesetzt: zentriert platzieren (normalisierte Koordinaten 0-1)
+    const baseNx = slide.position?.x != null ? slide.position.x / width : 0.5;
+    const baseNy = slide.position?.y != null ? slide.position.y / height : 0.5;
+
+    if (title) {
+      // Titel-Node (größer, oben)
+      base.nodes.push({
+        id: `text-title-${nanoid()}`,
+        type: "text",
+        nx: baseNx,
+        ny: 0.25, // Weiter oben positionieren
+        width: textWidth,
+        text: title,
+        fontFamily: "Inter",
+        fontSize: pickFontSize(title.length) + 10, // Etwas größer für Titel
+        align: alignment,
+        fill: textColor,
+      });
+
+      textPosition = {
+        x: Math.round(baseNx * width),
+        y: Math.round(0.25 * height),
+      };
+    }
+
+    if (bulletPoints.length > 0) {
+      // Erstelle für jeden Bullet Point ein eigenes Text-Element
+      const startY = title ? 0.4 : 0.3; // Start-Y-Position
+      const bulletSpacing = 0.08; // Abstand zwischen Bullets (8% der Höhe)
+      const bulletFontSize = 50; // Kleinere Schriftgröße für Bullets
+
+      bulletPoints.forEach((bullet, index) => {
+        const bulletY = startY + index * bulletSpacing;
+
+        base.nodes.push({
+          id: `text-bullet-${index}-${nanoid()}`,
+          type: "text",
+          nx: baseNx,
+          ny: bulletY,
+          width: textWidth,
+          text: bullet,
+          fontFamily: "Inter",
+          fontSize: bulletFontSize,
+          align: "left", // Linksbündig für Bullet Points
+          fill: textColor,
+        });
+      });
+
+      if (!textPosition) {
+        textPosition = {
+          x: Math.round(baseNx * width),
+          y: Math.round(startY * height),
+        };
+      }
+    }
+
+    // Fallback: Wenn keine Struktur erkannt wurde, verwende den gesamten Content
+    if (base.nodes.length === 0) {
+      base.nodes.push({
+        id: `text-${nanoid()}`,
+        type: "text",
+        nx: baseNx,
+        ny: baseNy,
+        width: textWidth,
+        text: content,
+        fontFamily: "Inter",
+        fontSize: pickFontSize(content.length),
+        align: alignment,
+        fill: textColor,
+      });
+      textPosition = {
+        x: Math.round(baseNx * width),
+        y: Math.round(baseNy * height),
+      };
+    }
   }
 
   const canvas = applyBackgroundImageToCanvas(base, slide.rootImage?.url);
@@ -187,6 +367,118 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
       ...slide,
       canvas,
       position: slide.position ?? position,
+    };
+  }
+
+  // MIGRATION: Splitte Multi-Line Text-Nodes mit Bullets in separate Nodes
+  const hasMultiLineTextNode = nodes.some((node) => {
+    if (node.type !== "text") return false;
+    const text = (node as any).text || (node as any).content || "";
+    return text.includes("\n") && (text.includes("•") || text.includes("-"));
+  });
+
+  if (hasMultiLineTextNode && slide.canvas?.nodes) {
+    console.log(
+      "🔄 ensureSlideCanvas Migration: Splitting multi-line text nodes",
+    );
+    const width = slide.canvas.width ?? CANVAS_WIDTH;
+    const height = slide.canvas.height ?? CANVAS_HEIGHT;
+    const newNodes: any[] = [];
+    let hasProcessedMultiLine = false;
+
+    slide.canvas.nodes.forEach((node) => {
+      if (node.type !== "text") {
+        newNodes.push(node);
+        return;
+      }
+
+      const textNode = node as any;
+      const text = textNode.text || textNode.content || "";
+
+      // Prüfe ob dies ein Multi-Line Node mit Bullets ist
+      if (
+        text.includes("\n") &&
+        (text.includes("•") || text.includes("-")) &&
+        !hasProcessedMultiLine
+      ) {
+        hasProcessedMultiLine = true;
+        console.log("  ✂️ Splitting text node:", text.substring(0, 50) + "...");
+
+        // Splitte in Zeilen
+        const lines = text
+          .split("\n")
+          .map((l: string) => l.trim())
+          .filter(Boolean);
+
+        // Erkenne Titel und Bullets
+        const hasTitle =
+          lines.length > 0 &&
+          !lines[0]?.startsWith("•") &&
+          !lines[0]?.startsWith("-");
+        const title = hasTitle ? lines[0] : null;
+        const bulletPoints = hasTitle ? lines.slice(1) : lines;
+
+        const baseNx = textNode.nx ?? 0.5;
+        const textColor =
+          textNode.fill ||
+          chooseTextColor(slide.canvas.bg ?? DEFAULT_CANVAS.bg);
+        const textWidth = textNode.width ?? Math.round(width * 0.7);
+
+        // Erstelle Titel-Node
+        if (title) {
+          console.log("  📝 Creating title node:", title);
+          newNodes.push({
+            id: `text-title-${nanoid()}`,
+            type: "text",
+            nx: baseNx,
+            ny: 0.25,
+            width: textWidth,
+            text: title,
+            fontFamily: textNode.fontFamily || "Inter",
+            fontSize: (textNode.fontSize || 72) + 10,
+            align: "center",
+            fill: textColor,
+          });
+        }
+
+        // Erstelle separate Bullet-Nodes
+        if (bulletPoints.length > 0) {
+          const startY = title ? 0.4 : 0.3;
+          const bulletSpacing = 0.08;
+
+          bulletPoints.forEach((bullet: string, index: number) => {
+            const bulletY = startY + index * bulletSpacing;
+            console.log(
+              `  🔸 Creating bullet ${index + 1}:`,
+              bullet.substring(0, 30) + "...",
+            );
+
+            newNodes.push({
+              id: `text-bullet-${index}-${nanoid()}`,
+              type: "text",
+              nx: baseNx,
+              ny: bulletY,
+              width: textWidth,
+              text: bullet,
+              fontFamily: textNode.fontFamily || "Inter",
+              fontSize: 50,
+              align: "left",
+              fill: textColor,
+            });
+          });
+        }
+      } else {
+        // Behalte andere Text-Nodes unverändert
+        newNodes.push(node);
+      }
+    });
+
+    slide = {
+      ...slide,
+      canvas: {
+        ...slide.canvas,
+        nodes: newNodes,
+      },
     };
   }
 
