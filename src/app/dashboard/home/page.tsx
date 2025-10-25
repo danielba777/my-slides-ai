@@ -514,16 +514,40 @@ export default function DashboardHome() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setSortOption("views-desc")}>
+              <DropdownMenuItem
+                onClick={() => setSortOption("views-desc")}
+                className={cn(
+                  sortOption === "views-desc" &&
+                    "bg-primary/10 text-primary font-medium",
+                )}
+              >
                 Views (Most)
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortOption("views-asc")}>
+              <DropdownMenuItem
+                onClick={() => setSortOption("views-asc")}
+                className={cn(
+                  sortOption === "views-asc" &&
+                    "bg-primary/10 text-primary font-medium",
+                )}
+              >
                 Views (Least)
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortOption("likes-desc")}>
+              <DropdownMenuItem
+                onClick={() => setSortOption("likes-desc")}
+                className={cn(
+                  sortOption === "likes-desc" &&
+                    "bg-primary/10 text-primary font-medium",
+                )}
+              >
                 Likes (Most)
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortOption("likes-asc")}>
+              <DropdownMenuItem
+                onClick={() => setSortOption("likes-asc")}
+                className={cn(
+                  sortOption === "likes-asc" &&
+                    "bg-primary/10 text-primary font-medium",
+                )}
+              >
                 Likes (Least)
               </DropdownMenuItem>
             </DropdownMenuContent>

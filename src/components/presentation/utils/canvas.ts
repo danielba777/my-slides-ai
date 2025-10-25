@@ -60,6 +60,7 @@ function pickFontSize(charCount: number): number {
 export function applyBackgroundImageToCanvas(
   canvas: CanvasDoc | null | undefined,
   imageUrl?: string | null,
+  gridImages?: Array<{ url?: string }> | null,
 ): CanvasDoc {
   // Starte IMMER vom bestehenden Canvas und erhalte ALLE Nicht-Image-Nodes
   const base: CanvasDoc = {
@@ -74,8 +75,61 @@ export function applyBackgroundImageToCanvas(
     previewDataUrl: canvas?.previewDataUrl,
   };
 
+  // Remove all existing background images (including grid images)
+  const withoutBg = base.nodes.filter(
+    (n: any) =>
+      !(
+        n?.type === "image" &&
+        (n?.id === "canvas-background-image" ||
+          n?.id?.startsWith("canvas-grid-image-"))
+      ),
+  );
+
+  // Handle grid layout
+  if (gridImages && Array.isArray(gridImages) && gridImages.length > 0) {
+    const gridNodes: any[] = [];
+    // Berechne exakte Zellgrößen für 2x2 Grid
+    // WICHTIG: Alle Zellen MÜSSEN exakt gleich groß sein
+    const cellWidth = base.width / 2;
+    const cellHeight = base.height / 2;
+
+    // Grid-Layout: 4 Zellen in 2x2 Anordnung
+    // Zelle 0: Oben Links
+    // Zelle 1: Oben Rechts
+    // Zelle 2: Unten Links
+    // Zelle 3: Unten Rechts
+
+    const positions = [
+      { x: 0, y: 0, width: cellWidth, height: cellHeight }, // Oben Links
+      { x: cellWidth, y: 0, width: cellWidth, height: cellHeight }, // Oben Rechts
+      { x: 0, y: cellHeight, width: cellWidth, height: cellHeight }, // Unten Links
+      { x: cellWidth, y: cellHeight, width: cellWidth, height: cellHeight }, // Unten Rechts
+    ];
+
+    for (let i = 0; i < 4; i++) {
+      const img = gridImages[i];
+      if (img?.url) {
+        gridNodes.push({
+          id: `canvas-grid-image-${i}`,
+          type: "image" as const,
+          ...positions[i],
+          url: img.url,
+        });
+      }
+    }
+
+    return {
+      ...base,
+      nodes: [...gridNodes, ...withoutBg],
+    };
+  }
+
+  // Handle single image
   if (!imageUrl) {
-    return base;
+    return {
+      ...base,
+      nodes: withoutBg,
+    };
   }
 
   const imageNode = {
@@ -87,12 +141,6 @@ export function applyBackgroundImageToCanvas(
     height: base.height,
     url: imageUrl,
   };
-
-  // Entferne ausschließlich den bisherigen BG-Image-Knoten (falls vorhanden),
-  // erhalte aber ALLE anderen Nodes (v. a. Text!)
-  const withoutBg = base.nodes.filter(
-    (n: any) => !(n?.type === "image" && n?.id === "canvas-background-image"),
-  );
 
   // Prüfe Idempotenz: existiert bereits der gleiche BG?
   const prevBg = base.nodes.find(
@@ -235,14 +283,16 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
 
       const withBg = applyBackgroundImageToCanvas(
         updatedCanvas,
-        slide.rootImage?.url,
+        slide.rootImage?.useGrid ? null : slide.rootImage?.url,
+        slide.rootImage?.useGrid ? slide.rootImage.gridImages : null,
       );
       return { canvas: withBg, position: slide.position };
     }
 
     const withBg = applyBackgroundImageToCanvas(
       slide.canvas,
-      slide.rootImage?.url,
+      slide.rootImage?.useGrid ? null : slide.rootImage?.url,
+      slide.rootImage?.useGrid ? slide.rootImage.gridImages : null,
     );
     return { canvas: withBg, position: slide.position };
   }
@@ -346,11 +396,33 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
     }
   }
 
-  const canvas = applyBackgroundImageToCanvas(base, slide.rootImage?.url);
+  const canvas = applyBackgroundImageToCanvas(
+    base,
+    slide.rootImage?.useGrid ? null : slide.rootImage?.url,
+    slide.rootImage?.useGrid ? slide.rootImage.gridImages : null,
+  );
   return { canvas, position: textPosition };
 }
 
 export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
+  // 🔧 FIX: Korrigiere falsche Canvas-Größen (z.B. 1920 statt 1620)
+  if (slide.canvas) {
+    const correctHeight = CANVAS_HEIGHT; // 1620 für 2:3 Format
+    if (slide.canvas.height !== correctHeight) {
+      console.warn(
+        `⚠️ Korrigiere Canvas-Höhe von ${slide.canvas.height} auf ${correctHeight}`,
+      );
+      slide = {
+        ...slide,
+        canvas: {
+          ...slide.canvas,
+          width: CANVAS_WIDTH,
+          height: CANVAS_HEIGHT,
+        },
+      };
+    }
+  }
+
   const nodes = slide.canvas?.nodes ?? [];
   const hasTextNode = nodes.some((node) => {
     if (node.type !== "text") return false;
@@ -518,7 +590,11 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
   if (!hasImageNode && slide.rootImage?.url) {
     return {
       ...slide,
-      canvas: applyBackgroundImageToCanvas(slide.canvas, slide.rootImage.url),
+      canvas: applyBackgroundImageToCanvas(
+        slide.canvas,
+        slide.rootImage.useGrid ? null : slide.rootImage.url,
+        slide.rootImage.useGrid ? slide.rootImage.gridImages : null,
+      ),
     };
   }
 

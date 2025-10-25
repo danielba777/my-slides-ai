@@ -121,6 +121,15 @@ function fitContain(dstW: number, dstH: number, natW: number, natH: number) {
   return { w, h, x, y };
 }
 
+function fitCover(dstW: number, dstH: number, natW: number, natH: number) {
+  const r = Math.max(dstW / natW, dstH / natH);
+  const w = natW * r;
+  const h = natH * r;
+  const x = (dstW - w) / 2;
+  const y = (dstH - h) / 2;
+  return { w, h, x, y };
+}
+
 function drawRoundedRect(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -1590,14 +1599,29 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       ctx.restore();
     }
 
-    // ➕ Overlays ins PNG rendern (1:1 wie Preview, mit contain-Fit)
+    // ➕ Overlays ins PNG rendern
     for (const n of overlayNodes) {
-      const nat = natSizeMap[n.id] || { w: 1, h: 1 };
-      const f = fitContain(n.width, n.height, nat.w, nat.h);
-      const left = Math.round(n.x + f.x);
-      const top = Math.round(n.y + f.y);
-      const w = Math.round(f.w);
-      const h = Math.round(f.h);
+      const isGridImage = n.id.startsWith("canvas-grid-image-");
+
+      // Grid-Bilder haben immer 2:3 Format wie das Canvas
+      // -> Direkt auf Zellgröße skalieren, keine fitContain/fitCover Berechnung
+      let left: number, top: number, w: number, h: number;
+
+      if (isGridImage) {
+        left = n.x;
+        top = n.y;
+        w = n.width;
+        h = n.height;
+      } else {
+        // Für andere Overlay-Bilder (z.B. Logos) fitContain verwenden
+        const nat = natSizeMap[n.id] || { w: 1, h: 1 };
+        const f = fitContain(n.width, n.height, nat.w, nat.h);
+        left = Math.round(n.x + f.x);
+        top = Math.round(n.y + f.y);
+        w = Math.round(f.w);
+        h = Math.round(f.h);
+      }
+
       await new Promise<void>((res) => {
         const img = new Image();
         img.onload = () => {
@@ -2133,17 +2157,76 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               Selektionsrahmen entspricht exakt dem sichtbaren (contain-gefitteten) Bild */}
           {overlayNodes.map((node) => {
             const isActive = activeLayerId === node.id;
+            const isGridImage = node.id.startsWith("canvas-grid-image-");
+
+            // Grid-Bilder: Direkt auf exakte Zellgröße skalieren
+            if (isGridImage) {
+              return (
+                <div
+                  key={node.id}
+                  className="absolute"
+                  style={{
+                    left: node.x,
+                    top: node.y,
+                    width: node.width,
+                    height: node.height,
+                    overflow: "hidden",
+                    touchAction: "none",
+                  }}
+                  onPointerDown={(e) => onOverlayPointerDown(e, node)}
+                  onPointerMove={onOverlayPointerMove}
+                  onPointerUp={onOverlayPointerUp}
+                >
+                  <img
+                    src={node.url}
+                    alt=""
+                    draggable={false}
+                    className="select-none"
+                    style={{
+                      display: "block",
+                      width: node.width + "px",
+                      height: node.height + "px",
+                      objectFit: "cover",
+                      objectPosition: "center",
+                      userSelect: "none",
+                      pointerEvents: "none",
+                    }}
+                  />
+                  {isActive && (
+                    <div
+                      className="pointer-events-none"
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        border: "2px dashed rgba(59,130,246,0.9)",
+                        borderRadius: 8,
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            }
+
+            // Für andere Overlay-Bilder (z.B. Logos) fitContain verwenden
             const nat = natSizeMap[node.id] || { w: 1, h: 1 };
             const fit = fitContain(node.width, node.height, nat.w, nat.h);
-            const left = Math.round(node.x + fit.x);
-            const top = Math.round(node.y + fit.y);
+            const left = Math.round(fit.x);
+            const top = Math.round(fit.y);
             const w = Math.round(fit.w);
             const h = Math.round(fit.h);
+
             return (
               <div
                 key={node.id}
                 className="absolute"
-                style={{ left, top, width: w, height: h, touchAction: "none" }}
+                style={{
+                  left: node.x,
+                  top: node.y,
+                  width: node.width,
+                  height: node.height,
+                  overflow: "hidden",
+                  touchAction: "none",
+                }}
                 onPointerDown={(e) => onOverlayPointerDown(e, node)}
                 onPointerMove={onOverlayPointerMove}
                 onPointerUp={onOverlayPointerUp}
@@ -2154,9 +2237,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                   draggable={false}
                   className="select-none"
                   style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "fill", // Container ist bereits passend gefittet
+                    position: "absolute",
+                    left,
+                    top,
+                    width: w,
+                    height: h,
+                    objectFit: "contain",
                     userSelect: "none",
                     pointerEvents: "none",
                   }}
