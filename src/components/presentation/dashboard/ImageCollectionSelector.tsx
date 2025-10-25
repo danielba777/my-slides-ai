@@ -14,7 +14,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { usePresentationState } from "@/states/presentation-state";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { JSX } from "react";
 
 interface ImageSetImage {
   id?: string;
@@ -26,8 +25,10 @@ interface ImageSet {
   name: string;
   category?: string;
   images?: ImageSetImage[];
-  _count?: { images: number };
+  _count?: { images: number; children?: number };
   isOwnedByUser?: boolean;
+  parentId?: string | null;
+  children?: ImageSet[];
 }
 
 export const ImageCollectionSelector: React.FC = () => {
@@ -38,6 +39,9 @@ export const ImageCollectionSelector: React.FC = () => {
   const [imageSets, setImageSets] = useState<ImageSet[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"community" | "mine">("community");
+
+  // Drill-down navigation state
+  const [drillDownParent, setDrillDownParent] = useState<ImageSet | null>(null);
 
   const loadImageSets = useCallback(async () => {
     try {
@@ -68,6 +72,7 @@ export const ImageCollectionSelector: React.FC = () => {
   useEffect(() => {
     if (isDialogOpen) {
       setPendingSetId(imageSetId ?? null);
+      setDrillDownParent(null); // Reset drill-down when opening dialog
     }
   }, [isDialogOpen, imageSetId]);
 
@@ -77,10 +82,36 @@ export const ImageCollectionSelector: React.FC = () => {
   );
 
   const { communitySets, mySets } = useMemo(() => {
+    // If drilling down, show only children of selected parent
+    if (drillDownParent) {
+      const children = drillDownParent.children || [];
+      const community: ImageSet[] = [];
+      const mine: ImageSet[] = [];
+
+      children.forEach((set) => {
+        const category = set.category?.toLowerCase() ?? "";
+        const isMine =
+          Boolean(set.isOwnedByUser) ||
+          category === "personal" ||
+          category === "mine" ||
+          category === "user";
+
+        if (isMine) {
+          mine.push(set);
+        } else {
+          community.push(set);
+        }
+      });
+
+      return { communitySets: community, mySets: mine };
+    }
+
+    // Otherwise show top-level sets
     const community: ImageSet[] = [];
     const mine: ImageSet[] = [];
+    const topLevelSets = imageSets.filter((set) => !set.parentId);
 
-    imageSets.forEach((set) => {
+    topLevelSets.forEach((set) => {
       const category = set.category?.toLowerCase() ?? "";
       const isMine =
         Boolean(set.isOwnedByUser) ||
@@ -96,10 +127,25 @@ export const ImageCollectionSelector: React.FC = () => {
     });
 
     return { communitySets: community, mySets: mine };
-  }, [imageSets]);
+  }, [imageSets, drillDownParent]);
 
   const handleSelectSet = (set: ImageSet) => {
-    setPendingSetId(set.id);
+    // Check if this set has children
+    const hasChildren =
+      (set.children && set.children.length > 0) ||
+      (set._count?.children && set._count.children > 0);
+
+    if (hasChildren) {
+      // Drill down to show only children
+      setDrillDownParent(set);
+    } else {
+      // Directly select this set
+      setPendingSetId(set.id);
+    }
+  };
+
+  const handleBackToTopLevel = () => {
+    setDrillDownParent(null);
   };
 
   const handleSave = () => {
@@ -111,10 +157,72 @@ export const ImageCollectionSelector: React.FC = () => {
   };
 
   const getPreviewImages = (set: ImageSet): ImageSetImage[] => {
+    // If this set has its own images, use them
     if (Array.isArray(set.images) && set.images.length > 0) {
       return set.images.slice(0, 5);
     }
+
+    // If this set has children but no own images, use mixed preview
+    if (set.children && set.children.length > 0) {
+      return getMixedPreviewImages(set);
+    }
+
     return [];
+  };
+
+  const getMixedPreviewImages = (parent: ImageSet): ImageSetImage[] => {
+    // Create a mixed preview from all children
+    if (!parent.children || parent.children.length === 0) {
+      // Fallback: use parent's own images if available
+      if (Array.isArray(parent.images) && parent.images.length > 0) {
+        return parent.images.slice(0, 5);
+      }
+      return [];
+    }
+
+    const mixedImages: ImageSetImage[] = [];
+    const childrenWithImages = parent.children.filter(
+      (child) => Array.isArray(child.images) && child.images.length > 0,
+    );
+
+    if (childrenWithImages.length === 0) {
+      // If no children have images, use parent's own images if available
+      if (Array.isArray(parent.images) && parent.images.length > 0) {
+        return parent.images.slice(0, 5);
+      }
+      return [];
+    }
+
+    // Distribute images evenly across children (round-robin)
+    let childIndex = 0;
+    while (
+      mixedImages.length < 5 &&
+      childIndex < childrenWithImages.length * 10
+    ) {
+      const childIdx = childIndex % childrenWithImages.length;
+      const child = childrenWithImages[childIdx];
+
+      if (!child) {
+        childIndex++;
+        continue;
+      }
+
+      const imageIndex = Math.floor(childIndex / childrenWithImages.length);
+
+      if (child.images && imageIndex < child.images.length) {
+        const image = child.images[imageIndex];
+        if (image) {
+          mixedImages.push(image);
+        }
+      }
+
+      childIndex++;
+
+      // Break if we've exhausted all images
+      if (childIndex >= childrenWithImages.length * 10) break;
+    }
+
+    return mixedImages.slice(0, 5);
   };
 
   const renderImageSetGrid = (sets: ImageSet[], emptyLabel: string) => {
@@ -128,13 +236,63 @@ export const ImageCollectionSelector: React.FC = () => {
       );
     }
 
-    if (!sets.length) {
+    if (!sets.length && !drillDownParent) {
       return null; // Wenn keine Sets vorhanden sind, nichts anzeigen
     }
 
     return (
       <ScrollArea className="h-full max-h-full pr-4">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {/* "All Images" Option when drilling down */}
+          {drillDownParent && (
+            <div
+              key="all-images"
+              onClick={() => setPendingSetId(drillDownParent.id)}
+              className={cn(
+                "group cursor-pointer rounded-lg p-2 transition bg-card relative overflow-visible",
+                pendingSetId === drillDownParent.id
+                  ? "border-2 border-blue-500"
+                  : "border border-transparent hover:border-muted-foreground/30",
+              )}
+            >
+              <div className="mb-2 text-base font-bold text-foreground">
+                ✨ All Images
+              </div>
+              {(() => {
+                const allImagesPreview = getMixedPreviewImages(drillDownParent);
+                return allImagesPreview.length ? (
+                  <div className="overflow-hidden">
+                    <div className="grid grid-cols-5 gap-0">
+                      {allImagesPreview.map((image, index) => (
+                        <div
+                          key={image.id ?? `all-${index}`}
+                          className={cn(
+                            "relative h-24 md:h-32 lg:h-40 overflow-hidden",
+                            index === 0 && "rounded-l-lg",
+                            index === allImagesPreview.length - 1 &&
+                              "rounded-r-lg",
+                          )}
+                        >
+                          <img
+                            src={image.url}
+                            alt={`All images preview ${index + 1}`}
+                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                            loading="lazy"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground">
+                    Use all images from all subfolders
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Regular image sets */}
           {sets.map((set) => {
             const previewImages = getPreviewImages(set);
 
@@ -239,9 +397,23 @@ export const ImageCollectionSelector: React.FC = () => {
         </DialogTrigger>
         <DialogContent className="max-w-7xl min-h-[700px] flex flex-col justify-start items-stretch">
           <DialogHeader>
-            <DialogTitle className="text-2xl">
-              Select Image Collection
-            </DialogTitle>
+            <div className="flex items-center gap-4">
+              {drillDownParent && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleBackToTopLevel}
+                  className="gap-2"
+                >
+                  ← Back
+                </Button>
+              )}
+              <DialogTitle className="text-2xl">
+                {drillDownParent
+                  ? `Select from: ${drillDownParent.name}`
+                  : "Select Image Collection"}
+              </DialogTitle>
+            </div>
           </DialogHeader>
           <Tabs
             value={activeTab}
