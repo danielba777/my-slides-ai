@@ -17,11 +17,12 @@ import {
   SortableContext,
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { ImageIcon, Type } from "lucide-react";
+import { Grid2x2, ImageIcon, Type } from "lucide-react";
 import dynamic from "next/dynamic";
 import React, { memo, useEffect, useRef, useState } from "react";
 import { PresentModeHeader } from "../dashboard/PresentModeHeader";
 import { ThinkingDisplay } from "../dashboard/ThinkingDisplay";
+import { MultiSlideImageSelector } from "./MultiSlideImageSelector";
 import { SingleSlideImageSelector } from "./SingleSlideImageSelector";
 import { SortableSlide } from "./SortableSlide";
 import StickyDownloadActions from "./StickyDownloadActions";
@@ -110,7 +111,11 @@ const SlideFrame = memo(function SlideFrame({
   }, [imgUrl]);
 
   // BG-Image direkt in den Canvas-Daten verankern, ohne Text zu verlieren
-  const docWithBg = applyBackgroundImageToCanvas(safeCanvas, safeImgUrl);
+  const docWithBg = applyBackgroundImageToCanvas(
+    safeCanvas,
+    slide.rootImage?.useGrid ? null : safeImgUrl,
+    slide.rootImage?.useGrid ? slide.rootImage.gridImages : null,
+  );
   const imageReady = useImageReady(safeImgUrl);
 
   const canvasRef = useRef<SlideCanvasAdapterHandle | null>(null);
@@ -120,6 +125,8 @@ const SlideFrame = memo(function SlideFrame({
   const isEditingText = editingSlideId === slide.id;
   const [isHovering, setIsHovering] = useState(false);
   const [isImageSelectorOpen, setIsImageSelectorOpen] = useState(false);
+  const [isMultiImageSelectorOpen, setIsMultiImageSelectorOpen] =
+    useState(false);
 
   // Registriere pro Slide einen Exporter in einer globalen Map, damit der Header
   // zentral in der aktuellen Reihenfolge exportieren kann.
@@ -166,13 +173,69 @@ const SlideFrame = memo(function SlideFrame({
     setSlides(updated);
   };
 
+  // Handler für die Multi-Bild-Auswahl
+  const handleMultiImageSelect = (imageUrls: string[]) => {
+    const { slides, setSlides } = usePresentationState.getState();
+    const updated = slides.slice();
+    const i = updated.findIndex((x) => x.id === slide.id);
+    if (i < 0) return;
+
+    const currentSlide = updated[i];
+    if (!currentSlide) return;
+
+    updated[i] = {
+      ...currentSlide,
+      rootImage: {
+        ...currentSlide.rootImage,
+        query: currentSlide.rootImage?.query || "",
+        gridImages: imageUrls.map((url) => ({ url })),
+      },
+    };
+    setSlides(updated);
+  };
+
+  // Toggle zwischen Single und Grid Mode
+  const toggleGridMode = () => {
+    const { slides, setSlides } = usePresentationState.getState();
+    const updated = slides.slice();
+    const i = updated.findIndex((x) => x.id === slide.id);
+    if (i < 0) return;
+
+    const currentSlide = updated[i];
+    if (!currentSlide?.rootImage) return;
+
+    const useGrid = !currentSlide.rootImage.useGrid;
+    updated[i] = {
+      ...currentSlide,
+      rootImage: {
+        ...currentSlide.rootImage,
+        useGrid,
+        gridImages: useGrid
+          ? currentSlide.rootImage.gridImages || [
+              { url: currentSlide.rootImage.url },
+              {},
+              {},
+              {},
+            ]
+          : undefined,
+      },
+    };
+    setSlides(updated);
+  };
+
   return (
     <>
-      {/* Image Selector Modal */}
+      {/* Image Selector Modals */}
       <SingleSlideImageSelector
         isOpen={isImageSelectorOpen}
         onClose={() => setIsImageSelectorOpen(false)}
         onSelectImage={handleImageSelect}
+      />
+      <MultiSlideImageSelector
+        isOpen={isMultiImageSelectorOpen}
+        onClose={() => setIsMultiImageSelectorOpen(false)}
+        onSelectImages={handleMultiImageSelect}
+        maxImages={4}
       />
       <SortableSlide id={slide.id} key={slide.id}>
         <div
@@ -218,7 +281,7 @@ const SlideFrame = memo(function SlideFrame({
                     !isReadOnly &&
                     isHovering &&
                     !editingSlideId ? (
-                      <div className="flex flex-col h-full pointer-events-none">
+                      <div className="relative flex flex-col h-full pointer-events-none">
                         {/* Top Half: Edit Text */}
                         <button
                           onClick={() => {
@@ -239,7 +302,11 @@ const SlideFrame = memo(function SlideFrame({
                         {/* Bottom Half: Edit Image */}
                         <button
                           onClick={() => {
-                            setIsImageSelectorOpen(true);
+                            if (slide.rootImage?.useGrid) {
+                              setIsMultiImageSelectorOpen(true);
+                            } else {
+                              setIsImageSelectorOpen(true);
+                            }
                             setIsHovering(false);
                           }}
                           className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
@@ -249,9 +316,37 @@ const SlideFrame = memo(function SlideFrame({
                             className="h-6 w-6 text-white"
                           />
                           <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
-                            Edit Image
+                            {slide.rootImage?.useGrid
+                              ? "Edit Images"
+                              : "Edit Image"}
                           </span>
                         </button>
+                        {/* Toggle Button */}
+                        {slide.rootImage && (
+                          <button
+                            onClick={() => {
+                              toggleGridMode();
+                              setIsHovering(false);
+                            }}
+                            className="absolute bottom-4 right-4 flex items-center gap-2 bg-white/90 hover:bg-white text-gray-900 px-4 py-2 rounded-lg transition-all backdrop-blur-sm pointer-events-auto cursor-pointer shadow-lg"
+                          >
+                            {slide.rootImage.useGrid ? (
+                              <>
+                                <ImageIcon className="h-4 w-4" />
+                                <span className="text-sm font-semibold">
+                                  Single Image
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <Grid2x2 className="h-4 w-4" />
+                                <span className="text-sm font-semibold">
+                                  4 Images
+                                </span>
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
                     ) : undefined
                   }

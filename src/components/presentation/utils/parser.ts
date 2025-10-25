@@ -122,12 +122,20 @@ export type PlateNode =
   | TTableCellElement;
 
 export type LayoutType = "left" | "right" | "vertical" | "background";
+export type ImageGridItem = {
+  url?: string;
+  query?: string;
+  cropSettings?: ImageCropSettings;
+};
 export type RootImage = {
   query: string;
   url?: string;
   cropSettings?: ImageCropSettings;
   layoutType?: LayoutType;
   size?: { w?: string; h?: number };
+  // New: Support for 4-image grid
+  useGrid?: boolean;
+  gridImages?: ImageGridItem[];
 };
 // Updated slide type to be a structured object instead of just an array
 export type PlateSlide = {

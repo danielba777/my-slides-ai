@@ -405,7 +405,11 @@ export function PresentationGenerationManager() {
                       ...(s.rootImage ?? { query }),
                       url: imageUrl,
                     },
-                    canvas: applyBackgroundImageToCanvas(s.canvas, imageUrl),
+                    canvas: applyBackgroundImageToCanvas(
+                      s.canvas,
+                      imageUrl,
+                      null,
+                    ),
                   })
                 : s,
             ),

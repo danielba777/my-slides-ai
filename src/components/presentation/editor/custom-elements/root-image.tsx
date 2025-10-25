@@ -10,10 +10,12 @@ import { Spinner } from "@/components/ui/spinner";
 import { useRootImageActions } from "@/hooks/presentation/useRootImageActions";
 import { cn } from "@/lib/utils";
 import { usePresentationState } from "@/states/presentation-state";
-import { Edit, ImageOff, Trash2 } from "lucide-react";
+import { Edit, Grid2x2, ImageIcon, ImageOff, Trash2 } from "lucide-react";
 import { useEditorReadOnly } from "platejs/react";
 import { Resizable } from "re-resizable";
 import { useState } from "react";
+import { MultiSlideImageSelector } from "../../presentation-page/MultiSlideImageSelector";
+import { SingleSlideImageSelector } from "../../presentation-page/SingleSlideImageSelector";
 import { type RootImage as RootImageType } from "../../utils/parser";
 import ImagePlaceholder from "./image-placeholder";
 import { PresentationImageEditor } from "./presentation-image-editor";
@@ -35,6 +37,11 @@ export default function RootImage({
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   // State for showing delete popover
   const [showDeletePopover, setShowDeletePopover] = useState(false);
+  // State for image selectors
+  const [isSingleImageSelectorOpen, setIsSingleImageSelectorOpen] =
+    useState(false);
+  const [isMultiImageSelectorOpen, setIsMultiImageSelectorOpen] =
+    useState(false);
   const setSlides = usePresentationState((s) => s.setSlides);
   const slides = usePresentationState((s) => s.slides);
   // Check if editor is in read-only mode
@@ -57,6 +64,67 @@ export default function RootImage({
     e.stopPropagation();
     removeRootImageFromSlide();
     setShowDeletePopover(false);
+  };
+
+  // Toggle between single image and grid layout
+  const toggleGridMode = () => {
+    const currentSlide = slides[slideIndex];
+    if (!currentSlide?.rootImage) return;
+
+    setSlides(
+      slides.map((slide, index) => {
+        if (slideIndex !== index) return slide;
+
+        const useGrid = !slide.rootImage?.useGrid;
+        return {
+          ...slide,
+          rootImage: {
+            ...slide.rootImage!,
+            useGrid,
+            gridImages: useGrid
+              ? slide.rootImage?.gridImages || [
+                  { url: slide.rootImage?.url },
+                  {},
+                  {},
+                  {},
+                ]
+              : undefined,
+          },
+        };
+      }),
+    );
+  };
+
+  // Handle single image selection
+  const handleSingleImageSelect = (imageUrl: string) => {
+    setSlides(
+      slides.map((slide, index) => {
+        if (slideIndex !== index) return slide;
+        return {
+          ...slide,
+          rootImage: {
+            ...slide.rootImage!,
+            url: imageUrl,
+          },
+        };
+      }),
+    );
+  };
+
+  // Handle multi-image selection
+  const handleMultiImageSelect = (imageUrls: string[]) => {
+    setSlides(
+      slides.map((slide, index) => {
+        if (slideIndex !== index) return slide;
+        return {
+          ...slide,
+          rootImage: {
+            ...slide.rootImage!,
+            gridImages: imageUrls.map((url) => ({ url })),
+          },
+        };
+      }),
+    );
   };
 
   // Double-click handler for the image
@@ -88,6 +156,135 @@ export default function RootImage({
     layoutType === "vertical";
 
   if (isOverlayLayout) {
+    // Render grid layout if enabled
+    if (image.useGrid && image.gridImages) {
+      return (
+        <div className="absolute inset-0">
+          <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-0 overflow-hidden">
+            {[0, 1, 2, 3].map((index) => {
+              const gridImage = image.gridImages?.[index];
+              const hasImage = gridImage?.url;
+
+              return (
+                <div
+                  key={index}
+                  className="relative w-full h-full overflow-hidden bg-muted/40"
+                >
+                  {hasImage ? (
+                    <>
+                      {/** biome-ignore lint/performance/noImgElement: This is a valid use case */}
+                      <img
+                        src={gridImage.url}
+                        alt={`Grid image ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        style={
+                          gridImage.cropSettings
+                            ? {
+                                objectFit:
+                                  gridImage.cropSettings.objectFit ?? "cover",
+                                objectPosition: `${gridImage.cropSettings.objectPosition.x}% ${gridImage.cropSettings.objectPosition.y}%`,
+                                transform: `scale(${gridImage.cropSettings.zoom ?? 1})`,
+                                transformOrigin: `${gridImage.cropSettings.objectPosition.x}% ${gridImage.cropSettings.objectPosition.y}%`,
+                              }
+                            : undefined
+                        }
+                      />
+                    </>
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                      Empty
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/35 via-black/10 to-black/60" />
+          {!readOnly && (
+            <div className="pointer-events-auto absolute bottom-4 right-4 z-20 flex flex-col items-end gap-2">
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleGridMode();
+                }}
+                variant="secondary"
+                size="sm"
+                className="shadow-md"
+              >
+                <ImageIcon className="mr-2 h-4 w-4" />
+                Single Image
+              </Button>
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsMultiImageSelectorOpen(true);
+                }}
+                variant="secondary"
+                size="sm"
+                className="shadow-md"
+              >
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Images
+              </Button>
+              {image.gridImages?.some((img) => img.url) && (
+                <Popover
+                  open={showDeletePopover}
+                  onOpenChange={setShowDeletePopover}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="shadow-md"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </Button>
+                  </PopoverTrigger>
+
+                  <PopoverContent className="w-auto p-0" side="top" align="end">
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeRootImageFromSlide();
+                        setShowDeletePopover(false);
+                      }}
+                      variant="destructive"
+                      size="sm"
+                      className="h-8"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Layout
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeImage();
+                        setShowDeletePopover(false);
+                      }}
+                    >
+                      <ImageOff className="mr-2 h-4 w-4" />
+                      Delete Images
+                    </Button>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+          )}
+          <MultiSlideImageSelector
+            isOpen={isMultiImageSelectorOpen}
+            onClose={() => setIsMultiImageSelectorOpen(false)}
+            onSelectImages={handleMultiImageSelect}
+            maxImages={4}
+          />
+        </div>
+      );
+    }
+
+    // Render single image layout (default)
     return (
       <div className="absolute inset-0">
         <div
@@ -137,7 +334,18 @@ export default function RootImage({
             <Button
               onClick={(e) => {
                 e.stopPropagation();
-                setIsSheetOpen(true);
+                toggleGridMode();
+              }}
+              variant="secondary"
+              size="sm"
+              className="shadow-md"
+            >
+              <Grid2x2 className="mr-2 h-4 w-4" />4 Images
+            </Button>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsSingleImageSelectorOpen(true);
               }}
               variant="secondary"
               size="sm"
@@ -190,17 +398,10 @@ export default function RootImage({
             )}
           </div>
         )}
-        <PresentationImageEditor
-          open={isSheetOpen}
-          onOpenChange={setIsSheetOpen}
-          layoutType={layoutType ?? ""}
-          slideIndex={slideIndex}
-          isRootImage={true}
-          element={{
-            type: "rootImage",
-            children: [],
-            ...image,
-          }}
+        <SingleSlideImageSelector
+          isOpen={isSingleImageSelectorOpen}
+          onClose={() => setIsSingleImageSelectorOpen(false)}
+          onSelectImage={handleSingleImageSelect}
         />
       </div>
     );

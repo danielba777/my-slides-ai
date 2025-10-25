@@ -70,6 +70,8 @@ interface RootImage {
   url?: string;
   query: string;
   cropSettings?: ImageCropSettings;
+  useGrid?: boolean;
+  gridImages?: Array<{ url?: string; cropSettings?: ImageCropSettings }>;
 }
 
 interface ThemeColors {
@@ -176,7 +178,11 @@ export class PlateJSToPPTXConverter {
 
     // Add root image first (no margins/padding as requested)
     if (slide.rootImage) {
-      await this.addRootImage(slide.rootImage, slide.layoutType);
+      if (slide.rootImage.useGrid && slide.rootImage.gridImages) {
+        await this.addGridImages(slide.rootImage.gridImages);
+      } else {
+        await this.addRootImage(slide.rootImage, slide.layoutType);
+      }
     }
 
     // Calculate content area based on layout
@@ -200,6 +206,51 @@ export class PlateJSToPPTXConverter {
     };
 
     return baseArea;
+  }
+
+  private async addGridImages(
+    gridImages: Array<{ url?: string; cropSettings?: ImageCropSettings }>,
+  ) {
+    if (!this.currentSlide) return;
+
+    const cellWidth = this.SLIDE_WIDTH / 2;
+    const cellHeight = this.SLIDE_HEIGHT / 2;
+
+    for (let i = 0; i < 4; i++) {
+      const img = gridImages[i];
+      if (!img?.url) continue;
+
+      const row = Math.floor(i / 2);
+      const col = i % 2;
+
+      const imageOptions: PptxGenJS.ImageProps = {
+        path: img.url,
+        x: col * cellWidth,
+        y: row * cellHeight,
+        w: cellWidth,
+        h: cellHeight,
+      };
+
+      // Apply crop settings if available
+      const cropSettings = img.cropSettings;
+      const objectFit = cropSettings?.objectFit || "cover";
+
+      if (objectFit === "contain") {
+        imageOptions.sizing = {
+          type: "contain",
+          w: cellWidth,
+          h: cellHeight,
+        };
+      } else if (objectFit === "cover") {
+        imageOptions.sizing = {
+          type: "cover",
+          w: cellWidth,
+          h: cellHeight,
+        };
+      }
+
+      this.currentSlide.addImage(imageOptions);
+    }
   }
 
   private async addRootImage(rootImage: RootImage, _layoutType?: string) {
