@@ -102,7 +102,7 @@ export function PresentationControls({
             <SelectValue placeholder="Select number of slides" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="auto">Auto (use prompt)</SelectItem>
+            <SelectItem value="auto">Auto</SelectItem>
             {[1, 2, 3, 4, 5, 6, 7, 8, 10, 12].map((num) => (
               <SelectItem key={num} value={String(num)}>
                 {num} slides
