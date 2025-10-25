@@ -1,12 +1,14 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { usePresentationState } from "@/states/presentation-state";
 import { Download, Rocket } from "lucide-react";
 import { useState } from "react";
-import { usePresentationState } from "@/states/presentation-state";
 
 // JSZip wird lazy geladen, damit initialer Bundle klein bleibt
-async function zipFiles(files: Array<{ name: string; blob: Blob }>): Promise<Blob> {
+async function zipFiles(
+  files: Array<{ name: string; blob: Blob }>,
+): Promise<Blob> {
   const JSZip = (await import("jszip")).default;
   const zip = new JSZip();
   for (const f of files) {
@@ -32,8 +34,12 @@ async function loadBlobAsImage(blob: Blob): Promise<HTMLImageElement> {
   });
 }
 
-// Erzwingt Full-Frame-Export 1080x1920 und harten Rand-Clip (kein „mittendrin"-Crop)
-async function normalizeToDesignPNG(pngBlob: Blob, W = 1080, H = 1920): Promise<Blob> {
+// Erzwingt Full-Frame-Export 1080x1620 (2:3) und harten Rand-Clip (kein „mittendrin"-Crop)
+async function normalizeToDesignPNG(
+  pngBlob: Blob,
+  W = 1080,
+  H = 1620,
+): Promise<Blob> {
   const img = await loadBlobAsImage(pngBlob);
   const canvas = document.createElement("canvas");
   canvas.width = W;
@@ -56,8 +62,8 @@ async function normalizeToDesignPNG(pngBlob: Blob, W = 1080, H = 1920): Promise<
   return out ?? pngBlob;
 }
 
-async function blobToJpeg(pngBlob: Blob, W = 1080, H = 1920): Promise<Blob> {
-  // Erst sicherstellen, dass wir exakt den vollen Frame (1080×1920) haben
+async function blobToJpeg(pngBlob: Blob, W = 1080, H = 1620): Promise<Blob> {
+  // Erst sicherstellen, dass wir exakt den vollen Frame (1080×1620, 2:3) haben
   const normalized = await normalizeToDesignPNG(pngBlob, W, H);
   const img = await loadBlobAsImage(normalized);
   const canvas = document.createElement("canvas");
@@ -74,12 +80,14 @@ async function blobToJpeg(pngBlob: Blob, W = 1080, H = 1920): Promise<Blob> {
 export function DownloadSlidesButton() {
   const [downloading, setDownloading] = useState(false);
   const slides = usePresentationState((s) => s.slides);
-  const title = usePresentationState((s) => s.currentPresentationTitle) || "slides";
+  const title =
+    usePresentationState((s) => s.currentPresentationTitle) || "slides";
 
   const handleDownload = async () => {
     try {
       setDownloading(true);
-      const exporters: Map<string, () => Promise<Blob>> = (window as any).__slideExporters ?? new Map();
+      const exporters: Map<string, () => Promise<Blob>> =
+        (window as any).__slideExporters ?? new Map();
       // sichere Reihenfolge (aktuelle UI-Reihenfolge im State)
       const ordered = slides.map((s, idx) => ({ id: s.id as string, idx }));
       const jpgFiles: Array<{ name: string; blob: Blob }> = [];
@@ -87,8 +95,8 @@ export function DownloadSlidesButton() {
         const exporter = exporters.get(id);
         if (!exporter) continue;
         const png = await exporter();
-        // Erzwinge Full-Frame 1080×1920 + Rand-Clip, danach nach JPG
-        const jpg = await blobToJpeg(png, 1080, 1920);
+        // Erzwinge Full-Frame 1080×1620 (2:3) + Rand-Clip, danach nach JPG
+        const jpg = await blobToJpeg(png, 1080, 1620);
         const name = `${String(idx + 1).padStart(2, "0")}.jpg`;
         jpgFiles.push({ name, blob: jpg });
       }

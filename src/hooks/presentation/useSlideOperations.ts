@@ -1,11 +1,11 @@
 "use client";
 
-import { type PlateSlide } from "@/components/presentation/utils/parser";
 import {
   DEFAULT_CANVAS,
   type CanvasDoc,
   type CanvasTextNode,
 } from "@/canvas/types";
+import { type PlateSlide } from "@/components/presentation/utils/parser";
 import { usePresentationState } from "@/states/presentation-state";
 import { nanoid } from "nanoid";
 
@@ -23,8 +23,8 @@ export function useSlideOperations() {
       {
         id: nanoid(),
         type: "text",
-        x: 160,
-        y: 180,
+        nx: 0.5, // horizontal zentriert (normalisierte Koordinaten)
+        ny: 0.5, // vertikal zentriert (normalisierte Koordinaten)
         text: "Neuer Text",
         fontFamily: "Inter",
         fontSize: 72,

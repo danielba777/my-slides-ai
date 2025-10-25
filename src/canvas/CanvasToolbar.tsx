@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,13 +22,13 @@ import {
   ImagePlus,
   Italic,
   Lock,
-  Palette,
   Plus,
   SendToBack,
   Trash2,
   Unlock,
   type LucideIcon,
 } from "lucide-react";
+import { useMemo, useRef } from "react";
 import type { CanvasDoc, CanvasNode } from "./types";
 
 type Props = {
@@ -215,11 +214,11 @@ export default function CanvasToolbar({
               "bg-primary text-primary-foreground hover:opacity-90 transition",
               // keine Ringe/Outlines
               "focus-visible:outline-none focus-visible:ring-0",
-              // volle Breite der linken Spalte
-              "w-[90px]"
+              // full width of left column
+              "w-[90px]",
             )}
-            aria-label="Neues Textfeld"
-            title="Neues Textfeld"
+            aria-label="New Text Field"
+            title="New Text Field"
           >
             <Plus className="mr-2 h-4 w-4" />
             Text +
@@ -237,129 +236,147 @@ export default function CanvasToolbar({
             onChange={handleFileChange}
           />
 
-          {/* Obere Aktionsleiste: Bild einfügen, Duplizieren, Snapshot, Löschen */}
+          {/* Top action bar: Insert Image, Duplicate, Snapshot, Delete */}
           <div className="flex flex-wrap items-center gap-2">
             <ToolbarIconButton
               icon={ImagePlus}
-              label="Bild einfuegen"
+              label="Insert Image"
               onClick={triggerImagePicker}
             />
             <ToolbarIconButton
               icon={Copy}
-              label="Auswahl duplizieren"
+              label="Duplicate Selection"
               onClick={onDuplicate}
               disabled={!selected}
             />
             <ToolbarIconButton
               icon={Camera}
-              label="Snapshot speichern"
+              label="Save Snapshot"
               onClick={onSnapshot}
             />
             <ToolbarIconButton
               icon={Trash2}
-              label="Auswahl entfernen"
+              label="Remove Selection"
               onClick={onDelete}
               disabled={!selected}
             />
           </div>
 
-          {/* Text-Formatierung (nur aktiv, wenn Text selektiert) */}
+          {/* Text Formatting (only active when text is selected) */}
           <div className="flex items-center gap-2">
             <ToolbarIconButton
               icon={Bold}
-              label="Fett"
+              label="Bold"
               onClick={() => toggleFontWeight("bold")}
               disabled={!selectedIsText}
-              active={selectedIsText && (selected?.fontStyle ?? "normal").includes("bold")}
+              active={
+                selectedIsText &&
+                (selected?.fontStyle ?? "normal").includes("bold")
+              }
             />
             <ToolbarIconButton
               icon={Italic}
-              label="Kursiv"
+              label="Italic"
               onClick={() => toggleFontWeight("italic")}
               disabled={!selectedIsText}
-              active={selectedIsText && (selected?.fontStyle ?? "normal").includes("italic")}
+              active={
+                selectedIsText &&
+                (selected?.fontStyle ?? "normal").includes("italic")
+              }
             />
             <ToolbarIconButton
               icon={AlignLeft}
-              label="Linksbuendig"
+              label="Align Left"
               onClick={() => handleAlign("left")}
               disabled={!selectedIsText}
               active={selectedIsText && selected?.align === "left"}
             />
             <ToolbarIconButton
               icon={AlignCenter}
-              label="Zentriert"
+              label="Align Center"
               onClick={() => handleAlign("center")}
               disabled={!selectedIsText}
-              active={selectedIsText && (selected?.align ?? "center") === "center"}
+              active={
+                selectedIsText && (selected?.align ?? "center") === "center"
+              }
             />
             <ToolbarIconButton
               icon={AlignRight}
-              label="Rechtsbuendig"
+              label="Align Right"
               onClick={() => handleAlign("right")}
               disabled={!selectedIsText}
               active={selectedIsText && selected?.align === "right"}
             />
           </div>
 
-          {/* Farben & Ebenen */}
+          {/* Colors & Layers */}
           <div className="flex items-center gap-2">
-            <Label htmlFor={colorInputId} className="text-xs text-muted-foreground">
-              Textfarbe
+            <Label
+              htmlFor={colorInputId}
+              className="text-xs text-muted-foreground"
+            >
+              Text Color
             </Label>
             <input
               id={colorInputId}
               type="color"
               onChange={(e) => handleFillChange(e.target.value)}
-              value={(selectedIsText ? (selected?.fill as string) : canvas.bg) ?? "#111111"}
+              value={
+                (selectedIsText ? (selected?.fill as string) : canvas.bg) ??
+                "#111111"
+              }
               disabled={!selectedIsText}
               className="h-8 w-10 cursor-pointer rounded-md border border-border bg-background p-1"
-              aria-label="Textfarbe"
-              title="Textfarbe"
+              aria-label="Text Color"
+              title="Text Color"
             />
 
             <Separator orientation="vertical" className="h-6" />
 
             <ToolbarIconButton
               icon={BringToFront}
-              label="Nach vorne"
+              label="Bring to Front"
               onClick={onFront}
               disabled={!selected}
             />
             <ToolbarIconButton
               icon={SendToBack}
-              label="Nach hinten"
+              label="Send to Back"
               onClick={onBack}
               disabled={!selected}
             />
             <ToolbarIconButton
               icon={selected?.locked ? Unlock : Lock}
-              label={selected?.locked ? "Entsperren" : "Sperren"}
+              label={selected?.locked ? "Unlock" : "Lock"}
               onClick={() => onLock(!(selected?.locked ?? false))}
               disabled={!selected}
             />
           </div>
 
-          {/* Typografie & Maße */}
+          {/* Typography & Dimensions */}
           <div className="flex items-center gap-2">
-            <Label className="text-xs text-muted-foreground">Größe</Label>
+            <Label className="text-xs text-muted-foreground">Size</Label>
             <Input
               type="number"
               min={8}
               step={1}
               value={selectedIsText ? (selected?.fontSize ?? 64) : 64}
-              onChange={(e) => handleNumberChange("fontSize", Number(e.target.value))}
+              onChange={(e) =>
+                handleNumberChange("fontSize", Number(e.target.value))
+              }
               disabled={!selectedIsText}
               className="h-8 w-20"
             />
 
-            <Label className="text-xs text-muted-foreground">Breite</Label>
+            <Label className="text-xs text-muted-foreground">Width</Label>
             <Input
               type="number"
               min={50}
               step={10}
               value={selectedIsText ? (selected?.width ?? 400) : 400}
-              onChange={(e) => handleNumberChange("width", Number(e.target.value))}
+              onChange={(e) =>
+                handleNumberChange("width", Number(e.target.value))
+              }
               disabled={!selectedIsText}
               className="h-8 w-24"
             />
@@ -369,7 +386,9 @@ export default function CanvasToolbar({
               type="number"
               step={0.05}
               value={selectedIsText ? (selected?.lineHeight ?? 1.2) : 1.2}
-              onChange={(e) => handleNumberChange("lineHeight", Number(e.target.value))}
+              onChange={(e) =>
+                handleNumberChange("lineHeight", Number(e.target.value))
+              }
               disabled={!selectedIsText}
               className="h-8 w-20"
             />
@@ -379,7 +398,9 @@ export default function CanvasToolbar({
               type="number"
               step={0.5}
               value={selectedIsText ? (selected?.letterSpacing ?? 0) : 0}
-              onChange={(e) => handleNumberChange("letterSpacing", Number(e.target.value))}
+              onChange={(e) =>
+                handleNumberChange("letterSpacing", Number(e.target.value))
+              }
               disabled={!selectedIsText}
               className="h-8 w-20"
             />
@@ -389,4 +410,3 @@ export default function CanvasToolbar({
     </TooltipProvider>
   );
 }
-

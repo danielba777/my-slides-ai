@@ -1,0 +1,346 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+import { ArrowLeft } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+interface ImageSetImage {
+  id?: string;
+  url: string;
+}
+
+interface ImageSet {
+  id: string;
+  name: string;
+  category?: string;
+  images?: ImageSetImage[];
+  isOwnedByUser?: boolean;
+}
+
+interface SingleSlideImageSelectorProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectImage: (imageUrl: string) => void;
+}
+
+export function SingleSlideImageSelector({
+  isOpen,
+  onClose,
+  onSelectImage,
+}: SingleSlideImageSelectorProps) {
+  const [selectedSet, setSelectedSet] = useState<ImageSet | null>(null);
+  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
+  const [imageSets, setImageSets] = useState<ImageSet[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"community" | "mine">("community");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const IMAGES_PER_PAGE = 27; // 9 columns x 3 rows
+
+  const loadImageSets = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch("/api/imagesets");
+      if (!response.ok) {
+        throw new Error("Failed to fetch image sets");
+      }
+
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setImageSets(data);
+      } else {
+        setImageSets([]);
+      }
+    } catch (error) {
+      console.error("Error loading image sets:", error);
+      setImageSets([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      void loadImageSets();
+      setPendingImageUrl(null);
+      setSelectedSet(null);
+      setCurrentPage(1);
+    }
+  }, [isOpen, loadImageSets]);
+
+  // Reset page when changing selected set
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedSet]);
+
+  const { communitySets, mySets } = useMemo(() => {
+    const community: ImageSet[] = [];
+    const mine: ImageSet[] = [];
+
+    imageSets.forEach((set) => {
+      const category = set.category?.toLowerCase() ?? "";
+      const isMine =
+        Boolean(set.isOwnedByUser) ||
+        category === "personal" ||
+        category === "mine" ||
+        category === "user";
+
+      if (isMine) {
+        mine.push(set);
+      } else {
+        community.push(set);
+      }
+    });
+
+    return { communitySets: community, mySets: mine };
+  }, [imageSets]);
+
+  const handleSelectImage = (imageUrl: string) => {
+    setPendingImageUrl(imageUrl);
+  };
+
+  const handleSave = () => {
+    if (pendingImageUrl) {
+      onSelectImage(pendingImageUrl);
+      onClose();
+    }
+  };
+
+  const getPreviewImages = (set: ImageSet): ImageSetImage[] => {
+    if (Array.isArray(set.images) && set.images.length > 0) {
+      return set.images.slice(0, 5);
+    }
+    return [];
+  };
+
+  const renderImageSetGrid = (sets: ImageSet[], emptyLabel: string) => {
+    if (isLoading) {
+      return (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <Skeleton key={index} className="h-40 w-full" />
+          ))}
+        </div>
+      );
+    }
+
+    if (!sets.length) {
+      return (
+        <div className="flex items-center justify-center h-40 text-muted-foreground">
+          {emptyLabel}
+        </div>
+      );
+    }
+
+    return (
+      <ScrollArea className="h-full max-h-full pr-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {sets.map((set) => {
+            const previewImages = getPreviewImages(set);
+
+            return (
+              <div
+                key={set.id}
+                onClick={() => setSelectedSet(set)}
+                className="group cursor-pointer rounded-lg p-2 transition bg-card relative overflow-visible border border-transparent hover:border-muted-foreground/30"
+              >
+                <div className="mb-2 text-base font-medium text-foreground truncate">
+                  {set.name}
+                </div>
+                {previewImages.length ? (
+                  <div className="overflow-hidden">
+                    <div className="grid grid-cols-5 gap-0">
+                      {previewImages.map((image, index) => (
+                        <div
+                          key={image.id ?? `${set.id}-${index}`}
+                          className={cn(
+                            "relative h-24 md:h-32 lg:h-40 overflow-hidden",
+                            index === 0 && "rounded-l-lg",
+                            index === previewImages.length - 1 &&
+                              "rounded-r-lg",
+                          )}
+                        >
+                          <img
+                            src={image.url}
+                            alt={`${set.name} preview ${index + 1}`}
+                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                            loading="lazy"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground">
+                    No preview images available
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </ScrollArea>
+    );
+  };
+
+  const renderImageSelection = () => {
+    if (!selectedSet || !selectedSet.images) return null;
+
+    const totalImages = selectedSet.images.length;
+    const totalPages = Math.ceil(totalImages / IMAGES_PER_PAGE);
+    const startIndex = (currentPage - 1) * IMAGES_PER_PAGE;
+    const endIndex = startIndex + IMAGES_PER_PAGE;
+    const currentImages = selectedSet.images.slice(startIndex, endIndex);
+
+    return (
+      <>
+        <div className="flex-1 overflow-auto">
+          <div className="grid gap-3 grid-cols-9 auto-rows-fr p-4">
+            {currentImages.map((img, idx) => (
+              <button
+                key={img.id ?? startIndex + idx}
+                onClick={() => handleSelectImage(img.url)}
+                className={cn(
+                  "aspect-square rounded-lg overflow-hidden transition-all relative",
+                  "hover:ring-2 hover:ring-blue-400 hover:scale-105",
+                  pendingImageUrl === img.url &&
+                    "ring-4 ring-blue-500 scale-105",
+                )}
+              >
+                <img
+                  src={img.url}
+                  alt={`${selectedSet.name} ${startIndex + idx + 1}`}
+                  className="w-full h-full object-cover"
+                />
+                {pendingImageUrl === img.url && (
+                  <div className="absolute inset-0 bg-blue-500/20" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-4 py-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+              }
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-7xl min-h-[700px] flex flex-col justify-start items-stretch">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            {selectedSet && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setSelectedSet(null);
+                  setPendingImageUrl(null);
+                }}
+                className="h-8 w-8"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+            <DialogTitle className="text-2xl">
+              {selectedSet
+                ? `Select Image from ${selectedSet.name}`
+                : "Select Image Collection"}
+            </DialogTitle>
+          </div>
+        </DialogHeader>
+
+        {selectedSet ? (
+          <div className="mt-4 flex-1 overflow-hidden">
+            {renderImageSelection()}
+          </div>
+        ) : (
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) =>
+              setActiveTab(value as "community" | "mine")
+            }
+            className="mt-4 flex flex-col flex-1"
+          >
+            <TabsList className="grid w-full grid-cols-2 rounded-lg bg-muted p-1">
+              <TabsTrigger
+                value="community"
+                className="w-full rounded-md text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
+                Community
+              </TabsTrigger>
+              <TabsTrigger
+                value="mine"
+                className="w-full rounded-md text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
+                My Collections
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent
+              value="community"
+              className="mt-4 flex-1 overflow-hidden"
+            >
+              {renderImageSetGrid(
+                communitySets,
+                "No community collections available yet.",
+              )}
+            </TabsContent>
+            <TabsContent value="mine" className="mt-4 flex-1 overflow-hidden">
+              {renderImageSetGrid(
+                mySets,
+                "You haven't created any collections yet.",
+              )}
+            </TabsContent>
+          </Tabs>
+        )}
+
+        <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          {selectedSet && (
+            <Button onClick={handleSave} disabled={!pendingImageUrl}>
+              Apply Image
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

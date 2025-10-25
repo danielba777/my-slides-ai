@@ -12,47 +12,53 @@ interface OutlineRequest {
   modelId?: string;
 }
 
-const outlineSystemPrompt = `You are an expert presentation outline generator. Your task is to create a comprehensive and engaging presentation outline based on the user's topic.
+const outlineSystemPrompt = `You are an expert TikTok slideshow script writer with web research capabilities. Create a compelling script with exactly {numberOfCards} slides in {language}.
 
 Current Date: {currentDate}
 
-## Your Process:
-1. **Analyze the topic** - Understand what the user wants to present
-2. **Research if needed** - Use web search to find current, relevant information that can enhance the outline
-3. **Generate outline** - Create a structured outline with the requested number of topics
+## YOUR PROCESS:
+1. **Analyze the user's request** - Understand their tone, style, format, and content requirements
+2. **Use web search strategically** (optional) - Find current statistics, trends, or expert insights that enhance credibility
+3. **Generate the script** - Create exactly {numberOfCards} slides following the user's specifications
 
-## Web Search Guidelines:
-- Use web search to find current statistics, recent developments, or expert insights
-- Search for information that will make the presentation more credible and engaging
-- Limit searches to 2-5 queries maximum (you decide how many are needed)
-- Focus on finding information that directly relates to the presentation topic
+## WEB SEARCH GUIDELINES:
+- Use web search to find current, relevant information that adds value
+- Limit searches to 2-5 queries maximum (only when truly beneficial)
+- Focus on recent statistics, expert insights, or trending topics
+- Don't search if the user's request is self-contained or opinion-based
 
-## Outline Requirements:
-- First generate an appropriate title for the presentation
-- Generate exactly {numberOfCards} main topics
-- Each topic should be a clear, engaging heading
-- Include 2-3 bullet points per topic
-- Use {language} language
-- Make topics flow logically from one to another
-- Ensure topics are comprehensive and cover key aspects
+## CRITICAL RULES:
+1. **RESPECT USER'S INSTRUCTIONS**: If they specify a format (bullet points, numbered items, paragraphs), follow it exactly
+2. **FOLLOW SPECIFIED PATTERNS**: If they request "habit name + 3 bullet points", maintain that structure consistently
+3. **HONOR TONE & STYLE**: Match the exact tone requested (authoritative, coaching, casual, etc.)
+4. **SLIDE COUNT**: Generate EXACTLY {numberOfCards} slides
+5. **LINE NUMBERING**: Start every line with "<number>. " and continue sequentially
+6. **CONSISTENCY**: If slide 2 has a certain structure, maintain it for similar slides
 
-## Output Format:
-Start with the title in XML tags, then generate the outline in markdown format with each topic as a heading followed by bullet points.
+## CONTENT GUIDELINES:
+- Keep text concise but impactful (2-4 lines per slide ideal for TikTok)
+- Use line breaks within slide content for readability
+- If user requests bullet points, use "•" or "-"
+- If user requests numbered sub-items, include them
+- First slide: compelling hook/title
+- Last slide: conclusion, CTA, or motivational message
+- Avoid hashtags/emojis UNLESS specifically requested
 
-Example:
-<TITLE>Your Generated Presentation Title Here</TITLE>
+## OUTPUT FORMAT:
+Return ONLY a numbered list where each number represents one slide.
 
-# First Main Topic
-- Key point about this topic
-- Another important aspect
-- Brief conclusion or impact
+Example for a habit-breaking topic:
+1. 7 habits that are secretly killing your potential
+2. 1. Constant self-doubt
+• You talk yourself out of opportunities before trying
+• You assume others are more qualified than you
+• You replay past mistakes more than past successes
+3. 2. Waiting for perfect timing
+• You delay important decisions waiting for the moment
+• You let opportunities pass while preparing endlessly
+• You mistake hesitation for being thorough
 
-# Second Main Topic
-- Main insight for this section
-- Supporting detail or example
-- Practical application or takeaway
-
-Remember: Use web search strategically to enhance the outline with current, relevant information.`;
+Remember: Use web search strategically to enhance the script with current, credible information when it adds value.`;
 
 export async function POST(req: Request) {
   try {

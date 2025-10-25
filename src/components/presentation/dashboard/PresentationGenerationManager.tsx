@@ -7,8 +7,8 @@ import {
   applyBackgroundImageToCanvas,
   ensureSlideCanvas,
 } from "@/components/presentation/utils/canvas";
-import { extractThinking } from "@/lib/thinking-extractor";
 import { getEffectiveSlideCount } from "@/lib/presentation/slide-count";
+import { extractThinking } from "@/lib/thinking-extractor";
 import { usePresentationState } from "@/states/presentation-state";
 import { useChat } from "@ai-sdk/react";
 import { useEffect, useMemo, useRef } from "react";
@@ -47,9 +47,10 @@ export function PresentationGenerationManager() {
 
   const outlineRafIdRef = useRef<number | null>(null);
   const outlineBufferRef = useRef<string[] | null>(null);
-  const searchResultsBufferRef = useRef<
-    Array<{ query: string; results: unknown[] }> | null
-  >(null);
+  const searchResultsBufferRef = useRef<Array<{
+    query: string;
+    results: unknown[];
+  }> | null>(null);
   const titleExtractedRef = useRef<boolean>(false);
   const outlineRequestInFlightRef = useRef(false);
   const effectiveSlideCount = useMemo(
@@ -142,25 +143,66 @@ export function PresentationGenerationManager() {
         cleanContent = cleanContent.replace(/<TITLE>.*?<\/TITLE>/i, "").trim();
       }
 
-      const numberedMatches = Array.from(
-        cleanContent.matchAll(/^\s*\d+[\.\)]\s+(.*\S)\s*$/gm),
-      )
-        .map((match) => match[1]?.trim())
-        .filter((value): value is string => Boolean(value && value.length > 0));
+      // Neue Logik: Erfasse komplette Multi-Line Outline-Items
+      const lines = cleanContent.split("\n");
+      const outlineItems: string[] = [];
+      let currentItem = "";
+      let inItem = false;
 
-      let outlineItems: string[] = [];
+      for (const line of lines) {
+        const trimmedLine = line.trim();
 
-      if (numberedMatches.length > 0) {
-        outlineItems = numberedMatches;
-      } else {
-        const sections = cleanContent.split(/^#\s+/gm).filter(Boolean);
-        outlineItems =
-          sections.length > 0
-            ? sections.map((section) => {
+        // Check if this line starts a new numbered item
+        const numberMatch = trimmedLine.match(/^(\d+)[\.\)]\s+(.*)$/);
+
+        if (numberMatch) {
+          // Save the previous item if it exists
+          if (currentItem.trim()) {
+            outlineItems.push(currentItem.trim());
+          }
+          // Start a new item with the content after the number
+          currentItem = numberMatch[2] || "";
+          inItem = true;
+        } else if (inItem && trimmedLine) {
+          // Continue the current item (bullet points, sub-text, etc.)
+          currentItem += "\n" + trimmedLine;
+        } else if (!trimmedLine) {
+          // Empty line - might be separator between items
+          if (currentItem.trim()) {
+            // Don't add the item yet, wait for next numbered item or end
+          }
+        }
+      }
+
+      // Don't forget the last item
+      if (currentItem.trim()) {
+        outlineItems.push(currentItem.trim());
+      }
+
+      if (outlineItems.length === 0) {
+        // Fallback: Try to extract single-line items if multi-line parsing failed
+        const numberedMatches = Array.from(
+          cleanContent.matchAll(/^\s*\d+[\.\)]\s+(.*\S)\s*$/gm),
+        )
+          .map((match) => match[1]?.trim())
+          .filter((value): value is string =>
+            Boolean(value && value.length > 0),
+          );
+
+        if (numberedMatches.length > 0) {
+          outlineItems.push(...numberedMatches);
+        } else {
+          // Second fallback: Try markdown-style headers
+          const sections = cleanContent.split(/^#\s+/gm).filter(Boolean);
+          if (sections.length > 0) {
+            outlineItems.push(
+              ...sections.map((section) => {
                 const trimmed = section.trim();
                 return trimmed.startsWith("#") ? trimmed : `# ${trimmed}`;
-              })
-            : [];
+              }),
+            );
+          }
+        }
       }
 
       if (outlineItems.length > 0) {
@@ -264,8 +306,7 @@ export function PresentationGenerationManager() {
           usePresentationState.getState();
 
         if (outlineRafIdRef.current === null) {
-          outlineRafIdRef.current =
-            requestAnimationFrame(updateOutlineWithRAF);
+          outlineRafIdRef.current = requestAnimationFrame(updateOutlineWithRAF);
         }
 
         await appendOutlineMessage(

@@ -19,6 +19,7 @@ import {
   AlignLeft,
   AlignRight,
   Check,
+  CheckIcon,
   ChevronDown,
   ChevronUp,
   Plus,
@@ -36,7 +37,11 @@ type LegacyEditorToolbarProps = {
   className?: string;
   selectedText?: SlideTextElement | null;
   // Patch kommt teils mit Zusatzfeldern aus der Toolbar (fill, stroke, fontWeight etc.)
-  onChangeSelectedText?: (patch: Partial<SlideTextElement> & Record<string, unknown>) => void;
+  onChangeSelectedText?: (
+    patch: Partial<SlideTextElement> & Record<string, unknown>,
+  ) => void;
+  /** Callback zum Schließen der Toolbar */
+  onClose?: () => void;
 };
 
 /**
@@ -51,6 +56,7 @@ function LegacyEditorToolbar({
   className,
   selectedText,
   onChangeSelectedText,
+  onClose,
 }: LegacyEditorToolbarProps) {
   const handleAdd = useCallback(() => {
     if (onAddText) return onAddText();
@@ -67,15 +73,17 @@ function LegacyEditorToolbar({
   const hasSelection = !!selectedText;
   const selectedBackground = selectedText?.background;
   const selectedFontWeight =
-    (selectedText as any)?.fontWeight ?? (selectedText as any)?.weight ?? "normal";
+    (selectedText as any)?.fontWeight ??
+    (selectedText as any)?.weight ??
+    "normal";
   const isBold = hasSelection && selectedFontWeight === "bold";
   const selectedFontStyle =
     (selectedText as any)?.fontStyle ??
     ((selectedText as any)?.italic ? "italic" : "normal");
   const isItalic = hasSelection && selectedFontStyle === "italic";
-  const activeAlign = (
-    (selectedText as any)?.align ?? selectedText?.align ?? "left"
-  ) as "left" | "center" | "right";
+  const activeAlign = ((selectedText as any)?.align ??
+    selectedText?.align ??
+    "left") as "left" | "center" | "right";
 
   React.useEffect(() => {
     if (!selectedBackground) {
@@ -157,13 +165,13 @@ function LegacyEditorToolbar({
       {/* === Primärzeile: nur wichtigste Controls === */}
       <div className="flex items-center justify-between gap-2 px-3 py-1.5">
         <div className="flex items-center gap-2">
-          {/* Text hinzufügen */}
+          {/* Add text */}
           <Button
             variant="secondary"
             className="rounded-xl px-3"
             onClick={handleAdd}
-            aria-label="Text hinzufügen"
-            title="Text hinzufügen"
+            aria-label="Add text"
+            title="Add text"
           >
             <Plus className="mr-1 h-4 w-4" /> Text
           </Button>
@@ -286,9 +294,23 @@ function LegacyEditorToolbar({
             </Button>
           </div>
         </div>
+
+        {/* Done Button - rechts oben */}
+        {onClose && (
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={onClose}
+            className="rounded-full bg-green-500 hover:bg-green-600"
+            aria-label="Done editing"
+            title="Done editing"
+          >
+            <CheckIcon className="h-5 w-5 text-white" />
+          </Button>
+        )}
       </div>
 
-      {/* Sekundärzeile: „Erweiterte Optionen" */}
+      {/* Secondary row: "Advanced Options" */}
       <div className="border-t px-3">
         <Collapsible>
           <CollapsibleTrigger asChild>
@@ -297,7 +319,7 @@ function LegacyEditorToolbar({
               size="sm"
               className="w-full justify-between rounded-xl"
             >
-              Erweiterte Optionen
+              Advanced Options
               <ChevronDown className="h-4 w-4 data-[state=open]:hidden" />
               <ChevronUp className="hidden h-4 w-4 data-[state=open]:block" />
             </Button>
@@ -317,7 +339,7 @@ function LegacyEditorToolbar({
                   }}
                 />
                 <MiniRange
-                  label="Rundung"
+                  label="Radius"
                   min={0}
                   max={64}
                   value={textBgRadius}
@@ -327,7 +349,7 @@ function LegacyEditorToolbar({
                   }}
                 />
                 <MiniRange
-                  label="Opazität"
+                  label="Opacity"
                   min={0}
                   max={100}
                   value={textBgOpacity}
@@ -338,7 +360,7 @@ function LegacyEditorToolbar({
                 />
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-muted-foreground">
-                    Hintergrund
+                    Background
                   </span>
                   <input
                     type="color"
@@ -354,7 +376,7 @@ function LegacyEditorToolbar({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="rounded-xl">
-                      Modus: {textBgMode === "block" ? "Block" : "Blob"}
+                      Mode: {textBgMode === "block" ? "Block" : "Blob"}
                       <ChevronDown className="ml-1 h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -403,7 +425,7 @@ function LegacyEditorToolbar({
 
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-muted-foreground">
-                  Textfarbe
+                  Text Color
                 </span>
                 <input
                   type="color"
@@ -420,7 +442,7 @@ function LegacyEditorToolbar({
               </div>
 
               <MiniRange
-                label="Konturstärke"
+                label="Stroke Width"
                 min={0}
                 max={20}
                 value={(selectedText as any)?.strokeWidth ?? 0}
@@ -436,7 +458,7 @@ function LegacyEditorToolbar({
 
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-muted-foreground">
-                  Konturfarbe
+                  Stroke Color
                 </span>
                 <input
                   type="color"
