@@ -24,7 +24,10 @@ interface ImageSet {
   name: string;
   category?: string;
   images?: ImageSetImage[];
+  _count?: { images: number; children?: number };
   isOwnedByUser?: boolean;
+  parentId?: string | null;
+  children?: ImageSet[];
 }
 
 interface MultiSlideImageSelectorProps {
@@ -46,6 +49,9 @@ export function MultiSlideImageSelector({
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"community" | "mine">("community");
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Drill-down navigation state
+  const [drillDownParent, setDrillDownParent] = useState<ImageSet | null>(null);
 
   const IMAGES_PER_PAGE = 27; // 9 columns x 3 rows
 
@@ -77,6 +83,7 @@ export function MultiSlideImageSelector({
       setPendingImageUrls([]);
       setSelectedSet(null);
       setCurrentPage(1);
+      setDrillDownParent(null); // Reset drill-down when opening dialog
     }
   }, [isOpen, loadImageSets]);
 
@@ -86,10 +93,36 @@ export function MultiSlideImageSelector({
   }, [selectedSet]);
 
   const { communitySets, mySets } = useMemo(() => {
+    // If drilling down, show only children of selected parent
+    if (drillDownParent) {
+      const children = drillDownParent.children || [];
+      const community: ImageSet[] = [];
+      const mine: ImageSet[] = [];
+
+      children.forEach((set) => {
+        const category = set.category?.toLowerCase() ?? "";
+        const isMine =
+          Boolean(set.isOwnedByUser) ||
+          category === "personal" ||
+          category === "mine" ||
+          category === "user";
+
+        if (isMine) {
+          mine.push(set);
+        } else {
+          community.push(set);
+        }
+      });
+
+      return { communitySets: community, mySets: mine };
+    }
+
+    // Otherwise show top-level sets
     const community: ImageSet[] = [];
     const mine: ImageSet[] = [];
+    const topLevelSets = imageSets.filter((set) => !set.parentId);
 
-    imageSets.forEach((set) => {
+    topLevelSets.forEach((set) => {
       const category = set.category?.toLowerCase() ?? "";
       const isMine =
         Boolean(set.isOwnedByUser) ||
@@ -105,7 +138,7 @@ export function MultiSlideImageSelector({
     });
 
     return { communitySets: community, mySets: mine };
-  }, [imageSets]);
+  }, [imageSets, drillDownParent]);
 
   const handleSelectImage = (imageUrl: string) => {
     setPendingImageUrls((prev) => {
@@ -127,11 +160,92 @@ export function MultiSlideImageSelector({
     }
   };
 
+  const handleSelectSet = (set: ImageSet) => {
+    // Check if this set has children
+    const hasChildren =
+      (set.children && set.children.length > 0) ||
+      (set._count?.children && set._count.children > 0);
+
+    if (hasChildren) {
+      // Drill down to show only children
+      setDrillDownParent(set);
+    } else {
+      // Directly select this set for image browsing
+      setSelectedSet(set);
+    }
+  };
+
+  const handleBackToTopLevel = () => {
+    setDrillDownParent(null);
+  };
+
   const getPreviewImages = (set: ImageSet): ImageSetImage[] => {
+    // If this set has its own images, use them
     if (Array.isArray(set.images) && set.images.length > 0) {
       return set.images.slice(0, 5);
     }
+
+    // If this set has children but no own images, use mixed preview
+    if (set.children && set.children.length > 0) {
+      return getMixedPreviewImages(set);
+    }
+
     return [];
+  };
+
+  const getMixedPreviewImages = (parent: ImageSet): ImageSetImage[] => {
+    // Create a mixed preview from all children
+    if (!parent.children || parent.children.length === 0) {
+      // Fallback: use parent's own images if available
+      if (Array.isArray(parent.images) && parent.images.length > 0) {
+        return parent.images.slice(0, 5);
+      }
+      return [];
+    }
+
+    const mixedImages: ImageSetImage[] = [];
+    const childrenWithImages = parent.children.filter(
+      (child) => Array.isArray(child.images) && child.images.length > 0,
+    );
+
+    if (childrenWithImages.length === 0) {
+      // If no children have images, use parent's own images if available
+      if (Array.isArray(parent.images) && parent.images.length > 0) {
+        return parent.images.slice(0, 5);
+      }
+      return [];
+    }
+
+    // Distribute images evenly across children (round-robin)
+    let childIndex = 0;
+    while (
+      mixedImages.length < 5 &&
+      childIndex < childrenWithImages.length * 10
+    ) {
+      const childIdx = childIndex % childrenWithImages.length;
+      const child = childrenWithImages[childIdx];
+
+      if (!child) {
+        childIndex++;
+        continue;
+      }
+
+      const imageIndex = Math.floor(childIndex / childrenWithImages.length);
+
+      if (child.images && imageIndex < child.images.length) {
+        const image = child.images[imageIndex];
+        if (image) {
+          mixedImages.push(image);
+        }
+      }
+
+      childIndex++;
+
+      // Break if we've exhausted all images
+      if (childIndex >= childrenWithImages.length * 10) break;
+    }
+
+    return mixedImages.slice(0, 5);
   };
 
   const renderImageSetGrid = (sets: ImageSet[], emptyLabel: string) => {
@@ -145,7 +259,7 @@ export function MultiSlideImageSelector({
       );
     }
 
-    if (!sets.length) {
+    if (!sets.length && !drillDownParent) {
       return (
         <div className="flex items-center justify-center h-40 text-muted-foreground">
           {emptyLabel}
@@ -156,13 +270,58 @@ export function MultiSlideImageSelector({
     return (
       <ScrollArea className="h-full max-h-full pr-4">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {/* "All Images" Option when drilling down */}
+          {drillDownParent && (
+            <div
+              key="all-images"
+              onClick={() => setSelectedSet(drillDownParent)}
+              className="group cursor-pointer rounded-lg p-2 transition bg-card relative overflow-visible border border-transparent hover:border-muted-foreground/30"
+            >
+              <div className="mb-2 text-base font-bold text-foreground">
+                ✨ All Images
+              </div>
+              {(() => {
+                const allImagesPreview = getMixedPreviewImages(drillDownParent);
+                return allImagesPreview.length ? (
+                  <div className="overflow-hidden">
+                    <div className="grid grid-cols-5 gap-0">
+                      {allImagesPreview.map((image, index) => (
+                        <div
+                          key={image.id ?? `all-${index}`}
+                          className={cn(
+                            "relative h-24 md:h-32 lg:h-40 overflow-hidden",
+                            index === 0 && "rounded-l-lg",
+                            index === allImagesPreview.length - 1 &&
+                              "rounded-r-lg",
+                          )}
+                        >
+                          <img
+                            src={image.url}
+                            alt={`All images preview ${index + 1}`}
+                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                            loading="lazy"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground">
+                    Use all images from all subfolders
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Regular image sets */}
           {sets.map((set) => {
             const previewImages = getPreviewImages(set);
 
             return (
               <div
                 key={set.id}
-                onClick={() => setSelectedSet(set)}
+                onClick={() => handleSelectSet(set)}
                 className="group cursor-pointer rounded-lg p-2 transition bg-card relative overflow-visible border border-transparent hover:border-muted-foreground/30"
               >
                 <div className="mb-2 text-base font-medium text-foreground truncate">
@@ -205,13 +364,30 @@ export function MultiSlideImageSelector({
   };
 
   const renderImageSelection = () => {
-    if (!selectedSet || !selectedSet.images) return null;
+    if (!selectedSet) return null;
 
-    const totalImages = selectedSet.images.length;
+    // Collect all images: either from this set or from all children
+    let allImages: ImageSetImage[] = [];
+
+    if (Array.isArray(selectedSet.images) && selectedSet.images.length > 0) {
+      // Use own images if available
+      allImages = selectedSet.images;
+    } else if (selectedSet.children && selectedSet.children.length > 0) {
+      // Collect images from all children
+      selectedSet.children.forEach((child) => {
+        if (Array.isArray(child.images)) {
+          allImages.push(...child.images);
+        }
+      });
+    }
+
+    if (allImages.length === 0) return null;
+
+    const totalImages = allImages.length;
     const totalPages = Math.ceil(totalImages / IMAGES_PER_PAGE);
     const startIndex = (currentPage - 1) * IMAGES_PER_PAGE;
     const endIndex = startIndex + IMAGES_PER_PAGE;
-    const currentImages = selectedSet.images.slice(startIndex, endIndex);
+    const currentImages = allImages.slice(startIndex, endIndex);
 
     return (
       <>
@@ -284,13 +460,17 @@ export function MultiSlideImageSelector({
       <DialogContent className="max-w-7xl min-h-[700px] flex flex-col justify-start items-stretch">
         <DialogHeader>
           <div className="flex items-center gap-2">
-            {selectedSet && (
+            {(selectedSet || drillDownParent) && (
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => {
-                  setSelectedSet(null);
-                  setPendingImageUrls([]);
+                  if (selectedSet) {
+                    setSelectedSet(null);
+                    setPendingImageUrls([]);
+                  } else if (drillDownParent) {
+                    handleBackToTopLevel();
+                  }
                 }}
                 className="h-8 w-8"
               >
@@ -300,7 +480,9 @@ export function MultiSlideImageSelector({
             <DialogTitle className="text-2xl">
               {selectedSet
                 ? `Select ${maxImages} Images from ${selectedSet.name}`
-                : "Select Image Collection"}
+                : drillDownParent
+                  ? `Select from: ${drillDownParent.name}`
+                  : "Select Image Collection"}
             </DialogTitle>
           </div>
           {selectedSet && (

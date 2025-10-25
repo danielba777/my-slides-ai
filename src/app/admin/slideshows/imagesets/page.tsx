@@ -6,16 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
-import { Edit, Image as ImageIcon, Plus, Trash2, Upload } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Edit, Folder, Plus, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -23,45 +24,30 @@ interface ImageSet {
   id: string;
   name: string;
   slug: string;
-  description?: string;
-  category: string;
   isActive: boolean;
   createdAt: string;
-  images: ImageSetImage[];
-  _count: { images: number };
-}
-
-interface ImageSetImage {
-  id: string;
-  filename: string;
-  url: string;
-  order: number;
-  metadata: any;
+  parentId?: string | null;
+  children?: ImageSet[];
+  _count: { images: number; children?: number };
 }
 
 export default function ImageSetsAdminPage() {
+  const router = useRouter();
   const [imageSets, setImageSets] = useState<ImageSet[]>([]);
-  const [selectedImageSet, setSelectedImageSet] = useState<ImageSet | null>(
-    null,
-  );
   const [isCreating, setIsCreating] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadFiles, setUploadFiles] = useState<FileList | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [parentForNew, setParentForNew] = useState<string | null>(null);
 
   // Form state für neues ImageSet
   const [newImageSet, setNewImageSet] = useState({
     name: "",
-    description: "",
-    category: "art",
+    parentId: null as string | null,
   });
 
   // Form state für Bearbeitung
   const [editingImageSet, setEditingImageSet] = useState<ImageSet | null>(null);
   const [editForm, setEditForm] = useState({
     name: "",
-    description: "",
-    category: "art",
     isActive: true,
   });
 
@@ -101,8 +87,12 @@ export default function ImageSetsAdminPage() {
 
       if (response.ok) {
         toast.success("Bilder-Set erstellt");
-        setNewImageSet({ name: "", description: "", category: "art" });
+        setNewImageSet({
+          name: "",
+          parentId: null,
+        });
         setIsCreating(false);
+        setParentForNew(null);
         loadImageSets();
       } else {
         const errorData = await response.json();
@@ -128,13 +118,6 @@ export default function ImageSetsAdminPage() {
         toast.success("Bilder-Set aktualisiert");
         setEditingImageSet(null);
         loadImageSets();
-        // Aktualisiere das ausgewählte Set falls es das gleiche ist
-        if (selectedImageSet?.id === editingImageSet.id) {
-          const updatedSet = imageSets.find(
-            (set) => set.id === editingImageSet.id,
-          );
-          if (updatedSet) setSelectedImageSet(updatedSet);
-        }
       } else {
         const errorData = await response.json();
         toast.error(
@@ -144,80 +127,6 @@ export default function ImageSetsAdminPage() {
     } catch (error) {
       console.error("Error updating image set:", error);
       toast.error("Fehler beim Aktualisieren des Bilder-Sets");
-    }
-  };
-
-  const uploadImages = async () => {
-    if (!selectedImageSet || !uploadFiles || uploadFiles.length === 0) {
-      toast.error("Bitte wähle ein Bilder-Set und Dateien aus");
-      return;
-    }
-
-    setIsUploading(true);
-    const formData = new FormData();
-
-    // Verwende Array.from() für bessere Type-Safety
-    Array.from(uploadFiles).forEach((file) => {
-      formData.append("images", file);
-    });
-
-    try {
-      const response = await fetch(
-        `/api/imagesets/${selectedImageSet.id}/upload`,
-        {
-          method: "POST",
-          body: formData,
-        },
-      );
-
-      if (response.ok) {
-        toast.success(`${uploadFiles.length} Bilder erfolgreich hochgeladen`);
-        setUploadFiles(null);
-        loadImageSets();
-        // Aktualisiere das ausgewählte Set
-        const updatedSet = imageSets.find(
-          (set) => set.id === selectedImageSet.id,
-        );
-        if (updatedSet) setSelectedImageSet(updatedSet);
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.error || "Fehler beim Hochladen der Bilder");
-      }
-    } catch (error) {
-      console.error("Error uploading images:", error);
-      toast.error("Fehler beim Hochladen der Bilder");
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const deleteImage = async (imageId: string) => {
-    if (!confirm("Möchtest du dieses Bild wirklich löschen?")) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/imagesets/images/${imageId}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        toast.success("Bild gelöscht");
-        loadImageSets();
-        // Aktualisiere das ausgewählte Set
-        if (selectedImageSet) {
-          const updatedSet = imageSets.find(
-            (set) => set.id === selectedImageSet.id,
-          );
-          if (updatedSet) setSelectedImageSet(updatedSet);
-        }
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.error || "Fehler beim Löschen des Bildes");
-      }
-    } catch (error) {
-      console.error("Error deleting image:", error);
-      toast.error("Fehler beim Löschen des Bildes");
     }
   };
 
@@ -237,7 +146,6 @@ export default function ImageSetsAdminPage() {
 
       if (response.ok) {
         toast.success("Bilder-Set gelöscht");
-        setSelectedImageSet(null);
         loadImageSets();
       } else {
         const errorData = await response.json();
@@ -253,8 +161,6 @@ export default function ImageSetsAdminPage() {
     setEditingImageSet(imageSet);
     setEditForm({
       name: imageSet.name,
-      description: imageSet.description || "",
-      category: imageSet.category,
       isActive: imageSet.isActive,
     });
   };
@@ -263,11 +169,58 @@ export default function ImageSetsAdminPage() {
     setEditingImageSet(null);
     setEditForm({
       name: "",
-      description: "",
-      category: "art",
       isActive: true,
     });
   };
+
+  // Hierarchie-Helfer: Baue Baumstruktur
+  const buildTree = (sets: ImageSet[]): ImageSet[] => {
+    const map = new Map<string, ImageSet>();
+    const roots: ImageSet[] = [];
+
+    // Erstelle Map mit allen Sets
+    sets.forEach((set) => {
+      map.set(set.id, { ...set, children: [] });
+    });
+
+    // Ordne children zu parents zu
+    sets.forEach((set) => {
+      const node = map.get(set.id)!;
+      if (set.parentId) {
+        const parent = map.get(set.parentId);
+        if (parent) {
+          parent.children = parent.children || [];
+          parent.children.push(node);
+        } else {
+          roots.push(node); // Fallback wenn Parent nicht gefunden
+        }
+      } else {
+        roots.push(node);
+      }
+    });
+
+    return roots;
+  };
+
+  // Flache Liste für Tabelle mit Einrückung
+  const flattenTree = (
+    sets: ImageSet[],
+    level = 0,
+  ): Array<ImageSet & { level: number }> => {
+    const result: Array<ImageSet & { level: number }> = [];
+
+    sets.forEach((set) => {
+      result.push({ ...set, level });
+      if (set.children && set.children.length > 0) {
+        result.push(...flattenTree(set.children, level + 1));
+      }
+    });
+
+    return result;
+  };
+
+  const treeData = buildTree(imageSets);
+  const flatData = flattenTree(treeData);
 
   if (isLoading) {
     return (
@@ -289,7 +242,17 @@ export default function ImageSetsAdminPage() {
             Erstelle und verwalte Bilder-Sets für deine Präsentationen
           </p>
         </div>
-        <Button onClick={() => setIsCreating(true)} className="gap-2">
+        <Button
+          onClick={() => {
+            setIsCreating(true);
+            setParentForNew(null);
+            setNewImageSet({
+              name: "",
+              parentId: null,
+            });
+          }}
+          className="gap-2"
+        >
           <Plus className="h-4 w-4" />
           Neues Bilder-Set
         </Button>
@@ -299,7 +262,11 @@ export default function ImageSetsAdminPage() {
       {isCreating && (
         <Card>
           <CardHeader>
-            <CardTitle>Neues Bilder-Set erstellen</CardTitle>
+            <CardTitle>
+              {parentForNew
+                ? `Unterordner erstellen unter: ${imageSets.find((s) => s.id === parentForNew)?.name}`
+                : "Neues Bilder-Set erstellen"}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -310,48 +277,18 @@ export default function ImageSetsAdminPage() {
                 onChange={(e) =>
                   setNewImageSet({ ...newImageSet, name: e.target.value })
                 }
-                placeholder="z.B. Surrealism"
+                placeholder="z.B. Healthy Nutrition"
               />
-            </div>
-            <div>
-              <Label htmlFor="description">Beschreibung</Label>
-              <Textarea
-                id="description"
-                value={newImageSet.description}
-                onChange={(e) =>
-                  setNewImageSet({
-                    ...newImageSet,
-                    description: e.target.value,
-                  })
-                }
-                placeholder="Beschreibung des Bilder-Sets"
-                rows={3}
-              />
-            </div>
-            <div>
-              <Label htmlFor="category">Kategorie</Label>
-              <Select
-                value={newImageSet.category}
-                onValueChange={(value) =>
-                  setNewImageSet({ ...newImageSet, category: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="art">Kunst</SelectItem>
-                  <SelectItem value="nature">Natur</SelectItem>
-                  <SelectItem value="abstract">Abstrakt</SelectItem>
-                  <SelectItem value="business">Business</SelectItem>
-                  <SelectItem value="technology">Technologie</SelectItem>
-                  <SelectItem value="minimalist">Minimalistisch</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div className="flex gap-2">
               <Button onClick={createImageSet}>Erstellen</Button>
-              <Button variant="outline" onClick={() => setIsCreating(false)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsCreating(false);
+                  setParentForNew(null);
+                }}
+              >
                 Abbrechen
               </Button>
             </div>
@@ -374,41 +311,8 @@ export default function ImageSetsAdminPage() {
                 onChange={(e) =>
                   setEditForm({ ...editForm, name: e.target.value })
                 }
-                placeholder="z.B. Surrealism"
+                placeholder="z.B. Healthy Nutrition"
               />
-            </div>
-            <div>
-              <Label htmlFor="edit-description">Beschreibung</Label>
-              <Textarea
-                id="edit-description"
-                value={editForm.description}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, description: e.target.value })
-                }
-                placeholder="Beschreibung des Bilder-Sets"
-                rows={3}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-category">Kategorie</Label>
-              <Select
-                value={editForm.category}
-                onValueChange={(value) =>
-                  setEditForm({ ...editForm, category: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="art">Kunst</SelectItem>
-                  <SelectItem value="nature">Natur</SelectItem>
-                  <SelectItem value="abstract">Abstrakt</SelectItem>
-                  <SelectItem value="business">Business</SelectItem>
-                  <SelectItem value="technology">Technologie</SelectItem>
-                  <SelectItem value="minimalist">Minimalistisch</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div className="flex gap-2">
               <Button onClick={updateImageSet}>Speichern</Button>
@@ -420,168 +324,118 @@ export default function ImageSetsAdminPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Bilder-Sets Liste */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Bilder-Sets ({imageSets.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {imageSets.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <ImageIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Noch keine Bilder-Sets vorhanden</p>
-                <p className="text-sm">Erstelle dein erstes Bilder-Set</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {imageSets.map((imageSet) => (
-                  <div
-                    key={imageSet.id}
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedImageSet?.id === imageSet.id
-                        ? "bg-primary/10 border-primary"
-                        : "hover:bg-muted"
-                    }`}
-                    onClick={() => setSelectedImageSet(imageSet)}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold">{imageSet.name}</h3>
-                          {!imageSet.isActive && (
-                            <Badge variant="secondary" className="text-xs">
-                              Inaktiv
-                            </Badge>
-                          )}
+      {/* Kompakte Tabellenansicht */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Folder className="h-5 w-5" />
+            Bilder-Sets ({imageSets.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {imageSets.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Folder className="h-16 w-16 mx-auto mb-4 opacity-50" />
+              <p className="text-lg font-medium mb-2">
+                Noch keine Bilder-Sets vorhanden
+              </p>
+              <p className="text-sm">Erstelle dein erstes Bilder-Set</p>
+            </div>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50%]">Name</TableHead>
+                    <TableHead className="text-center">Bilder</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-right">Aktionen</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {flatData.map((imageSet) => (
+                    <TableRow
+                      key={imageSet.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() =>
+                        router.push(
+                          `/admin/slideshows/imagesets/${imageSet.id}`,
+                        )
+                      }
+                    >
+                      <TableCell className="font-medium">
+                        <div
+                          className="flex items-center gap-2"
+                          style={{ paddingLeft: `${imageSet.level * 24}px` }}
+                        >
+                          <Folder className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <span>{imageSet.name}</span>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {imageSet.description}
-                        </p>
-                        <div className="flex gap-2">
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="text-xs">
+                          {imageSet._count.images}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {imageSet.isActive ? (
+                          <Badge variant="default" className="text-xs">
+                            Aktiv
+                          </Badge>
+                        ) : (
                           <Badge variant="secondary" className="text-xs">
-                            {imageSet.category}
+                            Inaktiv
                           </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {imageSet._count.images} Bilder
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="flex gap-1 ml-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startEdit(imageSet);
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteImageSet(imageSet.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Bilder-Upload und Verwaltung */}
-        {selectedImageSet ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ImageIcon className="h-5 w-5" />
-                {selectedImageSet.name}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Upload Bereich */}
-              <div>
-                <Label htmlFor="images">Neue Bilder hochladen</Label>
-                <Input
-                  id="images"
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={(e) => setUploadFiles(e.target.files)}
-                  className="mt-1"
-                />
-                {uploadFiles && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {uploadFiles.length} Dateien ausgewählt
-                  </p>
-                )}
-              </div>
-
-              <Button
-                onClick={uploadImages}
-                disabled={
-                  !uploadFiles || uploadFiles.length === 0 || isUploading
-                }
-                className="w-full gap-2"
-              >
-                <Upload className="h-4 w-4" />
-                {isUploading ? "Wird hochgeladen..." : "Bilder hochladen"}
-              </Button>
-
-              {/* Aktuelle Bilder */}
-              {selectedImageSet.images.length > 0 && (
-                <div>
-                  <h4 className="font-semibold mb-3">
-                    Aktuelle Bilder ({selectedImageSet.images.length})
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    {selectedImageSet.images.map((image) => (
-                      <div key={image.id} className="relative group">
-                        <img
-                          src={image.url}
-                          alt={image.filename}
-                          className="w-full h-24 object-cover rounded border"
-                        />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center">
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
                           <Button
-                            variant="destructive"
+                            variant="ghost"
                             size="sm"
-                            onClick={() => deleteImage(image.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setParentForNew(imageSet.id);
+                              setNewImageSet({
+                                ...newImageSet,
+                                parentId: imageSet.id,
+                              });
+                              setIsCreating(true);
+                            }}
+                            title="Unterordner erstellen"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEdit(imageSet);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteImageSet(imageSet.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                        <div className="absolute bottom-1 left-1 right-1">
-                          <p className="text-xs text-white bg-black/50 rounded px-1 truncate">
-                            {image.filename}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardContent className="flex items-center justify-center h-64">
-              <div className="text-center text-muted-foreground">
-                <ImageIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Wähle ein Bilder-Set aus, um Bilder zu verwalten</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
