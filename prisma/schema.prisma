@@ -51,7 +51,7 @@ model User {
 
   // Billing
   stripeCustomerId String?
-  plan             Plan?        @default(STARTER)
+  plan             Plan?
   planSince        DateTime?
   planRenewsAt     DateTime?
   subscriptions    Subscription[]

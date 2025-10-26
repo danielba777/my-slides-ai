@@ -10,8 +10,9 @@ export async function GET() {
   const user = await db.user.findUnique({
     where: { id: session.user.id },
     select: {
-      plan: true,
+      plan: true, // kann null sein = Free
       planRenewsAt: true,
+      stripeCustomerId: true,
       creditBalance: { select: { credits: true, aiCredits: true, resetsAt: true } },
       subscriptions: {
         select: { status: true, currentPeriodEnd: true, stripeSubscriptionId: true, stripePriceId: true },
@@ -20,13 +21,17 @@ export async function GET() {
       },
     },
   });
+  const latestSub = user?.subscriptions?.[0] ?? null;
+  const hasPlan = !!user?.plan;
   return NextResponse.json({
-    plan: user?.plan ?? "STARTER",
-    status: user?.subscriptions?.[0]?.status ?? "ACTIVE",
-    credits: user?.creditBalance?.credits ?? 0,
-    aiCredits: user?.creditBalance?.aiCredits ?? 0,
-    resetsAt: user?.creditBalance?.resetsAt ?? user?.planRenewsAt ?? null,
-    stripePriceId: user?.subscriptions?.[0]?.stripePriceId ?? null,
-    stripeSubscriptionId: user?.subscriptions?.[0]?.stripeSubscriptionId ?? null,
+    plan: hasPlan ? user!.plan : null,
+    status: latestSub?.status ?? null,
+    credits: hasPlan ? user?.creditBalance?.credits ?? 0 : null,
+    aiCredits: hasPlan ? user?.creditBalance?.aiCredits ?? 0 : null,
+    resetsAt: hasPlan ? (user?.creditBalance?.resetsAt ?? user?.planRenewsAt ?? null) : null,
+    stripePriceId: latestSub?.stripePriceId ?? null,
+    stripeSubscriptionId: latestSub?.stripeSubscriptionId ?? null,
+    hasCustomer: !!user?.stripeCustomerId,
+    hasSubscription: !!latestSub?.stripeSubscriptionId,
   });
 }

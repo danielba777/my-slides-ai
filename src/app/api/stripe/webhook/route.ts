@@ -173,7 +173,8 @@ export async function POST(req: Request) {
           data: { status: "CANCELED" },
         });
 
-        await db.user.update({ where: { id: user.id }, data: { plan: "STARTER" } });
+        // Kein bezahlter Plan mehr → auf "Free" (null) setzen
+        await db.user.update({ where: { id: user.id }, data: { plan: null, planRenewsAt: null } });
         break;
       }
 

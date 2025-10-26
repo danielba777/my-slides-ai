@@ -6,22 +6,24 @@ import { Progress } from "@/components/ui/progress";
 import { PLAN_CREDITS } from "@/lib/billing";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { toast } from "sonner";
 
 type Usage = {
-  plan: string;
-  status: "ACTIVE" | "PAST_DUE" | "TRIALING" | "CANCELED" | string;
-  credits: number;
-  aiCredits: number;
+  plan: string | null;
+  status: "ACTIVE" | "PAST_DUE" | "TRIALING" | "CANCELED" | string | null;
+  credits: number | null;
+  aiCredits: number | null;
   resetsAt: string | null;
-  /* fallback if resetsAt not yet persisted (e.g., test/dev or first cycle) */
-  planRenewsAt?: string | null;
   stripePriceId: string | null;
   stripeSubscriptionId: string | null;
+  hasCustomer: boolean;
+  hasSubscription: boolean;
 };
 
 export default function ProfileBilling() {
+  const router = useRouter();
   const { data: session } = useSession();
   const qc = useQueryClient();
   const usage = useQuery<Usage>({
@@ -72,86 +74,164 @@ export default function ProfileBilling() {
   }
 
   const data = usage.data;
-  const pack = PLAN_CREDITS[data.plan as keyof typeof PLAN_CREDITS] ?? {
-    credits: 0,
-    ai: 0,
-  };
-  const total = pack.credits < 0 ? Infinity : pack.credits;
-  const aiTotal = pack.ai < 0 ? Infinity : pack.ai;
-  const used = total === Infinity ? 0 : Math.max(0, total - data.credits);
+  const hasPlan = !!data.plan;
+  const pack = hasPlan
+    ? (PLAN_CREDITS[data.plan as keyof typeof PLAN_CREDITS] ?? {
+        credits: 0,
+        ai: 0,
+      })
+    : null;
+  const total = pack ? (pack.credits < 0 ? Infinity : pack.credits) : 0;
+  const aiTotal = pack ? (pack.ai < 0 ? Infinity : pack.ai) : 0;
+  const creditsLeft =
+    hasPlan && Number.isFinite(total) ? (data.credits ?? 0) : null;
+  const aiLeft =
+    hasPlan && Number.isFinite(aiTotal) ? (data.aiCredits ?? 0) : null;
+  const used =
+    pack && Number.isFinite(total)
+      ? Math.max(0, total - (data.credits ?? 0))
+      : 0;
   const aiUsed =
-    aiTotal === Infinity ? 0 : Math.max(0, aiTotal - data.aiCredits);
-  const pct = total === Infinity ? 0 : Math.round((used / total) * 100);
-  const aiPct = aiTotal === Infinity ? 0 : Math.round((aiUsed / aiTotal) * 100);
-  const resetISO = data.resetsAt ?? data.planRenewsAt ?? null;
-const nextReset = resetISO ? new Date(resetISO) : null;
+    pack && Number.isFinite(aiTotal)
+      ? Math.max(0, aiTotal - (data.aiCredits ?? 0))
+      : 0;
+  const pct = total === Infinity ? 0 : Math.round((used / (total || 1)) * 100);
+  const aiPct =
+    aiTotal === Infinity ? 0 : Math.round((aiUsed / (aiTotal || 1)) * 100);
+  const nextReset = data.resetsAt ? new Date(data.resetsAt) : null;
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mx-auto w-full max-w-5xl space-y-6">
-        {/* TOP: Account + Plan + Manage */}
-        <Card className="backdrop-blur supports-[backdrop-filter]:bg-background/70">
-          <CardHeader className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <CardTitle className="text-xl">Profile & Billing</CardTitle>
+      <div className="max-w-6xl mx-auto grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Plan Card */}
+        <Card className="lg:col-span-1 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-xl">Your plan</CardTitle>
+            {hasPlan ? (
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">{data.plan}</Badge>
-                <Badge variant={data.status === "ACTIVE" ? "default" : "outline"}>
+                <Badge
+                  variant={data.status === "ACTIVE" ? "default" : "outline"}
+                >
                   {data.status}
                 </Badge>
               </div>
-            </div>
-            <div className="grid grid-cols-1 gap-2 text-sm text-muted-foreground md:grid-cols-2">
-              <div>
-                Email: <span className="text-foreground">{session?.user?.email ?? "—"}</span>
-              </div>
-              <div>
-                Next reset:{" "}
-                <span className="text-foreground">
-                  {nextReset
-                    ? nextReset.toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })
-                    : "—"}
+            ) : (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">Free</Badge>
+                <span className="text-sm text-muted-foreground">
+                  (no plan yet)
                 </span>
               </div>
-            </div>
+            )}
           </CardHeader>
-          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-sm text-muted-foreground">
-              Manage plan, payment methods and invoices in Stripe.
+          <CardContent className="space-y-4">
+            {hasPlan ? (
+              <div className="text-sm text-muted-foreground">
+                Next reset:{" "}
+                {nextReset
+                  ? nextReset.toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })
+                  : "—"}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Choose a plan to unlock limits.
+              </div>
+            )}
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Monthly credits</div>
+              {hasPlan ? (
+                <>
+                  <Progress value={pct} />
+                  <div className="text-xs text-muted-foreground">
+                    {pack!.credits < 0
+                      ? "Unlimited"
+                      : `${creditsLeft ?? 0} of ${pack!.credits} left`}
+                  </div>
+                </>
+              ) : (
+                <div className="text-xs text-muted-foreground">—</div>
+              )}
             </div>
-            <Button onClick={() => toPortal.mutate()} disabled={toPortal.isPending}>
-              Manage subscription
-            </Button>
+            <div className="space-y-2">
+              <div className="text-sm font-medium">AI credits</div>
+              {hasPlan ? (
+                <>
+                  <Progress value={aiPct} />
+                  <div className="text-xs text-muted-foreground">
+                    {pack!.ai < 0
+                      ? "Unlimited"
+                      : `${aiLeft ?? 0} of ${pack!.ai} left`}
+                  </div>
+                </>
+              ) : (
+                <div className="text-xs text-muted-foreground">—</div>
+              )}
+            </div>
+            <div className="pt-4">
+              {data.hasSubscription ? (
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    fetch("/api/billing/portal", { method: "POST" })
+                      .then((r) => r.json())
+                      .then(({ url }) => (window.location.href = url))
+                  }
+                  className="w-full"
+                >
+                  Manage subscription
+                </Button>
+              ) : (
+                <Button
+                  className="w-full"
+                  onClick={() => router.push("/#pricing")}
+                >
+                  Choose a plan
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 
-        {/* BOTTOM: Usage (two bars side by side) */}
-        <Card className="backdrop-blur supports-[backdrop-filter]:bg-background/70">
+        {/* Usage Card */}
+        <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">Usage</CardTitle>
+            <CardTitle>Usage</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span>Monthly credits</span>
-                <span className="text-muted-foreground">
-                  {pack.credits < 0 ? "Unlimited" : `${data.credits}/${pack.credits}`}
-                </span>
-              </div>
-              <Progress value={pct} />
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <div className="text-sm font-medium mb-2">Monthly credits</div>
+              {hasPlan && pack ? (
+                <>
+                  <Progress value={pct} className="mb-2" />
+                  <div className="text-sm">
+                    {pack.credits < 0
+                      ? "Unlimited"
+                      : `${creditsLeft ?? 0} left of ${pack.credits}`}
+                  </div>
+                </>
+              ) : (
+                <div className="text-sm text-muted-foreground">—</div>
+              )}
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span>AI credits</span>
-                <span className="text-muted-foreground">
-                  {pack.ai < 0 ? "Unlimited" : `${data.aiCredits}/${pack.ai}`}
-                </span>
-              </div>
-              <Progress value={aiPct} />
+            <div>
+              <div className="text-sm font-medium mb-2">AI credits</div>
+              {hasPlan && pack ? (
+                <>
+                  <Progress value={aiPct} className="mb-2" />
+                  <div className="text-sm">
+                    {pack.ai < 0
+                      ? "Unlimited"
+                      : `${aiLeft ?? 0} left of ${pack.ai}`}
+                  </div>
+                </>
+              ) : (
+                <div className="text-sm text-muted-foreground">—</div>
+              )}
             </div>
           </CardContent>
         </Card>
