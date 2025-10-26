@@ -17,9 +17,10 @@ import { cn } from "@/lib/utils";
 import { usePresentationState } from "@/states/presentation-state";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Plus, Trash } from "lucide-react";
-import React, { useEffect } from "react";
+import { GripVertical, Plus, Trash, Image as ImageIcon } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { SlideEditPopover } from "./SlideEditPopover";
+import PersonalImageSelectorDialog from "./PersonalImageSelectorDialog";
 
 interface SlideContainerProps {
   children: React.ReactNode;
@@ -142,10 +143,8 @@ export function SlideContainer({
                 <GripVertical className="h-4 w-4" />
               </button>
 
-              {/* Slide-Einstellungen */}
-              <div className="rounded-md">
-                <SlideEditPopover index={index} />
-              </div>
+              {/* Neuer: Persönliche Bilder (ersetzt den Edit/Canvas-Button) */}
+              <PersonalImagePickerButton index={index} />
 
               {/* Neue Folie darunter */}
               <Button
@@ -213,5 +212,48 @@ export function SlideContainer({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Button + Dialog für persönliche Bilder:
+ * - Öffnet eigenes Menü (gleiches Styling/Größen wie ImageCollectionSelector)
+ * - Tab "Upload" (+ per-Account Speicherung), Tab "Meine Bilder"
+ * - Confirm setzt das Bild zentriert als rootImage der aktuellen Slide
+ */
+function PersonalImagePickerButton({ index }: { index: number }) {
+  const [open, setOpen] = useState(false);
+  const slides = usePresentationState((s) => s.slides);
+  const setSlides = usePresentationState((s) => s.setSlides);
+
+  const handleConfirm = (imageUrl: string) => {
+    const updated = slides.slice();
+    if (!updated[index]) return;
+    updated[index] = {
+      ...updated[index],
+      rootImage: { url: imageUrl, query: "" }, // zentriert via bestehender Canvas/RootImage-Logik
+    };
+    setSlides(updated);
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
+        onClick={() => setOpen(true)}
+        aria-label="Persönliche Bilder"
+        title="Persönliche Bilder"
+      >
+        <ImageIcon className="h-4 w-4" />
+      </Button>
+      <PersonalImageSelectorDialog
+        open={open}
+        onOpenChange={setOpen}
+        onConfirm={handleConfirm}
+      />
+    </>
   );
 }
