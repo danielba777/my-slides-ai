@@ -48,6 +48,14 @@ model User {
   favorites      FavoriteDocument[]
   GeneratedImage GeneratedImage[]
   images         UserImage[]
+
+  // Billing
+  stripeCustomerId String?
+  plan             Plan?        @default(STARTER)
+  planSince        DateTime?
+  planRenewsAt     DateTime?
+  subscriptions    Subscription[]
+  creditBalance    CreditBalance?
 }
 
 model UserImage {
@@ -56,6 +64,44 @@ model UserImage {
   userId    String
   url       String
   createdAt DateTime @default(now())
+}
+
+enum Plan {
+  STARTER
+  GROWTH
+  SCALE
+  UNLIMITED
+}
+
+enum SubscriptionStatus {
+  INCOMPLETE
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  INCOMPLETE_EXPIRED
+  TRIALING
+}
+
+model Subscription {
+  id                   String              @id @default(cuid())
+  userId               String
+  user                 User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeSubscriptionId String              @unique
+  stripePriceId        String
+  status               SubscriptionStatus
+  currentPeriodEnd     DateTime
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+}
+
+model CreditBalance {
+  userId     String   @id
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credits    Int      @default(0)
+  aiCredits  Int      @default(0)
+  resetsAt   DateTime?
+  updatedAt  DateTime @updatedAt
 }
 
 model BaseDocument {
