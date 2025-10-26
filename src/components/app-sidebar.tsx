@@ -6,6 +6,7 @@ import {
   Home,
   Images,
   TestTube2,
+  User,
   UserPen,
   type LucideIcon,
 } from "lucide-react";
@@ -45,6 +46,11 @@ const playgroundItems: SidebarItem[] = [
     title: "Slideshows",
     url: "/dashboard/slideshows",
     icon: Images,
+  },
+  {
+    title: "AI Avatars",
+    url: "/dashboard/ai-avatars",
+    icon: User,
   },
 ];
 
