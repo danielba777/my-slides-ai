@@ -19,7 +19,7 @@ export default function AiAvatarDashboardPage() {
     [],
   );
   const [isLoadingRecent, setIsLoadingRecent] = useState(true);
-  const [activeTab, setActiveTab] = useState<"recent" | "templates">("recent");
+  const [activeTab, setActiveTab] = useState<"recent" | "templates">("templates");
 
   useEffect(() => {
     void loadTemplates();

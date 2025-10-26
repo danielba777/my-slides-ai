@@ -26,7 +26,10 @@ export function AiAvatarTemplateGrid({
   return (
     <div className="grid w-full grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
       {visibleTemplates.map((template) => (
-        <div key={template.id} className="relative aspect-[9/16] overflow-hidden rounded-2xl border bg-muted">
+        <div
+          key={template.id}
+          className="relative aspect-[2/3] overflow-hidden rounded-2xl border bg-muted"
+        >
           <img
             src={template.imageUrl}
             alt="AI avatar template preview"
@@ -49,7 +52,7 @@ export function AiAvatarTemplateGrid({
         Array.from({ length: placeholders }).map((_, index) => (
           <div
             key={`placeholder-${index}`}
-            className="aspect-[9/16] rounded-2xl border border-dashed bg-muted/60"
+            className="aspect-[2/3] rounded-2xl border border-dashed bg-muted/60"
           />
         ))}
 
