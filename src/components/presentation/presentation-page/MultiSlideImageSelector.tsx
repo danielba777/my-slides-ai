@@ -459,10 +459,11 @@ export function MultiSlideImageSelector({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
         className="
-          w-[92vw] sm:w-[900px] lg:w-[1000px]
-          h-[85vh] max-h-[85vh]
-          p-0 overflow-hidden flex flex-col
-          rounded-2xl shadow-xl border border-border/30
+     !max-w-none                 /* überschreibt jedes max-w aus dem Component-Default */
+     w-[96vw] md:w-[1200px] lg:w-[1400px] xl:w-[1600px] 2xl:w-[1760px]
+     h-[85vh] max-h-[85vh]
+     p-0 overflow-hidden flex flex-col
+     rounded-2xl shadow-xl border border-border/30
         "
       >
         <DialogHeader
@@ -508,9 +509,7 @@ export function MultiSlideImageSelector({
         {/* Scrollbarer Mittelteil */}
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 overscroll-contain">
           {selectedSet ? (
-            <div className="mt-2">
-              {renderImageSelection()}
-            </div>
+            <div className="mt-2">{renderImageSelection()}</div>
           ) : (
             <Tabs
               value={activeTab}
