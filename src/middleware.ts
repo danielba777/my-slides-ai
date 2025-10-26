@@ -11,7 +11,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  const publicPaths = new Set(["/"]);
+  const publicPaths = new Set(["/", "/privacy", "/terms"]);
   const isPublicPath =
     publicPaths.has(path) || path.startsWith("/integrations/social/tiktok");
 
