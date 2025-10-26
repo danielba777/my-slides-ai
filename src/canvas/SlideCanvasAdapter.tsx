@@ -306,8 +306,6 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
               outlineEnabled: (src as any).outlineEnabled ?? false,
               outlineWidth: (src as any).outlineWidth ?? 6,
               outlineColor: (src as any).outlineColor ?? "#000",
-              nx: pxToNormX(pxX),
-              ny: pxToNormY(pxY),
               nmaxWidth: src.maxWidth ?? Math.round(W * 0.7),
               background: (src as any).background ?? undefined,
             } as ExtendedCanvasTextNode);

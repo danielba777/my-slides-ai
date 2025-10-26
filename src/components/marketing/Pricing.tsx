@@ -12,32 +12,32 @@ const tiers = [
     price: "€19",
     priceId: "price_starter",
     features: [
-      "25 monatliche Credits",
-      "50 monatliche KI-Credits",
-      "Erstelle Slideshows",
-      "Hook + Demo-Videos",
+      "25 monthly credits",
+      "50 monthly AI credits",
+      "Create slideshows",
+      "Hook + demo videos",
     ],
   },
   {
     name: "Growth",
     price: "€49",
     highlight: true,
-    badge: "Beliebtester",
+    badge: "Most popular",
     features: [
-      "100 monatliche Credits",
-      "150 monatliche KI-Credits",
-      "Massen-Erstellung",
-      "Prioritäts-Warteschlange",
+      "100 monthly credits",
+      "150 monthly AI credits",
+      "Bulk creation",
+      "Priority queue",
     ],
   },
   {
     name: "Scale",
     price: "€95",
     features: [
-      "250 monatliche Credits",
-      "300 monatliche KI-Credits",
-      "10 TikTok-Automatisierungen",
-      "Team-Zugang",
+      "250 monthly credits",
+      "300 monthly AI credits",
+      "10 TikTok automations",
+      "Team access",
     ],
   },
   {
@@ -45,10 +45,10 @@ const tiers = [
     price: "€195",
     badge: "Premium",
     features: [
-      "Unbegrenzte Credits",
-      "1000 monatliche KI-Credits",
-      "Unbegrenzte Automatisierungen",
-      "Weiße-Hand-Unterstützung",
+      "Unlimited credits",
+      "1,000 monthly AI credits",
+      "Unlimited automations",
+      "White-glove support",
     ],
   },
 ];
@@ -63,10 +63,10 @@ export function MarketingPricing({ session }: { session: boolean }) {
         className="text-center space-y-5 mb-8"
       >
         <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 leading-tight">
-          Preise
+          Pricing
         </h2>
         <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-          Wähle den Plan, der zu deinem Wachstum passt.
+          Pick the plan that matches your next growth stage.
         </p>
       </motion.div>
       <motion.div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -124,7 +124,7 @@ export function MarketingPricing({ session }: { session: boolean }) {
                     }`}
                     data-price={t.priceId}
                   >
-                    {t.highlight ? "Mit Growth starten" : "Plan wählen"}
+                    {t.highlight ? "Start with Growth" : "Choose plan"}
                   </Button>
                 </Link>
               </div>

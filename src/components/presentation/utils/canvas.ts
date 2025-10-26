@@ -5,6 +5,12 @@ import type { PlateNode, PlateSlide } from "./parser";
 const CANVAS_WIDTH = DEFAULT_CANVAS.width;
 const CANVAS_HEIGHT = DEFAULT_CANVAS.height;
 
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+const resolveX = (nx: number, width: number) =>
+  Math.round(clamp01(nx) * width);
+const resolveY = (ny: number, height: number) =>
+  Math.round(clamp01(ny) * height);
+
 function collectTextSegments(nodes?: PlateNode[]): string[] {
   if (!Array.isArray(nodes)) return [];
   const segments: string[] = [];
@@ -237,6 +243,8 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
             newNodes.push({
               id: `text-title-${nanoid()}`,
               type: "text",
+              x: resolveX(baseNx, width),
+              y: resolveY(0.25, height),
               nx: baseNx,
               ny: 0.25,
               width: textWidth,
@@ -259,6 +267,8 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
               newNodes.push({
                 id: `text-bullet-${index}-${nanoid()}`,
                 type: "text",
+                x: resolveX(baseNx, width),
+                y: resolveY(bulletY, height),
                 nx: baseNx,
                 ny: bulletY,
                 width: textWidth,
@@ -328,6 +338,8 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
       base.nodes.push({
         id: `text-title-${nanoid()}`,
         type: "text",
+        x: resolveX(baseNx, width),
+        y: resolveY(0.25, height),
         nx: baseNx,
         ny: 0.25, // Weiter oben positionieren
         width: textWidth,
@@ -356,6 +368,8 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
         base.nodes.push({
           id: `text-bullet-${index}-${nanoid()}`,
           type: "text",
+          x: resolveX(baseNx, width),
+          y: resolveY(bulletY, height),
           nx: baseNx,
           ny: bulletY,
           width: textWidth,
@@ -380,6 +394,8 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
       base.nodes.push({
         id: `text-${nanoid()}`,
         type: "text",
+        x: resolveX(baseNx, width),
+        y: resolveY(baseNy, height),
         nx: baseNx,
         ny: baseNy,
         width: textWidth,
@@ -493,7 +509,7 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
         const baseNx = textNode.nx ?? 0.5;
         const textColor =
           textNode.fill ||
-          chooseTextColor(slide.canvas.bg ?? DEFAULT_CANVAS.bg);
+          chooseTextColor(slide.canvas?.bg ?? DEFAULT_CANVAS.bg);
         const textWidth = textNode.width ?? Math.round(width * 0.7);
 
         // Erstelle Titel-Node
@@ -502,6 +518,8 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
           newNodes.push({
             id: `text-title-${nanoid()}`,
             type: "text",
+            x: resolveX(baseNx, width),
+            y: resolveY(0.25, height),
             nx: baseNx,
             ny: 0.25,
             width: textWidth,
@@ -528,6 +546,8 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
             newNodes.push({
               id: `text-bullet-${index}-${nanoid()}`,
               type: "text",
+              x: resolveX(baseNx, width),
+              y: resolveY(bulletY, height),
               nx: baseNx,
               ny: bulletY,
               width: textWidth,

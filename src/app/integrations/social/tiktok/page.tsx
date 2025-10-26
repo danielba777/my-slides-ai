@@ -70,7 +70,10 @@ export default function TikTokCallbackPage() {
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
       {status === "processing" && (
         <>
-          <Spinner text="Connecting your TikTok account..." />
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <Spinner className="h-5 w-5" />
+            <span>Connecting your TikTok account...</span>
+          </div>
           <p className="text-sm text-muted-foreground">
             This will only take a moment.
           </p>
