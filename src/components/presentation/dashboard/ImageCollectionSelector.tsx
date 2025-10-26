@@ -395,8 +395,22 @@ export const ImageCollectionSelector: React.FC = () => {
             )}
           </button>
         </DialogTrigger>
-        <DialogContent className="max-w-7xl min-h-[700px] flex flex-col justify-start items-stretch">
-          <DialogHeader>
+        <DialogContent
+          className="
+     !max-w-none                 /* überschreibt jedes max-w aus dem Component-Default */
+     w-[96vw] md:w-[1200px] lg:w-[1400px] xl:w-[1600px] 2xl:w-[1760px]
+     h-[85vh] max-h-[85vh]
+     p-0 overflow-hidden flex flex-col
+     rounded-2xl shadow-xl border border-border/30
+          "
+        >
+          <DialogHeader
+            className="
+              sticky top-0 z-10
+              px-6 pt-6 pb-4 border-b
+              bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60
+            "
+          >
             <div className="flex items-center gap-4">
               {drillDownParent && (
                 <Button
@@ -415,44 +429,54 @@ export const ImageCollectionSelector: React.FC = () => {
               </DialogTitle>
             </div>
           </DialogHeader>
-          <Tabs
-            value={activeTab}
-            onValueChange={(value) =>
-              setActiveTab(value as "community" | "mine")
-            }
-            className="mt-4 flex flex-col flex-1"
-          >
-            <TabsList className="grid w-full grid-cols-2 rounded-lg bg-muted p-1">
-              <TabsTrigger
-                value="community"
-                className="w-full rounded-md text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-              >
-                Community
-              </TabsTrigger>
-              <TabsTrigger
-                value="mine"
-                className="w-full rounded-md text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-              >
-                My Collections
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent
-              value="community"
-              className="mt-4 flex-1 overflow-hidden"
+
+          {/* Scrollbarer Mittelteil (behält feste Außenmaße bei) */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 overscroll-contain">
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) =>
+                setActiveTab(value as "community" | "mine")
+              }
+              className="flex flex-col min-h-0"
             >
-              {renderImageSetGrid(
-                communitySets,
-                "No community collections available yet.",
-              )}
-            </TabsContent>
-            <TabsContent value="mine" className="mt-4 flex-1 overflow-hidden">
-              {renderImageSetGrid(
-                mySets,
-                "You haven't created any collections yet.",
-              )}
-            </TabsContent>
-          </Tabs>
-          <div className="mt-auto flex items-center justify-end gap-2 pt-4">
+              <TabsList className="grid w-full grid-cols-2 rounded-lg bg-muted p-1">
+                <TabsTrigger
+                  value="community"
+                  className="w-full rounded-md text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                >
+                  Community
+                </TabsTrigger>
+                <TabsTrigger
+                  value="mine"
+                  className="w-full rounded-md text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                >
+                  My Collections
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="community" className="mt-4 min-h-0">
+                {renderImageSetGrid(
+                  communitySets,
+                  "No community collections available yet.",
+                )}
+              </TabsContent>
+              <TabsContent value="mine" className="mt-4 min-h-0">
+                {renderImageSetGrid(
+                  mySets,
+                  "You haven't created any collections yet.",
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Fixer Footer */}
+          <div
+            className="
+              shrink-0 border-t
+              px-6 py-4
+              bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60
+              flex items-center justify-end gap-2
+            "
+          >
             <Button variant="secondary" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>

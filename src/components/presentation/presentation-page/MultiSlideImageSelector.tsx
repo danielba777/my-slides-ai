@@ -457,8 +457,21 @@ export function MultiSlideImageSelector({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl min-h-[700px] flex flex-col justify-start items-stretch">
-        <DialogHeader>
+      <DialogContent
+        className="
+          w-[92vw] sm:w-[900px] lg:w-[1000px]
+          h-[85vh] max-h-[85vh]
+          p-0 overflow-hidden flex flex-col
+          rounded-2xl shadow-xl border border-border/30
+        "
+      >
+        <DialogHeader
+          className="
+            sticky top-0 z-10
+            px-6 pt-6 pb-4 border-b
+            bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60
+          "
+        >
           <div className="flex items-center gap-2">
             {(selectedSet || drillDownParent) && (
               <Button
@@ -492,50 +505,52 @@ export function MultiSlideImageSelector({
           )}
         </DialogHeader>
 
-        {selectedSet ? (
-          <div className="mt-4 flex-1 overflow-hidden">
-            {renderImageSelection()}
-          </div>
-        ) : (
-          <Tabs
-            value={activeTab}
-            onValueChange={(value) =>
-              setActiveTab(value as "community" | "mine")
-            }
-            className="mt-4 flex flex-col flex-1"
-          >
-            <TabsList className="grid w-full grid-cols-2 rounded-lg bg-muted p-1">
-              <TabsTrigger
-                value="community"
-                className="w-full rounded-md text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-              >
-                Community
-              </TabsTrigger>
-              <TabsTrigger
-                value="mine"
-                className="w-full rounded-md text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-              >
-                My Collections
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent
-              value="community"
-              className="mt-4 flex-1 overflow-hidden"
+        {/* Scrollbarer Mittelteil */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 overscroll-contain">
+          {selectedSet ? (
+            <div className="mt-2">
+              {renderImageSelection()}
+            </div>
+          ) : (
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) =>
+                setActiveTab(value as "community" | "mine")
+              }
+              className="flex flex-col min-h-0"
             >
-              {renderImageSetGrid(
-                communitySets,
-                "No community collections available yet.",
-              )}
-            </TabsContent>
-            <TabsContent value="mine" className="mt-4 flex-1 overflow-hidden">
-              {renderImageSetGrid(
-                mySets,
-                "You haven't created any collections yet.",
-              )}
-            </TabsContent>
-          </Tabs>
-        )}
+              <TabsList className="grid w-full grid-cols-2 rounded-lg bg-muted p-1">
+                <TabsTrigger
+                  value="community"
+                  className="w-full rounded-md text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                >
+                  Community
+                </TabsTrigger>
+                <TabsTrigger
+                  value="mine"
+                  className="w-full rounded-md text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                >
+                  My Collections
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="community" className="mt-4 min-h-0">
+                {renderImageSetGrid(
+                  communitySets,
+                  "No community collections available yet.",
+                )}
+              </TabsContent>
+              <TabsContent value="mine" className="mt-4 min-h-0">
+                {renderImageSetGrid(
+                  mySets,
+                  "You haven't created any collections yet.",
+                )}
+              </TabsContent>
+            </Tabs>
+          )}
+        </div>
 
+        {/* Fixer Footer für Multi-Auswahl? (falls vorhanden, hier ergänzen)
+            Wenn es Buttons braucht, genauso wie im Dashboard-Dialog sticky unten platzieren. */}
         <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cancel
