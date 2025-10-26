@@ -1,6 +1,6 @@
 "use client";
 
-import { Wand2 } from "lucide-react";
+import { Sparkles, Wand2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -19,6 +19,7 @@ export default function AiAvatarDashboardPage() {
     [],
   );
   const [isLoadingRecent, setIsLoadingRecent] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<"recent" | "templates">("templates");
 
   useEffect(() => {
@@ -61,6 +62,49 @@ export default function AiAvatarDashboardPage() {
       .catch(() => toast.error("Prompt konnte nicht kopiert werden"));
   };
 
+  const handleGenerate = async () => {
+    if (!prompt.trim()) {
+      toast.error("Bitte gib einen Prompt ein");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const response = await fetch("/api/ai-avatars/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !Array.isArray(data?.images) || data.images.length === 0) {
+        throw new Error(data?.error || "Generation fehlgeschlagen");
+      }
+
+      const creations: AiAvatarTemplate[] = data.images.map(
+        (image: { minUrl?: string; rawUrl?: string }, index: number) => ({
+          id: `${data.id ?? "generated"}-${Date.now()}-${index}`,
+          prompt: prompt.trim(),
+          imageUrl: image?.minUrl ?? image?.rawUrl ?? "",
+          rawImageUrl: image?.rawUrl,
+          createdAt: new Date().toISOString(),
+        }),
+      );
+
+      setRecentCreations((prev) =>
+        [...creations, ...prev].slice(0, 18),
+      );
+      setActiveTab("recent");
+      toast.success("Avatar generiert");
+    } catch (error) {
+      console.error("Generation failed", error);
+      toast.error(
+        error instanceof Error ? error.message : "Generation fehlgeschlagen",
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const templatesCountLabel = useMemo(
     () => `${templates.length} Template${templates.length === 1 ? "" : "s"}`,
     [templates.length],
@@ -88,11 +132,30 @@ export default function AiAvatarDashboardPage() {
             </Button>
           </div>
 
-          <AiAvatarPromptInput
-            value={prompt}
-            onChange={setPrompt}
-            onShowTemplates={() => setActiveTab("templates")}
-          />
+        <AiAvatarPromptInput
+          value={prompt}
+          onChange={setPrompt}
+          onShowTemplates={() => setActiveTab("templates")}
+        />
+        <div className="flex justify-end">
+          <Button
+            className="gap-2"
+            onClick={handleGenerate}
+            disabled={isGenerating || !prompt.trim()}
+          >
+            {isGenerating ? (
+              <>
+                <Spinner className="h-4 w-4" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                Generate
+              </>
+            )}
+          </Button>
+        </div>
         </div>
 
         <Tabs
@@ -145,11 +208,6 @@ export default function AiAvatarDashboardPage() {
               <AiAvatarTemplateGrid
                 templates={templates}
                 onCopy={handleCopyPrompt}
-                emptyState={
-                  <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-                    Noch keine Templates vorhanden.
-                  </div>
-                }
               />
             )}
           </TabsContent>
