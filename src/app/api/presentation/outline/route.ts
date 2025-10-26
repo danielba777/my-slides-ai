@@ -3,12 +3,27 @@ import { auth } from "@/server/auth";
 import { streamText } from "ai";
 import { NextResponse } from "next/server";
 
+// Sampling config tuned for higher diversity across generations
+const defaultSampling = () => {
+  return {
+    // higher temperature + nucleus sampling encourage variation
+    temperature: 0.9,
+    topP: 0.95,
+    // push the model away from repeating the same phrasing/ideas
+    frequencyPenalty: 0.4,
+    presencePenalty: 0.6,
+    // randomize seed so two identical prompts produce different outputs
+    seed: Math.floor(Math.random() * 2_000_000_000),
+  };
+};
+
 interface OutlineRequest {
   prompt: string;
   numberOfCards: number;
   language: string;
   modelProvider?: string;
   modelId?: string;
+  diversitySeed?: number;
 }
 
 const outlineTemplate = `You are an expert TikTok slideshow script writer. Create a compelling script with exactly {numberOfCards} slides in {language}.
@@ -20,7 +35,7 @@ User Request (MUST follow all tone/style/format directives): {prompt}
 Analyze the user's request carefully. They may specify:
 - A specific tone (e.g., authoritative, coaching, conversational)
 - A particular structure (e.g., numbered habits, steps, tips)
-- Content format (e.g., bullet points, short sentences, paragraphs)
+- Content format (e.g., bullet points, short sentences, captions)
 - Reading level and style preferences
 
 ## CRITICAL RULES:
@@ -31,12 +46,20 @@ Analyze the user's request carefully. They may specify:
 5. **SLIDE COUNT**: Generate EXACTLY {numberOfCards} slides. First slide is typically a title/hook, last slide is typically a conclusion/CTA.
 6. **LINE NUMBERING**: Start every line with "<number>. " (e.g., "1. ", "2. ", etc.) and continue sequentially.
 
+## DIVERSITY & NOVELTY RULES (VERY IMPORTANT):
+- Do **not** repeat the same idea with different wording.
+- Ensure each slide introduces a **distinct concept** (e.g., for snack ideas: vary base ingredient, preparation method, flavor profile, and occasion).
+- Avoid common, overused examples unless the user explicitly asks for them.
+- Re-use of the **same primary ingredient** across slides is forbidden.
+- Vary structure and micro-phrasing across slides (don’t echo the same sentence stem).
+- If the user asks for “caption-like” text, keep it concise, aesthetic, and **no full sentences**.
+
 ## CONTENT GUIDELINES:
-- Keep text concise but impactful (2-4 lines per slide is ideal for TikTok)
-- Use line breaks within a slide content when appropriate for readability
+- Keep text concise but impactful (2–4 lines per slide is ideal for TikTok)
+- Use line breaks within a slide when appropriate for readability
 - If the user requests bullet points, use "•" or "-" for bullets
 - If the user requests numbered sub-items, include them (e.g., "1. Main point")
-- Avoid hashtags, emojis, or excessive punctuation UNLESS the user requests them
+- Avoid hashtags, emojis, or excessive punctuation UNLESS requested
 - First slide should be a compelling hook/title
 - Last slide should provide closure (conclusion, CTA, or motivational message)
 
@@ -54,7 +77,7 @@ Example for a habit-breaking topic:
 • You let opportunities pass while preparing endlessly
 • You mistake hesitation for being thorough
 
-Now generate exactly {numberOfCards} slides following the user's instructions:
+Now generate exactly {numberOfCards} slides following the user's instructions **and the diversity rules**:
 `;
 
 export async function POST(req: Request) {
@@ -70,6 +93,7 @@ export async function POST(req: Request) {
       language,
       modelProvider = "openai",
       modelId,
+      diversitySeed,
     } = (await req.json()) as OutlineRequest;
 
     if (!prompt || !numberOfCards || !language) {
@@ -110,9 +134,19 @@ export async function POST(req: Request) {
       .replace(/{currentDate}/g, currentDate)
       .replace(/{prompt}/g, prompt);
 
+    const sampling = defaultSampling();
+    if (typeof diversitySeed === "number" && Number.isFinite(diversitySeed)) {
+      sampling.seed = Math.trunc(diversitySeed);
+    }
+
     const result = streamText({
       model,
       prompt: formattedPrompt,
+      temperature: sampling.temperature,
+      topP: sampling.topP,
+      frequencyPenalty: sampling.frequencyPenalty,
+      presencePenalty: sampling.presencePenalty,
+      seed: sampling.seed,
     });
 
     return result.toDataStreamResponse();
