@@ -46,12 +46,11 @@ export function MarketingTestimonials() {
         className="text-center space-y-6 mb-8"
       >
         <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 leading-tight">
-          Was unsere Nutzer sagen
+          What our creators say
         </h2>
         <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-          Echte Stimmen von Creators, die mit{" "}
-          <span className="font-bold text-[#304674]">SlidesCockpit</span>{" "}
-          arbeiten.
+          Real voices from creators who scale with{" "}
+          <span className="font-bold text-[#304674]">SlidesCockpit</span>.
         </p>
       </motion.div>
 

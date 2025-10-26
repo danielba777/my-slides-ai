@@ -25,9 +25,13 @@ export const addText = (c: CanvasDoc, text = "Neuer Text"): CanvasDoc => ({
       // Verwende normalisierte Koordinaten (0-1) für korrekte Zentrierung
       const nx = 0.5; // horizontal zentriert
       const ny = 0.5; // vertikal zentriert
+      const pxX = Math.round(nx * c.width);
+      const pxY = Math.round(ny * c.height);
       return {
         id: crypto.randomUUID(),
         type: "text",
+        x: pxX,
+        y: pxY,
         nx,
         ny,
         text,

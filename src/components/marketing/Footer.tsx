@@ -9,8 +9,8 @@ export function MarketingFooter() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <p>© {new Date().getFullYear()} SlidesCockpit. All rights reserved.</p>
           <div className="flex items-center gap-5">
-            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
-            <Link href="/terms" className="hover:text-foreground">Terms</Link>
+            <Link href="/privacy" className="hover:text-foreground">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-foreground">Terms of Service</Link>
             <Link href="#pricing" className="hover:text-foreground">Pricing</Link>
           </div>
         </div>

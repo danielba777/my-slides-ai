@@ -5,6 +5,12 @@ export type CanvasTextNode = {
   type: "text";
   x: number;
   y: number;
+  /**
+   * Optional normalized coordinates (0-1) to make responsive positioning easier.
+   * When present, they describe the anchor point that was used to derive x/y.
+   */
+  nx?: number;
+  ny?: number;
   rotation?: number;
   width?: number;
   text: string;

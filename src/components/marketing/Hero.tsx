@@ -69,7 +69,7 @@ export function MarketingHero({ session }: { session: boolean }) {
           >
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
-              <span>250M+ Aufrufe mit SlidesCockpit generiert</span>
+              <span>250M+ views generated with SlidesCockpit</span>
             </div>
             <div className="hidden sm:block h-4 w-px bg-indigo-300/30"></div>
             <div className="flex items-center gap-1">
@@ -85,13 +85,13 @@ export function MarketingHero({ session }: { session: boolean }) {
             transition={{ delay: 0.08, duration: 0.7 }}
             className="py-8 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight text-white"
           >
-            <span className="block">Automatisiere TikTok Slides,</span>
+            <span className="block">Automate TikTok slides</span>
             {/* Mobile ≈3 Zeilen, ab sm → 2 Zeilen */}
             <span className="block sm:inline sm:whitespace-nowrap">
-              die wirklich&nbsp;
+              that actually&nbsp;
             </span>
             <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
-              Traffic bringen
+              drive traffic
             </span>
           </motion.h1>
 
@@ -102,9 +102,9 @@ export function MarketingHero({ session }: { session: boolean }) {
             transition={{ delay: 0.15, duration: 0.6 }}
             className="mt-8 pb-8 text-lg sm:text-xl lg:text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed font-light"
           >
-            Planung, Erstellung und Publishing in Minuten. Professionelle
-            Typografie, pixelperfekte Slides und Automatisierungen, die nicht
-            nach KI aussehen.
+            Planning, production, and publishing in minutes. Professional
+            typography, pixel-perfect slides, and automations that never feel
+            like obvious AI output.
           </motion.p>
 
           {/* CTA buttons */}
@@ -120,7 +120,7 @@ export function MarketingHero({ session }: { session: boolean }) {
                   size="lg"
                   className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
                 >
-                  Zur App gehen
+                  Go to the app
                   <ArrowRightIcon className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
                 </Button>
               </Link>
@@ -135,7 +135,7 @@ export function MarketingHero({ session }: { session: boolean }) {
               className="inline-flex items-center gap-2 text-white/80 hover:text-white text-sm sm:text-base font-medium underline-offset-4 hover:underline transition-all duration-200 px-2 py-1"
             >
               <StarIcon className="w-4 h-4 text-yellow-400" />
-              Beispiele ansehen
+              Browse examples
             </a>
           </motion.div>
 
@@ -151,10 +151,10 @@ export function MarketingHero({ session }: { session: boolean }) {
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
                   <ZapIcon className="w-5 h-5 text-white" />
                 </div>
-                <h3 className="text-white font-semibold">In 10 Min. live</h3>
+                <h3 className="text-white font-semibold">Live in 10 min</h3>
               </div>
               <p className="text-gray-300 text-sm leading-relaxed">
-                Von Hook bis Export – ohne Fummelei.
+                From hook to export without any fiddling.
               </p>
             </div>
 
@@ -164,11 +164,11 @@ export function MarketingHero({ session }: { session: boolean }) {
                   <BarChart3Icon className="w-5 h-5 text-white" />
                 </div>
                 <h3 className="text-white font-semibold">
-                  Vorlagen, die ziehen
+                  Templates that convert
                 </h3>
               </div>
               <p className="text-gray-300 text-sm leading-relaxed">
-                Analysierte Winners. Mehr Reach, mehr Follows.
+                Battle-tested winners. More reach, more followers.
               </p>
             </div>
 
@@ -178,11 +178,11 @@ export function MarketingHero({ session }: { session: boolean }) {
                   <CheckCircle2Icon className="w-5 h-5 text-white" />
                 </div>
                 <h3 className="text-white font-semibold">
-                  Sieht nicht nach KI aus
+                  Looks handcrafted
                 </h3>
               </div>
               <p className="text-gray-300 text-sm leading-relaxed">
-                Creator-Look statt AI-Vibe. Natürlich & glaubwürdig.
+                Creator aesthetic instead of AI vibe. Natural and trustworthy.
               </p>
             </div>
           </motion.div>
@@ -207,7 +207,7 @@ export function MarketingHero({ session }: { session: boolean }) {
                     50K+
                   </div>
                   <div className="text-sm text-gray-300/90">
-                    Zufriedene Nutzer
+                    Happy creators
                   </div>
                 </div>
                 <div className="text-center">
@@ -215,14 +215,14 @@ export function MarketingHero({ session }: { session: boolean }) {
                     1M+
                   </div>
                   <div className="text-sm text-gray-300/90">
-                    Erstellte Slides
+                    Slides produced
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
                     98%
                   </div>
-                  <div className="text-sm text-gray-300/90">Erfolgsquote</div>
+                  <div className="text-sm text-gray-300/90">Success rate</div>
                 </div>
               </div>
             </div>

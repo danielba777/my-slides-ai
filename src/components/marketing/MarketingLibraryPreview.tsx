@@ -62,7 +62,7 @@ export function MarketingLibraryPreview() {
         likeCount: p.likeCount,
         viewCount: p.viewCount,
         imageUrl: p.slides?.[0]?.imageUrl ?? null,
-        title: p.title || `Viral Slideshow ${index + 1}`,
+        title: p.title || `Viral slideshow ${index + 1}`,
         creator: p.creator || `Creator ${index + 1}`,
         trending: index < 3,
       }));
@@ -83,35 +83,34 @@ export function MarketingLibraryPreview() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-100 to-[#c2d5ff] rounded-full text-sm font-medium text-indigo-700 mb-4">
             <TrendingUpIcon className="w-4 h-4" />
-            Trending Slides
+            Trending slides
           </div>
 
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 leading-tight">
-            Entdecke echte
+            Discover real
             <span className="block bg-clip-text text-[#304674]">
-              virale Slides
+              viral slides
             </span>
           </h2>
 
           <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-            Sehe, wie Top-Creator mit{" "}
-            <span className="font-bold text-[#304674]">SlidesCockpit</span> ihre
-            TikTok-Reichweite explodieren lassen. Echte Beispiele, echtes
-            Wachstum.
+            Watch how top creators use{" "}
+            <span className="font-bold text-[#304674]">SlidesCockpit</span> to
+            blow up their TikTok reach. Real examples, real growth.
           </p>
 
           <div className="flex flex-wrap justify-center gap-8 text-sm font-medium text-gray-500">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              Echtzeit-Daten
+              Real-time data
             </div>
             <div className="flex items-center gap-2">
               <StarIcon className="w-4 h-4 text-yellow-500" />
-              Top-Performer
+              Top performers
             </div>
             <div className="flex items-center gap-2">
               <PlayIcon className="w-4 h-4 text-blue-500" />
-              Millionen Views
+              Millions of views
             </div>
           </div>
         </motion.div>
@@ -180,7 +179,7 @@ export function MarketingLibraryPreview() {
 
                       {/* Creator */}
                       <div className="text-xs text-gray-300 font-medium">
-                        von {post.creator}
+                        by {post.creator}
                       </div>
 
                       {/* Stats */}

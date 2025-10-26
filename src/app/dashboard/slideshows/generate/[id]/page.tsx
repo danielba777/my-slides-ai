@@ -46,6 +46,8 @@ function clearPendingCookie() {
 
 function makeCanvasFromText(text: string, w = 1080, h = 1620): CanvasDoc {
   // 2:3 aspect ratio
+  const nx = 0.5;
+  const ny = 0.5;
   return {
     version: 1,
     width: w,
@@ -55,8 +57,10 @@ function makeCanvasFromText(text: string, w = 1080, h = 1620): CanvasDoc {
       {
         id: nanoid(),
         type: "text",
-        nx: 0.5, // Horizontal mittig (normalisierte Koordinaten)
-        ny: 0.5, // Vertikal mittig (normalisierte Koordinaten)
+        x: Math.round(nx * w),
+        y: Math.round(ny * h),
+        nx, // Horizontal mittig (normalisierte Koordinaten)
+        ny, // Vertikal mittig (normalisierte Koordinaten)
         text,
         fontFamily: "Inter",
         fontSize: 72,

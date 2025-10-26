@@ -23,6 +23,8 @@ export function useSlideOperations() {
       {
         id: nanoid(),
         type: "text",
+        x: Math.round(0.5 * DEFAULT_CANVAS.width),
+        y: Math.round(0.5 * DEFAULT_CANVAS.height),
         nx: 0.5, // horizontal zentriert (normalisierte Koordinaten)
         ny: 0.5, // vertikal zentriert (normalisierte Koordinaten)
         text: "Neuer Text",
