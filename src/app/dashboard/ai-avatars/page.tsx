@@ -46,8 +46,24 @@ export default function AiAvatarDashboardPage() {
   const loadRecentCreations = async () => {
     try {
       setIsLoadingRecent(true);
-      // Placeholder: Hook up to user-generated avatars once API is ready.
+      const response = await fetch("/api/ai-avatars/creations", {
+        method: "GET",
+        cache: "no-store",
+      });
+      const data = (await response.json().catch(() => null)) as
+        | AiAvatarTemplate[]
+        | { error?: string }
+        | null;
+
+      if (!response.ok || !Array.isArray(data)) {
+        throw new Error("Failed to load generated avatars");
+      }
+
+      setRecentCreations(data);
+    } catch (error) {
+      console.error("Error loading recent AI avatars:", error);
       setRecentCreations([]);
+      toast.error("Erstellte Avatare konnten nicht geladen werden");
     } finally {
       setIsLoadingRecent(false);
     }
@@ -83,17 +99,22 @@ export default function AiAvatarDashboardPage() {
         throw new Error(data?.error || "Generation fehlgeschlagen");
       }
 
-      const creations: AiAvatarTemplate[] = data.images.map(
-        (image: { minUrl?: string; rawUrl?: string }, index: number) => ({
-          id: `${data.id ?? "generated"}-${Date.now()}-${index}`,
-          prompt: prompt.trim(),
-          imageUrl: image?.minUrl ?? image?.rawUrl ?? "",
-          rawImageUrl: image?.rawUrl,
-          createdAt: new Date().toISOString(),
-        }),
-      );
+      const creations: AiAvatarTemplate[] = data.images;
 
-      setRecentCreations((prev) => [...creations, ...prev].slice(0, 18));
+      setRecentCreations((prev) => {
+        const merged = [...creations, ...prev];
+        const seen = new Set<string>();
+        const deduped: AiAvatarTemplate[] = [];
+
+        for (const item of merged) {
+          if (!item?.id) continue;
+          if (seen.has(item.id)) continue;
+          seen.add(item.id);
+          deduped.push(item);
+        }
+
+        return deduped.slice(0, 18);
+      });
       setActiveTab("recent");
       toast.success("Avatar generiert");
     } catch (error) {
@@ -167,7 +188,7 @@ export default function AiAvatarDashboardPage() {
               ) : (
                 <AiAvatarTemplateGrid
                   templates={recentCreations}
-                  onCopy={handleCopyPrompt}
+                  showOpenInNewTab
                 />
               )}
             </div>

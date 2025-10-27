@@ -7,13 +7,18 @@ import { useState } from "react";
 type TemplateGridProps = {
   templates: AiAvatarTemplate[];
   onCopy?: (prompt: string) => void;
+  showOpenInNewTab?: boolean;
 };
 
 const COLUMNS = 6;
 const ROWS = 3;
 const TOTAL_CELLS = COLUMNS * ROWS;
 
-export function AiAvatarTemplateGrid({ templates, onCopy }: TemplateGridProps) {
+export function AiAvatarTemplateGrid({
+  templates,
+  onCopy,
+  showOpenInNewTab = false,
+}: TemplateGridProps) {
   const [addedId, setAddedId] = useState<string | null>(null);
   const visibleTemplates = templates.slice(0, TOTAL_CELLS);
   const placeholders = Math.max(TOTAL_CELLS - visibleTemplates.length, 0);
@@ -26,7 +31,7 @@ export function AiAvatarTemplateGrid({ templates, onCopy }: TemplateGridProps) {
           className="relative aspect-[2/3] overflow-hidden rounded-2xl border bg-muted"
         >
           <img
-            src={template.imageUrl}
+            src={template.imageUrl || template.rawImageUrl || ""}
             alt="AI avatar template preview"
             className="h-full w-full object-cover transition duration-500 hover:scale-105"
           />
@@ -46,6 +51,22 @@ export function AiAvatarTemplateGrid({ templates, onCopy }: TemplateGridProps) {
                 }}
               >
                 {addedId === template.id ? "Added!" : "Copy Prompt"}
+              </Button>
+            </div>
+          ) : showOpenInNewTab ? (
+            <div className="absolute inset-x-0 bottom-0 p-3">
+              <Button
+                variant="outline"
+                size="default"
+                className="w-full gap-2 rounded-full bg-white text-zinc-900 text-lg font-medium hover:bg-zinc-100"
+                onClick={() => {
+                  const targetUrl = template.imageUrl || template.rawImageUrl;
+                  if (targetUrl) {
+                    window.open(targetUrl, "_blank", "noopener,noreferrer");
+                  }
+                }}
+              >
+                Open in new tab
               </Button>
             </div>
           ) : null}

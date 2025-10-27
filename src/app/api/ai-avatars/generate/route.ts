@@ -1,3 +1,5 @@
+import { env } from "@/env";
+import { auth } from "@/server/auth";
 import { NextResponse } from "next/server";
 
 const API_BASE = "https://api.302.ai";
@@ -7,6 +9,11 @@ const FETCH_ENDPOINT = (id: string) =>
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { prompt } = (await request.json()) as { prompt?: string };
 
     if (!prompt || !prompt.trim()) {
@@ -21,15 +28,15 @@ export async function POST(request: Request) {
       );
     }
 
-const payload = {
-  quality: "basic",
-  aspect_ratio: "2:3",
-  prompt: prompt.trim(),
-  negative_prompt: "",
-  enhance_prompt: false,
-  seed: 38459,
-  style_id: "1cb4b936-77bf-4f9a-9039-f3d349a4cdbe",
-};
+    const payload = {
+      quality: "basic",
+      aspect_ratio: "2:3",
+      prompt: prompt.trim(),
+      negative_prompt: "",
+      enhance_prompt: false,
+      seed: 38459,
+      style_id: "1cb4b936-77bf-4f9a-9039-f3d349a4cdbe",
+    };
 
     console.debug("[AI Avatar] Sending generation request", {
       url: GENERATE_ENDPOINT,
@@ -59,10 +66,37 @@ const payload = {
 
     const fetchResult = await pollForResult(jobJson.id, apiKey);
 
+    const persistedImages = [];
+    for (const image of fetchResult.images) {
+      const sourceUrl = image.rawUrl ?? image.minUrl;
+      if (!sourceUrl) {
+        console.warn(
+          "[AI Avatar] Skipping image persistence due to missing URL",
+          image,
+        );
+        continue;
+      }
+
+      const saved = await persistGeneratedImage({
+        prompt: prompt.trim(),
+        sourceUrl,
+        rawImageUrl: image.rawUrl ?? null,
+        userId: session.user.id,
+      });
+      persistedImages.push(saved);
+    }
+
+    if (persistedImages.length === 0) {
+      return NextResponse.json(
+        { error: "No generated images could be stored" },
+        { status: 502 },
+      );
+    }
+
     return NextResponse.json({
       success: true,
       id: jobJson.id,
-      images: fetchResult.images,
+      images: persistedImages,
       raw: fetchResult.raw,
     });
   } catch (error) {
@@ -75,10 +109,11 @@ const payload = {
 }
 
 async function pollForResult(id: string, apiKey: string) {
-  const maxAttempts = 40;
   const delayMs = 2000;
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+  let attempt = 0;
+
+  while (true) {
     const response = await fetch(FETCH_ENDPOINT(id), {
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -113,12 +148,19 @@ async function pollForResult(id: string, apiKey: string) {
     }
 
     await new Promise((resolve) => setTimeout(resolve, delayMs));
-  }
 
-  throw new Error("Avatar generation timed out");
+    attempt += 1;
+  }
 }
 
 type ImageResult = { minUrl?: string; rawUrl?: string };
+type PersistedImage = {
+  id: string;
+  prompt: string;
+  imageUrl: string;
+  rawImageUrl?: string | null;
+  createdAt: string;
+};
 
 function extractImages(data: any): ImageResult[] {
   if (!data) return [];
@@ -147,4 +189,41 @@ function extractImages(data: any): ImageResult[] {
   ].find((value) => typeof value === "string");
 
   return fallback ? [{ minUrl: fallback }] : [];
+}
+
+async function persistGeneratedImage({
+  prompt,
+  sourceUrl,
+  rawImageUrl,
+  userId,
+}: {
+  prompt: string;
+  sourceUrl: string;
+  rawImageUrl: string | null;
+  userId: string;
+}): Promise<PersistedImage> {
+  const response = await fetch(`${env.SLIDESCOCKPIT_API}/ai-avatars/generations`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-user-id": userId,
+    },
+    body: JSON.stringify({
+      prompt,
+      sourceUrl,
+      rawImageUrl,
+    }),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || !data) {
+    console.error("[AI Avatar] Failed to persist generated image", {
+      status: response.status,
+      data,
+    });
+    throw new Error("Failed to store generated image");
+  }
+
+  return data as PersistedImage;
 }
