@@ -15,6 +15,8 @@ type Usage = {
   status: "ACTIVE" | "PAST_DUE" | "TRIALING" | "CANCELED" | string | null;
   credits: number | null;
   aiCredits: number | null;
+  usedCredits: number | null;
+  usedAiCredits: number | null;
   resetsAt: string | null;
   stripePriceId: string | null;
   stripeSubscriptionId: string | null;
@@ -79,12 +81,22 @@ export default function ProfileBilling() {
   const pack = hasPlan ? (PLAN_CREDITS[data.plan as keyof typeof PLAN_CREDITS] ?? { credits: 0, ai: 0 }) : null;
   const total   = pack ? (pack.credits < 0 ? Infinity : pack.credits) : 0;
   const aiTotal = pack ? (pack.ai      < 0 ? Infinity : pack.ai)      : 0;
-  const creditsLeft = data.credits ?? null;
-  const aiLeft      = data.aiCredits ?? null;
-  const used = !hasPlan || creditsLeft == null || total === 0 || total === Infinity ? 0 : Math.max(0, total - creditsLeft);
-  const aiUsed = !hasPlan || aiLeft == null || aiTotal === 0 || aiTotal === Infinity ? 0 : Math.max(0, aiTotal - aiLeft);
-  const pct = !hasPlan || total === 0 || total === Infinity ? 0 : Math.round((used / total) * 100);
-  const aiPct = !hasPlan || aiTotal === 0 || aiTotal === Infinity ? 0 : Math.round((aiUsed / aiTotal) * 100);
+  const creditsLeft = data.credits == null ? null : data.credits < 0 ? Infinity : data.credits;
+  const aiLeft      = data.aiCredits == null ? null : data.aiCredits < 0 ? Infinity : data.aiCredits;
+  const used = hasPlan
+    ? Math.max(
+        0,
+        data.usedCredits ?? (total === Infinity || creditsLeft == null ? 0 : total - creditsLeft),
+      )
+    : 0;
+  const aiUsed = hasPlan
+    ? Math.max(
+        0,
+        data.usedAiCredits ?? (aiTotal === Infinity || aiLeft == null ? 0 : aiTotal - aiLeft),
+      )
+    : 0;
+  const pct = !hasPlan || total === 0 || total === Infinity ? 0 : Math.round((Math.min(used, total) / total) * 100);
+  const aiPct = !hasPlan || aiTotal === 0 || aiTotal === Infinity ? 0 : Math.round((Math.min(aiUsed, aiTotal) / aiTotal) * 100);
   const nextReset = data.resetsAt ? new Date(data.resetsAt) : null;
 
   return (

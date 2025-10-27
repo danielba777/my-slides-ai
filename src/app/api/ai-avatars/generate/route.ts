@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/server/auth";
+import { ensureAndConsumeCredits } from "@/server/billing";
 
 const API_BASE = "https://api.302.ai";
 const GENERATE_ENDPOINT = `${API_BASE}/higgsfield/text2image_soul`;
@@ -7,6 +9,11 @@ const FETCH_ENDPOINT = (id: string) =>
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
     const { prompt } = (await request.json()) as { prompt?: string };
 
     if (!prompt || !prompt.trim()) {
@@ -20,6 +27,19 @@ export async function POST(request: Request) {
         { status: 500 },
       );
     }
+
+  // Vor Start atomar 2 AI-Credits abziehen
+  try {
+    await ensureAndConsumeCredits(userId, { kind: "ai", cost: 2 });
+  } catch (e: any) {
+    if (e?.code === "INSUFFICIENT_AI_CREDITS") {
+      return NextResponse.json(
+        { error: "Not enough AI credits", upgradeUrl: "/#pricing" },
+        { status: 402 },
+      );
+    }
+    throw e;
+  }
 
 const payload = {
   quality: "basic",

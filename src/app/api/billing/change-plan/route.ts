@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { stripe } from "@/server/stripe";
-import { planFromPrice } from "@/lib/billing";
+import { planFromPrice } from "@/server/billing";
 
 export async function POST(req: Request) {
   const session = await auth();

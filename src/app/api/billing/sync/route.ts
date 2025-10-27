@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { stripe } from "@/server/stripe";
-import { PLAN_CREDITS, planFromPrice } from "@/lib/billing";
+import { planFromPrice, carryOverCreditsOnPlanChange } from "@/server/billing";
+import { PLAN_CREDITS } from "@/lib/billing";
+import { FREE_SLIDESHOW_QUOTA } from "@/lib/billing";
 
 // Kleine Helper, um leere/kaputte Zeiten zu vermeiden
 function dateFromUnix(sec?: number | null) {
@@ -49,10 +51,24 @@ export async function POST() {
     );
 
     if (!active) {
-      // Kein aktives Abo -> auf Free setzen
+      // Kein aktives Abo -> FREE (5/0) hart setzen und Altstände aufräumen
       await db.user.update({
         where: { id: user.id },
         data: { plan: null, planRenewsAt: null },
+      });
+      await db.$transaction(async (tx) => {
+        const prev = await tx.creditBalance.findUnique({ where: { userId: user.id } });
+        if (prev) await tx.creditBalance.delete({ where: { userId: user.id } });
+        await tx.creditBalance.create({
+          data: {
+            userId: user.id,
+            credits: FREE_SLIDESHOW_QUOTA, // 5
+            aiCredits: 0,
+            usedCredits: 0,
+            usedAiCredits: 0,
+            resetsAt: null,
+          },
+        });
       });
       return NextResponse.json({ synced: true, plan: null });
     }
@@ -77,7 +93,7 @@ export async function POST() {
     const periodEnd = dateFromUnix(active.current_period_end);
 
     // 4) Subscription upsert
-    await db.subscription.upsert({
+      await db.subscription.upsert({
       where: { stripeSubscriptionId: active.id },
       create: {
         userId: user.id,
@@ -93,31 +109,18 @@ export async function POST() {
       },
     });
 
-    // 5) User-Plan setzen (planSince nur beim ersten Mal)
-    await db.user.update({
-      where: { id: user.id },
-      data: {
-        plan,
-        planSince: user.plan ? user.planSince : periodStart,
-        planRenewsAt: periodEnd,
-      },
-    });
-
-    // 6) Credits gemäß Plan setzen
-    const pack = PLAN_CREDITS[plan as keyof typeof PLAN_CREDITS];
-    await db.creditBalance.upsert({
-      where: { userId: user.id },
-      create: {
-        userId: user.id,
-        credits: pack.credits,
-        aiCredits: pack.ai,
-        resetsAt: periodEnd,
-      },
-      update: {
-        credits: pack.credits,
-        aiCredits: pack.ai,
-        resetsAt: periodEnd,
-      },
+    // 5) Credits & User-Plan via Carry-Over/Reset setzen (hart neu schreiben)
+    await db.$transaction(async (tx) => {
+      const oldPlan = (await tx.user.findUnique({ where: { id: user.id }, select: { plan: true } }))?.plan ?? null;
+      await carryOverCreditsOnPlanChange(tx, user.id, oldPlan, plan, periodEnd);
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          plan,
+          planSince: user.plan ? user.planSince : periodStart,
+          planRenewsAt: periodEnd,
+        },
+      });
     });
 
     return NextResponse.json({

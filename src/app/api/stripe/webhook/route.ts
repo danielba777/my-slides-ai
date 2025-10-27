@@ -2,14 +2,15 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { stripe } from "@/server/stripe";
 import { db } from "@/server/db";
-import { PLAN_CREDITS, planFromPrice } from "@/lib/billing";
+import { FREE_SLIDESHOW_QUOTA } from "@/lib/billing";
+import { planFromPrice, carryOverCreditsOnPlanChange } from "@/server/billing";
 
 
 function dateFromUnixOrFallback(unix?: number | null): Date {
   if (typeof unix === "number" && Number.isFinite(unix)) {
     return new Date(unix * 1000);
   }
-  // Fallback: +30 Tage – nur als Sicherheitsnetz, in der Praxis
+  // Fallback: +30 Tage  nur als Sicherheitsnetz, in der Praxis
   // kommt kurz danach ein invoice.payment_succeeded mit korrektem Wert.
   return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 }
@@ -39,58 +40,75 @@ export async function POST(req: Request) {
             : null);
         if (!user) break;
 
-        if (!user.stripeCustomerId && customerId) {
-          await db.user.update({ where: { id: user.id }, data: { stripeCustomerId: customerId } });
-        }
-
         if (subId) {
           // Achtung: Direkt nach Checkout kann Stripe Sub-Daten noch nachreichen.
           // Wir holen sie und nutzen Fallbacks.
           const subscription = await stripe.subscriptions.retrieve(subId);
           const priceId = subscription.items.data[0]?.price?.id as string | undefined;
           const plan = planFromPrice(priceId);
-          console.log("[webhook]", evt.type, "priceId:", priceId, "→ plan:", plan);
+          console.log("[webhook]", evt.type, "priceId:", priceId, " plan:", plan);
           if (!plan) break;
 
-          await db.subscription.upsert({
-            where: { stripeSubscriptionId: subId },
-            create: {
-              userId: user.id,
-              stripeSubscriptionId: subId,
-              stripePriceId: priceId,
-              status: "ACTIVE",
-              currentPeriodEnd: dateFromUnixOrFallback(subscription.current_period_end),
-            },
-            update: {
-              stripePriceId: priceId,
-              status: "ACTIVE",
-              currentPeriodEnd: dateFromUnixOrFallback(subscription.current_period_end),
-            },
-          });
+          const periodStart = subscription.current_period_start
+            ? new Date(subscription.current_period_start * 1000)
+            : new Date();
+          const periodEnd = dateFromUnixOrFallback(subscription.current_period_end);
 
-          await db.user.update({
-            where: { id: user.id },
-            data: {
+          await db.$transaction(async (tx) => {
+            const dbUser = await tx.user.findUnique({
+              where: { id: user.id },
+              select: { plan: true, planSince: true, stripeCustomerId: true },
+            });
+            if (!dbUser) return;
+
+            const oldPlan = dbUser.plan ?? null;
+
+            await tx.subscription.upsert({
+              where: { stripeSubscriptionId: subId },
+              create: {
+                userId: user.id,
+                stripeSubscriptionId: subId,
+                stripePriceId: priceId,
+                status: "ACTIVE",
+                currentPeriodEnd: periodEnd,
+              },
+              update: {
+                stripePriceId: priceId,
+                status: "ACTIVE",
+                currentPeriodEnd: periodEnd,
+              },
+            });
+
+            await carryOverCreditsOnPlanChange(
+              tx,
+              user.id,
+              oldPlan,
               plan,
-              planSince: new Date(),
-              planRenewsAt: dateFromUnixOrFallback(subscription.current_period_end),
-            },
-          });
+              periodEnd,
+            );
 
-          const pack = PLAN_CREDITS[plan as keyof typeof PLAN_CREDITS];
-          await db.creditBalance.upsert({
-            where: { userId: user.id },
-            create: {
-              userId: user.id,
-              credits: pack.credits,
-              aiCredits: pack.ai,
-              resetsAt: dateFromUnixOrFallback(subscription.current_period_end),
-            },
-            update: {
-              credits: pack.credits,
-              aiCredits: pack.ai,
-              resetsAt: dateFromUnixOrFallback(subscription.current_period_end),
-            },
+            const planSince =
+              oldPlan && oldPlan === plan
+                ? (dbUser.planSince ?? periodStart)
+                : periodStart;
+            const userUpdate: {
+              plan: typeof plan;
+              planSince: Date | null;
+              planRenewsAt: Date | null;
+              stripeCustomerId?: string;
+            } = {
+              plan,
+              planSince,
+              planRenewsAt: periodEnd,
+            };
+            if (!dbUser.stripeCustomerId && customerId) {
+              userUpdate.stripeCustomerId = customerId;
+            }
+
+            await tx.user.update({
+              where: { id: user.id },
+              data: userUpdate,
+            });
           });
         }
         break;
@@ -102,7 +120,7 @@ export async function POST(req: Request) {
         const customerId = sub.customer as string;
         const priceId = sub.items?.data?.[0]?.price?.id as string | undefined;
         const plan = planFromPrice(priceId);
-        console.log("[webhook]", evt.type, "priceId:", priceId, "→ plan:", plan);
+        console.log("[webhook]", evt.type, "priceId:", priceId, " plan:", plan);
         if (!customerId || !plan) break;
 
         const user = await db.user.findFirst({ where: { stripeCustomerId: customerId } });
@@ -132,8 +150,7 @@ export async function POST(req: Request) {
           data: { plan, planSince: user.plan ? user.planSince : periodStart, planRenewsAt: periodEnd },
         });
 
-        // Credits NICHT hart zurücksetzen – das übernimmt die bezahlte Invoice;
-        // hier nur vorbereiten (Plan/Periode).
+              // Credits NICHT hart zurcksetzen  Umstellung wird bei Invoice korrigiert.
         break;
       }
 
@@ -144,13 +161,32 @@ export async function POST(req: Request) {
         });
         if (!user) break;
 
-        await db.subscription.update({
+        await db.subscription.updateMany({
           where: { stripeSubscriptionId: sub.id },
           data: { status: "CANCELED" },
         });
 
-        // Kein bezahlter Plan mehr → auf "Free" (null) setzen
-        await db.user.update({ where: { id: user.id }, data: { plan: null, planRenewsAt: null } });
+        // Kein bezahlter Plan mehr  auf "Free" (null) setzen
+        await db.$transaction(async (tx) => {
+          await tx.user.update({
+            where: { id: user.id },
+            data: { plan: null, planRenewsAt: null, planSince: null },
+          });
+          const prev = await tx.creditBalance.findUnique({ where: { userId: user.id } });
+          if (prev) {
+            await tx.creditBalance.delete({ where: { userId: user.id } });
+          }
+          await tx.creditBalance.create({
+            data: {
+              userId: user.id,
+              credits: FREE_SLIDESHOW_QUOTA,
+              aiCredits: 0,
+              usedCredits: 0,
+              usedAiCredits: 0,
+              resetsAt: null,
+            },
+          });
+        });
         break;
       }
 
@@ -159,7 +195,7 @@ export async function POST(req: Request) {
         const subId = invoice.subscription as string | undefined;
         if (!subId) break;
 
-        // WICHTIG: bei retrieve → "items.data.price" expanden
+        // WICHTIG: bei retrieve  "items.data.price" expanden
         const sub = await stripe.subscriptions.retrieve(subId, {
           expand: ["items.data.price"],
         });
@@ -169,7 +205,7 @@ export async function POST(req: Request) {
 
         const priceId = (sub.items?.data?.[0]?.price as { id?: string } | undefined)?.id;
         const plan = planFromPrice(priceId);
-        console.log("[webhook]", evt.type, "priceId:", priceId, "→ plan:", plan);
+        console.log("[webhook]", evt.type, "priceId:", priceId, " plan:", plan);
         if (!plan) break;
 
         const periodStart = sub.current_period_start ? new Date(sub.current_period_start * 1000) : new Date();
@@ -191,18 +227,40 @@ export async function POST(req: Request) {
           },
         });
 
-        // Plan + Perioden sicherstellen (falls dieses Event als erstes kam)
-        await db.user.update({
-          where: { id: user.id },
-          data: { plan, planSince: user.plan ? user.planSince : periodStart, planRenewsAt: periodEnd },
-        });
-
-        // Credits für neuen Abrechnungszeitraum setzen
-        const pack = PLAN_CREDITS[plan];
-        await db.creditBalance.upsert({
-          where: { userId: user.id },
-          create: { userId: user.id, credits: pack.credits, aiCredits: pack.ai, resetsAt: periodEnd },
-          update: { credits: pack.credits, aiCredits: pack.ai, resetsAt: periodEnd },
+                  // ALLES in einer TX erledigen (periodEnd bereits oben bestimmt)
+        await db.$transaction(async (tx) => {
+          const oldPlan = (await tx.user.findUnique({ where: { id: user.id }, select: { plan: true } }))?.plan ?? null;
+          await carryOverCreditsOnPlanChange(tx, user.id, oldPlan, plan, periodEnd);
+          const userUpdate: {
+            plan: typeof plan;
+            planRenewsAt: Date | null;
+            planSince?: Date | null;
+          } = {
+            plan,
+            planRenewsAt: periodEnd,
+          };
+          if (!oldPlan || oldPlan !== plan) {
+            userUpdate.planSince = periodStart;
+          }
+          await tx.user.update({
+            where: { id: user.id },
+            data: userUpdate,
+          });
+          await tx.subscription.upsert({
+            where: { stripeSubscriptionId: subId },
+            create: {
+              userId: user.id,
+              stripeSubscriptionId: subId,
+              stripePriceId: priceId ?? null,
+              status: "ACTIVE",
+              currentPeriodEnd: periodEnd,
+            },
+            update: {
+              stripePriceId: priceId ?? null,
+              status: "ACTIVE",
+              currentPeriodEnd: periodEnd,
+            },
+          });
         });
         break;
       }
@@ -217,3 +275,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

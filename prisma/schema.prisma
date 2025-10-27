@@ -96,12 +96,14 @@ model Subscription {
 }
 
 model CreditBalance {
-  userId     String   @id
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  credits    Int      @default(0)
-  aiCredits  Int      @default(0)
-  resetsAt   DateTime?
-  updatedAt  DateTime @updatedAt
+  userId        String   @id
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credits       Int      @default(0)   // verbleibende Slides-Credits in der aktuellen Periode
+  aiCredits     Int      @default(0)   // verbleibende AI-Credits in der aktuellen Periode
+  usedCredits   Int      @default(0)   // in der Periode verbrauchte Slides-Credits
+  usedAiCredits Int      @default(0)   // in der Periode verbrauchte AI-Credits
+  resetsAt      DateTime?
+  updatedAt     DateTime @updatedAt
 }
 
 model BaseDocument {

@@ -1,71 +1,255 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
 *** Begin Patch
-*** Update File: src/env.js
+*** Update File: src/server/billing.ts
 @@
- import { createEnv } from "@t3-oss/env-nextjs";
- import { z } from "zod";
+ import type { Plan } from "@prisma/client";
+ import { PLAN_CREDITS, FREE_SLIDESHOW_QUOTA } from "@/lib/billing";
  
- export const env = createEnv({
-   server: {
-     DATABASE_URL: z.string().url(),
-     TAVILY_API_KEY: z.string(),
-     NODE_ENV: z
-       .enum(["development", "test", "production"])
-       .default("development"),
- 
-     OPENAI_API_KEY: z.string(),
-     TOGETHER_AI_API_KEY: z.string(),
-     GOOGLE_CLIENT_ID: z.string(),
-     GOOGLE_CLIENT_SECRET: z.string(),
-     UNSPLASH_ACCESS_KEY: z.string(),
-+    // ─── Stripe (für Checkout, Webhooks, Plan-Mapping) ───────────────────────
-+    STRIPE_SECRET_KEY: z.string().min(1, "Missing STRIPE_SECRET_KEY"),
-+    STRIPE_WEBHOOK_SECRET: z.string().min(1, "Missing STRIPE_WEBHOOK_SECRET"),
-+    STRIPE_PRICE_STARTER: z.string().min(1, "Missing STRIPE_PRICE_STARTER"),
-+    STRIPE_PRICE_GROWTH: z.string().min(1, "Missing STRIPE_PRICE_GROWTH"),
-+    STRIPE_PRICE_SCALE: z.string().min(1, "Missing STRIPE_PRICE_SCALE"),
-+    STRIPE_PRICE_UNLIMITED: z.string().min(1, "Missing STRIPE_PRICE_UNLIMITED"),
-+    // optional (nur falls irgendwo im Client gebraucht wird → besser als NEXT_PUBLIC_* anlegen)
-+    STRIPE_PUBLISHABLE_KEY: z.string().optional(),
-+    // Für Portal-/Return-URLs (optional, fällt sonst auf Request-Origin zurück)
-+    NEXT_PUBLIC_APP_URL: z.string().optional(),
+ export function planFromPrice(priceId?: string): Plan | undefined {
 @@
-     NEXTAUTH_URL: z.preprocess(
-       (str) => process.env.VERCEL_URL ?? str,
-       process.env.VERCEL ? z.string() : z.string().url(),
-     ),
-     NEXTAUTH_SECRET:
-       process.env.NODE_ENV === "production"
-         ? z.string()
-         : z.string().optional(),
-     SLIDESCOCKPIT_API: z.string().url(),
-   },
+   return undefined;
+ }
  
-   runtimeEnv: {
-     DATABASE_URL: process.env.DATABASE_URL,
-     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-     UNSPLASH_ACCESS_KEY: process.env.UNSPLASH_ACCESS_KEY,
-     TAVILY_API_KEY: process.env.TAVILY_API_KEY,
-     NODE_ENV: process.env.NODE_ENV,
-     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-     TOGETHER_AI_API_KEY: process.env.TOGETHER_AI_API_KEY,
-     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
-     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-     SLIDESCOCKPIT_API: process.env.SLIDESCOCKPIT_API,
-+    // Stripe
-+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
-+    STRIPE_PRICE_STARTER: process.env.STRIPE_PRICE_STARTER,
-+    STRIPE_PRICE_GROWTH: process.env.STRIPE_PRICE_GROWTH,
-+    STRIPE_PRICE_SCALE: process.env.STRIPE_PRICE_SCALE,
-+    STRIPE_PRICE_UNLIMITED: process.env.STRIPE_PRICE_UNLIMITED,
-+    STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
-+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-   },
++/**
++ * Hartes Zurücksetzen/Neuaufsetzen der CreditBalance anhand eines Ziel-Plans.
++ * - Downgrade: used=0, left = neues Kontingent
++ * - Upgrade:   used bleibt, left = neuesKontingent - used (>=0)
++ * - Wechsel Free <-> Paid wird ebenfalls korrekt abgebildet
++ * Es wird bewusst delete→create benutzt, damit keine Altwerte/Resets hängen bleiben.
++ */
++export async function carryOverCreditsOnPlanChange(
++  tx: typeof db,
++  userId: string,
++  oldPlan: Plan | null,
++  newPlan: Plan,
++  newPeriodEnd: Date | null,
++) {
++  const prev = await tx.creditBalance.findUnique({ where: { userId } });
++
++  // Altdaten sichern
++  const prevUsedSlides   = prev?.usedCredits    ?? 0;
++  const prevUsedAi       = prev?.usedAiCredits  ?? 0;
++  const prevLeftSlides   = prev?.credits        ?? 0;
++  const prevLeftAi       = prev?.aiCredits      ?? 0;
++
++  // Neues Kontingent ermitteln
++  const target = PLAN_CREDITS[newPlan];
++  const newTotalSlides = target.credits < 0 ? Number.POSITIVE_INFINITY : target.credits;
++  const newTotalAi     = target.ai      < 0 ? Number.POSITIVE_INFINITY : target.ai;
++
++  const wasUnlimited = oldPlan === "UNLIMITED";
++  const isUnlimited  = newPlan === "UNLIMITED";
++  const isDowngrade  =
++    !isUnlimited &&
++    (oldPlan && PLAN_CREDITS[oldPlan].credits > 0) &&
++    (PLAN_CREDITS[oldPlan].credits > PLAN_CREDITS[newPlan].credits);
++
++  // Bisher „used“ robuster bestimmen:
++  // a) Falls wir echte used*-Zähler haben, nimm diese
++  // b) Andernfalls aus Left ableiten (nur wenn alter Plan endlich war)
++  const inferredUsedSlides = Number.isFinite(newTotalSlides)
++    ? (prevUsedSlides || (oldPlan && oldPlan !== "UNLIMITED"
++        ? Math.max(0, (PLAN_CREDITS[oldPlan].credits) - prevLeftSlides)
++        : 0))
++    : 0;
++  const inferredUsedAi = Number.isFinite(newTotalAi)
++    ? (prevUsedAi || (oldPlan && oldPlan !== "UNLIMITED"
++        ? Math.max(0, (PLAN_CREDITS[oldPlan].ai) - prevLeftAi)
++        : 0))
++    : 0;
++
++  let nextLeftSlides: number;
++  let nextUsedSlides: number;
++  let nextLeftAi: number;
++  let nextUsedAi: number;
++
++  if (isUnlimited) {
++    // Unlimited → kein Verbrauch, alles egal
++    nextLeftSlides = Number.POSITIVE_INFINITY;
++    nextUsedSlides = 0;
++    nextLeftAi     = Number.POSITIVE_INFINITY;
++    nextUsedAi     = 0;
++  } else if (isDowngrade) {
++    // Downgrade: Verbrauch zurücksetzen
++    nextLeftSlides = Number.isFinite(newTotalSlides) ? newTotalSlides as number : 0;
++    nextUsedSlides = 0;
++    nextLeftAi     = Number.isFinite(newTotalAi) ? newTotalAi as number : 0;
++    nextUsedAi     = 0;
++  } else {
++    // Gleichbleibend oder Upgrade: used bleibt
++    nextUsedSlides = Math.max(0, inferredUsedSlides);
++    nextLeftSlides = Number.isFinite(newTotalSlides)
++      ? Math.max(0, (newTotalSlides as number) - nextUsedSlides)
++      : Number.POSITIVE_INFINITY;
++
++    nextUsedAi = Math.max(0, inferredUsedAi);
++    nextLeftAi = Number.isFinite(newTotalAi)
++      ? Math.max(0, (newTotalAi as number) - nextUsedAi)
++      : Number.POSITIVE_INFINITY;
++  }
++
++  // Altbalance weg → sauberen Datensatz schreiben
++  if (prev) {
++    await tx.creditBalance.delete({ where: { userId } });
++  }
++  await tx.creditBalance.create({
++    data: {
++      userId,
++      credits: Number.isFinite(nextLeftSlides) ? nextLeftSlides : 0,
++      aiCredits: Number.isFinite(nextLeftAi) ? nextLeftAi : 0,
++      usedCredits: Number.isFinite(nextLeftSlides) ? nextUsedSlides : 0,
++      usedAiCredits: Number.isFinite(nextLeftAi) ? nextUsedAi : 0,
++      resetsAt: newPeriodEnd,
++    },
++  });
++}
++
+ export async function getUsageLimits(userId: string) {
+   const [sub, bal] = await Promise.all([
+     db.subscription.findFirst({
+       where: { userId, status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] } },
+       orderBy: { updatedAt: "desc" },
+@@
+   return { plan, unlimited, slidesLeft, aiLeft };
+ }
  
-   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
-   emptyStringAsUndefined: true,
- });
+ type ConsumeArgs =
+   | { kind: "slide"; cost?: number }
+   | { kind: "ai"; cost?: number };
+ 
+ export async function ensureAndConsumeCredits(userId: string, args: ConsumeArgs) {
+   const cost = Math.max(1, args.cost ?? (args.kind === "ai" ? 2 : 1));
+   return await db.$transaction(async (tx) => {
+@@
+-    let bal = await tx.creditBalance.findUnique({ where: { userId } });
+-    if (!bal) {
+-      bal = await tx.creditBalance.create({
+-        data: {
+-          userId,
+-          credits: !plan ? FREE_SLIDESHOW_QUOTA : 0,
+-          aiCredits: 0,
+-          usedCredits: 0,
+-          usedAiCredits: 0,
+-          resetsAt: null,
+-        },
+-      });
+-    }
++    let bal = await tx.creditBalance.findUnique({ where: { userId } });
++    if (!bal) {
++      // Free-Init: IMMER 5/0 – nie 250/300
++      bal = await tx.creditBalance.create({
++        data: {
++          userId,
++          credits: !plan ? FREE_SLIDESHOW_QUOTA : 0,
++          aiCredits: 0,
++          usedCredits: 0,
++          usedAiCredits: 0,
++          resetsAt: null,
++        },
++      });
++    }
+ 
+     if (unlimited) return { ok: true as const };
+ 
+     if (args.kind === "slide") {
+       const updated = await tx.creditBalance.updateMany({
+*** End Patch
+diff
+Code kopieren
+*** Begin Patch
+*** Update File: src/app/api/billing/sync/route.ts
+@@
+ import { stripe } from "@/server/stripe";
+-import { planFromPrice } from "@/server/billing";
++import { planFromPrice, carryOverCreditsOnPlanChange } from "@/server/billing";
+ import { PLAN_CREDITS } from "@/lib/billing";
+-import { carryOverCreditsOnPlanChange } from "@/server/billing";
++import { FREE_SLIDESHOW_QUOTA } from "@/lib/billing";
+@@
+     if (!active) {
+-      // Kein aktives Abo -> auf Free setzen
++      // Kein aktives Abo -> FREE (5/0) hart setzen und Altstände aufräumen
+       await db.user.update({
+         where: { id: user.id },
+         data: { plan: null, planRenewsAt: null },
+       });
++      await db.$transaction(async (tx) => {
++        const prev = await tx.creditBalance.findUnique({ where: { userId: user.id } });
++        if (prev) await tx.creditBalance.delete({ where: { userId: user.id } });
++        await tx.creditBalance.create({
++          data: {
++            userId: user.id,
++            credits: FREE_SLIDESHOW_QUOTA, // 5
++            aiCredits: 0,
++            usedCredits: 0,
++            usedAiCredits: 0,
++            resetsAt: null,
++          },
++        });
++      });
+       return NextResponse.json({ synced: true, plan: null });
+     }
+@@
+-    await db.subscription.upsert({
++    await db.subscription.upsert({
+       where: { stripeSubscriptionId: active.id },
+       create: {
+         userId: user.id,
+         stripeSubscriptionId: active.id,
+         stripePriceId: priceId ?? null,
+         status: (active.status as string).toUpperCase() as any,
+         currentPeriodEnd: periodEnd,
+       },
+       update: {
+         stripePriceId: priceId ?? null,
+         status: (active.status as string).toUpperCase() as any,
+         currentPeriodEnd: periodEnd,
+       },
+     });
+ 
+-      // 5) Credits & User-Plan via Carry-Over/Reset setzen
++    // 5) Credits & User-Plan via Carry-Over/Reset setzen (hart neu schreiben)
+     await db.$transaction(async (tx) => {
+       const oldPlan = (await tx.user.findUnique({ where: { id: user.id }, select: { plan: true } }))?.plan ?? null;
+       await carryOverCreditsOnPlanChange(tx, user.id, oldPlan, plan, periodEnd);
+       await tx.user.update({
+         where: { id: user.id },
+         data: {
+           plan,
+           planSince: user.plan ? user.planSince : periodStart,
+           planRenewsAt: periodEnd,
+         },
+       });
+     });
+*** End Patch
+diff
+Code kopieren
+*** Begin Patch
+*** Update File: src/app/api/billing/usage/route.ts
+@@
+   const latestSub = user?.subscriptions?.[0] ?? null;
+   const hasPlan = !!user?.plan;
++  // Bei Free-Plan keine „0 left“-Falle durch alte Balance:
++  // Falls kein Plan und keine Balance vorhanden → 5/0 zurückgeben (UI zeigt dann korrekt 0/5 verwendet)
++  const freeCredits = !hasPlan
++    ? (user?.creditBalance?.credits ?? 5)
++    : null;
++  const freeAi = !hasPlan
++    ? (user?.creditBalance?.aiCredits ?? 0)
++    : null;
+   return NextResponse.json({
+     plan: hasPlan ? user!.plan : null,
+     status: latestSub?.status ?? null,
+-    credits: hasPlan ? user?.creditBalance?.credits ?? 0 : null,
+-    aiCredits: hasPlan ? user?.creditBalance?.aiCredits ?? 0 : null,
+-    resetsAt: hasPlan ? (user?.creditBalance?.resetsAt ?? user?.planRenewsAt ?? null) : null,
++    credits: hasPlan ? (user?.creditBalance?.credits ?? 0) : freeCredits,
++    aiCredits: hasPlan ? (user?.creditBalance?.aiCredits ?? 0) : freeAi,
++    resetsAt: hasPlan ? (user?.creditBalance?.resetsAt ?? user?.planRenewsAt ?? null) : null,
+     stripePriceId: latestSub?.stripePriceId ?? null,
+     stripeSubscriptionId: latestSub?.stripeSubscriptionId ?? null,
+     hasCustomer: !!user?.stripeCustomerId,
+     hasSubscription: !!latestSub?.stripeSubscriptionId,
+   });
 *** End Patch

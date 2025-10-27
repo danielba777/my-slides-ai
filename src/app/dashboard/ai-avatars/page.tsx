@@ -22,9 +22,24 @@ export default function AiAvatarDashboardPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<"recent" | "templates">("templates");
 
+  const [limits, setLimits] = useState<{ aiLeft: number; unlimited: boolean } | null>(null);
+  const [limitsLoading, setLimitsLoading] = useState(false);
+
   useEffect(() => {
     void loadTemplates();
     void loadRecentCreations();
+
+    void (async () => {
+      try {
+        setLimitsLoading(true);
+        const res = await fetch("/api/billing/limits", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        setLimits({ aiLeft: data?.aiLeft ?? 0, unlimited: !!data?.unlimited });
+      } finally {
+        setLimitsLoading(false);
+      }
+    })();
   }, []);
 
   const loadTemplates = async () => {
@@ -67,8 +82,13 @@ export default function AiAvatarDashboardPage() {
       toast.error("Bitte gib einen Prompt ein");
       return;
     }
-
-    setIsGenerating(true);
+    const canGenerate = limits?.unlimited || (typeof limits?.aiLeft === "number" && limits.aiLeft >= 2);
+    if (!canGenerate) {
+      toast.error("Not enough AI credits");
+      window.location.href = "/#pricing";
+      return;
+    }
+       setIsGenerating(true);
     try {
       const response = await fetch("/api/ai-avatars/generate", {
         method: "POST",
@@ -137,25 +157,36 @@ export default function AiAvatarDashboardPage() {
           onChange={setPrompt}
           onShowTemplates={() => setActiveTab("templates")}
         />
-        <div className="flex justify-end">
-          <Button
-            className="gap-2"
-            onClick={handleGenerate}
-            disabled={isGenerating || !prompt.trim()}
-          >
-            {isGenerating ? (
-              <>
-                <Spinner className="h-4 w-4" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4" />
-                Generate
-              </>
-            )}
-          </Button>
-        </div>
+        <div className="flex flex-col items-end gap-1">
+            <Button
+              className="gap-2"
+              onClick={async () => {
+                const canGenerate = limits?.unlimited || (typeof limits?.aiLeft === "number" && limits.aiLeft >= 2);
+                if (canGenerate) {
+                  await handleGenerate();
+                } else {
+                  window.location.href = "/#pricing";
+                }
+              }}
+              disabled={isGenerating || !prompt.trim() || limitsLoading}
+              variant={limits?.unlimited || (limits?.aiLeft ?? 0) >= 2 ? "default" : "secondary"}
+            >
+              {isGenerating ? (
+                <>
+                  <Spinner className="h-4 w-4" />
+                  Generating…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  {(limits?.unlimited || (limits?.aiLeft ?? 0) >= 2) ? "Generate" : "Upgrade Now"}
+                </>
+              )}
+            </Button>
+            <div className="text-xs text-muted-foreground">
+              {limits?.unlimited ? "Usage: unlimited" : `Usage: ${limits?.aiLeft ?? 0} AI credits left`}
+            </div>
+          </div>
         </div>
 
         <Tabs
