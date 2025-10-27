@@ -12,26 +12,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import type { SlideTextElement } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
-
-  Plus,
-  Bold as LucideBold,
-  Italic as ItalicIcon,
-  AlignLeft,
   AlignCenter,
+  AlignLeft,
   AlignRight,
-  Image as ImageIcon,
   Check as CheckIcon,
   ChevronDown,
-  ChevronUp
-  } from "lucide-react";
+  ChevronUp,
+  Bold as LucideBold,
+  Plus,
+} from "lucide-react";
 import * as React from "react";
 import { useCallback } from "react";
 
@@ -99,7 +91,8 @@ function LegacyEditorToolbar({
     (selectedText as any)?.strokeEnabled ??
     (selectedText as any)?.outlineEnabled ??
     ((selectedText as any)?.strokeWidth ?? 0) > 0;
-  const bgEnabled = !!selectedBackground && (selectedBackground.opacity ?? 0) > 0;
+  const bgEnabled =
+    !!selectedBackground && (selectedBackground.opacity ?? 0) > 0;
 
   React.useEffect(() => {
     if (!selectedBackground) {
@@ -126,9 +119,10 @@ function LegacyEditorToolbar({
 
   const buildBackground = useCallback(
     (overrides?: Partial<SlideTextElement["background"]>) => {
-      const nextOpacity = overrides?.opacity ?? textBgOpacity / 100;
+      const rawOpacity = overrides?.opacity ?? textBgOpacity / 100;
+      const nextOpacity = Math.min(1, Math.max(0, rawOpacity));
       return {
-        // "enabled" wird implizit über Opazität gesteuert:
+        // "enabled" wird implizit ueber Opazitaet gesteuert:
         enabled: nextOpacity > 0,
         mode: overrides?.mode ?? textBgMode,
         color: overrides?.color ?? textBgColor,
@@ -172,50 +166,101 @@ function LegacyEditorToolbar({
   // 🔁 Bold toggeln (an/aus) – Status in Button widerspiegeln
   const toggleBold = () => {
     if (!hasSelection) return;
-    const next =
-      String(selectedFontWeight) === "bold" ? "regular" : "bold";
-    onChangeSelectedText?.({ ...selectedText!, weight: next, fontWeight: next });
+    const next = String(selectedFontWeight) === "bold" ? "regular" : "bold";
+    onChangeSelectedText?.({
+      ...selectedText!,
+      weight: next,
+      fontWeight: next,
+    });
   };
   const setAlign = (a: "left" | "center" | "right") =>
     onChangeSelectedText?.({ ...selectedText!, align: a });
 
   // ✅ Schöne, klare Custom-Icons für Outline / Background (weißes „A")
   const IconTextOutlineA = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" {...props}>
+    <svg
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+      aria-hidden="true"
+      {...props}
+    >
       <defs>
         <filter id="stroke" colorInterpolationFilters="sRGB">
-          <feMorphology operator="dilate" radius="1.2" in="SourceAlpha" result="DILATE"/>
-          <feColorMatrix type="matrix" values="
+          <feMorphology
+            operator="dilate"
+            radius="1.2"
+            in="SourceAlpha"
+            result="DILATE"
+          />
+          <feColorMatrix
+            type="matrix"
+            values="
              0 0 0 0 0
              0 0 0 0 0
              0 0 0 0 0
-             0 0 0 1 0" in="DILATE" result="BLACK"/>
+             0 0 0 1 0"
+            in="DILATE"
+            result="BLACK"
+          />
           <feMerge>
-            <feMergeNode in="BLACK"/>
-            <feMergeNode in="SourceGraphic"/>
+            <feMergeNode in="BLACK" />
+            <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
       </defs>
       <g filter="url(#stroke)">
-        <text x="12" y="16" textAnchor="middle" fontWeight="700" fontSize="14" fill="#fff">A</text>
+        <text
+          x="12"
+          y="16"
+          textAnchor="middle"
+          fontWeight="700"
+          fontSize="14"
+          fill="#fff"
+        >
+          A
+        </text>
       </g>
     </svg>
   );
   const IconTextBackgroundA = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" {...props}>
-      <rect x="3.5" y="6.5" width="17" height="11" rx="2.5" fill="currentColor" opacity="0.25"></rect>
-      <text x="12" y="15" textAnchor="middle" fontWeight="700" fontSize="14" fill="#fff">A</text>
+    <svg
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+      aria-hidden="true"
+      {...props}
+    >
+      <rect
+        x="3.5"
+        y="6.5"
+        width="17"
+        height="11"
+        rx="2.5"
+        fill="currentColor"
+        opacity="0.25"
+      ></rect>
+      <text
+        x="12"
+        y="15"
+        textAnchor="middle"
+        fontWeight="700"
+        fontSize="14"
+        fill="#fff"
+      >
+        A
+      </text>
     </svg>
   );
 
   // --- Feste Werte für Ein-Klick-Toggles (TikTok-Style) ---
-  const TIKTOK_OUTLINE_WIDTH = 6; // fixe Konturstärke
+  const TIKTOK_OUTLINE_WIDTH = 14; // fixed outline width
   const DEFAULT_OUTLINE_COLOR = "#000000";
   const DEFAULT_TEXT_COLOR = "#ffffff";
   const DEFAULT_BG_COLOR = "#000000";
-  const DEFAULT_BG_RADIUS = 14;
-  const DEFAULT_BG_PADDING = 12;
-
+  const DEFAULT_BG_RADIUS = 0;
+  const DEFAULT_BG_PADDING = 22;
+  const DEFAULT_BG_OPACITY = 1;
 
   return (
     <div
@@ -249,13 +294,40 @@ function LegacyEditorToolbar({
             className={cn("h-9 w-9", outlineEnabled && "bg-muted")}
             onClick={() => {
               if (!hasSelection) return;
-              const sw = (selectedText as any)?.strokeWidth ?? 0;
-              const enabled = sw > 0 || (selectedText as any)?.strokeEnabled || (selectedText as any)?.outlineEnabled;
+              const rawStrokeWidth = (selectedText as any)?.strokeWidth;
+              const rawOutlineWidth = (selectedText as any)?.outlineWidth;
+              const parsedStrokeWidth =
+                typeof rawStrokeWidth === "number"
+                  ? rawStrokeWidth
+                  : parseFloat(rawStrokeWidth ?? "");
+              const parsedOutlineWidth =
+                typeof rawOutlineWidth === "number"
+                  ? rawOutlineWidth
+                  : parseFloat(rawOutlineWidth ?? "");
+              const strokeWidthValue = Number.isFinite(parsedStrokeWidth)
+                ? parsedStrokeWidth
+                : 0;
+              const outlineWidthValue = Number.isFinite(parsedOutlineWidth)
+                ? parsedOutlineWidth
+                : 0;
+              const previousWidth =
+                strokeWidthValue > 0
+                  ? strokeWidthValue
+                  : outlineWidthValue > 0
+                    ? outlineWidthValue
+                    : 0;
+              const fallbackWidth =
+                previousWidth > 0 ? previousWidth : TIKTOK_OUTLINE_WIDTH;
+              const enabled =
+                strokeWidthValue > 0 ||
+                (selectedText as any)?.strokeEnabled ||
+                (selectedText as any)?.outlineEnabled;
               if (enabled) {
                 onChangeSelectedText?.({
                   ...selectedText!,
                   strokeEnabled: false,
                   outlineEnabled: false,
+                  outlineWidth: fallbackWidth,
                   strokeWidth: 0,
                 });
               } else {
@@ -263,8 +335,10 @@ function LegacyEditorToolbar({
                   ...selectedText!,
                   strokeEnabled: true,
                   outlineEnabled: true,
-                  strokeWidth: Math.max(2, (selectedText as any)?.outlineWidth ?? (selectedText as any)?.strokeWidth ?? 4),
-                  stroke: (selectedText as any)?.stroke ?? "#000000",
+                  outlineWidth: fallbackWidth,
+                  strokeWidth: fallbackWidth,
+                  stroke:
+                    (selectedText as any)?.stroke ?? DEFAULT_OUTLINE_COLOR,
                 });
               }
             }}
@@ -282,11 +356,29 @@ function LegacyEditorToolbar({
             className={cn("h-9 w-9", bgEnabled && "bg-muted")}
             onClick={() => {
               if (!hasSelection) return;
-              const prev = selectedBackground ?? { color: "#000000", opacity: 0, paddingX: 12, paddingY: 12, radius: 16, lineOverlap: 0 };
-              const nextOpacity = (prev.opacity ?? 0) > 0 ? 0 : (prev.opacity ?? 0.55);
+              const prev = selectedBackground ?? {
+                mode: textBgMode,
+                color: textBgColor ?? DEFAULT_BG_COLOR,
+                opacity: 0,
+                paddingX: textBgPadding ?? DEFAULT_BG_PADDING,
+                paddingY: textBgPadding ?? DEFAULT_BG_PADDING,
+                radius: textBgRadius ?? DEFAULT_BG_RADIUS,
+                lineOverlap: 0,
+              };
+              const wasEnabled = (prev.opacity ?? 0) > 0;
+              const fallbackOpacity =
+                !wasEnabled && (prev.opacity ?? 0) <= 0
+                  ? DEFAULT_BG_OPACITY
+                  : (prev.opacity ?? DEFAULT_BG_OPACITY);
+              const nextOpacity = wasEnabled ? 0 : fallbackOpacity;
+              setTextBgOpacity(Math.round(nextOpacity * 100));
               onChangeSelectedText?.({
                 ...selectedText!,
-                background: { ...prev, opacity: nextOpacity },
+                background: {
+                  ...prev,
+                  opacity: nextOpacity,
+                  enabled: nextOpacity > 0,
+                },
               });
             }}
             title="Toggle text background"
@@ -319,7 +411,9 @@ function LegacyEditorToolbar({
                 aria-label="Text alignment"
               >
                 {activeAlign === "left" && <AlignLeft className="h-4 w-4" />}
-                {activeAlign === "center" && <AlignCenter className="h-4 w-4" />}
+                {activeAlign === "center" && (
+                  <AlignCenter className="h-4 w-4" />
+                )}
                 {activeAlign === "right" && <AlignRight className="h-4 w-4" />}
               </Button>
             </DropdownMenuTrigger>
@@ -329,19 +423,28 @@ function LegacyEditorToolbar({
               className="z-[60] rounded-xl border bg-popover/95 backdrop-blur supports-backdrop-blur:bg-popover/75"
             >
               <DropdownMenuItem
-                onClick={() => hasSelection && onChangeSelectedText?.({ ...selectedText!, align: "left" })}
+                onClick={() =>
+                  hasSelection &&
+                  onChangeSelectedText?.({ ...selectedText!, align: "left" })
+                }
                 className={cn("gap-2", activeAlign === "left" && "bg-muted")}
               >
                 <AlignLeft className="h-4 w-4" /> Left
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => hasSelection && onChangeSelectedText?.({ ...selectedText!, align: "center" })}
+                onClick={() =>
+                  hasSelection &&
+                  onChangeSelectedText?.({ ...selectedText!, align: "center" })
+                }
                 className={cn("gap-2", activeAlign === "center" && "bg-muted")}
               >
                 <AlignCenter className="h-4 w-4" /> Center
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => hasSelection && onChangeSelectedText?.({ ...selectedText!, align: "right" })}
+                onClick={() =>
+                  hasSelection &&
+                  onChangeSelectedText?.({ ...selectedText!, align: "right" })
+                }
                 className={cn("gap-2", activeAlign === "right" && "bg-muted")}
               >
                 <AlignRight className="h-4 w-4" /> Right
@@ -383,7 +486,9 @@ function LegacyEditorToolbar({
             <div className="flex flex-wrap items-center gap-4 py-1.5">
               {/* Farben als gefüllte Swatches + größere Labels */}
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground min-w-[72px]">Text</span>
+                <span className="text-sm text-muted-foreground min-w-[72px]">
+                  Text
+                </span>
                 <input
                   type="color"
                   value={(selectedText as any)?.fill ?? DEFAULT_TEXT_COLOR}
@@ -398,20 +503,27 @@ function LegacyEditorToolbar({
                 />
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground min-w-[72px]">Background</span>
+                <span className="text-sm text-muted-foreground min-w-[72px]">
+                  Background
+                </span>
                 <input
                   type="color"
                   value={textBgColor}
                   onChange={(e) => {
                     const c = e.currentTarget.value;
                     setTextBgColor(c);
-                    commitBackground({ color: c, opacity: textBgOpacity });
+                    commitBackground({
+                      color: c,
+                      opacity: textBgOpacity / 100,
+                    });
                   }}
                   className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
                 />
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground min-w-[72px]">Outline</span>
+                <span className="text-sm text-muted-foreground min-w-[72px]">
+                  Outline
+                </span>
                 <input
                   type="color"
                   value={(selectedText as any)?.stroke ?? DEFAULT_OUTLINE_COLOR}
@@ -421,22 +533,31 @@ function LegacyEditorToolbar({
                       ...selectedText!,
                       stroke: e.currentTarget.value,
                       strokeWidth:
-                        (selectedText as any)?.strokeWidth > 0
+                        ((selectedText as any)?.strokeWidth ?? 0) > 0
+                          ? (selectedText as any)?.strokeWidth
+                          : TIKTOK_OUTLINE_WIDTH,
+                      outlineWidth:
+                        ((selectedText as any)?.strokeWidth ?? 0) > 0
                           ? (selectedText as any)?.strokeWidth
                           : TIKTOK_OUTLINE_WIDTH,
                       strokeEnabled: true,
+                      outlineEnabled: true,
                     })
                   }
                   className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
                 />
               </div>
 
-                          <Button
+              <Button
                 variant="outline"
                 size="sm"
                 className="rounded-xl ml-auto"
                 title="Dim background"
-                onClick={onToggleDim ?? (() => window.dispatchEvent(new CustomEvent("canvas:toggle-dim")))}
+                onClick={
+                  onToggleDim ??
+                  (() =>
+                    window.dispatchEvent(new CustomEvent("canvas:toggle-dim")))
+                }
               >
                 Dim background
               </Button>
