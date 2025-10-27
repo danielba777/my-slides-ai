@@ -49,6 +49,7 @@ export async function POST(req: Request) {
           const subscription = await stripe.subscriptions.retrieve(subId);
           const priceId = subscription.items.data[0]?.price?.id as string | undefined;
           const plan = planFromPrice(priceId);
+          console.log("[webhook]", evt.type, "priceId:", priceId, "→ plan:", plan);
           if (!plan) break;
 
           await db.subscription.upsert({
@@ -95,60 +96,32 @@ export async function POST(req: Request) {
         break;
       }
 
-      case "customer.subscription.updated":
-      case "customer.subscription.created": {
-        const sub = evt.data.object as any; // enthält current_period_end direkt
+      case "customer.subscription.created":
+      case "customer.subscription.updated": {
+        const sub = evt.data.object as any;
         const customerId = sub.customer as string;
-        const priceId = sub.items.data[0]?.price.id as string;
-        const plan = planFromPrice(priceId as string);
-        if (!plan) break;
+        const priceId = sub.items?.data?.[0]?.price?.id as string | undefined;
+        const plan = planFromPrice(priceId);
+        console.log("[webhook]", evt.type, "priceId:", priceId, "→ plan:", plan);
+        if (!customerId || !plan) break;
 
         const user = await db.user.findFirst({ where: { stripeCustomerId: customerId } });
         if (!user) break;
 
-        // >>> NEW: Detect plan change and top up the difference (no hard reset mid-cycle)
-        const previousPlan = user.plan ?? "STARTER";
-        if (previousPlan !== plan) {
-          const prevPack = PLAN_CREDITS[previousPlan];
-          const newPack = PLAN_CREDITS[plan];
-          // only top-up on upgrade (credits must increase and not UNLIMITED→finite)
-          const isUpgrade =
-            (prevPack.credits >= 0 && newPack.credits > prevPack.credits) ||
-            (prevPack.credits < 0 && newPack.credits >= 0) || // Unlimited -> finite (edge) => skip top-up
-            (prevPack.credits >= 0 && newPack.credits < 0);    // finite -> Unlimited: no need to top-up
+        const periodStart = sub.current_period_start ? new Date(sub.current_period_start * 1000) : new Date();
+        const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : dateFromUnixOrFallback(null);
 
-          if (isUpgrade && prevPack.credits >= 0 && newPack.credits >= 0) {
-            const diffCredits = newPack.credits - prevPack.credits;
-            const diffAi = Math.max(0, newPack.ai - prevPack.ai);
-            await db.creditBalance.upsert({
-              where: { userId: user.id },
-              create: {
-                userId: user.id,
-                credits: prevPack.credits + diffCredits,
-                aiCredits: Math.max(prevPack.ai, 0) + diffAi,
-                resetsAt: new Date(sub.current_period_end * 1000),
-              },
-              update: {
-                credits: { increment: diffCredits },
-                aiCredits: { increment: diffAi },
-                resetsAt: new Date(sub.current_period_end * 1000),
-              },
-            });
-          }
-        }
-
-        const periodEnd = dateFromUnixOrFallback(sub.current_period_end);
         await db.subscription.upsert({
           where: { stripeSubscriptionId: sub.id },
           create: {
             userId: user.id,
             stripeSubscriptionId: sub.id,
-            stripePriceId: priceId,
+            stripePriceId: priceId ?? null,
             status: (sub.status as string).toUpperCase() as any,
             currentPeriodEnd: periodEnd,
           },
           update: {
-            stripePriceId: priceId,
+            stripePriceId: priceId ?? null,
             status: (sub.status as string).toUpperCase() as any,
             currentPeriodEnd: periodEnd,
           },
@@ -156,8 +129,11 @@ export async function POST(req: Request) {
 
         await db.user.update({
           where: { id: user.id },
-          data: { plan, planRenewsAt: periodEnd },
+          data: { plan, planSince: user.plan ? user.planSince : periodStart, planRenewsAt: periodEnd },
         });
+
+        // Credits NICHT hart zurücksetzen – das übernimmt die bezahlte Invoice;
+        // hier nur vorbereiten (Plan/Periode).
         break;
       }
 
@@ -180,28 +156,53 @@ export async function POST(req: Request) {
 
       case "invoice.payment_succeeded": {
         const invoice = evt.data.object as any;
-        const subId = invoice.subscription as string;
+        const subId = invoice.subscription as string | undefined;
         if (!subId) break;
 
-        const sub = await stripe.subscriptions.retrieve(subId);
+        // WICHTIG: bei retrieve → "items.data.price" expanden
+        const sub = await stripe.subscriptions.retrieve(subId, {
+          expand: ["items.data.price"],
+        });
         const customerId = sub.customer as string;
         const user = await db.user.findFirst({ where: { stripeCustomerId: customerId } });
-        if (!user || !user.plan) break;
+        if (!user) break;
 
-        const pack = PLAN_CREDITS[user.plan as keyof typeof PLAN_CREDITS];
-        await db.creditBalance.upsert({
-          where: { userId: user.id },
+        const priceId = (sub.items?.data?.[0]?.price as { id?: string } | undefined)?.id;
+        const plan = planFromPrice(priceId);
+        console.log("[webhook]", evt.type, "priceId:", priceId, "→ plan:", plan);
+        if (!plan) break;
+
+        const periodStart = sub.current_period_start ? new Date(sub.current_period_start * 1000) : new Date();
+        const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : dateFromUnixOrFallback(null);
+
+        await db.subscription.upsert({
+          where: { stripeSubscriptionId: sub.id },
           create: {
             userId: user.id,
-            credits: pack.credits,
-            aiCredits: pack.ai,
-            resetsAt: new Date(sub.current_period_end * 1000),
+            stripeSubscriptionId: sub.id,
+            stripePriceId: priceId ?? null,
+            status: (sub.status as string).toUpperCase() as any,
+            currentPeriodEnd: periodEnd,
           },
           update: {
-            credits: pack.credits,
-            aiCredits: pack.ai,
-            resetsAt: new Date(sub.current_period_end * 1000),
+            stripePriceId: priceId ?? null,
+            status: (sub.status as string).toUpperCase() as any,
+            currentPeriodEnd: periodEnd,
           },
+        });
+
+        // Plan + Perioden sicherstellen (falls dieses Event als erstes kam)
+        await db.user.update({
+          where: { id: user.id },
+          data: { plan, planSince: user.plan ? user.planSince : periodStart, planRenewsAt: periodEnd },
+        });
+
+        // Credits für neuen Abrechnungszeitraum setzen
+        const pack = PLAN_CREDITS[plan];
+        await db.creditBalance.upsert({
+          where: { userId: user.id },
+          create: { userId: user.id, credits: pack.credits, aiCredits: pack.ai, resetsAt: periodEnd },
+          update: { credits: pack.credits, aiCredits: pack.ai, resetsAt: periodEnd },
         });
         break;
       }

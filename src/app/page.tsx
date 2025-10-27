@@ -6,23 +6,27 @@ import { MarketingLibraryPreview } from "@/components/marketing/MarketingLibrary
 import { MarketingNavbar } from "@/components/marketing/Navbar";
 import { MarketingPricing } from "@/components/marketing/Pricing";
 import { MarketingTestimonials } from "@/components/marketing/Testimonials";
+import SmoothHashScroll from "@/components/marketing/SmoothHashScroll";
 import { auth } from "@/server/auth";
 
 export default async function Home() {
   const session = await auth();
 
   return (
-    <MarketingPageBackground>
-      <MarketingNavbar session={!!session} />
-      <main className="flex-1">
-        <MarketingHero session={!!session} />
+    <>
+      <SmoothHashScroll />
+      <MarketingPageBackground>
+        <MarketingNavbar session={!!session} />
+        <main className="flex-1">
+          <MarketingHero session={!!session} />
 
-        <MarketingLibraryPreview />
-        <MarketingTestimonials />
-        <MarketingPricing session={!!session} />
-        <MarketingFAQ />
-      </main>
-      <MarketingFooter />
-    </MarketingPageBackground>
+          <MarketingLibraryPreview />
+          <MarketingTestimonials />
+          <MarketingPricing session={!!session} />
+          <MarketingFAQ />
+        </main>
+        <MarketingFooter />
+      </MarketingPageBackground>
+    </>
   );
 }

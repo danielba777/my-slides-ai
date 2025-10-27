@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Section } from "./Section";
+import { toast } from "sonner";
 
 const tiers = [
   {
@@ -82,9 +83,30 @@ export function MarketingPricing({ session }: { session: boolean }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
       });
-      const data = await res.json();
+
+      // Robust gegen Non-JSON / leeren Body
+      let data: any = null;
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("application/json")) {
+        try {
+          data = await res.json();
+        } catch {
+          // JSON kaputt/leer
+          data = null;
+        }
+      } else {
+        // Fallback: Text lesen für Logging
+        const text = await res.text().catch(() => "");
+        console.error("Checkout non-JSON response:", text);
+      }
+
       if (!res.ok || !data?.url) {
-        console.error("Checkout error", data);
+        console.error("Checkout error", { status: res.status, data });
+        toast.error(
+          data?.error
+            ? `Checkout failed: ${data.error}`
+            : `Checkout failed (${res.status}). Please try again.`,
+        );
         return;
       }
       window.location.href = data.url as string;

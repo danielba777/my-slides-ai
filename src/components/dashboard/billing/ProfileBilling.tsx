@@ -74,30 +74,17 @@ export default function ProfileBilling() {
   }
 
   const data = usage.data;
+
   const hasPlan = !!data.plan;
-  const pack = hasPlan
-    ? (PLAN_CREDITS[data.plan as keyof typeof PLAN_CREDITS] ?? {
-        credits: 0,
-        ai: 0,
-      })
-    : null;
-  const total = pack ? (pack.credits < 0 ? Infinity : pack.credits) : 0;
-  const aiTotal = pack ? (pack.ai < 0 ? Infinity : pack.ai) : 0;
-  const creditsLeft =
-    hasPlan && Number.isFinite(total) ? (data.credits ?? 0) : null;
-  const aiLeft =
-    hasPlan && Number.isFinite(aiTotal) ? (data.aiCredits ?? 0) : null;
-  const used =
-    pack && Number.isFinite(total)
-      ? Math.max(0, total - (data.credits ?? 0))
-      : 0;
-  const aiUsed =
-    pack && Number.isFinite(aiTotal)
-      ? Math.max(0, aiTotal - (data.aiCredits ?? 0))
-      : 0;
-  const pct = total === Infinity ? 0 : Math.round((used / (total || 1)) * 100);
-  const aiPct =
-    aiTotal === Infinity ? 0 : Math.round((aiUsed / (aiTotal || 1)) * 100);
+  const pack = hasPlan ? (PLAN_CREDITS[data.plan as keyof typeof PLAN_CREDITS] ?? { credits: 0, ai: 0 }) : null;
+  const total   = pack ? (pack.credits < 0 ? Infinity : pack.credits) : 0;
+  const aiTotal = pack ? (pack.ai      < 0 ? Infinity : pack.ai)      : 0;
+  const creditsLeft = data.credits ?? null;
+  const aiLeft      = data.aiCredits ?? null;
+  const used = !hasPlan || creditsLeft == null || total === 0 || total === Infinity ? 0 : Math.max(0, total - creditsLeft);
+  const aiUsed = !hasPlan || aiLeft == null || aiTotal === 0 || aiTotal === Infinity ? 0 : Math.max(0, aiTotal - aiLeft);
+  const pct = !hasPlan || total === 0 || total === Infinity ? 0 : Math.round((used / total) * 100);
+  const aiPct = !hasPlan || aiTotal === 0 || aiTotal === Infinity ? 0 : Math.round((aiUsed / aiTotal) * 100);
   const nextReset = data.resetsAt ? new Date(data.resetsAt) : null;
 
   return (
@@ -110,90 +97,32 @@ export default function ProfileBilling() {
             {hasPlan ? (
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">{data.plan}</Badge>
-                <Badge
-                  variant={data.status === "ACTIVE" ? "default" : "outline"}
-                >
-                  {data.status}
-                </Badge>
+                {data.status && <Badge variant={data.status === "ACTIVE" ? "default" : "secondary"}>{data.status}</Badge>}
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">Free</Badge>
-                <span className="text-sm text-muted-foreground">
-                  (no plan yet)
-                </span>
+                <Badge variant="outline">No subscription</Badge>
               </div>
             )}
           </CardHeader>
           <CardContent className="space-y-4">
             {hasPlan ? (
-              <div className="text-sm text-muted-foreground">
-                Next reset:{" "}
-                {nextReset
-                  ? nextReset.toLocaleDateString(undefined, {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })
-                  : "—"}
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground">
-                Choose a plan to unlock limits.
-              </div>
-            )}
-            <div className="space-y-2">
-              <div className="text-sm font-medium">Monthly credits</div>
-              {hasPlan ? (
-                <>
-                  <Progress value={pct} />
-                  <div className="text-xs text-muted-foreground">
-                    {pack!.credits < 0
-                      ? "Unlimited"
-                      : `${creditsLeft ?? 0} of ${pack!.credits} left`}
-                  </div>
-                </>
-              ) : (
-                <div className="text-xs text-muted-foreground">—</div>
-              )}
-            </div>
-            <div className="space-y-2">
-              <div className="text-sm font-medium">AI credits</div>
-              {hasPlan ? (
-                <>
-                  <Progress value={aiPct} />
-                  <div className="text-xs text-muted-foreground">
-                    {pack!.ai < 0
-                      ? "Unlimited"
-                      : `${aiLeft ?? 0} of ${pack!.ai} left`}
-                  </div>
-                </>
-              ) : (
-                <div className="text-xs text-muted-foreground">—</div>
-              )}
-            </div>
-            <div className="pt-4">
-              {data.hasSubscription ? (
-                <Button
-                  variant="secondary"
-                  onClick={() =>
-                    fetch("/api/billing/portal", { method: "POST" })
-                      .then((r) => r.json())
-                      .then(({ url }) => (window.location.href = url))
-                  }
-                  className="w-full"
-                >
+              data.hasSubscription ? (
+                <Button onClick={async () => {
+                  const r = await fetch("/api/billing/portal", { method: "POST" });
+                  const j = await r.json();
+                  if (j?.url) window.location.href = j.url;
+                  else toast.error("Could not open portal");
+                }}>
                   Manage subscription
                 </Button>
               ) : (
-                <Button
-                  className="w-full"
-                  onClick={() => router.push("/#pricing")}
-                >
-                  Choose a plan
-                </Button>
-              )}
-            </div>
+                <Button onClick={() => router.push("/#pricing")}>Choose a plan</Button>
+              )
+            ) : (
+              <Button onClick={() => router.push("/#pricing")}>Choose a plan</Button>
+            )}
           </CardContent>
         </Card>
 
@@ -202,37 +131,40 @@ export default function ProfileBilling() {
           <CardHeader>
             <CardTitle>Usage</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <div className="text-sm font-medium mb-2">Monthly credits</div>
-              {hasPlan && pack ? (
-                <>
-                  <Progress value={pct} className="mb-2" />
-                  <div className="text-sm">
-                    {pack.credits < 0
-                      ? "Unlimited"
-                      : `${creditsLeft ?? 0} left of ${pack.credits}`}
+          <CardContent className="space-y-4">
+            {hasPlan ? (
+              <>
+                {/* Credits */}
+                <div>
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-sm font-medium">Credits</span>
+                    <span className="text-xs text-muted-foreground">
+                      {pack!.credits < 0 ? "∞" : `${used}/${total}`}
+                    </span>
                   </div>
-                </>
-              ) : (
-                <div className="text-sm text-muted-foreground">—</div>
-              )}
-            </div>
-            <div>
-              <div className="text-sm font-medium mb-2">AI credits</div>
-              {hasPlan && pack ? (
-                <>
-                  <Progress value={aiPct} className="mb-2" />
-                  <div className="text-sm">
-                    {pack.ai < 0
-                      ? "Unlimited"
-                      : `${aiLeft ?? 0} left of ${pack.ai}`}
+                  <Progress value={pack!.credits < 0 ? 0 : pct} />
+                </div>
+                {/* AI Credits */}
+                <div>
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-sm font-medium">AI credits</span>
+                    <span className="text-xs text-muted-foreground">
+                      {pack!.ai < 0 ? "∞" : `${aiUsed}/${aiTotal}`}
+                    </span>
                   </div>
-                </>
-              ) : (
-                <div className="text-sm text-muted-foreground">—</div>
-              )}
-            </div>
+                  <Progress value={pack!.ai < 0 ? 0 : aiPct} />
+                </div>
+                {nextReset && (
+                  <div className="text-xs text-muted-foreground">
+                    Resets on {nextReset.toLocaleDateString()}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                No plan yet — <button className="underline" onClick={() => router.push("/#pricing")}>choose a plan</button> to unlock credits.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

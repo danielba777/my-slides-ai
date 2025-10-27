@@ -21,6 +21,7 @@ export async function GET() {
       },
     },
   });
+
   const latestSub = user?.subscriptions?.[0] ?? null;
   const hasPlan = !!user?.plan;
   return NextResponse.json({
