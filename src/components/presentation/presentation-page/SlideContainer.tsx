@@ -217,10 +217,10 @@ export function SlideContainer({
 }
 
 /**
- * Button + Dialog für persönliche Bilder:
- * - Öffnet eigenes Menü (gleiches Styling/Größen wie ImageCollectionSelector)
- * - Tab "Upload" (+ per-Account Speicherung), Tab "Meine Bilder"
- * - Confirm setzt das Bild zentriert als rootImage der aktuellen Slide
+ * Button + Dialog for personal images:
+ * - Opens own menu (same styling/sizes as ImageCollectionSelector)
+ * - Tab "Upload" (+ per-account storage), Tab "My Images"
+ * - Confirm sets the image centered as rootImage of the current slide
  */
 function PersonalImagePickerButton({ index }: { index: number }) {
   const [open, setOpen] = useState(false);

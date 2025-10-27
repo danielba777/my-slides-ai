@@ -3,6 +3,7 @@
 
 import LegacyEditorToolbar from "@/canvas/LegacyEditorToolbar";
 import type { CanvasImageNode } from "@/canvas/types";
+import { loadImageDecoded } from "@/canvas/konva-helpers";
 import { measureWrappedText } from "@/lib/textMetrics";
 import type { SlideTextElement } from "@/lib/types";
 import { AlignCenter, AlignLeft, AlignRight } from "lucide-react";
@@ -15,6 +16,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { usePresentationState } from "@/states/presentation-state";
 
 // UI-Event aus der Toolbar:
 // window.dispatchEvent(new CustomEvent("canvas:text-bg", { detail: { enabled: boolean, mode: "block" | "blob" } }))
@@ -69,6 +71,12 @@ const PADDING = 8;
 const BASE_FONT_PX = 72;
 // Zusätzlicher Puffer für Descender (z. B. g, y, p, q, j), damit beim Export nichts abgeschnitten wird
 const DESCENT_PAD = Math.ceil(BASE_FONT_PX * 0.25); // ~25 % der Basis-Fonthöhe
+
+// Feste Opazität für das globale Abdunkeln (lesbarer TikTok-Look)
+const DIM_OVERLAY_OPACITY = 0.28; // muss mit Preview übereinstimmen
+
+// +// Einheitliches Text-Baseline-Verhalten, damit Export == Preview
+const TEXT_BASELINE = "middle";
 
 function hexToRgba(hex: string, alpha: number): string {
   const clampedAlpha = Number.isFinite(alpha)
@@ -414,6 +422,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const wrapRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [dimBg, setDimBg] = React.useState(false);
+
+  // --- Globaler State für Dim-Overlay ---
+  const dimOverlaySlideId = usePresentationState((s) => s.dimOverlaySlideId);
+  const setDimOverlaySlideId = usePresentationState((s) => s.setDimOverlaySlideId);
 
   // Sicherer Wrapper: nur aufrufen, wenn wirklich eine Funktion übergeben wurde
   const onLayout = useCallback(
@@ -1187,22 +1200,41 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, W, H);
 
-    // === NEU: Hintergrundbild exakt wie in der Preview zeichnen ===
-    // Preview verwendet: translate(-50%,-50%) + translate(offset) + scale(scale) um das Bildzentrum
-    // Wir spiegeln das fürs Canvas:
-    const img = imgRef.current;
-    if (imageUrl && img && img.naturalWidth && img.naturalHeight) {
-      ctx.save();
-      // gleiche Matrix wie in der Preview: ins Zentrum + Pan + Zoom
-      ctx.translate(W / 2 + offset.x, H / 2 + offset.y);
-      ctx.scale(Math.max(0.001, scale), Math.max(0.001, scale));
-      // Bild um sein Zentrum zeichnen
-      const iw = img.naturalWidth;
-      const ih = img.naturalHeight;
-      ctx.drawImage(img, -iw / 2, -ih / 2);
-      ctx.restore();
+    // Zeichenoberfläche vorbereiten (avoid name clash with existing `canvas`)
+    const offscreenCanvas = document.createElement("canvas");
+    offscreenCanvas.width = W;
+    offscreenCanvas.height = H;
+    const exportCtx = offscreenCanvas.getContext("2d")!;
+
+    // WICHTIG für identische Vertikal-Ausrichtung wie im Preview
+    exportCtx.textBaseline = TEXT_BASELINE as CanvasTextBaseline;
+    exportCtx.textAlign = "left";
+
+    // 1) Hintergrund zeichnen
+    if (imageUrl) {
+      // Cover Fit wie im Preview (scale + center)
+      const img = await loadImageDecoded(imageUrl);
+      const fit = fitCover(W, H, img.naturalWidth, img.naturalHeight);
+      exportCtx.save();
+      exportCtx.scale(fit.scale, fit.scale);
+      exportCtx.translate(fit.x, fit.y);
+      exportCtx.drawImage(img, 0, 0, fit.w, fit.h);
+      exportCtx.restore();
+    } else {
+      exportCtx.fillStyle = "#000000";
+      exportCtx.fillRect(0, 0, W, H);
     }
-    // === ENDE NEU ===
+
+    // 1.5) Dim-Overlay NUR auf den Background anwenden (vor Overlays/Text)
+    // Quelle: globales Event setzt lokalen State 'dimBg' im Canvas
+    // -> beim Export lesen wir denselben State und legen ein halbtransparentes Schwarz darüber
+    // Hinweis: Eigene/Overlay-Bilder werden danach gezeichnet und sind NICHT mit abgedunkelt.
+    if (dimBg) {
+      exportCtx.save();
+      exportCtx.fillStyle = `rgba(0,0,0,${DIM_OVERLAY_OPACITY})`;
+      exportCtx.fillRect(0, 0, W, H);
+      exportCtx.restore();
+    }
 
     // Text (skip fully off-canvas)
     const sorted = [...textLayers].sort((a, b) => a.zIndex - b.zIndex);
@@ -1257,13 +1289,13 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const fullyOutside = right < 0 || left > W || bottom < 0 || top > H;
       if (fullyOutside) continue;
 
-      ctx.save();
+      exportCtx.save();
 
-      ctx.translate(layer.x, layer.y);
+      exportCtx.translate(layer.x, layer.y);
 
-      ctx.rotate((layer.rotation * Math.PI) / 180);
+      exportCtx.rotate((layer.rotation * Math.PI) / 180);
 
-      ctx.scale(scaleFactor, scaleFactor);
+      exportCtx.scale(scaleFactor, scaleFactor);
 
       const boxLeft = -layer.width / 2;
 
@@ -1283,16 +1315,16 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       const contentHeight = Math.max(0, layerHeight - 2 * PADDING);
 
-      ctx.font = `${italic ? "italic " : ""}${weight} ${BASE_FONT_PX}px ${layer.fontFamily}`;
+      exportCtx.font = `${italic ? "italic " : ""}${weight} ${BASE_FONT_PX}px ${layer.fontFamily}`;
 
-      (ctx as any).fontKerning = "normal";
+      (exportCtx as any).fontKerning = "normal";
 
-      ctx.fillStyle = layer.color;
+      exportCtx.fillStyle = layer.color;
 
-      ctx.textBaseline = "alphabetic";
+      exportCtx.textBaseline = "alphabetic";
 
       const lineHeightPx = BASE_FONT_PX * layer.lineHeight;
-      const sampleMetrics = ctx.measureText("Mg");
+      const sampleMetrics = exportCtx.measureText("Mg");
       const ascentEstimate =
         sampleMetrics.actualBoundingBoxAscent ?? BASE_FONT_PX * 0.72;
       const descentEstimate =
@@ -1338,18 +1370,18 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           fill,
         };
 
-        ctx.save();
-        ctx.fillStyle = fill;
+        exportCtx.save();
+        exportCtx.fillStyle = fill;
         drawRoundedRect(
-          ctx,
+          exportCtx,
           backgroundRect.x,
           backgroundRect.y,
           backgroundRect.width,
           backgroundRect.height,
           backgroundRect.radius,
         );
-        ctx.fill();
-        ctx.restore();
+        exportCtx.fill();
+        exportCtx.restore();
       }
 
       const outlineEnabled = (layer as any).outlineEnabled;
@@ -1419,10 +1451,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         Math.ceil(backgroundOverflowBottom + 1),
       );
 
-      ctx.save();
-      ctx.beginPath();
+      exportCtx.save();
+      exportCtx.beginPath();
 
-      ctx.rect(
+      exportCtx.rect(
         clipRect.x - clipMarginLeft,
 
         clipRect.y - clipMarginTop,
@@ -1432,7 +1464,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         clipRect.height + clipMarginTop + clipMarginBottom,
       );
 
-      ctx.clip();
+      exportCtx.clip();
 
       // Hilfsfunktionen
       const perGlyph = (
@@ -1444,7 +1476,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         let x = startX;
         for (const ch of text) {
           cb(ch, x, y);
-          x += ctx.measureText(ch).width + layer.letterSpacing;
+          x += exportCtx.measureText(ch).width + layer.letterSpacing;
         }
       };
 
@@ -1469,7 +1501,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
         const ox = off.getContext("2d")!;
 
-        ox.font = ctx.font;
+        ox.font = exportCtx.font;
 
         ox.textBaseline = "alphabetic";
 
@@ -1545,7 +1577,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
         ox.globalCompositeOperation = "source-over";
 
-        ctx.drawImage(
+        exportCtx.drawImage(
           off,
           -layer.width / 2 - offsetX,
           -layerHeight / 2 - offsetY,
@@ -1555,25 +1587,25 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const drawFillLine = (raw: string, yPos: number) => {
         const textW = Math.max(0, layer.width - 2 * PADDING);
         // Soft Shadow wie im Preview: "0 2px 8px rgba(0,0,0,0.8)"
-        ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.8)";
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 2;
-        ctx.shadowBlur = 8;
+        exportCtx.save();
+        exportCtx.shadowColor = "rgba(0,0,0,0.8)";
+        exportCtx.shadowOffsetX = 0;
+        exportCtx.shadowOffsetY = 2;
+        exportCtx.shadowBlur = 8;
         if (layer.letterSpacing === 0) {
           if (layer.align === "left") {
-            ctx.textAlign = "left";
-            ctx.fillText(raw, -layer.width / 2 + PADDING, yPos);
+            exportCtx.textAlign = "left";
+            exportCtx.fillText(raw, -layer.width / 2 + PADDING, yPos);
           } else if (layer.align === "right") {
-            ctx.textAlign = "right";
-            ctx.fillText(raw, -layer.width / 2 + PADDING + textW, yPos);
+            exportCtx.textAlign = "right";
+            exportCtx.fillText(raw, -layer.width / 2 + PADDING + textW, yPos);
           } else {
-            ctx.textAlign = "center";
-            ctx.fillText(raw, -layer.width / 2 + PADDING + textW / 2, yPos);
+            exportCtx.textAlign = "center";
+            exportCtx.fillText(raw, -layer.width / 2 + PADDING + textW / 2, yPos);
           }
         } else {
           let visualWidth = 0;
-          for (const ch of raw) visualWidth += ctx.measureText(ch).width;
+          for (const ch of raw) visualWidth += exportCtx.measureText(ch).width;
           if (raw.length > 1)
             visualWidth += layer.letterSpacing * (raw.length - 1);
           let startX: number;
@@ -1581,9 +1613,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           else if (layer.align === "right")
             startX = -layer.width / 2 + PADDING + textW - visualWidth;
           else startX = -layer.width / 2 + PADDING + (textW - visualWidth) / 2;
-          perGlyph((ch, x, yy) => ctx.fillText(ch, x, yy), raw, startX, yPos);
+          perGlyph((ch, x, yy) => exportCtx.fillText(ch, x, yy), raw, startX, yPos);
         }
-        ctx.restore();
+        exportCtx.restore();
       };
 
       for (const raw of lines) {
@@ -1595,8 +1627,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         y += lineHeightPx;
       }
 
-      ctx.restore();
-      ctx.restore();
+      exportCtx.restore();
+      exportCtx.restore();
     }
 
     // ➕ Overlays ins PNG rendern
@@ -1626,7 +1658,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         const img = new Image();
         img.onload = () => {
           try {
-            ctx.drawImage(img, left, top, w, h);
+            exportCtx.drawImage(img, left, top, w, h);
           } catch {}
           res();
         };
@@ -1636,10 +1668,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       });
     }
 
-    return new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error("toBlob failed"))),
-        "image/png",
+    return new Promise<Blob>((resolve, reject) => {
+      offscreenCanvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error("Export failed"))),
+        "image/png"
       );
     });
   }, [textLayers, imageUrl, scale, offset, overlayNodes, natSizeMap]);
@@ -1739,6 +1771,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       if (typeof (patch as any).fontWeight === "string") {
         const isBold = ((patch as any).fontWeight as string) === "bold";
         applyToActive((l) => ({ ...l, weight: isBold ? "bold" : "regular" }));
+      }
+      // Support direct 'weight' (needed for Bold button in toolbar)
+      if (typeof (patch as any).weight === "string") {
+        const w = (patch as any).weight as any;
+        applyToActive((l) => ({ ...l, weight: w === "bold" ? "bold" : "regular" }));
       }
       if (typeof (patch as any).fontStyle === "string") {
         const isItalic = ((patch as any).fontStyle as string) === "italic";
@@ -1859,6 +1896,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           <LegacyEditorToolbar
             onAddText={handleAddText}
             className="py-1 px-2"
+            onToggleDim={() => setDimBg((v) => !v)}
             selectedText={
               active
                 ? ({
@@ -2151,6 +2189,14 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             </>
           ) : (
             <div className="absolute inset-0 bg-black" />
+          )}
+
+                              {/* Per-slide dim overlay: liegt ÜBER dem Background <img>, aber UNTER allen Overlays/Text */}
+          {dimBg && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{ backgroundColor: `rgba(0,0,0,${DIM_OVERLAY_OPACITY})` }}
+            />
           )}
 
           {/* ➕ Overlay-Images (klick-selektierbar & dragbar)

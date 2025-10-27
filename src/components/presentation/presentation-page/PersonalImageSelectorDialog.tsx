@@ -54,11 +54,11 @@ export default function PersonalImageSelectorDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Meine Bilder</DialogTitle>
+          <DialogTitle>My Images</DialogTitle>
         </DialogHeader>
         <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="mine">Meine Bilder</TabsTrigger>
+            <TabsTrigger value="mine">My Images</TabsTrigger>
             <TabsTrigger value="upload">Upload</TabsTrigger>
           </TabsList>
 
@@ -72,14 +72,14 @@ export default function PersonalImageSelectorDialog({
                     "relative aspect-[4/5] overflow-hidden rounded-md border",
                     selectedUrl === img.url ? "ring-2 ring-primary border-primary" : "border-transparent"
                   )}
-                  aria-label="Bild auswählen"
+                  aria-label="Select image"
                 >
                   <img src={img.url} alt="" className="h-full w-full object-cover" />
                 </button>
               ))}
               {images.length === 0 && (
                 <div className="col-span-full text-center text-sm text-muted-foreground py-10">
-                  Noch keine Bilder hochgeladen.
+                  No images uploaded yet.
                 </div>
               )}
             </div>
@@ -89,14 +89,14 @@ export default function PersonalImageSelectorDialog({
             <div className="space-y-3">
               <Input type="file" multiple accept="image/*" onChange={(e) => setFiles(e.currentTarget.files)} />
               <Button onClick={onUpload} disabled={isUploading || !files || files.length === 0}>
-                {isUploading ? "Lade hoch..." : "Upload starten"}
+                {isUploading ? "Uploading..." : "Start upload"}
               </Button>
-              <p className="text-xs text-muted-foreground">Unterstützt JPG, PNG, WEBP. Max. mehrere Dateien.</p>
+              <p className="text-xs text-muted-foreground">Supported: JPG, PNG, WEBP. Multiple files allowed.</p>
             </div>
           </TabsContent>
         </Tabs>
         <DialogFooter>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>Abbrechen</Button>
+          <Button variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={() => selectedUrl && onConfirm(selectedUrl)} disabled={!selectedUrl}>
             Confirm
           </Button>

@@ -1,93 +1,86 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-**_ Begin Patch _**
-**_ Update File: src/canvas/legacy/SlideCanvasLegacy.tsx _**
+**_ Begin Patch
+_** Update File: src/canvas/LegacyEditorToolbar.tsx
 @@
--                      <div
--                        data-role="handle"
--                        title="Breite ändern (links)"
--                        className="absolute left-0 top-1/2 w-9 h-10 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
--                        style={{ pointerEvents: "auto" }}
--                        onPointerDown={(e) =>
--                          startResize(layer.id, "resize-left", e)
--                        }
--                      >
-+                      <div
-+                        data-role="handle"
-+                        title="Breite ändern (links)"
-+                        className="absolute left-0 top-1/2 w-12 h-24 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center z-[60]"
-+                        style={{ pointerEvents: "auto" }}
-+                        onPointerDown={(e) => {
-+                          e.stopPropagation();
-+                          startResize(layer.id, "resize-left", e);
-+                        }}
-+                      >
-                         <div className="h-16 w-[12px] rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
-                       </div>
-@@
--                      <div
--                        data-role="handle"
--                        title="Breite ändern (rechts)"
--                        className="absolute right-0 top-1/2 w-7 h-10 translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center"
--                        style={{ pointerEvents: "auto" }}
--                        onPointerDown={(e) =>
--                          startResize(layer.id, "resize-right", e)
--                        }
--                      >
-+                      <div
-+                        data-role="handle"
-+                        title="Breite ändern (rechts)"
-+                        className="absolute right-0 top-1/2 w-12 h-24 translate-x-1/2 -translate-y-1/2 cursor-ew-resize flex items-center justify-center z-[60]"
-+                        style={{ pointerEvents: "auto" }}
-+                        onPointerDown={(e) => {
-+                          e.stopPropagation();
-+                          startResize(layer.id, "resize-right", e);
-+                        }}
-+                      >
-                         <div className="h-16 w-[12px] rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
-                       </div>
-@@
--                      <div
--                        data-role="handle"
--                        title="Höhe (oben)"
--                        className="absolute top-0 left-1/2 w-10 h-7 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize flex items-center justify-center"
--                        style={{ pointerEvents: "auto" }}
--                        onPointerDown={(e) =>
--                          startResize(layer.id, "resize-top", e)
--                        }
--                      >
-+                      <div
-+                        data-role="handle"
-+                        title="Höhe (oben)"
-+                        className="absolute top-0 left-1/2 w-28 h-10 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize flex items-center justify-center z-[60]"
-+                        style={{ pointerEvents: "auto" }}
-+                        onPointerDown={(e) => {
-+                          e.stopPropagation();
-+                          startResize(layer.id, "resize-top", e);
-+                        }}
-+                      >
-                         <div className="h-[12px] w-16 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
-                       </div>
-@@
--                      <div
--                        data-role="handle"
--                        title="Höhe (unten)"
--                        className="absolute bottom-0 left-1/2 w-10 h-7 -translate-x-1/2 translate-y-1/2 cursor-ns-resize flex items-center justify-center"
--                        style={{ pointerEvents: "auto" }}
--                        onPointerDown={(e) =>
--                          startResize(layer.id, "resize-bottom", e)
--                        }
--                      >
-+                      <div
-+                        data-role="handle"
-+                        title="Höhe (unten)"
-+                        className="absolute bottom-0 left-1/2 w-28 h-10 -translate-x-1/2 translate-y-1/2 cursor-ns-resize flex items-center justify-center z-[60]"
-+                        style={{ pointerEvents: "auto" }}
-+                        onPointerDown={(e) => {
-+                          e.stopPropagation();
-+                          startResize(layer.id, "resize-bottom", e);
-+                        }}
-+                      >
-                         <div className="h-[12px] w-16 rounded bg-white border border-blue-500 shadow-sm pointer-events-none" />
-                       </div>
-**_ End Patch _**
+
+- // --- Feste Werte für Ein-Klick-Toggles (TikTok-Style) ---
+- const TIKTOK_OUTLINE_WIDTH = 6; // fixe Konturstärke
+
+* // --- Feste Werte für Ein-Klick-Toggles (TikTok-Style) ---
+* // Deutlich dicker für bessere Lesbarkeit (TikTok-typisch)
+* const TIKTOK_OUTLINE_WIDTH = 12; // fixe Konturstärke
+  @@
+
+-          {/* Background toggle (100% opacity) */}
+-          <Tooltip>
+-            <TooltipTrigger asChild>
+-              <Button
+-                variant="ghost"
+-                size="icon"
+-                aria-label="Text background"
+-                className={cn("h-9 w-9", selectedText?.bgEnabled && "bg-muted")}
+-                onClick={toggleBg}
+-              >
+-                <IconTextBackground className="h-4 w-4" />
+-              </Button>
+-            </TooltipTrigger>
+-            <TooltipContent>Text background</TooltipContent>
+-          </Tooltip>
+
+*          {/* Background toggle (100% opacity) */}
+*          <Tooltip>
+*            <TooltipTrigger asChild>
+*              <Button
+*                variant="ghost"
+*                size="icon"
+*                aria-label="Text background"
+*                // nicht deaktivieren – bei Klick wird Zustand am selektierten Text gesetzt
+*                className={cn("h-9 w-9", selectedText?.bgEnabled && "bg-muted")}
+*                onClick={() => {
+*                  if (!selectedText) return;
+*                  // 100% Opazität beim Aktivieren
+*                  onChangeSelectedText?.({
+*                    ...selectedText,
+*                    bgEnabled: !selectedText.bgEnabled,
+*                    bgOpacity: 1,
+*                  });
+*                }}
+*              >
+*                <IconTextBackground className="h-4 w-4" />
+*              </Button>
+*            </TooltipTrigger>
+*            <TooltipContent>Text background</TooltipContent>
+*          </Tooltip>
+  **_ End Patch
+  diff
+  Code kopieren
+  _** Begin Patch
+  \*\*\* Update File: src/canvas/legacy/SlideCanvasLegacy.tsx
+  @@
+
+-                          textShadow:
+-                            (layer as any).outlineEnabled &&
+-                            ((layer as any).outlineWidth || 0) > 0
+-                              ? buildOuterTextShadow(
+-                                  Math.round(
+-                                    ((layer as any).outlineWidth || 6) *
+-                                      layer.scale,
+-                                  ),
+-                                  (layer as any).outlineColor || "#000",
+-                                ) + ", 0 2px 8px rgba(0,0,0,0.8)"
+-                              : "0 2px 8px rgba(0,0,0,0.8)",
+
+*                          textShadow:
+*                            (layer as any).outlineEnabled &&
+*                            ((layer as any).outlineWidth || 0) > 0
+*                              ? buildOuterTextShadow(
+*                                  Math.round(
+*                                    // Fallback an TikTok-Outline-Breite angleichen
+*                                    ((layer as any).outlineWidth || 12) *
+*                                      layer.scale,
+*                                  ),
+*                                  (layer as any).outlineColor || "#000",
+*                                ) + ", 0 2px 8px rgba(0,0,0,0.8)"
+*                              : "0 2px 8px rgba(0,0,0,0.8)",
+  \*\*\* End Patch

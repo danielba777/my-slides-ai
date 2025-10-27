@@ -12,18 +12,26 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { SlideTextElement } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
-  AlignCenter,
-  AlignLeft,
-  AlignRight,
-  Check,
-  CheckIcon,
-  ChevronDown,
-  ChevronUp,
+
   Plus,
-} from "lucide-react";
+  Bold as LucideBold,
+  Italic as ItalicIcon,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Image as ImageIcon,
+  Check as CheckIcon,
+  ChevronDown,
+  ChevronUp
+  } from "lucide-react";
 import * as React from "react";
 import { useCallback } from "react";
 
@@ -42,6 +50,8 @@ type LegacyEditorToolbarProps = {
   ) => void;
   /** Callback zum Schließen der Toolbar */
   onClose?: () => void;
+  /** Toggle "Dim background" for the current slide (only BG image) */
+  onToggleDim?: () => void;
 };
 
 /**
@@ -57,6 +67,7 @@ function LegacyEditorToolbar({
   selectedText,
   onChangeSelectedText,
   onClose,
+  onToggleDim,
 }: LegacyEditorToolbarProps) {
   const handleAdd = useCallback(() => {
     if (onAddText) return onAddText();
@@ -76,7 +87,7 @@ function LegacyEditorToolbar({
     (selectedText as any)?.fontWeight ??
     (selectedText as any)?.weight ??
     "normal";
-  const isBold = hasSelection && selectedFontWeight === "bold";
+  const isBold = !!hasSelection && String(selectedFontWeight) === "bold";
   const selectedFontStyle =
     (selectedText as any)?.fontStyle ??
     ((selectedText as any)?.italic ? "italic" : "normal");
@@ -84,6 +95,11 @@ function LegacyEditorToolbar({
   const activeAlign = ((selectedText as any)?.align ??
     selectedText?.align ??
     "left") as "left" | "center" | "right";
+  const outlineEnabled =
+    (selectedText as any)?.strokeEnabled ??
+    (selectedText as any)?.outlineEnabled ??
+    ((selectedText as any)?.strokeWidth ?? 0) > 0;
+  const bgEnabled = !!selectedBackground && (selectedBackground.opacity ?? 0) > 0;
 
   React.useEffect(() => {
     if (!selectedBackground) {
@@ -153,6 +169,54 @@ function LegacyEditorToolbar({
     [commitBackground, hasSelection],
   );
 
+  // 🔁 Bold toggeln (an/aus) – Status in Button widerspiegeln
+  const toggleBold = () => {
+    if (!hasSelection) return;
+    const next =
+      String(selectedFontWeight) === "bold" ? "regular" : "bold";
+    onChangeSelectedText?.({ ...selectedText!, weight: next, fontWeight: next });
+  };
+  const setAlign = (a: "left" | "center" | "right") =>
+    onChangeSelectedText?.({ ...selectedText!, align: a });
+
+  // ✅ Schöne, klare Custom-Icons für Outline / Background (weißes „A")
+  const IconTextOutlineA = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" {...props}>
+      <defs>
+        <filter id="stroke" colorInterpolationFilters="sRGB">
+          <feMorphology operator="dilate" radius="1.2" in="SourceAlpha" result="DILATE"/>
+          <feColorMatrix type="matrix" values="
+             0 0 0 0 0
+             0 0 0 0 0
+             0 0 0 0 0
+             0 0 0 1 0" in="DILATE" result="BLACK"/>
+          <feMerge>
+            <feMergeNode in="BLACK"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+      <g filter="url(#stroke)">
+        <text x="12" y="16" textAnchor="middle" fontWeight="700" fontSize="14" fill="#fff">A</text>
+      </g>
+    </svg>
+  );
+  const IconTextBackgroundA = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" {...props}>
+      <rect x="3.5" y="6.5" width="17" height="11" rx="2.5" fill="currentColor" opacity="0.25"></rect>
+      <text x="12" y="15" textAnchor="middle" fontWeight="700" fontSize="14" fill="#fff">A</text>
+    </svg>
+  );
+
+  // --- Feste Werte für Ein-Klick-Toggles (TikTok-Style) ---
+  const TIKTOK_OUTLINE_WIDTH = 6; // fixe Konturstärke
+  const DEFAULT_OUTLINE_COLOR = "#000000";
+  const DEFAULT_TEXT_COLOR = "#ffffff";
+  const DEFAULT_BG_COLOR = "#000000";
+  const DEFAULT_BG_RADIUS = 14;
+  const DEFAULT_BG_PADDING = 12;
+
+
   return (
     <div
       className={cn(
@@ -162,7 +226,7 @@ function LegacyEditorToolbar({
       role="toolbar"
       aria-label="Canvas toolbar"
     >
-      {/* === Primärzeile: nur wichtigste Controls === */}
+      {/* === TikTok-Style: Add Text + Outline Toggle + Text BG Toggle === */}
       <div className="flex items-center justify-between gap-2 px-3 py-1.5">
         <div className="flex items-center gap-2">
           {/* Add text */}
@@ -176,123 +240,114 @@ function LegacyEditorToolbar({
             <Plus className="mr-1 h-4 w-4" /> Text
           </Button>
 
-          {/* Bold / Italic */}
+          {/* Text outline (toggle, unified styling) */}
           <Button
-            size="icon"
             variant="ghost"
-            disabled={!hasSelection}
-            aria-pressed={isBold}
-            className={cn(
-              "rounded-xl transition-colors",
-              isBold
-                ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-                : "hover:bg-muted",
-            )}
+            size="icon"
+            aria-label="Text outline"
+            aria-pressed={outlineEnabled}
+            className={cn("h-9 w-9", outlineEnabled && "bg-muted")}
             onClick={() => {
               if (!hasSelection) return;
-              commitBackground({}); // force rerender
-              onChangeSelectedText?.({
-                ...selectedText!,
-                fontWeight:
-                  (selectedText as any)?.fontWeight === "bold"
-                    ? "normal"
-                    : "bold",
-              });
+              const sw = (selectedText as any)?.strokeWidth ?? 0;
+              const enabled = sw > 0 || (selectedText as any)?.strokeEnabled || (selectedText as any)?.outlineEnabled;
+              if (enabled) {
+                onChangeSelectedText?.({
+                  ...selectedText!,
+                  strokeEnabled: false,
+                  outlineEnabled: false,
+                  strokeWidth: 0,
+                });
+              } else {
+                onChangeSelectedText?.({
+                  ...selectedText!,
+                  strokeEnabled: true,
+                  outlineEnabled: true,
+                  strokeWidth: Math.max(2, (selectedText as any)?.outlineWidth ?? (selectedText as any)?.strokeWidth ?? 4),
+                  stroke: (selectedText as any)?.stroke ?? "#000000",
+                });
+              }
             }}
+            title="Toggle text outline"
           >
-            <span className="font-bold text-base">B</span>
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            disabled={!hasSelection}
-            aria-pressed={isItalic}
-            className={cn(
-              "rounded-xl italic transition-colors",
-              isItalic
-                ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-                : "hover:bg-muted",
-            )}
-            onClick={() => {
-              if (!hasSelection) return;
-              onChangeSelectedText?.({
-                ...selectedText!,
-                fontStyle:
-                  (selectedText as any)?.fontStyle === "italic"
-                    ? "normal"
-                    : "italic",
-              });
-            }}
-          >
-            I
+            <IconTextOutlineA className="h-4 w-4" />
           </Button>
 
-          {/* Text-Ausrichtung */}
-          <div className="flex items-center gap-1 rounded-xl border px-1.5 py-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              disabled={!hasSelection}
-              aria-pressed={activeAlign === "left"}
-              className={cn(
-                "rounded-md transition-colors",
-                activeAlign === "left"
-                  ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-                  : "hover:bg-muted",
-              )}
-              onClick={() =>
-                hasSelection &&
-                onChangeSelectedText?.({
-                  ...selectedText!,
-                  align: "left",
-                })
-              }
+          {/* Text background (toggle, unified styling) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Text background"
+            aria-pressed={bgEnabled}
+            className={cn("h-9 w-9", bgEnabled && "bg-muted")}
+            onClick={() => {
+              if (!hasSelection) return;
+              const prev = selectedBackground ?? { color: "#000000", opacity: 0, paddingX: 12, paddingY: 12, radius: 16, lineOverlap: 0 };
+              const nextOpacity = (prev.opacity ?? 0) > 0 ? 0 : (prev.opacity ?? 0.55);
+              onChangeSelectedText?.({
+                ...selectedText!,
+                background: { ...prev, opacity: nextOpacity },
+              });
+            }}
+            title="Toggle text background"
+          >
+            <IconTextBackgroundA className="h-4 w-4" />
+          </Button>
+
+          {/* Bold (toggle) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Bold"
+            aria-pressed={isBold}
+            className={cn("h-9 w-9", isBold && "bg-muted")}
+            onClick={toggleBold}
+            title="Bold"
+          >
+            <LucideBold className="h-4 w-4" />
+          </Button>
+
+          {/* Text-Ausrichtung (kompakt als Overlay-Menü) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                disabled={!hasSelection}
+                className="rounded-xl px-2.5 py-1"
+                title="Text alignment"
+                aria-label="Text alignment"
+              >
+                {activeAlign === "left" && <AlignLeft className="h-4 w-4" />}
+                {activeAlign === "center" && <AlignCenter className="h-4 w-4" />}
+                {activeAlign === "right" && <AlignRight className="h-4 w-4" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              sideOffset={6}
+              className="z-[60] rounded-xl border bg-popover/95 backdrop-blur supports-backdrop-blur:bg-popover/75"
             >
-              <AlignLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              disabled={!hasSelection}
-              aria-pressed={activeAlign === "center"}
-              className={cn(
-                "rounded-md transition-colors",
-                activeAlign === "center"
-                  ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-                  : "hover:bg-muted",
-              )}
-              onClick={() =>
-                hasSelection &&
-                onChangeSelectedText?.({
-                  ...selectedText!,
-                  align: "center",
-                })
-              }
-            >
-              <AlignCenter className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              disabled={!hasSelection}
-              aria-pressed={activeAlign === "right"}
-              className={cn(
-                "rounded-md transition-colors",
-                activeAlign === "right"
-                  ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-                  : "hover:bg-muted",
-              )}
-              onClick={() =>
-                hasSelection &&
-                onChangeSelectedText?.({
-                  ...selectedText!,
-                  align: "right",
-                })
-              }
-            >
-              <AlignRight className="h-4 w-4" />
-            </Button>
-          </div>
+              <DropdownMenuItem
+                onClick={() => hasSelection && onChangeSelectedText?.({ ...selectedText!, align: "left" })}
+                className={cn("gap-2", activeAlign === "left" && "bg-muted")}
+              >
+                <AlignLeft className="h-4 w-4" /> Left
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => hasSelection && onChangeSelectedText?.({ ...selectedText!, align: "center" })}
+                className={cn("gap-2", activeAlign === "center" && "bg-muted")}
+              >
+                <AlignCenter className="h-4 w-4" /> Center
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => hasSelection && onChangeSelectedText?.({ ...selectedText!, align: "right" })}
+                className={cn("gap-2", activeAlign === "right" && "bg-muted")}
+              >
+                <AlignRight className="h-4 w-4" /> Right
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Done Button - rechts oben */}
@@ -310,7 +365,7 @@ function LegacyEditorToolbar({
         )}
       </div>
 
-      {/* Secondary row: "Advanced Options" */}
+      {/* Sekundärzeile: vereinfachte "Optionen" */}
       <div className="border-t px-3">
         <Collapsible>
           <CollapsibleTrigger asChild>
@@ -324,112 +379,14 @@ function LegacyEditorToolbar({
               <ChevronUp className="hidden h-4 w-4 data-[state=open]:block" />
             </Button>
           </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="flex flex-wrap items-center gap-3 py-3">
-              {/* === Gruppe: Texthintergrund (Padding, Rundung, Opazität, Farbe, Modus) === */}
-              <div className="flex items-center gap-4">
-                <MiniRange
-                  label="Padding"
-                  min={0}
-                  max={48}
-                  value={textBgPadding}
-                  onChange={(v) => {
-                    setTextBgPadding(v);
-                    commitBackground({ paddingX: v, paddingY: v });
-                  }}
-                />
-                <MiniRange
-                  label="Radius"
-                  min={0}
-                  max={64}
-                  value={textBgRadius}
-                  onChange={(v) => {
-                    setTextBgRadius(v);
-                    commitBackground({ radius: v });
-                  }}
-                />
-                <MiniRange
-                  label="Opacity"
-                  min={0}
-                  max={100}
-                  value={textBgOpacity}
-                  onChange={(v) => {
-                    setTextBgOpacity(v);
-                    commitBackground({ opacity: v / 100 });
-                  }}
-                />
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-muted-foreground">
-                    Background
-                  </span>
-                  <input
-                    type="color"
-                    value={textBgColor}
-                    onChange={(e) => {
-                      const c = e.currentTarget.value;
-                      setTextBgColor(c);
-                      commitBackground({ color: c });
-                    }}
-                    className="h-6 w-7 cursor-pointer rounded-md border border-border bg-background p-0.5"
-                  />
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="rounded-xl">
-                      Mode: {textBgMode === "block" ? "Block" : "Blob"}
-                      <ChevronDown className="ml-1 h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem
-                      role="menuitemradio"
-                      aria-checked={textBgMode === "block"}
-                      className={cn(
-                        "flex items-center justify-between",
-                        textBgMode === "block"
-                          ? "bg-muted font-medium text-foreground"
-                          : "",
-                      )}
-                      onClick={() => {
-                        setTextBgMode("block");
-                        commitBackground({ mode: "block" });
-                      }}
-                    >
-                      <span>Block</span>
-                      {textBgMode === "block" && (
-                        <Check aria-hidden className="ml-2 h-4 w-4" />
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      role="menuitemradio"
-                      aria-checked={textBgMode === "blob"}
-                      className={cn(
-                        "flex items-center justify-between",
-                        textBgMode === "blob"
-                          ? "bg-muted font-medium text-foreground"
-                          : "",
-                      )}
-                      onClick={() => {
-                        setTextBgMode("blob");
-                        commitBackground({ mode: "blob" });
-                      }}
-                    >
-                      <span>Blob</span>
-                      {textBgMode === "blob" && (
-                        <Check aria-hidden className="ml-2 h-4 w-4" />
-                      )}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
+          <CollapsibleContent className="mt-2 space-y-3">
+            <div className="flex flex-wrap items-center gap-4 py-1.5">
+              {/* Farben als gefüllte Swatches + größere Labels */}
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground">
-                  Text Color
-                </span>
+                <span className="text-sm text-muted-foreground min-w-[72px]">Text</span>
                 <input
                   type="color"
-                  value={(selectedText as any)?.fill ?? "#ffffff"}
+                  value={(selectedText as any)?.fill ?? DEFAULT_TEXT_COLOR}
                   onChange={(e) =>
                     hasSelection &&
                     onChangeSelectedText?.({
@@ -437,42 +394,52 @@ function LegacyEditorToolbar({
                       fill: e.currentTarget.value,
                     })
                   }
-                  className="h-6 w-7 cursor-pointer rounded-md border border-border bg-background p-0.5"
+                  className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
                 />
               </div>
-
-              <MiniRange
-                label="Stroke Width"
-                min={0}
-                max={20}
-                value={(selectedText as any)?.strokeWidth ?? 0}
-                onChange={(v) =>
-                  hasSelection &&
-                  onChangeSelectedText?.({
-                    ...selectedText!,
-                    strokeWidth: v,
-                    strokeEnabled: v > 0,
-                  })
-                }
-              />
-
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground">
-                  Stroke Color
-                </span>
+                <span className="text-sm text-muted-foreground min-w-[72px]">Background</span>
                 <input
                   type="color"
-                  value={(selectedText as any)?.stroke ?? "#000000"}
+                  value={textBgColor}
+                  onChange={(e) => {
+                    const c = e.currentTarget.value;
+                    setTextBgColor(c);
+                    commitBackground({ color: c, opacity: textBgOpacity });
+                  }}
+                  className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground min-w-[72px]">Outline</span>
+                <input
+                  type="color"
+                  value={(selectedText as any)?.stroke ?? DEFAULT_OUTLINE_COLOR}
                   onChange={(e) =>
                     hasSelection &&
                     onChangeSelectedText?.({
                       ...selectedText!,
                       stroke: e.currentTarget.value,
+                      strokeWidth:
+                        (selectedText as any)?.strokeWidth > 0
+                          ? (selectedText as any)?.strokeWidth
+                          : TIKTOK_OUTLINE_WIDTH,
+                      strokeEnabled: true,
                     })
                   }
-                  className="h-6 w-7 cursor-pointer rounded-md border border-border bg-background p-0.5"
+                  className="h-7 w-8 cursor-pointer rounded-md border border-border bg-background p-0.5"
                 />
               </div>
+
+                          <Button
+                variant="outline"
+                size="sm"
+                className="rounded-xl ml-auto"
+                title="Dim background"
+                onClick={onToggleDim ?? (() => window.dispatchEvent(new CustomEvent("canvas:toggle-dim")))}
+              >
+                Dim background
+              </Button>
             </div>
           </CollapsibleContent>
         </Collapsible>
