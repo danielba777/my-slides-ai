@@ -130,6 +130,10 @@ interface PresentationState {
   // Slide editing state
   editingSlideId: string | null;
   setEditingSlideId: (id: string | null) => void;
+
+  /** Edit-Mode für das persönliche Overlay-Bild auf einer Slide */
+  editingOverlaySlideId: string | null;
+  setEditingOverlaySlideId: (id: string | null) => void;
 }
 
 export const usePresentationState = create<PresentationState>((set) => ({
@@ -169,6 +173,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
   config: {},
   pendingInsertNode: null,
   editingSlideId: null,
+  editingOverlaySlideId: null,
 
   // Sidebar states
   isSidebarCollapsed: false,
@@ -189,6 +194,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
   setPendingInsertNode: (node) => set({ pendingInsertNode: node }),
   setConfig: (config) => set({ config }),
   setEditingSlideId: (id) => set({ editingSlideId: id }),
+  setEditingOverlaySlideId: (id) => set({ editingOverlaySlideId: id }),
   startRootImageGeneration: (slideId, query) =>
     set((state) => ({
       rootImageGeneration: {

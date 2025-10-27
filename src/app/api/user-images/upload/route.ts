@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
-import path from "node:path";
-import fs from "node:fs/promises";
 import { db } from "@/server/db";
+import { utapi } from "@/app/api/uploadthing/core";
+import { UTFile } from "uploadthing/server";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -16,23 +16,34 @@ export async function POST(req: Request) {
   }
 
   const userId = session.user.id;
-  const baseDir = path.join(process.cwd(), "public", "user-images", userId);
-  await fs.mkdir(baseDir, { recursive: true });
-
   const saved: { id: string; url: string }[] = [];
+
+  // ⬆️ Upload extern via UploadThing (analog zu euren Image/AI-Uploads)
+  //    Pro User gespeichert (DB filtert ohnehin per userId)
+  const utFiles: UTFile[] = [];
   for (const file of files) {
-    const arrayBuf = await file.arrayBuffer();
-    const buf = Buffer.from(arrayBuf);
-    const ext = (file.type?.split("/")[1] || "jpg").toLowerCase();
-    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const abs = path.join(baseDir, fileName);
-    await fs.writeFile(abs, buf);
-    const url = `/user-images/${userId}/${fileName}`;
+    const buf = new Uint8Array(await file.arrayBuffer());
+    // Dateiname präfixen (nur kosmetisch – der Storage-Key wird von UT verwaltet)
+    const safeName =
+      (file.name?.replace(/[^\w.\-]+/g, "_") || "image") +
+      "_" +
+      Date.now().toString();
+    utFiles.push(new UTFile([buf], `users_${userId}__personal__${safeName}`));
+  }
+
+  const uploads = await utapi.uploadFiles(utFiles);
+
+  for (const up of uploads) {
+    if (!up?.data?.ufsUrl) continue; // Falls ein einzelner Upload fehlschlägt, überspringen
     const rec = await db.userImage.create({
-      data: { userId, url },
+      data: { userId, url: up.data.ufsUrl },
       select: { id: true, url: true },
     });
     saved.push(rec);
+  }
+
+  if (saved.length === 0) {
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
   return NextResponse.json({ saved });
 }

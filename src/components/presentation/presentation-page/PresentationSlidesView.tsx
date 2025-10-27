@@ -23,6 +23,7 @@ import React, { memo, useEffect, useRef, useState } from "react";
 import { PresentModeHeader } from "../dashboard/PresentModeHeader";
 import { ThinkingDisplay } from "../dashboard/ThinkingDisplay";
 import { MultiSlideImageSelector } from "./MultiSlideImageSelector";
+import OverlayImageEditorLayer from "./OverlayImageEditorLayer";
 import { SingleSlideImageSelector } from "./SingleSlideImageSelector";
 import { SortableSlide } from "./SortableSlide";
 import StickyDownloadActions from "./StickyDownloadActions";
@@ -122,6 +123,7 @@ const SlideFrame = memo(function SlideFrame({
 
   // Edit-Modus State: nur wenn aktiv, wird die Toolbar angezeigt
   const { editingSlideId, setEditingSlideId } = usePresentationState();
+  const { editingOverlaySlideId, setEditingOverlaySlideId } = usePresentationState();
   const isEditingText = editingSlideId === slide.id;
   const [isHovering, setIsHovering] = useState(false);
   const [isImageSelectorOpen, setIsImageSelectorOpen] = useState(false);
@@ -154,6 +156,27 @@ const SlideFrame = memo(function SlideFrame({
       canvasRef.current?.clearTextFocus();
     }
   }, [isEditingText]);
+
+  // Wenn Overlay-Editmodus aktiv: sicherstellen, dass das persönliche Bild selektiert ist
+  useEffect(() => {
+    if (editingOverlaySlideId !== slide.id) return;
+    const { slides, setSlides } = usePresentationState.getState();
+    const updated = slides.slice();
+    const i = updated.findIndex((x) => x.id === slide.id);
+    if (i < 0) return;
+    const current = updated[i];
+    const c = (current.canvas ?? {
+      version: DEFAULT_CANVAS.version,
+      width: DEFAULT_CANVAS.width,
+      height: DEFAULT_CANVAS.height,
+      bg: DEFAULT_CANVAS.bg,
+      nodes: [],
+      selection: [],
+    }) as CanvasDoc;
+    if (c.selection?.includes("user-overlay-image")) return;
+    updated[i] = { ...current, canvas: { ...c, selection: ["user-overlay-image"] } };
+    setSlides(updated);
+  }, [editingOverlaySlideId, slide.id]);
 
   // Handler für die Bild-Auswahl
   const handleImageSelect = (imageUrl: string) => {
@@ -276,80 +299,133 @@ const SlideFrame = memo(function SlideFrame({
                   ref={canvasRef}
                   doc={docWithBg}
                   showToolbar={isEditingText}
-                  overlayContent={
-                    !isPresenting &&
-                    !isReadOnly &&
-                    isHovering &&
-                    !editingSlideId ? (
-                      <div className="relative flex flex-col h-full pointer-events-none">
-                        {/* Top Half: Edit Text */}
-                        <button
-                          onClick={() => {
-                            setEditingSlideId(slide.id);
-                            setIsHovering(false);
-                            // Focus first text element after a short delay
-                            setTimeout(() => {
-                              canvasRef.current?.focusFirstText();
-                            }, 100);
-                          }}
-                          className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
-                        >
-                          <Type aria-hidden className="h-6 w-6 text-white" />
-                          <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
-                            Edit Text
-                          </span>
-                        </button>
-                        {/* Bottom Half: Edit Image */}
-                        <button
-                          onClick={() => {
-                            if (slide.rootImage?.useGrid) {
-                              setIsMultiImageSelectorOpen(true);
-                            } else {
-                              setIsImageSelectorOpen(true);
-                            }
-                            setIsHovering(false);
-                          }}
-                          className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
-                        >
-                          <ImageIcon
-                            aria-hidden
-                            className="h-6 w-6 text-white"
-                          />
-                          <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
-                            {slide.rootImage?.useGrid
-                              ? "Edit Images"
-                              : "Edit Image"}
-                          </span>
-                        </button>
-                        {/* Toggle Button */}
-                        {slide.rootImage && (
-                          <button
-                            onClick={() => {
-                              toggleGridMode();
-                              setIsHovering(false);
-                            }}
-                            className="absolute bottom-4 right-4 flex items-center gap-2 bg-white/90 hover:bg-white text-gray-900 px-4 py-2 rounded-lg transition-all backdrop-blur-sm pointer-events-auto cursor-pointer shadow-lg"
-                          >
-                            {slide.rootImage.useGrid ? (
-                              <>
-                                <ImageIcon className="h-4 w-4" />
-                                <span className="text-sm font-semibold">
-                                  Single Image
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                <Grid2x2 className="h-4 w-4" />
-                                <span className="text-sm font-semibold">
-                                  4 Images
-                                </span>
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    ) : undefined
-                  }
+                  overlayContent={(() => {
+                    const showHover = !isPresenting && !isReadOnly && isHovering && !editingSlideId && editingOverlaySlideId !== slide.id;
+                    const inOverlayEdit = editingOverlaySlideId === slide.id;
+                    if (inOverlayEdit) {
+                      return (
+                        <>
+                          <div className="absolute left-0 right-0 top-0 z-[6] flex justify-center pt-3 pointer-events-none">
+                            <div className="flex gap-2 rounded-full bg-black/50 backdrop-blur-md px-2 py-1 pointer-events-auto">
+                              <button
+                                onClick={() => {
+                                  setEditingOverlaySlideId(null);
+                                  const { slides, setSlides } = usePresentationState.getState();
+                                  const updated = slides.slice();
+                                  const i = updated.findIndex((x) => x.id === slide.id);
+                                  if (i >= 0) {
+                                    const c = (updated[i].canvas ?? docWithBg) as CanvasDoc;
+                                    updated[i] = { ...updated[i], canvas: { ...c, selection: [] } };
+                                    setSlides(updated);
+                                  }
+                                }}
+                                className="flex items-center gap-2 rounded-full bg-emerald-500/90 hover:bg-emerald-500 text-white px-3 py-1.5 shadow"
+                                aria-label="Confirm"
+                                title="Confirm"
+                              >
+                                ✓
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const { slides, setSlides } = usePresentationState.getState();
+                                  const updated = slides.slice();
+                                  const i = updated.findIndex((x) => x.id === slide.id);
+                                  if (i >= 0) {
+                                    const cur = updated[i];
+                                    const c = (cur.canvas ?? docWithBg) as CanvasDoc;
+                                    const nodes = (c.nodes ?? []).filter(
+                                      (n: any) => !(n?.type === "image" && n?.id === "user-overlay-image"),
+                                    );
+                                    updated[i] = { ...cur, canvas: { ...c, nodes, selection: [] } };
+                                    setSlides(updated);
+                                  }
+                                  setEditingOverlaySlideId(null);
+                                }}
+                                className="flex items-center gap-2 rounded-full bg-red-500/90 hover:bg-red-500 text-white px-3 py-1.5 shadow"
+                                aria-label="Delete Image"
+                                title="Delete Image"
+                              >
+                                🗑
+                              </button>
+                            </div>
+                          </div>
+                          <OverlayImageEditorLayer slideId={slide.id} />
+                        </>
+                      );
+                    }
+                    if (showHover) {
+                      return (
+                        <div className="relative flex flex-col h-full pointer-events-none">
+                           {/* Top Half: Edit Text */}
+                           <button
+                             onClick={() => {
+                               setEditingSlideId(slide.id);
+                               setIsHovering(false);
+                               // Focus first text element after a short delay
+                               setTimeout(() => {
+                                 canvasRef.current?.focusFirstText();
+                               }, 100);
+                             }}
+                             className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
+                           >
+                             <Type aria-hidden className="h-6 w-6 text-white" />
+                             <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
+                               Edit Text
+                             </span>
+                           </button>
+                           {/* Bottom Half: Edit Image */}
+                           <button
+                             onClick={() => {
+                               if (slide.rootImage?.useGrid) {
+                                 setIsMultiImageSelectorOpen(true);
+                               } else {
+                                 setIsImageSelectorOpen(true);
+                               }
+                               setIsHovering(false);
+                             }}
+                             className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
+                           >
+                             <ImageIcon
+                               aria-hidden
+                               className="h-6 w-6 text-white"
+                             />
+                             <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
+                               {slide.rootImage?.useGrid
+                                 ? "Edit Images"
+                                 : "Edit Image"}
+                             </span>
+                           </button>
+                           {/* Toggle Button */}
+                           {slide.rootImage && (
+                             <button
+                               onClick={() => {
+                                 toggleGridMode();
+                                 setIsHovering(false);
+                               }}
+                               className="absolute bottom-4 right-4 flex items-center gap-2 bg-white/90 hover:bg-white text-gray-900 px-4 py-2 rounded-lg transition-all backdrop-blur-sm pointer-events-auto cursor-pointer shadow-lg"
+                             >
+                               {slide.rootImage.useGrid ? (
+                                 <>
+                                   <ImageIcon className="h-4 w-4" />
+                                   <span className="text-sm font-semibold">
+                                     Single Image
+                                   </span>
+                                 </>
+                               ) : (
+                                 <>
+                                   <Grid2x2 className="h-4 w-4" />
+                                   <span className="text-sm font-semibold">
+                                     4 Images
+                                   </span>
+                                 </>
+                               )}
+                             </button>
+                           )}
+                        </div>
+                      );
+                    }
+                    return undefined;
+                  })()}
                   onCloseToolbar={() => {
                     setEditingSlideId(null);
                     // Remove focus from text

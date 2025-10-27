@@ -21,6 +21,7 @@ import { GripVertical, Plus, Trash, Image as ImageIcon } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { SlideEditPopover } from "./SlideEditPopover";
 import PersonalImageSelectorDialog from "./PersonalImageSelectorDialog";
+import type { CanvasDoc } from "@/canvas/types";
 
 interface SlideContainerProps {
   children: React.ReactNode;
@@ -225,16 +226,78 @@ function PersonalImagePickerButton({ index }: { index: number }) {
   const [open, setOpen] = useState(false);
   const slides = usePresentationState((s) => s.slides);
   const setSlides = usePresentationState((s) => s.setSlides);
+  const setEditingOverlaySlideId = usePresentationState(
+    (s) => s.setEditingOverlaySlideId,
+  );
+
+  const ensureCanvas = (c?: CanvasDoc | null): CanvasDoc => {
+    return {
+      version: c?.version ?? 1,
+      width: c?.width ?? 1080,
+      height: c?.height ?? 1620,
+      bg: c?.bg ?? "#ffffff",
+      nodes: Array.isArray(c?.nodes) ? [...c!.nodes] : [],
+      selection: Array.isArray(c?.selection) ? [...(c!.selection as any[])] : [],
+      previewDataUrl: c?.previewDataUrl,
+    };
+  };
 
   const handleConfirm = (imageUrl: string) => {
     const updated = slides.slice();
     if (!updated[index]) return;
-    updated[index] = {
-      ...updated[index],
-      rootImage: { url: imageUrl, query: "" }, // zentriert via bestehender Canvas/RootImage-Logik
+
+    // ➕ Persönliches Bild als Overlay-Node (unter dem Text, über dem BG)
+    const slide = updated[index]!;
+    const canvas = ensureCanvas(slide.canvas as CanvasDoc | undefined);
+
+    // Entferne evtl. vorhandenes persönliches Bild (1 pro Slide)
+    const nodesWithoutOld = canvas.nodes.filter(
+      (n: any) => !(n?.type === "image" && n?.id === "user-overlay-image"),
+    );
+
+    // Vollflächig initialisieren (Cover/Contain handled der Legacy-Canvas bereits visuell)
+    const personalNode = {
+      id: "user-overlay-image",
+      type: "image" as const,
+      x: 0,
+      y: 0,
+      width: canvas.width,
+      height: canvas.height,
+      url: imageUrl,
     };
+
+    const nextCanvas: CanvasDoc = {
+      ...canvas,
+      nodes: [...nodesWithoutOld, personalNode],
+      // direkt vorselektieren, damit Drag/Zoom sofort funktioniert
+      selection: ["user-overlay-image"],
+    };
+
+    updated[index] = { ...slide, canvas: nextCanvas };
     setSlides(updated);
     setOpen(false);
+  };
+
+  const onMainButtonClick = () => {
+    const slide = slides[index];
+    if (!slide) return;
+    const c = slide.canvas as CanvasDoc | undefined;
+    const hasPersonal =
+      Array.isArray(c?.nodes) &&
+      c!.nodes.some((n: any) => n?.type === "image" && n?.id === "user-overlay-image");
+
+    if (hasPersonal) {
+      // Statt Dialog: in den Editmodus wechseln
+      const ensured = ensureCanvas(c);
+      const next: CanvasDoc = { ...ensured, selection: ["user-overlay-image"] };
+      const updated = slides.slice();
+      updated[index] = { ...slide, canvas: next };
+      setSlides(updated);
+      setEditingOverlaySlideId(slide.id);
+      return;
+    }
+    // Sonst Dialog öffnen
+    setOpen(true);
   };
 
   return (
@@ -243,9 +306,9 @@ function PersonalImagePickerButton({ index }: { index: number }) {
         variant="ghost"
         size="icon"
         className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
-        onClick={() => setOpen(true)}
-        aria-label="Persönliche Bilder"
-        title="Persönliche Bilder"
+        onClick={onMainButtonClick}
+        aria-label="Personal Images"
+        title="Personal Images"
       >
         <ImageIcon className="h-4 w-4" />
       </Button>
