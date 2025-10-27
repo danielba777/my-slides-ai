@@ -10,7 +10,6 @@ import {
   UserPen,
   type LucideIcon,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
 
 import {
@@ -94,14 +93,13 @@ const debugItems: SidebarItem[] = [
 ];
 
 export function AppSidebar() {
-  const { resolvedTheme } = useTheme();
   const pathname = usePathname();
 
   return (
     <Sidebar>
       <SidebarContent>
         <div className="flex justify-center items-center gap-2 py-4">
-          <AppLogo size={32} borderRadius={6} dark={resolvedTheme === "dark"} />
+          <AppLogo size={32} borderRadius={6} />
           <p className="text-lg font-bold">SlidesCockpit</p>
         </div>
 
