@@ -1,12 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AiAvatarPromptInput } from "@/components/dashboard/ai-avatars/PromptInput";
 import { AiAvatarTemplateGrid } from "@/components/dashboard/ai-avatars/TemplateGrid";
 import { Spinner } from "@/components/ui/spinner";
 import type { AiAvatarTemplate } from "@/types/ai-avatars";
+
+type GenerationJob = {
+  id: string;
+  startedAt: string;
+  expectedImages?: number;
+};
+
+const EXPECTED_GENERATION_BATCH_SIZE = 4;
 
 export default function AiAvatarDashboardPage() {
   const [prompt, setPrompt] = useState("");
@@ -17,16 +25,14 @@ export default function AiAvatarDashboardPage() {
   );
   const [isLoadingRecent, setIsLoadingRecent] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [pendingGenerations, setPendingGenerations] = useState<
+    Array<{ id: string; startedAt: number }>
+  >([]);
   const [activeTab, setActiveTab] = useState<"recent" | "templates">(
     "templates",
   );
 
-  useEffect(() => {
-    void loadTemplates();
-    void loadRecentCreations();
-  }, []);
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     try {
       setIsLoadingTemplates(true);
       const response = await fetch("/api/ai-avatars/templates");
@@ -41,9 +47,9 @@ export default function AiAvatarDashboardPage() {
     } finally {
       setIsLoadingTemplates(false);
     }
-  };
+  }, []);
 
-  const loadRecentCreations = async () => {
+  const loadRecentCreations = useCallback(async () => {
     try {
       setIsLoadingRecent(true);
       const response = await fetch("/api/ai-avatars/creations", {
@@ -67,7 +73,45 @@ export default function AiAvatarDashboardPage() {
     } finally {
       setIsLoadingRecent(false);
     }
-  };
+  }, []);
+
+  const fetchPendingJobs = useCallback(async () => {
+    try {
+      const response = await fetch("/api/ai-avatars/jobs", {
+        method: "GET",
+        cache: "no-store",
+      });
+      const data = (await response.json().catch(() => null)) as
+        | GenerationJob[]
+        | { error?: string }
+        | null;
+
+      if (!response.ok || !Array.isArray(data)) {
+        throw new Error("Failed to load generation jobs");
+      }
+
+      const placeholders: Array<{ id: string; startedAt: number }> = [];
+      data.forEach((job) => {
+        const startedAt = new Date(job.startedAt ?? Date.now()).getTime();
+        const count = Math.max(
+          job.expectedImages ?? EXPECTED_GENERATION_BATCH_SIZE,
+          1,
+        );
+        for (let index = 0; index < count; index += 1) {
+          placeholders.push({
+            id: `${job.id}-${index}`,
+            startedAt,
+          });
+        }
+      });
+
+      setPendingGenerations(placeholders);
+      return data;
+    } catch (error) {
+      console.error("Error loading generation jobs:", error);
+      return null;
+    }
+  }, []);
 
   const handleCopyPrompt = (value: string) => {
     setPrompt(value);
@@ -78,54 +122,111 @@ export default function AiAvatarDashboardPage() {
   };
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) {
+    const trimmedPrompt = prompt.trim();
+    if (!trimmedPrompt) {
       toast.error("Bitte gib einen Prompt ein");
       return;
     }
 
+    const startedAt = Date.now();
+    const tempPrefix = `pending-${startedAt}`;
+    const tempPlaceholders = Array.from(
+      { length: EXPECTED_GENERATION_BATCH_SIZE },
+      (_, index) => ({
+        id: `${tempPrefix}-${index}`,
+        startedAt,
+      }),
+    );
+
+    setPrompt("");
+    setActiveTab("recent");
+    setPendingGenerations((prev) => [...tempPlaceholders, ...prev]);
     setIsGenerating(true);
-    try {
-      const response = await fetch("/api/ai-avatars/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (
-        !response.ok ||
-        !Array.isArray(data?.images) ||
-        data.images.length === 0
-      ) {
-        throw new Error(data?.error || "Generation fehlgeschlagen");
-      }
+    void (async () => {
+      try {
+        const response = await fetch("/api/ai-avatars/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: trimmedPrompt }),
+        });
+        const data = (await response.json().catch(() => null)) as
+          | { job?: GenerationJob; error?: string }
+          | null;
 
-      const creations: AiAvatarTemplate[] = data.images;
-
-      setRecentCreations((prev) => {
-        const merged = [...creations, ...prev];
-        const seen = new Set<string>();
-        const deduped: AiAvatarTemplate[] = [];
-
-        for (const item of merged) {
-          if (!item?.id) continue;
-          if (seen.has(item.id)) continue;
-          seen.add(item.id);
-          deduped.push(item);
+        if (!response.ok || !data?.job?.id) {
+          throw new Error(
+            (data?.error as string | undefined) ??
+              "Generation konnte nicht gestartet werden",
+          );
         }
 
-        return deduped.slice(0, 18);
-      });
-      setActiveTab("recent");
-      toast.success("Avatar generiert");
-    } catch (error) {
-      console.error("Generation failed", error);
-      toast.error(
-        error instanceof Error ? error.message : "Generation fehlgeschlagen",
-      );
-    } finally {
-      setIsGenerating(false);
-    }
+        const jobStartedAt = new Date(data.job.startedAt ?? Date.now()).getTime();
+        const expectedImages = Math.max(
+          data.job.expectedImages ?? EXPECTED_GENERATION_BATCH_SIZE,
+          1,
+        );
+
+        const jobPlaceholders = Array.from({ length: expectedImages }, (_, index) => ({
+          id: `${data.job!.id}-${index}`,
+          startedAt: jobStartedAt,
+        }));
+
+        setPendingGenerations((prev) => {
+          const filtered = prev.filter(
+            (item) => !item.id.startsWith(`${tempPrefix}-`),
+          );
+          const merged = [...jobPlaceholders, ...filtered];
+          const unique = new Map<string, { id: string; startedAt: number }>();
+          merged.forEach((item) => {
+            if (!unique.has(item.id)) {
+              unique.set(item.id, item);
+            }
+          });
+          return Array.from(unique.values());
+        });
+
+        toast.info("Avatar-Generierung gestartet");
+        void fetchPendingJobs();
+      } catch (error) {
+        console.error("Generation failed to start", error);
+        setPendingGenerations((prev) =>
+          prev.filter((item) => !item.id.startsWith(`${tempPrefix}-`)),
+        );
+        toast.error(
+          error instanceof Error ? error.message : "Generation fehlgeschlagen",
+        );
+      }
+    })();
+    setIsGenerating(false);
   };
+
+  useEffect(() => {
+    void loadTemplates();
+    void loadRecentCreations();
+    void fetchPendingJobs();
+  }, [loadTemplates, loadRecentCreations, fetchPendingJobs]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void fetchPendingJobs();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [fetchPendingJobs]);
+
+  const previousPendingCount = useRef(0);
+
+  useEffect(() => {
+    if (
+      previousPendingCount.current > 0 &&
+      pendingGenerations.length === 0
+    ) {
+      void loadRecentCreations();
+    }
+    previousPendingCount.current = pendingGenerations.length;
+  }, [pendingGenerations.length, loadRecentCreations]);
 
   const templatesCountLabel = useMemo(
     () => `${templates.length} Template${templates.length === 1 ? "" : "s"}`,
@@ -181,7 +282,9 @@ export default function AiAvatarDashboardPage() {
         <div className="px-6">
           {activeTab === "recent" && (
             <div className="mt-4">
-              {isLoadingRecent ? (
+              {isLoadingRecent &&
+              recentCreations.length === 0 &&
+              pendingGenerations.length === 0 ? (
                 <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed">
                   <Spinner className="h-6 w-6" />
                 </div>
@@ -189,6 +292,7 @@ export default function AiAvatarDashboardPage() {
                 <AiAvatarTemplateGrid
                   templates={recentCreations}
                   showOpenInNewTab
+                  loadingPlaceholders={pendingGenerations}
                 />
               )}
             </div>
@@ -212,4 +316,3 @@ export default function AiAvatarDashboardPage() {
       </div>
     </div>
   );
-}

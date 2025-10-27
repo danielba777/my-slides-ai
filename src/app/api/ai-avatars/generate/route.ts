@@ -6,6 +6,23 @@ const API_BASE = "https://api.302.ai";
 const GENERATE_ENDPOINT = `${API_BASE}/higgsfield/text2image_soul`;
 const FETCH_ENDPOINT = (id: string) =>
   `${API_BASE}/higgsfield/task/${encodeURIComponent(id)}/fetch`;
+const EXPECTED_GENERATION_BATCH_SIZE = 4;
+
+type ImageResult = { minUrl?: string; rawUrl?: string };
+type PersistedImage = {
+  id: string;
+  prompt: string;
+  imageUrl: string;
+  rawImageUrl?: string | null;
+  createdAt: string;
+  jobId?: string | null;
+};
+
+type GenerationJobResponse = {
+  id: string;
+  startedAt: string;
+  expectedImages: number;
+};
 
 export async function POST(request: Request) {
   try {
@@ -20,6 +37,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
+    const trimmedPrompt = prompt.trim();
     const apiKey = process.env["302AI_KEY"];
     if (!apiKey) {
       return NextResponse.json(
@@ -28,16 +46,67 @@ export async function POST(request: Request) {
       );
     }
 
-    const payload = {
-      quality: "basic",
-      aspect_ratio: "2:3",
-      prompt: prompt.trim(),
-      negative_prompt: "",
-      enhance_prompt: false,
-      seed: 38459,
-      style_id: "1cb4b936-77bf-4f9a-9039-f3d349a4cdbe",
-    };
+    const job = await createGenerationJob({
+      prompt: trimmedPrompt,
+      expectedImages: EXPECTED_GENERATION_BATCH_SIZE,
+      userId: session.user.id,
+    });
 
+    if (!job?.id) {
+      throw new Error("Failed to create generation job");
+    }
+
+    void processGenerationJob({
+      externalApiKey: apiKey,
+      jobId: job.id,
+      prompt: trimmedPrompt,
+      expectedImages: job.expectedImages ?? EXPECTED_GENERATION_BATCH_SIZE,
+      userId: session.user.id,
+    });
+
+    return NextResponse.json({
+      success: true,
+      job: {
+        id: job.id,
+        startedAt: job.startedAt,
+        expectedImages: job.expectedImages ?? EXPECTED_GENERATION_BATCH_SIZE,
+      },
+    });
+  } catch (error) {
+    console.error("AI avatar generation failed to start", error);
+    return NextResponse.json(
+      { error: "Failed to initiate avatar generation" },
+      { status: 500 },
+    );
+  }
+}
+
+async function processGenerationJob({
+  externalApiKey,
+  jobId,
+  prompt,
+  expectedImages,
+  userId,
+}: {
+  externalApiKey: string;
+  jobId: string;
+  prompt: string;
+  expectedImages: number;
+  userId: string;
+}) {
+  const randomSeed = Math.floor(Math.random() * 1_000_000);
+
+  const payload = {
+    quality: "basic",
+    aspect_ratio: "2:3",
+    prompt,
+    negative_prompt: "",
+    enhance_prompt: false,
+    seed: randomSeed,
+    style_id: "1cb4b936-77bf-4f9a-9039-f3d349a4cdbe",
+  };
+
+  try {
     console.debug("[AI Avatar] Sending generation request", {
       url: GENERATE_ENDPOINT,
       payload,
@@ -46,7 +115,7 @@ export async function POST(request: Request) {
     const jobResponse = await fetch(GENERATE_ENDPOINT, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${externalApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
@@ -58,15 +127,17 @@ export async function POST(request: Request) {
         status: jobResponse.status,
         jobJson,
       });
-      return NextResponse.json(
-        { error: "Failed to start avatar generation", detail: jobJson },
-        { status: jobResponse.status || 502 },
-      );
+      await updateGenerationJobStatus(jobId, "FAILED", {
+        errorMessage:
+          (jobJson?.message as string | undefined) ??
+          "Failed to start avatar generation",
+      });
+      return;
     }
 
-    const fetchResult = await pollForResult(jobJson.id, apiKey);
+    const fetchResult = await pollForResult(jobJson.id, externalApiKey);
 
-    const persistedImages = [];
+    let persistedCount = 0;
     for (const image of fetchResult.images) {
       const sourceUrl = image.rawUrl ?? image.minUrl;
       if (!sourceUrl) {
@@ -78,33 +149,33 @@ export async function POST(request: Request) {
       }
 
       const saved = await persistGeneratedImage({
-        prompt: prompt.trim(),
+        prompt,
         sourceUrl,
         rawImageUrl: image.rawUrl ?? null,
-        userId: session.user.id,
+        userId,
+        jobId,
       });
-      persistedImages.push(saved);
+      if (saved?.id) {
+        persistedCount += 1;
+      }
     }
 
-    if (persistedImages.length === 0) {
-      return NextResponse.json(
-        { error: "No generated images could be stored" },
-        { status: 502 },
-      );
+    if (persistedCount === 0) {
+      await updateGenerationJobStatus(jobId, "FAILED", {
+        errorMessage: "No generated images could be stored",
+      });
+      return;
     }
 
-    return NextResponse.json({
-      success: true,
-      id: jobJson.id,
-      images: persistedImages,
-      raw: fetchResult.raw,
+    await updateGenerationJobStatus(jobId, "COMPLETED", {
+      expectedImages,
     });
   } catch (error) {
-    console.error("AI avatar generation failed", error);
-    return NextResponse.json(
-      { error: "Failed to generate avatar" },
-      { status: 500 },
-    );
+    console.error("[AI Avatar] Generation job failed", error);
+    await updateGenerationJobStatus(jobId, "FAILED", {
+      errorMessage:
+        error instanceof Error ? error.message : "Generation job failed",
+    });
   }
 }
 
@@ -153,15 +224,6 @@ async function pollForResult(id: string, apiKey: string) {
   }
 }
 
-type ImageResult = { minUrl?: string; rawUrl?: string };
-type PersistedImage = {
-  id: string;
-  prompt: string;
-  imageUrl: string;
-  rawImageUrl?: string | null;
-  createdAt: string;
-};
-
 function extractImages(data: any): ImageResult[] {
   if (!data) return [];
 
@@ -191,16 +253,87 @@ function extractImages(data: any): ImageResult[] {
   return fallback ? [{ minUrl: fallback }] : [];
 }
 
+async function createGenerationJob({
+  prompt,
+  expectedImages,
+  userId,
+}: {
+  prompt: string;
+  expectedImages: number;
+  userId: string;
+}): Promise<GenerationJobResponse | null> {
+  const response = await fetch(
+    `${env.SLIDESCOCKPIT_API}/ai-avatars/generations/jobs`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": userId,
+      },
+      body: JSON.stringify({
+        prompt,
+        expectedImages,
+      }),
+    },
+  );
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || !data) {
+    console.error("[AI Avatar] Failed to create generation job", {
+      status: response.status,
+      data,
+    });
+    throw new Error("Failed to create generation job");
+  }
+
+  return data as GenerationJobResponse;
+}
+
+async function updateGenerationJobStatus(
+  jobId: string,
+  status: "COMPLETED" | "FAILED",
+  payload: { errorMessage?: string; expectedImages?: number },
+) {
+  try {
+    const response = await fetch(
+      `${env.SLIDESCOCKPIT_API}/ai-avatars/generations/jobs/${jobId}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status,
+          errorMessage: payload.errorMessage,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      console.error("[AI Avatar] Failed to update job status", {
+        status: response.status,
+        data,
+      });
+    }
+  } catch (error) {
+    console.error("[AI Avatar] Error updating job status", error);
+  }
+}
+
 async function persistGeneratedImage({
   prompt,
   sourceUrl,
   rawImageUrl,
   userId,
+  jobId,
 }: {
   prompt: string;
   sourceUrl: string;
   rawImageUrl: string | null;
   userId: string;
+  jobId: string;
 }): Promise<PersistedImage> {
   const response = await fetch(`${env.SLIDESCOCKPIT_API}/ai-avatars/generations`, {
     method: "POST",
@@ -212,6 +345,7 @@ async function persistGeneratedImage({
       prompt,
       sourceUrl,
       rawImageUrl,
+      jobId,
     }),
   });
 

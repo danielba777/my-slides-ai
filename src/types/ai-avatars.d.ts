@@ -4,4 +4,5 @@ export type AiAvatarTemplate = {
   imageUrl: string;
   rawImageUrl?: string;
   createdAt: string;
+  jobId?: string | null;
 };
