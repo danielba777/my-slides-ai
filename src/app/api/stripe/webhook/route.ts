@@ -129,28 +129,40 @@ export async function POST(req: Request) {
         const periodStart = sub.current_period_start ? new Date(sub.current_period_start * 1000) : new Date();
         const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : dateFromUnixOrFallback(null);
 
-        await db.subscription.upsert({
-          where: { stripeSubscriptionId: sub.id },
-          create: {
-            userId: user.id,
-            stripeSubscriptionId: sub.id,
-            stripePriceId: priceId ?? null,
-            status: (sub.status as string).toUpperCase() as any,
-            currentPeriodEnd: periodEnd,
-          },
-          update: {
-            stripePriceId: priceId ?? null,
-            status: (sub.status as string).toUpperCase() as any,
-            currentPeriodEnd: periodEnd,
-          },
-        });
+        await db.$transaction(async (tx) => {
+          const dbUser = await tx.user.findUnique({
+            where: { id: user.id },
+            select: { plan: true, planSince: true },
+          });
+          const oldPlan = dbUser?.plan ?? null;
 
-        await db.user.update({
-          where: { id: user.id },
-          data: { plan, planSince: user.plan ? user.planSince : periodStart, planRenewsAt: periodEnd },
-        });
+          await tx.subscription.upsert({
+            where: { stripeSubscriptionId: sub.id },
+            create: {
+              userId: user.id,
+              stripeSubscriptionId: sub.id,
+              stripePriceId: priceId ?? null,
+              status: (sub.status as string).toUpperCase() as any,
+              currentPeriodEnd: periodEnd,
+            },
+            update: {
+              stripePriceId: priceId ?? null,
+              status: (sub.status as string).toUpperCase() as any,
+              currentPeriodEnd: periodEnd,
+            },
+          });
 
-              // Credits NICHT hart zurcksetzen  Umstellung wird bei Invoice korrigiert.
+          await carryOverCreditsOnPlanChange(tx, user.id, oldPlan, plan, periodEnd);
+
+          await tx.user.update({
+            where: { id: user.id },
+            data: {
+              plan,
+              planSince: oldPlan ? (dbUser?.planSince ?? periodStart) : periodStart,
+              planRenewsAt: periodEnd,
+            },
+          });
+        });
         break;
       }
 
@@ -275,4 +287,5 @@ export async function POST(req: Request) {
     );
   }
 }
+
 

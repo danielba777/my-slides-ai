@@ -15,23 +15,14 @@ export function planFromPrice(priceId?: string): Plan | undefined {
 }
 
 export async function normalizeCreditBalance(tx: typeof db, userId: string): Promise<CreditBalance | null> {
-  console.debug("[billing] normalizeCreditBalance:start", { userId });
   const records = await tx.creditBalance.findMany({
     where: { userId },
     orderBy: { updatedAt: "desc" },
   });
-  console.debug("[billing] normalizeCreditBalance:records", { userId, count: records.length });
   if (records.length === 0) return null;
   if (records.length === 1) return records[0]!;
 
   const latest = records[0]!;
-  console.warn("[billing] normalizeCreditBalance:dedupe", {
-    userId,
-    keepCredits: latest.credits,
-    keepAi: latest.aiCredits,
-    keepUsed: latest.usedCredits,
-    keepUsedAi: latest.usedAiCredits,
-  });
   await tx.creditBalance.deleteMany({ where: { userId } });
   const normalized = await tx.creditBalance.create({
     data: {
@@ -43,12 +34,10 @@ export async function normalizeCreditBalance(tx: typeof db, userId: string): Pro
       resetsAt: latest.resetsAt,
     },
   });
-  console.debug("[billing] normalizeCreditBalance:result", { userId, balanceId: normalized.userId, credits: normalized.credits, aiCredits: normalized.aiCredits });
   return normalized;
 }
 
 export async function getUsageLimits(userId: string) {
-  console.debug("[billing] getUsageLimits:start", { userId });
   return await db.$transaction(async (tx) => {
     const [sub, rawBal] = await Promise.all([
       tx.subscription.findFirst({
@@ -60,20 +49,6 @@ export async function getUsageLimits(userId: string) {
     let bal = rawBal;
 
     const plan = sub?.plan ?? null;
-    console.debug("[billing] ensureAndConsumeCredits:subscription", {
-      userId,
-      hasSub: !!sub,
-      plan,
-      status: sub?.status,
-      periodEnd: sub?.currentPeriodEnd,
-    });
-    console.debug("[billing] getUsageLimits:subscription", {
-      userId,
-      hasSub: !!sub,
-      plan,
-      status: sub?.status,
-      periodEnd: sub?.currentPeriodEnd,
-    });
     const allowances = plan ? PLAN_CREDITS[plan] : null;
     const unlimitedSlides = !!allowances && allowances.credits < 0;
     const unlimitedAi = !!allowances && allowances.ai < 0;
@@ -91,13 +66,10 @@ export async function getUsageLimits(userId: string) {
         updates.aiCredits = allowances.ai;
       }
       if (Object.keys(updates).length > 0) {
-        console.debug("[billing] getUsageLimits:updateSentinels", { userId, updates });
         bal = await tx.creditBalance.update({
           where: { userId },
           data: updates,
         });
-      } else {
-        console.debug("[billing] getUsageLimits:noSentinelChange", { userId });
       }
     }
 
@@ -126,7 +98,6 @@ export async function getUsageLimits(userId: string) {
     }
 
     const result = { plan, unlimited: unlimitedSlides, slidesLeft, aiLeft };
-    console.debug("[billing] getUsageLimits:end", { userId, result });
     return result;
   });
 }
@@ -235,11 +206,10 @@ export async function ensureAndConsumeCredits(userId: string, args: ConsumeArgs)
 }
 
 /**
- * Hartes Zurcksetzen/Neuaufsetzen der CreditBalance anhand eines Ziel-Plans.
- * - Downgrade: used=0, left = neues Kontingent
- * - Upgrade:   used bleibt, left = neuesKontingent - used (>=0)
- * - Wechsel Free <-> Paid wird ebenfalls korrekt abgebildet
- * Es wird bewusst deletecreate benutzt, damit keine Altwerte/Resets hngen bleiben.
+ * Rewrites the credit balance for a target plan.
+ * - Downgrade: usage reset to 0
+ * - Upgrade:   usage carried over and remaining = new quota - used
+ * - Unlimited: stored as sentinel -1 with usage reset
  */
 export async function carryOverCreditsOnPlanChange(
   tx: typeof db,
@@ -281,9 +251,9 @@ export async function carryOverCreditsOnPlanChange(
     (oldPlan && PLAN_CREDITS[oldPlan].credits > 0) &&
     (PLAN_CREDITS[oldPlan].credits > PLAN_CREDITS[newPlan].credits);
 
-  // Bisher used" robuster bestimmen:
-  // a) Falls wir echte used*-Zhler haben, nimm diese
-  // b) Andernfalls aus Left ableiten (nur wenn alter Plan endlich war)
+  // Determine used values in a robust way:
+  // a) Prefer stored used counters if present
+  // b) Otherwise derive from remaining credits when the old plan was finite
   const inferredUsedSlides = Number.isFinite(newTotalSlides)
     ? (prevUsedSlides || (oldPlan && oldPlan !== "UNLIMITED" && PLAN_CREDITS[oldPlan].credits >= 0 && prevLeftSlidesFinite != null
         ? Math.max(0, PLAN_CREDITS[oldPlan].credits - prevLeftSlidesFinite)
@@ -295,41 +265,37 @@ export async function carryOverCreditsOnPlanChange(
         : 0))
     : 0;
 
-  let nextLeftSlides: number;
-  let nextUsedSlides: number;
-  let nextLeftAi: number;
-  let nextUsedAi: number;
+  const finiteSlideQuota = Number.isFinite(newTotalSlides) ? (newTotalSlides as number) : null;
+  const finiteAiQuota    = Number.isFinite(newTotalAi)     ? (newTotalAi as number)     : null;
 
-  if (isUnlimited) {
-    // Unlimited slides: keep sentinel for credits and reuse plan AI quota
-    nextLeftSlides = Number.POSITIVE_INFINITY;
-    nextUsedSlides = 0;
-    nextLeftAi     = target.ai < 0 ? Number.POSITIVE_INFINITY : target.ai;
-    nextUsedAi     = 0;
-  } else if (isDowngrade) {
-    // Downgrade: Verbrauch zurcksetzen
-    nextLeftSlides = Number.isFinite(newTotalSlides) ? newTotalSlides as number : 0;
-    nextUsedSlides = 0;
-    nextLeftAi     = Number.isFinite(newTotalAi) ? newTotalAi as number : 0;
-    nextUsedAi     = 0;
-  } else {
-    // Gleichbleibend oder Upgrade: used bleibt
-    nextUsedSlides = Math.max(0, inferredUsedSlides);
-    nextLeftSlides = Number.isFinite(newTotalSlides)
-      ? Math.max(0, (newTotalSlides as number) - nextUsedSlides)
-      : Number.POSITIVE_INFINITY;
+  let nextUsedSlides = Math.max(0, inferredUsedSlides);
+  if (finiteSlideQuota != null) {
+    nextUsedSlides = Math.min(finiteSlideQuota, nextUsedSlides);
+  }
+  let nextLeftSlides = finiteSlideQuota != null
+    ? Math.max(0, finiteSlideQuota - nextUsedSlides)
+    : Number.POSITIVE_INFINITY;
 
-    nextUsedAi = Math.max(0, inferredUsedAi);
-    nextLeftAi = Number.isFinite(newTotalAi)
-      ? Math.max(0, (newTotalAi as number) - nextUsedAi)
-      : Number.POSITIVE_INFINITY;
+  let nextUsedAi = Math.max(0, inferredUsedAi);
+  if (finiteAiQuota != null) {
+    nextUsedAi = Math.min(finiteAiQuota, nextUsedAi);
+  }
+  let nextLeftAi = finiteAiQuota != null
+    ? Math.max(0, finiteAiQuota - nextUsedAi)
+    : Number.POSITIVE_INFINITY;
+
+  if (isDowngrade) {
+    nextUsedSlides = 0;
+    nextLeftSlides = finiteSlideQuota != null ? finiteSlideQuota : Number.POSITIVE_INFINITY;
+    nextUsedAi = 0;
+    nextLeftAi = finiteAiQuota != null ? finiteAiQuota : Number.POSITIVE_INFINITY;
   }
 
   // Persist cleaned balance row
-  const storedCredits = Number.isFinite(nextLeftSlides)
+  const storedCredits = finiteSlideQuota != null
     ? Math.max(0, Math.trunc(nextLeftSlides))
     : -1;
-  const storedAiCredits = Number.isFinite(nextLeftAi)
+  const storedAiCredits = finiteAiQuota != null
     ? Math.max(0, Math.trunc(nextLeftAi))
     : -1;
 
