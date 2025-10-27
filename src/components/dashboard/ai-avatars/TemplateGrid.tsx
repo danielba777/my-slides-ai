@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import type { AiAvatarTemplate } from "@/types/ai-avatars";
-import { Copy } from "lucide-react";
+import { useState } from "react";
 
 type TemplateGridProps = {
   templates: AiAvatarTemplate[];
@@ -14,6 +14,7 @@ const ROWS = 3;
 const TOTAL_CELLS = COLUMNS * ROWS;
 
 export function AiAvatarTemplateGrid({ templates, onCopy }: TemplateGridProps) {
+  const [addedId, setAddedId] = useState<string | null>(null);
   const visibleTemplates = templates.slice(0, TOTAL_CELLS);
   const placeholders = Math.max(TOTAL_CELLS - visibleTemplates.length, 0);
 
@@ -33,12 +34,18 @@ export function AiAvatarTemplateGrid({ templates, onCopy }: TemplateGridProps) {
             <div className="absolute inset-x-0 bottom-0 p-3">
               <Button
                 variant="outline"
-                size="sm"
-                className="w-full gap-2 rounded-xl bg-background/80 text-xs font-medium backdrop-blur"
-                onClick={() => onCopy(template.prompt)}
+                size="default"
+                className="w-full gap-2 rounded-full bg-white text-zinc-900 text-lg font-medium hover:bg-zinc-100"
+                onClick={() => {
+                  onCopy?.(template.prompt);
+                  setAddedId(template.id);
+                  setTimeout(
+                    () => setAddedId((id) => (id === template.id ? null : id)),
+                    1500,
+                  );
+                }}
               >
-                <Copy className="h-3.5 w-3.5" />
-                Get Prompt
+                {addedId === template.id ? "Added!" : "Copy Prompt"}
               </Button>
             </div>
           ) : null}
