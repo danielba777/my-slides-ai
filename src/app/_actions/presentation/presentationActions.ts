@@ -4,6 +4,7 @@ import { type PlateSlide } from "@/components/presentation/utils/parser";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { type InputJsonValue } from "@prisma/client/runtime/library";
+import { ensureAndConsumeCredits } from "@/server/billing";
 
 export async function createPresentation({
   content,
@@ -31,6 +32,8 @@ export async function createPresentation({
   const userId = session.user.id;
 
   try {
+    // Wichtig: Vor dem Anlegen einen Slideshow-Credit atomar verbrauchen
+    await ensureAndConsumeCredits(userId, { kind: "slide", cost: 1 });
     const presentation = await db.baseDocument.create({
       data: {
         type: "PRESENTATION",

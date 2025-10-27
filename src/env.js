@@ -14,6 +14,15 @@ export const env = createEnv({
     GOOGLE_CLIENT_ID: z.string(),
     GOOGLE_CLIENT_SECRET: z.string(),
     UNSPLASH_ACCESS_KEY: z.string(),
+    // ─── Stripe (für Checkout, Webhooks, Plan-Mapping) ───────────────────────
+    STRIPE_SECRET_KEY: z.string().min(1, "Missing STRIPE_SECRET_KEY"),
+    STRIPE_WEBHOOK_SECRET: z.string().min(1, "Missing STRIPE_WEBHOOK_SECRET"),
+    STRIPE_PRICE_STARTER: z.string().min(1, "Missing STRIPE_PRICE_STARTER"),
+    STRIPE_PRICE_GROWTH: z.string().min(1, "Missing STRIPE_PRICE_GROWTH"),
+    STRIPE_PRICE_SCALE: z.string().min(1, "Missing STRIPE_PRICE_SCALE"),
+    STRIPE_PRICE_UNLIMITED: z.string().min(1, "Missing STRIPE_PRICE_UNLIMITED"),
+    // optional (nur falls irgendwo im Client gebraucht wird → besser als NEXT_PUBLIC_* anlegen)
+    STRIPE_PUBLISHABLE_KEY: z.string().optional(),
     NEXTAUTH_URL: z.preprocess(
       (str) => process.env.VERCEL_URL ?? str,
       process.env.VERCEL ? z.string() : z.string().url(),
@@ -37,6 +46,14 @@ export const env = createEnv({
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     SLIDESCOCKPIT_API: process.env.SLIDESCOCKPIT_API,
+    // Stripe
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    STRIPE_PRICE_STARTER: process.env.STRIPE_PRICE_STARTER,
+    STRIPE_PRICE_GROWTH: process.env.STRIPE_PRICE_GROWTH,
+    STRIPE_PRICE_SCALE: process.env.STRIPE_PRICE_SCALE,
+    STRIPE_PRICE_UNLIMITED: process.env.STRIPE_PRICE_UNLIMITED,
+    STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
   },
 
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

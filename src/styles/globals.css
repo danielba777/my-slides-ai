@@ -145,3 +145,13 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Smooth scrolling for anchor links */
+html {
+  scroll-behavior: smooth;
+}
+
+/* If you have a fixed navbar, this helps with margin-offset when scrolling */
+[id] {
+  scroll-margin-top: 96px; /* adjust to your navbar height */
+}

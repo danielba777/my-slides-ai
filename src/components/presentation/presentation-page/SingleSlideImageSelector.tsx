@@ -441,7 +441,7 @@ export function SingleSlideImageSelector({
       <DialogContent
         className="
      !max-w-none                 /* überschreibt jedes max-w aus dem Component-Default */
-     w-[96vw] md:w-[1200px] lg:w-[1400px] xl:w-[1600px] 2xl:w-[1760px]
+     w-[96vw] md:w-[70vw]
      h-[85vh] max-h-[85vh]
      p-0 overflow-hidden flex flex-col
      rounded-2xl shadow-xl border border-border/30
