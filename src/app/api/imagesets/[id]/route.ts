@@ -1,3 +1,4 @@
+import { auth } from "@/server/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 const API_BASE_URL = process.env.SLIDESCOCKPIT_API || "http://localhost:3000";
@@ -8,7 +9,16 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const response = await fetch(`${API_BASE_URL}/imagesets/${id}`);
+    const session = await auth();
+    const headers: Record<string, string> = {};
+    if (session?.user?.id) {
+      headers["x-user-id"] = session.user.id;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/imagesets/${id}`, {
+      headers,
+      cache: "no-store",
+    });
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
@@ -26,9 +36,17 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
+    const session = await auth();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (session?.user?.id) {
+      headers["x-user-id"] = session.user.id;
+    }
+
     const response = await fetch(`${API_BASE_URL}/imagesets/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(body),
     });
     const data = await response.json();
@@ -47,8 +65,15 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    const session = await auth();
+    const headers: Record<string, string> = {};
+    if (session?.user?.id) {
+      headers["x-user-id"] = session.user.id;
+    }
+
     const response = await fetch(`${API_BASE_URL}/imagesets/${id}`, {
       method: "DELETE",
+      headers,
     });
     const data = await response.json();
     return NextResponse.json(data);

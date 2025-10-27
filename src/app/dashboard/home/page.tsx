@@ -19,6 +19,7 @@ import {
   Images,
   PlayIcon,
   SlidersHorizontal,
+  User,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -475,24 +476,38 @@ export default function DashboardHome() {
     <div className="flex h-full w-full flex-col items-center justify-center px-10 py-12">
       <AppLogo size={72} borderRadius={15} />
 
-      <div className="text-center flex flex-col items-center gap-8 mt-2">
+      <div className="text-center flex flex-col items-center gap-8 mt-4">
         <h1 className="text-3xl font-semibold">What are you creating today?</h1>
 
-        <Link
-          href="/dashboard/slideshows"
-          className="flex h-auto w-max flex-col items-start gap-3 rounded-md bg-white p-4 text-foreground ring-1 ring-border transition hover:bg-accent/80 hover:text-accent-foreground"
-        >
-          <Images className="h-7 w-7 text-blue-500" />
-          <span className="flex flex-col items-start leading-tight">
-            <span className="text-lg font-medium">Slideshows</span>
-            <span className="text-base text-muted-foreground">
-              Create slideshows
+        <div className="flex gap-4">
+          <Link
+            href="/dashboard/slideshows"
+            className="flex h-auto w-[220px] flex-col items-start gap-3 rounded-xl bg-white p-4 text-foreground transition hover:bg-accent/80 hover:text-accent-foreground shadow-md"
+          >
+            <Images className="h-7 w-7 text-blue-500" />
+            <span className="flex flex-col items-start leading-tight">
+              <span className="text-lg font-medium">Slideshows</span>
+              <span className="text-base text-muted-foreground">
+                Create slideshows
+              </span>
             </span>
-          </span>
-        </Link>
+          </Link>
+          <Link
+            href="/dashboard/ai-avatars"
+            className="flex h-auto w-[220px] flex-col items-start gap-3 rounded-xl bg-white p-4 text-foreground transition hover:bg-accent/80 hover:text-accent-foreground shadow-md"
+          >
+            <User className="h-7 w-7 text-blue-500" />
+            <span className="flex flex-col items-start leading-tight">
+              <span className="text-lg font-medium">AI Avatars</span>
+              <span className="text-base text-muted-foreground">
+                Custom AI UGC Avatars
+              </span>
+            </span>
+          </Link>
+        </div>
       </div>
 
-      <section className="flex w-full max-w-7xl flex-col gap-6">
+      <section className="flex w-full max-w-7xl flex-col gap-6 mt-8">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-left">
             <h2 className="text-2xl font-semibold">
@@ -569,17 +584,17 @@ export default function DashboardHome() {
                 type="button"
                 key={post.id}
                 onClick={() => openPostModal(post.id)}
-                className="group relative overflow-hidden rounded-xl border bg-muted/30 text-left transition hover:border-primary hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="group relative block aspect-[2/3] w-full overflow-hidden rounded-xl border bg-muted/30 text-left transition hover:border-primary hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 aria-label="Slideshow ansehen"
               >
                 {post.imageUrl ? (
                   <img
                     src={post.imageUrl}
                     alt="Slideshow preview"
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                    className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
                   />
                 ) : (
-                  <div className="flex h-full min-h-[128px] items-center justify-center bg-muted text-sm text-muted-foreground">
+                  <div className="absolute inset-0 flex items-center justify-center bg-muted text-sm text-muted-foreground">
                     Keine Vorschau
                   </div>
                 )}

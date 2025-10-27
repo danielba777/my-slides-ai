@@ -20,7 +20,6 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
 
 interface SidebarItem {
@@ -64,14 +63,13 @@ const avatarItems: SidebarItem[] = [
 ];
 
 export function AdminSidebar() {
-  const { resolvedTheme } = useTheme();
   const pathname = usePathname();
 
   return (
     <Sidebar>
       <SidebarContent>
         <div className="flex items-center justify-center gap-2 py-4">
-          <AppLogo size={32} dark={resolvedTheme === "dark"} />
+          <AppLogo size={32} />
           <p className="text-lg font-bold">SlidesCockpit</p>
         </div>
 
