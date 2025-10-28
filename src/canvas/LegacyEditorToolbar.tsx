@@ -320,20 +320,21 @@ function LegacyEditorToolbar({
                 (selectedText as any)?.stroke ??
                 (selectedText as any)?.outlineColor ??
                 TIKTOK_OUTLINE_COLOR;
+              const idPatch = selectedText?.id
+                ? { id: selectedText.id }
+                : {};
               if (outlineEnabled) {
                 onChangeSelectedText?.({
-                  ...selectedText!,
+                  ...idPatch,
                   strokeEnabled: false,
                   outlineEnabled: false,
                   strokeWidth: 0,
-                  outlineWidth: TIKTOK_OUTLINE_WIDTH,
-                  stroke: currentColor,
-                  outlineColor: currentColor,
+                  outlineWidth: 0,
                 });
                 return;
               }
               onChangeSelectedText?.({
-                ...selectedText!,
+                ...idPatch,
                 strokeEnabled: true,
                 outlineEnabled: true,
                 strokeWidth: TIKTOK_OUTLINE_WIDTH,

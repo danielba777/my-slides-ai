@@ -82,7 +82,8 @@ const BASE_FONT_PX = 72;
 // Zusätzlicher Puffer für Descender (z. B. g, y, p, q, j), damit beim Export nichts abgeschnitten wird
 const DESCENT_PAD = Math.ceil(BASE_FONT_PX * 0.25); // ~25 % der Basis-Fonthöhe
 // Mindestabstand zwischen Textboxen (skaliert leicht mit Basisgröße)
-const MIN_TEXT_GAP = Math.max(1, Math.round(BASE_FONT_PX * 0.03));
+// halbierter Gap, damit die Boxen dichter beieinander liegen (User-Wunsch)
+const MIN_TEXT_GAP = Math.max(1, Math.round(BASE_FONT_PX * 0.015));
 
 // Feste Opazität für das globale Abdunkeln (lesbarer TikTok-Look)
 const DIM_OVERLAY_OPACITY = 0.28; // muss mit Preview übereinstimmen

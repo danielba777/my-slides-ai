@@ -1,16 +1,99 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-1. Outline-Button/-Farbe tut nichts → Mapping robust machen
-
-Datei: src/canvas/SlideCanvasAdapter.tsx
-Änderung: Mapping aus der Toolbar-Payload erweitert (unterstützt jetzt auch outlineColor/outlineWidth) und typo-freie Spreads, damit Klicks auf den Kontur-Button und Farb-Picker sofort wirken.
-
-\*\*\* a/src/canvas/SlideCanvasAdapter.tsx
---- b/src/canvas/SlideCanvasAdapter.tsx
+**_ a/src/canvas/legacy/SlideCanvasLegacy.tsx
+--- b/src/canvas/legacy/SlideCanvasLegacy.tsx
 @@
-const handleToolbarPatch = useCallback(
-(patch: Partial<SlideTextElement>) => {
+// Mindestabstand zwischen Textboxen (skaliert leicht mit Basisgröße)
+-const MIN_TEXT_GAP = Math.max(1, Math.round(BASE_FONT_PX _ 0.03));
++// halbierter Gap, damit die Boxen dichter beieinander liegen (User-Wunsch)
++const MIN*TEXT_GAP = Math.max(1, Math.round(BASE_FONT_PX * 0.015));
+diff
+Code kopieren
+\_** a/src/canvas/LegacyEditorToolbar.tsx
+--- b/src/canvas/LegacyEditorToolbar.tsx
 @@
+
+-              onChangeSelectedText?.({
+-                .selectedText!,
+
+*              onChangeSelectedText?.({
+*                ...selectedText!,
+                   strokeEnabled: true,
+                   outlineEnabled: true,
+                   strokeWidth: TIKTOK_OUTLINE_WIDTH,
+                   outlineWidth: TIKTOK_OUTLINE_WIDTH,
+                   stroke: currentColor,
+                   outlineColor: currentColor,
+                 });
+  @@
+
+-              if (bgEnabled) {
+
+*              if (bgEnabled) {
+                 setTextBgOpacity(0);
+
+-                onChangeSelectedText?.({
+-                  ...selectedText!,
+
+*                onChangeSelectedText?.({
+*                  ...selectedText!,
+                     background: {
+                       ...(selectedBackground ?? {}),
+                       opacity: 0,
+                       enabled: false,
+                       paddingX: TIKTOK_BACKGROUND_PADDING,
+  @@
+  const nextBackground = {
+  enabled: true,
+  mode: TIKTOK_BACKGROUND_MODE,
+  color: nextColor,
+  opacity: TIKTOK_BACKGROUND_OPACITY,
+  paddingX: TIKTOK_BACKGROUND_PADDING,
+  paddingY: TIKTOK_BACKGROUND_PADDING,
+  radius: TIKTOK_BACKGROUND_RADIUS,
+  lineOverlap: selectedBackground?.lineOverlap ?? 0,
+  } as SlideTextElement["background"];
+
+-              onChangeSelectedText?.({
+-                .selectedText!,
+
+*              onChangeSelectedText?.({
+*                ...selectedText!,
+                   background: nextBackground,
+                 });
+  diff
+  Code kopieren
+  \*\*\* a/src/canvas/SlideCanvasAdapter.tsx
+  --- b/src/canvas/SlideCanvasAdapter.tsx
+  @@
+  import type { SlideTextElement } from "@/lib/types";
+  +import {
+* TIKTOK_OUTLINE_COLOR,
+* TIKTOK_OUTLINE_WIDTH,
+  +} from "@/canvas/tiktokDefaults";
+  @@
+  const handleToolbarPatch = useCallback(
+  (patch: Partial<SlideTextElement>) => {
+  // 1) Hintergrund
+  if (patch.background) {
+  applyToActive((l) => {
+  @@
+  return { ...l, background: nextBackground };
+  });
+  }
+  // 2) Typografie / Layout
+  if (typeof patch.lineHeight === "number") {
+
+-        applyToActive((l) => ({ ...l, lineHeight: patch.lineHeight! }));
+
+*        applyToActive((l) => ({ ...l, lineHeight: patch.lineHeight! }));
+       }
+       if (typeof patch.letterSpacing === "number") {
+
+-        applyToActive((l) => ({ ...l, letterSpacing: patch.letterSpacing! }));
+
+*        applyToActive((l) => ({ ...l, letterSpacing: patch.letterSpacing! }));
+       }
 
 -      if (patch.align) {
 -        applyToActive((l) => ({ .l, align: patch.align as any }));
@@ -19,7 +102,15 @@ const handleToolbarPatch = useCallback(
 *      if (patch.align) {
 *        applyToActive((l) => ({ ...l, align: patch.align as any }));
 *      }
-  @@
+       // Toolbar liefert "fontSize" → mappen auf scale (BASE_FONT_PX * scale)
+       if (
+         typeof (patch as any).fontSize === "number" &&
+         Number.isFinite((patch as any).fontSize)
+       ) {
+         const nextScale = Math.max(
+           0.2,
+           Math.min(4, (patch as any).fontSize / BASE_FONT_PX),
+         );
 
 -        applyToActive((l) => ({ .l, scale: nextScale }));
 
@@ -34,36 +125,26 @@ const handleToolbarPatch = useCallback(
 
 *        applyToActive((l) => ({ ...l, color: c }));
        }
+
+       // === Outline/Stroke Mapping robust machen ===
+
+*      // width-Änderung
        if (typeof (patch as any).strokeWidth === "number") {
          const w = (patch as any).strokeWidth as number;
-         applyToActive((l: any) => ({
 
+-        applyToActive((l: any) => ({
 -          .l,
+-          outlineEnabled: w > 0,
+-          outlineWidth: w,
+-        }));
 
+*        applyToActive((l: any) => ({
 *          ...l,
-           outlineEnabled: w > 0,
-           outlineWidth: w,
-         }));
+*          outlineEnabled: w > 0,
+*          outlineWidth: w,
+*        }));
        }
-       if (typeof (patch as any).stroke === "string") {
-         const c = (patch as any).stroke as string;
-         applyToActive((l: any) => ({
-
--          .l,
-
-*          ...l,
-           outlineEnabled: true,
-           outlineColor: c,
-           outlineWidth:
-
--            l.
-
-*            l.outlineWidth && l.outlineWidth > 0
-*              ? l.outlineWidth
-*              : TIKTOK_OUTLINE_WIDTH,
-         }));
-       }
-*      // Explizite Keys direkt unterstützen (falls die Toolbar sie sendet)
+*      // explizite outlineWidth
 *      if (typeof (patch as any).outlineWidth === "number") {
 *        const w = (patch as any).outlineWidth as number;
 *        applyToActive((l: any) => ({
@@ -72,6 +153,31 @@ const handleToolbarPatch = useCallback(
 *          outlineWidth: w,
 *        }));
 *      }
+*      // Farbänderung
+       if (typeof (patch as any).stroke === "string") {
+         const c = (patch as any).stroke as string;
+
+-        applyToActive((l: any) => ({
+-          .l,
+-          outlineEnabled: true,
+-          outlineColor: c,
+-          outlineWidth:
+-            l.outlineWidth && l.outlineWidth > 0
+-              ? l.outlineWidth
+-              : TIKTOK_OUTLINE_WIDTH,
+-        }));
+
+*        applyToActive((l: any) => ({
+*          ...l,
+*          outlineEnabled: true,
+*          outlineColor: c,
+*          outlineWidth:
+*            l.outlineWidth && l.outlineWidth > 0
+*              ? l.outlineWidth
+*              : TIKTOK_OUTLINE_WIDTH,
+*        }));
+       }
+*      // explizite outlineColor
 *      if (typeof (patch as any).outlineColor === "string") {
 *        const c = (patch as any).outlineColor as string;
 *        applyToActive((l: any) => ({
@@ -84,96 +190,41 @@ const handleToolbarPatch = useCallback(
 *              : TIKTOK_OUTLINE_WIDTH,
 *        }));
 *      }
-  @@
-
--      if (typeof (patch as any).fontStyle === "string") {
--        const isItalic = ((patch as any).fontStyle as string) === "italic";
--        applyToActive((l: any) => ({ .l, italic: isItalic }));
--      }
-
-*      if (typeof (patch as any).fontStyle === "string") {
-*        const isItalic = ((patch as any).fontStyle as string) === "italic";
-*        applyToActive((l: any) => ({ ...l, italic: isItalic }));
+*      // explizite Toggles (kommen vom Toolbar-Button)
+*      if (typeof (patch as any).outlineEnabled === "boolean") {
+*        const en = (patch as any).outlineEnabled as boolean;
+*        applyToActive((l: any) => ({
+*          ...l,
+*          outlineEnabled: en,
+*          outlineWidth: en
+*            ? l.outlineWidth && l.outlineWidth > 0
+*              ? l.outlineWidth
+*              : TIKTOK_OUTLINE_WIDTH
+*            : 0,
+*          outlineColor: l.outlineColor ?? TIKTOK_OUTLINE_COLOR,
+*        }));
 *      }
+*      if (typeof (patch as any).strokeEnabled === "boolean") {
+*        const en = (patch as any).strokeEnabled as boolean;
+*        applyToActive((l: any) => ({
+*          ...l,
+*          outlineEnabled: en,
+*          outlineWidth: en
+*            ? l.outlineWidth && l.outlineWidth > 0
+*              ? l.outlineWidth
+*              : TIKTOK_OUTLINE_WIDTH
+*            : 0,
+*          outlineColor: l.outlineColor ?? TIKTOK_OUTLINE_COLOR,
+*        }));
+*      }
+
+       if (typeof (patch as any).fontStyle === "string") {
+         const isItalic = ((patch as any).fontStyle as string) === "italic";
+
+-        applyToActive((l: any) => ({ .l, italic: isItalic }));
+
+*        applyToActive((l: any) => ({ ...l, italic: isItalic }));
+       }
   },
   [applyToActive],
   );
-
-Verweise im Code: Toolbar sendet stroke/outlineColor/… (siehe Toolbar-Colorpicker und Toggle), Preview & Export lesen outlineEnabled/outlineWidth/outlineColor und reagieren sofort (Text-Shadow/Canvas-Stroke).
-
-codebase
-
-codebase
-
-codebase
-
-codebase
-
-codebase
-
-2. Mehrere generierte Textboxen überlappen → Mindestabstand automatisch erzwingen
-
-Datei: src/canvas/legacy/SlideCanvasLegacy.tsx
-Änderung: Ein kleiner, deterministischer Layout-Pass nach Änderungen an textLayers, der die Boxen nach y sortiert und nach unten schiebt, wenn sie sich schneiden. Nutzt vorhandene height (Auto-Height ist bereits implementiert).
-
-_\*\* a/src/canvas/legacy/SlideCanvasLegacy.tsx
---- b/src/canvas/legacy/SlideCanvasLegacy.tsx
-@@
-const BASE_FONT_PX = 72;
-// Zusätzlicher Puffer für Descender (z. B. g, y, p, q, j), damit beim Export nichts abgeschnitten wird
-const DESCENT_PAD = Math.ceil(BASE_FONT_PX _ 0.25); // ~25 % der Basis-Fonthöhe
-+// Mindestabstand zwischen Textboxen (skaliert leicht mit Basisgröße)
-+const MIN_TEXT_GAP = Math.max(8, Math.round(BASE_FONT_PX \* 0.18));
-@@
-const [dimBg, setDimBg] = React.useState(false);
-@@
-const applyToActive = (updater: (l: TextLayer) => TextLayer) => {
-const id = getActiveId();
-if (!id) return;
-setTextLayers((prev) => prev.map((l) => (l.id === id ? updater(l) : l)));
-};
-
--
-- /\*\*
-- - Verhindert Überlappungen vertikal benachbarter Text-Layer.
-- - Annahmen:
-- - - Rotation ~ 0 (gilt bei uns)
-- - - width/height sind gesetzt (Auto-Height ist bereits berechnet)
-- \*/
-- const enforceMinVerticalSpacing = useCallback((layers: TextLayer[]) => {
-- const next = [...layers].sort((a, b) => a.y - b.y);
-- for (let i = 1; i < next.length; i++) {
--      const prev = next[i - 1];
--      const cur = next[i];
--      // Nur Text-Layer betrachten
--      // (bei dir sind es hier ohnehin Text-Layer in diesem Array)
--      const prevTop = prev.y - (prev.height ?? 0) / 2;
--      const prevBottom = prev.y + (prev.height ?? 0) / 2;
--      const curTop = cur.y - (cur.height ?? 0) / 2;
--      const neededTop = prevBottom + MIN_TEXT_GAP;
--      if (curTop < neededTop) {
--        const curHalf = (cur.height ?? 0) / 2;
--        const newY = neededTop + curHalf;
--        cur.y = Math.round(newY);
--      }
-- }
-- // ursprüngliche Reihenfolge zurückgeben, aber mit aktualisierten y
-- const map = new Map(next.map((l) => [l.id, l.y]));
-- return layers.map((l) => (map.has(l.id) ? { ...l, y: map.get(l.id)! } : l));
-- }, []);
--
-- // Wenn Text-Layer entstehen/ändern (z. B. 4 Prompts → 4 Boxen),
-- // gleiche automatisch vertikal auf Abstand aus.
-- useEffect(() => {
-- setTextLayers((prev) => {
--      if (!prev || prev.length <= 1) return prev;
--      return enforceMinVerticalSpacing(prev);
-- });
-- }, [enforceMinVerticalSpacing, /* Trigger bei Layout-Änderungen: */ textLayers.length]);
-  @@
-  const setTextColor = (color: string) => {
-  applyToActive((l) => ({ ...l, color }));
-  };
-  const setOutlineColor = (color: string) => {
-  applyToActive((l) => ({ ...l, outlineEnabled: true, outlineColor: color }));
-  };

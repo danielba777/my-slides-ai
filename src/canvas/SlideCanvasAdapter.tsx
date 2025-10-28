@@ -14,6 +14,10 @@ import {
   useMemo,
   useRef,
 } from "react";
+import {
+  TIKTOK_OUTLINE_COLOR,
+  TIKTOK_OUTLINE_WIDTH,
+} from "./tiktokDefaults";
 
 type ExtendedCanvasTextNode = CanvasTextNode & {
   fontSize?: number;
