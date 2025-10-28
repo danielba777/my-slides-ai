@@ -1,6 +1,7 @@
 "use client";
 
 import { SidebarAccountSection } from "@/components/app-sidebar-account";
+import { SidebarUsageSummary } from "@/components/app-sidebar-usage";
 import { AppLogo } from "@/components/logo/AppLogo";
 import {
   Sidebar,
@@ -139,7 +140,8 @@ export function AdminSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="space-y-3">
+        <SidebarUsageSummary />
         <SidebarAccountSection />
       </SidebarFooter>
     </Sidebar>

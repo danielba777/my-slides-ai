@@ -202,9 +202,6 @@ export function PresentationDashboard({
               {canGenerate ? "Generate" : "Upgrade Now"}
             </Button>
           </div>
-          <div className="text-xs text-muted-foreground">
-            {limits?.unlimited ? "Usage: unlimited" : `Usage: ${limits?.slidesLeft ?? 0} left`}
-          </div>
         </div>
         </div>
       </div>

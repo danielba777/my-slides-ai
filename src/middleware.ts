@@ -1,10 +1,12 @@
 import { auth } from "@/server/auth";
+import { env } from "@/env";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
   const session = await auth();
   const isAuthPage = request.nextUrl.pathname.startsWith("/auth");
   const path = request.nextUrl.pathname;
+  const isAdminPath = path.startsWith("/admin");
 
   // If user is on auth page but already signed in, redirect to home page
   if (isAuthPage && session) {
@@ -28,6 +30,19 @@ export async function middleware(request: NextRequest) {
         request.url,
       ),
     );
+  }
+
+  if (isAdminPath) {
+    const allowedEmails = env.ADMIN_ALLOWED_EMAILS
+      ? env.ADMIN_ALLOWED_EMAILS.split(",")
+          .map((email) => email.trim().toLowerCase())
+          .filter(Boolean)
+      : [];
+
+    const userEmail = session?.user?.email?.toLowerCase();
+    if (!userEmail || !allowedEmails.includes(userEmail)) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
   }
 
   return NextResponse.next();
