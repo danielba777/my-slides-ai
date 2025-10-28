@@ -155,11 +155,9 @@ export default function AiAvatarDashboardPage() {
     aiLeft: number;
     unlimited: boolean;
   } | null>(null);
-  const [limitsLoading, setLimitsLoading] = useState(false);
 
   const fetchUsageLimits = useCallback(async () => {
     try {
-      setLimitsLoading(true);
       const response = await fetch("/api/billing/limits", {
         cache: "no-store",
       });
@@ -177,7 +175,6 @@ export default function AiAvatarDashboardPage() {
     } catch (error) {
       console.error("Failed to fetch usage limits", error);
     } finally {
-      setLimitsLoading(false);
     }
   }, []);
 
@@ -431,15 +428,6 @@ export default function AiAvatarDashboardPage() {
             })()}
             isGenerating={isGenerating}
           />
-          {(limitsLoading || limits) && (
-            <div className="flex justify-end text-xs text-muted-foreground">
-              {limitsLoading
-                ? "Checking AI credits…"
-                : limits?.unlimited
-                  ? "Usage: unlimited"
-                  : `Usage: ${limits?.aiLeft ?? 0} AI credits left`}
-            </div>
-          )}
         </div>
 
         {isThemeMenuOpen && (
