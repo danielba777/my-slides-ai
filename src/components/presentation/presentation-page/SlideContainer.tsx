@@ -1,5 +1,6 @@
 "use client";
 
+import type { CanvasDoc } from "@/canvas/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,11 +18,9 @@ import { cn } from "@/lib/utils";
 import { usePresentationState } from "@/states/presentation-state";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Plus, Trash, Image as ImageIcon } from "lucide-react";
+import { GripVertical, Image as ImageIcon, Plus, Trash } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { SlideEditPopover } from "./SlideEditPopover";
 import PersonalImageSelectorDialog from "./PersonalImageSelectorDialog";
-import type { CanvasDoc } from "@/canvas/types";
 
 interface SlideContainerProps {
   children: React.ReactNode;
@@ -126,9 +125,7 @@ export function SlideContainer({
         {/* Untere Toolbar unter dem Canvas */}
         {!isPresenting && !isReadOnly && (
           <div
-            className={cn(
-              "z-[1001] mt-3 w-full",
-            )}
+            className={cn("z-[1001] mt-3 w-full")}
             aria-label="Slide toolbar"
           >
             <div className="mx-auto flex w-full max-w-[760px] items-center justify-center gap-2 rounded-md bg-background/95 p-2 shadow-sm backdrop-blur">
@@ -138,8 +135,8 @@ export function SlideContainer({
                 {...listeners}
                 {...attributes}
                 className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus:outline-none focus-visible:outline-none"
-                aria-label="Folienposition ziehen"
-                title="Verschieben"
+                aria-label="Drag slide position"
+                title="Move"
               >
                 <GripVertical className="h-4 w-4" />
               </button>
@@ -153,8 +150,8 @@ export function SlideContainer({
                 size="icon"
                 className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
                 onClick={() => addSlide("after", index)}
-                aria-label="Neue Folie darunter"
-                title="Neue Folie darunter"
+                aria-label="Add next slide"
+                title="Add next slide"
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -166,8 +163,8 @@ export function SlideContainer({
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9 rounded-md text-muted-foreground hover:text-destructive"
-                    aria-label="Folie löschen"
-                    title="Folie löschen"
+                    aria-label="Delete slide"
+                    title="Delete slide"
                   >
                     <Trash className="h-4 w-4" />
                   </Button>
@@ -176,7 +173,8 @@ export function SlideContainer({
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete Slide</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete slide {index + 1}? This action cannot be undone.
+                      Are you sure you want to delete slide {index + 1}? This
+                      action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -237,7 +235,9 @@ function PersonalImagePickerButton({ index }: { index: number }) {
       height: c?.height ?? 1620,
       bg: c?.bg ?? "#ffffff",
       nodes: Array.isArray(c?.nodes) ? [...c!.nodes] : [],
-      selection: Array.isArray(c?.selection) ? [...(c!.selection as any[])] : [],
+      selection: Array.isArray(c?.selection)
+        ? [...(c!.selection as any[])]
+        : [],
       previewDataUrl: c?.previewDataUrl,
     };
   };
@@ -284,7 +284,9 @@ function PersonalImagePickerButton({ index }: { index: number }) {
     const c = slide.canvas as CanvasDoc | undefined;
     const hasPersonal =
       Array.isArray(c?.nodes) &&
-      c!.nodes.some((n: any) => n?.type === "image" && n?.id === "user-overlay-image");
+      c!.nodes.some(
+        (n: any) => n?.type === "image" && n?.id === "user-overlay-image",
+      );
 
     if (hasPersonal) {
       // Statt Dialog: in den Editmodus wechseln

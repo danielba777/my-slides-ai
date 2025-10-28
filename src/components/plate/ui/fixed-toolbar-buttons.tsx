@@ -60,8 +60,8 @@ export function FixedToolbarButtons() {
       <ToolbarGroup>
         <button
           onClick={handleAddText}
-          aria-label="Text hinzufügen"
-          title="Text hinzufügen"
+          aria-label="Add text"
+          title="Add text"
           className="inline-flex items-center justify-center whitespace-nowrap rounded-xl border border-border/80 bg-background/90 text-sm font-medium shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-0 h-9 w-9"
         >
           <Plus className="h-4 w-4" />
