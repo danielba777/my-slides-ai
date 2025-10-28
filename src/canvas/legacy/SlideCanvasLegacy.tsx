@@ -2,6 +2,16 @@
 "use client";
 
 import LegacyEditorToolbar from "@/canvas/LegacyEditorToolbar";
+import {
+  TIKTOK_BACKGROUND_COLOR,
+  TIKTOK_BACKGROUND_MODE,
+  TIKTOK_BACKGROUND_OPACITY,
+  TIKTOK_BACKGROUND_PADDING,
+  TIKTOK_BACKGROUND_RADIUS,
+  TIKTOK_OUTLINE_COLOR,
+  TIKTOK_OUTLINE_WIDTH,
+  TIKTOK_TEXT_COLOR,
+} from "@/canvas/tiktokDefaults";
 import type { CanvasImageNode } from "@/canvas/types";
 import { loadImageDecoded } from "@/canvas/konva-helpers";
 import { measureWrappedText } from "@/lib/textMetrics";
@@ -206,18 +216,21 @@ function layoutSignature(l: SlideTextElement[]): string {
       // folgende drei sind optional, können in deinem types.ts fehlen -> runtime-optional
       it: (x as any).italic ?? false,
       oe: (x as any).outlineEnabled ?? false,
-      ow: (x as any).outlineWidth ?? 6,
-      oc: (x as any).outlineColor ?? "#000",
-      tc: (x as any).color ?? "#ffffff",
+      ow: (x as any).outlineWidth ?? TIKTOK_OUTLINE_WIDTH,
+      oc: (x as any).outlineColor ?? TIKTOK_OUTLINE_COLOR,
+      tc: (x as any).color ?? TIKTOK_TEXT_COLOR,
       bg: x.background
         ? {
             en: x.background.enabled ?? false,
-            m: x.background.mode ?? "block",
-            c: x.background.color ?? "#000000",
-            op: x.background.opacity ?? 0.5,
-            px: x.background.paddingX ?? 12,
-            py: x.background.paddingY ?? x.background.paddingX ?? 12,
-            rd: x.background.radius ?? 12,
+            m: x.background.mode ?? TIKTOK_BACKGROUND_MODE,
+            c: x.background.color ?? TIKTOK_BACKGROUND_COLOR,
+            op: x.background.opacity ?? TIKTOK_BACKGROUND_OPACITY,
+            px: x.background.paddingX ?? TIKTOK_BACKGROUND_PADDING,
+            py:
+              x.background.paddingY ??
+              x.background.paddingX ??
+              TIKTOK_BACKGROUND_PADDING,
+            rd: x.background.radius ?? TIKTOK_BACKGROUND_RADIUS,
           }
         : null,
     })),
@@ -328,22 +341,26 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
             ? "semibold"
             : "regular",
       align: el.align ?? "left",
-      color: (el as any).color ?? "#ffffff",
+      color: (el as any).color ?? TIKTOK_TEXT_COLOR,
       content: el.content ?? "",
       zIndex: el.zIndex ?? i,
       italic: (el as any).italic ?? false,
       outlineEnabled: (el as any).outlineEnabled ?? true,
-      outlineWidth: (el as any).outlineWidth ?? 6,
-      outlineColor: (el as any).outlineColor ?? "#000000",
+      outlineWidth: (el as any).outlineWidth ?? TIKTOK_OUTLINE_WIDTH,
+      outlineColor: (el as any).outlineColor ?? TIKTOK_OUTLINE_COLOR,
       background: el.background
         ? {
             enabled: el.background.enabled ?? false,
-            mode: el.background.mode ?? "block",
-            color: el.background.color ?? "#000000",
-            opacity: el.background.opacity ?? 0.55,
-            paddingX: el.background.paddingX ?? 12,
-            paddingY: el.background.paddingY ?? el.background.paddingX ?? 12,
-            radius: el.background.radius ?? 16,
+            mode: el.background.mode ?? TIKTOK_BACKGROUND_MODE,
+            color: el.background.color ?? TIKTOK_BACKGROUND_COLOR,
+            opacity: el.background.opacity ?? TIKTOK_BACKGROUND_OPACITY,
+            paddingX:
+              el.background.paddingX ?? TIKTOK_BACKGROUND_PADDING,
+            paddingY:
+              el.background.paddingY ??
+              el.background.paddingX ??
+              TIKTOK_BACKGROUND_PADDING,
+            radius: el.background.radius ?? TIKTOK_BACKGROUND_RADIUS,
             lineOverlap: el.background.lineOverlap ?? 0,
           }
         : undefined,
@@ -500,12 +517,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       width: Math.round(W * 0.7),
       height: 0, // auto
       zIndex: (textLayers.at(-1)?.zIndex ?? 0) + 1,
-      color: "#ffffff",
+      color: TIKTOK_TEXT_COLOR,
       autoHeight: true,
       italic: false,
       outlineEnabled: true,
-      outlineWidth: 6,
-      outlineColor: "#000000",
+      outlineWidth: TIKTOK_OUTLINE_WIDTH,
+      outlineColor: TIKTOK_OUTLINE_COLOR,
     };
     const lines = computeWrappedLinesWithDOM(initial);
     initial.height = Math.ceil(computeAutoHeightForLayer(initial, lines));
@@ -1348,9 +1365,18 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         fill: string;
       } | null = null;
       if (bgEnabled) {
-        const padX = Math.max(0, bgConfig?.paddingX ?? 12);
-        const padY = Math.max(0, bgConfig?.paddingY ?? padX);
-        const radius = Math.max(0, bgConfig?.radius ?? 16);
+        const padX = Math.max(
+          0,
+          bgConfig?.paddingX ?? TIKTOK_BACKGROUND_PADDING,
+        );
+        const padY = Math.max(
+          0,
+          bgConfig?.paddingY ?? padX ?? TIKTOK_BACKGROUND_PADDING,
+        );
+        const radius = Math.max(
+          0,
+          bgConfig?.radius ?? TIKTOK_BACKGROUND_RADIUS,
+        );
         const fill = toCssColor(bgConfig?.color, bgConfig?.opacity);
         const contentW = Math.max(0, layer.width - 2 * PADDING);
         const contentH = Math.max(0, layerHeight - 2 * PADDING);
@@ -1386,9 +1412,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       const outlineEnabled = (layer as any).outlineEnabled;
 
-      const outlineWidth = (layer as any).outlineWidth ?? 6;
+      const outlineWidth =
+        (layer as any).outlineWidth ?? TIKTOK_OUTLINE_WIDTH;
 
-      const outlineColor = (layer as any).outlineColor ?? "#000";
+      const outlineColor =
+        (layer as any).outlineColor ?? TIKTOK_OUTLINE_COLOR;
 
       const scaledOutlineRadius =
         outlineEnabled && outlineWidth > 0
@@ -1713,14 +1741,45 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     (patch: Partial<SlideTextElement>) => {
       // 1) Hintergrund
       if (patch.background) {
-        const nextBackground = {
-          ...patch.background,
-          paddingX:
-            patch.background.paddingX ?? patch.background.paddingY ?? 12,
-          paddingY:
-            patch.background.paddingY ?? patch.background.paddingX ?? 12,
-        };
-        applyToActive((l) => ({ ...l, background: nextBackground }));
+        applyToActive((l) => {
+          const prevBg = l.background ?? {};
+          const targetOpacity =
+            patch.background?.opacity ?? prevBg.opacity ?? 0;
+          const fallbackPadding =
+            patch.background?.paddingX ??
+            patch.background?.paddingY ??
+            prevBg.paddingX ??
+            prevBg.paddingY ??
+            TIKTOK_BACKGROUND_PADDING;
+          const nextBackground = {
+            ...prevBg,
+            ...patch.background,
+            mode:
+              patch.background?.mode ??
+              prevBg.mode ??
+              TIKTOK_BACKGROUND_MODE,
+            color:
+              patch.background?.color ??
+              prevBg.color ??
+              TIKTOK_BACKGROUND_COLOR,
+            opacity: targetOpacity,
+            enabled:
+              patch.background?.enabled ??
+              targetOpacity > 0,
+            paddingX: patch.background?.paddingX ?? fallbackPadding,
+            paddingY:
+              patch.background?.paddingY ??
+              prevBg.paddingY ??
+              fallbackPadding,
+            radius:
+              patch.background?.radius ??
+              prevBg.radius ??
+              TIKTOK_BACKGROUND_RADIUS,
+            lineOverlap:
+              patch.background?.lineOverlap ?? prevBg.lineOverlap ?? 0,
+          };
+          return { ...l, background: nextBackground };
+        });
       }
 
       // 2) Typografie / Layout
@@ -1764,6 +1823,30 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           ...l,
           outlineEnabled: true,
           outlineColor: c,
+          outlineWidth:
+            l.outlineWidth && l.outlineWidth > 0
+              ? l.outlineWidth
+              : TIKTOK_OUTLINE_WIDTH,
+        }));
+      }
+      if (typeof (patch as any).outlineWidth === "number") {
+        const w = (patch as any).outlineWidth as number;
+        applyToActive((l: any) => ({
+          ...l,
+          outlineEnabled: w > 0,
+          outlineWidth: w,
+        }));
+      }
+      if (typeof (patch as any).outlineColor === "string") {
+        const c = (patch as any).outlineColor as string;
+        applyToActive((l: any) => ({
+          ...l,
+          outlineEnabled: true,
+          outlineColor: c,
+          outlineWidth:
+            l.outlineWidth && l.outlineWidth > 0
+              ? l.outlineWidth
+              : TIKTOK_OUTLINE_WIDTH,
         }));
       }
 
@@ -1792,9 +1875,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const [uiOutlineOn, setUiOutlineOn] = useState(true);
   const [uiScale, setUiScale] = useState<number>(1);
   const [uiLineHeight, setUiLineHeight] = useState<number>(1.12);
-  const [uiOutlineWidth, setUiOutlineWidth] = useState<number>(6);
-  const [uiTextColor, setUiTextColor] = useState<string>("#ffffff");
-  const [uiOutlineColor, setUiOutlineColor] = useState<string>("#000000");
+  const [uiOutlineWidth, setUiOutlineWidth] =
+    useState<number>(TIKTOK_OUTLINE_WIDTH);
+  const [uiTextColor, setUiTextColor] = useState<string>(TIKTOK_TEXT_COLOR);
+  const [uiOutlineColor, setUiOutlineColor] = useState<string>(
+    TIKTOK_OUTLINE_COLOR,
+  );
 
   const toggleBoldUI = () => {
     setUiBold((v) => !v);
@@ -1812,15 +1898,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const handleToggleOutlineOn = (e: React.ChangeEvent<HTMLInputElement>) => {
     const on = e.currentTarget.checked;
     setUiOutlineOn(on);
+    setUiOutlineWidth(on ? TIKTOK_OUTLINE_WIDTH : 0);
     applyToActive((l: any) => ({
       ...l,
       outlineEnabled: on,
-      // Falls eingeschaltet aber Breite 0, kleinen Default setzen:
-      outlineWidth: on
-        ? l.outlineWidth && l.outlineWidth > 0
-          ? l.outlineWidth
-          : 4
-        : 0,
+      outlineWidth: on ? TIKTOK_OUTLINE_WIDTH : 0,
     }));
   };
 
@@ -1838,8 +1920,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       (active as any).outlineEnabled ?? ((active as any).outlineWidth ?? 0) > 0;
     setUiOutlineOn(!!outlineEnabled);
     setUiOutlineWidth((active as any).outlineWidth ?? 0);
-    setUiTextColor((active as any).color ?? "#ffffff");
-    setUiOutlineColor((active as any).outlineColor ?? "#000000");
+    setUiTextColor((active as any).color ?? TIKTOK_TEXT_COLOR);
+    setUiOutlineColor((active as any).outlineColor ?? TIKTOK_OUTLINE_COLOR);
   }, [
     active?.id,
     active?.weight,
@@ -1884,6 +1966,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       ...(l as any),
       outlineEnabled: true,
       outlineColor: color,
+      outlineWidth:
+        (l as any).outlineWidth && (l as any).outlineWidth > 0
+          ? (l as any).outlineWidth
+          : TIKTOK_OUTLINE_WIDTH,
     }));
   };
 
@@ -1912,9 +1998,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                     align: active.align,
                     // Farbe(n)
                     // Toolbar liest 'fill' für Textfarbe
-                    fill: (active as any).color ?? "#ffffff",
+                    fill: (active as any).color ?? TIKTOK_TEXT_COLOR,
                     // Toolbar liest 'stroke' + 'strokeWidth' für Kontur
-                    stroke: (active as any).outlineColor ?? "#000000",
+                    stroke: (active as any).outlineColor ?? TIKTOK_OUTLINE_COLOR,
+                    outlineColor: (active as any).outlineColor ?? TIKTOK_OUTLINE_COLOR,
                     strokeWidth: (active as any).outlineWidth ?? 0,
                     // Bold / Italic
                     fontWeight:
@@ -2069,9 +2156,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               </label>
               <input
                 type="range"
-                min="0"
-                max="12"
-                step="0.5"
+                min={0}
+                max={TIKTOK_OUTLINE_WIDTH}
+                step={0.5}
                 value={uiOutlineWidth}
                 onChange={handleOutlineWidthChange}
                 disabled={!uiOutlineOn}
@@ -2321,11 +2408,20 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             // Kein Toggle mehr nötig: Opazität steuert Sichtbarkeit
             const bgEnabled =
               (background?.enabled ?? false) || (background?.opacity ?? 0) > 0;
-            const bgPadX = Math.max(0, background?.paddingX ?? 12);
-            const bgPadY = Math.max(0, background?.paddingY ?? bgPadX);
-            const bgRadius = Math.max(0, background?.radius ?? 16);
+            const bgPadX = Math.max(
+              0,
+              background?.paddingX ?? TIKTOK_BACKGROUND_PADDING,
+            );
+            const bgPadY = Math.max(
+              0,
+              background?.paddingY ?? bgPadX ?? TIKTOK_BACKGROUND_PADDING,
+            );
+            const bgRadius = Math.max(
+              0,
+              background?.radius ?? TIKTOK_BACKGROUND_RADIUS,
+            );
             const bgColor = toCssColor(background?.color, background?.opacity);
-            const bgMode = background?.mode ?? "block";
+            const bgMode = background?.mode ?? TIKTOK_BACKGROUND_MODE;
 
             return (
               <div key={layer.id}>
@@ -2656,3 +2752,4 @@ function ToolbarSizedByCanvas({
     </div>
   );
 }
+

@@ -26,6 +26,16 @@ import {
 } from "lucide-react";
 import * as React from "react";
 import { useCallback } from "react";
+import {
+  TIKTOK_BACKGROUND_COLOR,
+  TIKTOK_BACKGROUND_MODE,
+  TIKTOK_BACKGROUND_OPACITY,
+  TIKTOK_BACKGROUND_PADDING,
+  TIKTOK_BACKGROUND_RADIUS,
+  TIKTOK_OUTLINE_COLOR,
+  TIKTOK_OUTLINE_WIDTH,
+  TIKTOK_TEXT_COLOR,
+} from "./tiktokDefaults";
 
 type TextBgMode = "block" | "blob";
 
@@ -66,12 +76,19 @@ function LegacyEditorToolbar({
     window.dispatchEvent(new CustomEvent("canvas:add-text"));
   }, [onAddText]);
 
-  const [textBgMode, setTextBgMode] = React.useState<TextBgMode>("block");
-  const [textBgPadding, setTextBgPadding] = React.useState(12);
-  const [textBgRadius, setTextBgRadius] = React.useState(12);
+  const [textBgMode, setTextBgMode] =
+    React.useState<TextBgMode>(TIKTOK_BACKGROUND_MODE);
+  const [textBgPadding, setTextBgPadding] = React.useState(
+    TIKTOK_BACKGROUND_PADDING,
+  );
+  const [textBgRadius, setTextBgRadius] = React.useState(
+    TIKTOK_BACKGROUND_RADIUS,
+  );
   // Default: 0 => Hintergrund aus
   const [textBgOpacity, setTextBgOpacity] = React.useState(0); // 0-100
-  const [textBgColor, setTextBgColor] = React.useState<string>("#000000");
+  const [textBgColor, setTextBgColor] = React.useState<string>(
+    TIKTOK_BACKGROUND_COLOR,
+  );
 
   const hasSelection = !!selectedText;
   const selectedBackground = selectedText?.background;
@@ -96,18 +113,20 @@ function LegacyEditorToolbar({
 
   React.useEffect(() => {
     if (!selectedBackground) {
-      setTextBgMode("block");
-      setTextBgPadding(12);
-      setTextBgRadius(12);
+      setTextBgMode(TIKTOK_BACKGROUND_MODE);
+      setTextBgPadding(TIKTOK_BACKGROUND_PADDING);
+      setTextBgRadius(TIKTOK_BACKGROUND_RADIUS);
       setTextBgOpacity(0);
-      setTextBgColor("#000000");
+      setTextBgColor(TIKTOK_BACKGROUND_COLOR);
       return;
     }
-    setTextBgMode(selectedBackground.mode ?? "block");
-    setTextBgPadding(selectedBackground.paddingX ?? 12);
-    setTextBgRadius(selectedBackground.radius ?? 12);
+    setTextBgMode(selectedBackground.mode ?? TIKTOK_BACKGROUND_MODE);
+    setTextBgPadding(
+      selectedBackground.paddingX ?? TIKTOK_BACKGROUND_PADDING,
+    );
+    setTextBgRadius(selectedBackground.radius ?? TIKTOK_BACKGROUND_RADIUS);
     setTextBgOpacity(Math.round((selectedBackground.opacity ?? 0) * 100));
-    setTextBgColor(selectedBackground.color ?? "#000000");
+    setTextBgColor(selectedBackground.color ?? TIKTOK_BACKGROUND_COLOR);
   }, [
     selectedText?.id,
     selectedBackground?.mode,
@@ -121,15 +140,26 @@ function LegacyEditorToolbar({
     (overrides?: Partial<SlideTextElement["background"]>) => {
       const rawOpacity = overrides?.opacity ?? textBgOpacity / 100;
       const nextOpacity = Math.min(1, Math.max(0, rawOpacity));
+      const fallbackPadding =
+        overrides?.paddingX ??
+        overrides?.paddingY ??
+        textBgPadding ??
+        TIKTOK_BACKGROUND_PADDING;
       return {
         // "enabled" wird implizit ueber Opazitaet gesteuert:
         enabled: nextOpacity > 0,
-        mode: overrides?.mode ?? textBgMode,
-        color: overrides?.color ?? textBgColor,
+        mode: overrides?.mode ?? textBgMode ?? TIKTOK_BACKGROUND_MODE,
+        color:
+          overrides?.color ??
+          textBgColor ??
+          TIKTOK_BACKGROUND_COLOR,
         opacity: nextOpacity,
-        paddingX: overrides?.paddingX ?? textBgPadding,
-        paddingY: overrides?.paddingY ?? textBgPadding,
-        radius: overrides?.radius ?? textBgRadius,
+        paddingX: overrides?.paddingX ?? fallbackPadding,
+        paddingY: overrides?.paddingY ?? fallbackPadding,
+        radius:
+          overrides?.radius ??
+          textBgRadius ??
+          TIKTOK_BACKGROUND_RADIUS,
         lineOverlap:
           overrides?.lineOverlap ?? selectedBackground?.lineOverlap ?? 0,
       };
@@ -253,15 +283,7 @@ function LegacyEditorToolbar({
     </svg>
   );
 
-  // --- Feste Werte für Ein-Klick-Toggles (TikTok-Style) ---
-  const TIKTOK_OUTLINE_WIDTH = 14; // fixed outline width
-  const DEFAULT_OUTLINE_COLOR = "#000000";
-  const DEFAULT_TEXT_COLOR = "#ffffff";
-  const DEFAULT_BG_COLOR = "#000000";
-  const DEFAULT_BG_RADIUS = 0;
-  const DEFAULT_BG_PADDING = 22;
-  const DEFAULT_BG_OPACITY = 1;
-
+  
   return (
     <div
       className={cn(
@@ -294,53 +316,31 @@ function LegacyEditorToolbar({
             className={cn("h-9 w-9", outlineEnabled && "bg-muted")}
             onClick={() => {
               if (!hasSelection) return;
-              const rawStrokeWidth = (selectedText as any)?.strokeWidth;
-              const rawOutlineWidth = (selectedText as any)?.outlineWidth;
-              const parsedStrokeWidth =
-                typeof rawStrokeWidth === "number"
-                  ? rawStrokeWidth
-                  : parseFloat(rawStrokeWidth ?? "");
-              const parsedOutlineWidth =
-                typeof rawOutlineWidth === "number"
-                  ? rawOutlineWidth
-                  : parseFloat(rawOutlineWidth ?? "");
-              const strokeWidthValue = Number.isFinite(parsedStrokeWidth)
-                ? parsedStrokeWidth
-                : 0;
-              const outlineWidthValue = Number.isFinite(parsedOutlineWidth)
-                ? parsedOutlineWidth
-                : 0;
-              const previousWidth =
-                strokeWidthValue > 0
-                  ? strokeWidthValue
-                  : outlineWidthValue > 0
-                    ? outlineWidthValue
-                    : 0;
-              const fallbackWidth =
-                previousWidth > 0 ? previousWidth : TIKTOK_OUTLINE_WIDTH;
-              const enabled =
-                strokeWidthValue > 0 ||
-                (selectedText as any)?.strokeEnabled ||
-                (selectedText as any)?.outlineEnabled;
-              if (enabled) {
+              const currentColor =
+                (selectedText as any)?.stroke ??
+                (selectedText as any)?.outlineColor ??
+                TIKTOK_OUTLINE_COLOR;
+              if (outlineEnabled) {
                 onChangeSelectedText?.({
                   ...selectedText!,
                   strokeEnabled: false,
                   outlineEnabled: false,
-                  outlineWidth: fallbackWidth,
                   strokeWidth: 0,
+                  outlineWidth: TIKTOK_OUTLINE_WIDTH,
+                  stroke: currentColor,
+                  outlineColor: currentColor,
                 });
-              } else {
-                onChangeSelectedText?.({
-                  ...selectedText!,
-                  strokeEnabled: true,
-                  outlineEnabled: true,
-                  outlineWidth: fallbackWidth,
-                  strokeWidth: fallbackWidth,
-                  stroke:
-                    (selectedText as any)?.stroke ?? DEFAULT_OUTLINE_COLOR,
-                });
+                return;
               }
+              onChangeSelectedText?.({
+                ...selectedText!,
+                strokeEnabled: true,
+                outlineEnabled: true,
+                strokeWidth: TIKTOK_OUTLINE_WIDTH,
+                outlineWidth: TIKTOK_OUTLINE_WIDTH,
+                stroke: currentColor,
+                outlineColor: currentColor,
+              });
             }}
             title="Toggle text outline"
           >
@@ -356,29 +356,48 @@ function LegacyEditorToolbar({
             className={cn("h-9 w-9", bgEnabled && "bg-muted")}
             onClick={() => {
               if (!hasSelection) return;
-              const prev = selectedBackground ?? {
-                mode: textBgMode,
-                color: textBgColor ?? DEFAULT_BG_COLOR,
-                opacity: 0,
-                paddingX: textBgPadding ?? DEFAULT_BG_PADDING,
-                paddingY: textBgPadding ?? DEFAULT_BG_PADDING,
-                radius: textBgRadius ?? DEFAULT_BG_RADIUS,
-                lineOverlap: 0,
-              };
-              const wasEnabled = (prev.opacity ?? 0) > 0;
-              const fallbackOpacity =
-                !wasEnabled && (prev.opacity ?? 0) <= 0
-                  ? DEFAULT_BG_OPACITY
-                  : (prev.opacity ?? DEFAULT_BG_OPACITY);
-              const nextOpacity = wasEnabled ? 0 : fallbackOpacity;
-              setTextBgOpacity(Math.round(nextOpacity * 100));
+              if (bgEnabled) {
+                setTextBgOpacity(0);
+                onChangeSelectedText?.({
+                  ...selectedText!,
+                  background: {
+                    ...(selectedBackground ?? {}),
+                    opacity: 0,
+                    enabled: false,
+                    paddingX: TIKTOK_BACKGROUND_PADDING,
+                    paddingY: TIKTOK_BACKGROUND_PADDING,
+                    radius: TIKTOK_BACKGROUND_RADIUS,
+                    mode: TIKTOK_BACKGROUND_MODE,
+                    color:
+                      selectedBackground?.color ??
+                      textBgColor ??
+                      TIKTOK_BACKGROUND_COLOR,
+                  },
+                });
+                return;
+              }
+              const nextColor =
+                selectedBackground?.color ??
+                textBgColor ??
+                TIKTOK_BACKGROUND_COLOR;
+              setTextBgMode(TIKTOK_BACKGROUND_MODE);
+              setTextBgPadding(TIKTOK_BACKGROUND_PADDING);
+              setTextBgRadius(TIKTOK_BACKGROUND_RADIUS);
+              setTextBgOpacity(Math.round(TIKTOK_BACKGROUND_OPACITY * 100));
+              setTextBgColor(nextColor);
+              const nextBackground = {
+                enabled: true,
+                mode: TIKTOK_BACKGROUND_MODE,
+                color: nextColor,
+                opacity: TIKTOK_BACKGROUND_OPACITY,
+                paddingX: TIKTOK_BACKGROUND_PADDING,
+                paddingY: TIKTOK_BACKGROUND_PADDING,
+                radius: TIKTOK_BACKGROUND_RADIUS,
+                lineOverlap: selectedBackground?.lineOverlap ?? 0,
+              } as SlideTextElement["background"];
               onChangeSelectedText?.({
                 ...selectedText!,
-                background: {
-                  ...prev,
-                  opacity: nextOpacity,
-                  enabled: nextOpacity > 0,
-                },
+                background: nextBackground,
               });
             }}
             title="Toggle text background"
@@ -491,7 +510,7 @@ function LegacyEditorToolbar({
                 </span>
                 <input
                   type="color"
-                  value={(selectedText as any)?.fill ?? DEFAULT_TEXT_COLOR}
+                  value={(selectedText as any)?.fill ?? TIKTOK_TEXT_COLOR}
                   onChange={(e) =>
                     hasSelection &&
                     onChangeSelectedText?.({
@@ -526,12 +545,17 @@ function LegacyEditorToolbar({
                 </span>
                 <input
                   type="color"
-                  value={(selectedText as any)?.stroke ?? DEFAULT_OUTLINE_COLOR}
+                  value={
+                    (selectedText as any)?.stroke ??
+                    (selectedText as any)?.outlineColor ??
+                    TIKTOK_OUTLINE_COLOR
+                  }
                   onChange={(e) =>
                     hasSelection &&
                     onChangeSelectedText?.({
                       ...selectedText!,
                       stroke: e.currentTarget.value,
+                      outlineColor: e.currentTarget.value,
                       strokeWidth:
                         ((selectedText as any)?.strokeWidth ?? 0) > 0
                           ? (selectedText as any)?.strokeWidth
@@ -599,3 +623,4 @@ function MiniRange({
     </div>
   );
 }
+
