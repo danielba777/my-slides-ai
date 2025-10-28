@@ -18,6 +18,9 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  AlignVerticalJustifyStart,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
   Check as CheckIcon,
   ChevronDown,
   ChevronUp,
@@ -104,6 +107,8 @@ function LegacyEditorToolbar({
   const activeAlign = ((selectedText as any)?.align ??
     selectedText?.align ??
     "left") as "left" | "center" | "right";
+  const activeVerticalAlign = ((selectedText as any)?.verticalAlign ??
+    "center") as "top" | "center" | "bottom";
   const outlineEnabled =
     (selectedText as any)?.strokeEnabled ??
     (selectedText as any)?.outlineEnabled ??
@@ -205,6 +210,12 @@ function LegacyEditorToolbar({
   };
   const setAlign = (a: "left" | "center" | "right") =>
     onChangeSelectedText?.({ ...selectedText!, align: a });
+  const toggleVerticalAlign = () => {
+    if (!hasSelection) return;
+    const next = activeVerticalAlign === "top" ? "center" :
+                 activeVerticalAlign === "center" ? "bottom" : "top";
+    onChangeSelectedText?.({ ...selectedText!, verticalAlign: next });
+  };
 
   // ✅ Schöne, klare Custom-Icons für Outline / Background (weißes „A")
   const IconTextOutlineA = (props: React.SVGProps<SVGSVGElement>) => (
@@ -261,20 +272,20 @@ function LegacyEditorToolbar({
       aria-hidden="true"
       {...props}
     >
+      {/* vollständig schwarze Box */}
       <rect
-        x="3.5"
-        y="6.5"
-        width="17"
-        height="11"
-        rx="2.5"
-        fill="currentColor"
-        opacity="0.25"
-      ></rect>
+        x="3"
+        y="5"
+        width="18"
+        height="14"
+        rx="3"
+        fill="#000"
+      />
       <text
         x="12"
         y="15"
         textAnchor="middle"
-        fontWeight="700"
+        fontWeight="800"
         fontSize="14"
         fill="#fff"
       >
@@ -470,6 +481,26 @@ function LegacyEditorToolbar({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Text vertical align */}
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Vertical align"
+            className="h-9 w-9"
+            onClick={toggleVerticalAlign}
+            title="Vertical align"
+          >
+            {activeVerticalAlign === "top" && (
+              <AlignVerticalJustifyStart className="h-4 w-4" />
+            )}
+            {activeVerticalAlign === "center" && (
+              <AlignVerticalJustifyCenter className="h-4 w-4" />
+            )}
+            {activeVerticalAlign === "bottom" && (
+              <AlignVerticalJustifyEnd className="h-4 w-4" />
+            )}
+          </Button>
         </div>
 
         {/* Done Button - rechts oben */}
