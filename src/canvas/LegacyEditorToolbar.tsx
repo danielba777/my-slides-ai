@@ -18,9 +18,6 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
-  AlignVerticalJustifyStart,
-  AlignVerticalJustifyCenter,
-  AlignVerticalJustifyEnd,
   Check as CheckIcon,
   ChevronDown,
   ChevronUp,
@@ -107,8 +104,6 @@ function LegacyEditorToolbar({
   const activeAlign = ((selectedText as any)?.align ??
     selectedText?.align ??
     "left") as "left" | "center" | "right";
-  const activeVerticalAlign = ((selectedText as any)?.verticalAlign ??
-    "center") as "top" | "center" | "bottom";
   const outlineEnabled =
     (selectedText as any)?.strokeEnabled ??
     (selectedText as any)?.outlineEnabled ??
@@ -476,66 +471,7 @@ function LegacyEditorToolbar({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Text vertical align (Dropdown wie beim horizontal Align) */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={!hasSelection}
-                className="rounded-xl px-2.5 py-1"
-                title="Vertical align"
-                aria-label="Vertical align"
-              >
-                {activeVerticalAlign === "top" && (
-                  <AlignVerticalJustifyStart className="h-4 w-4" />
-                )}
-                {(!activeVerticalAlign ||
-                  activeVerticalAlign === "center") && (
-                  <AlignVerticalJustifyCenter className="h-4 w-4" />
-                )}
-                {activeVerticalAlign === "bottom" && (
-                  <AlignVerticalJustifyEnd className="h-4 w-4" />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              sideOffset={6}
-              className="z-[60] rounded-xl border bg-popover/95 backdrop-blur supports-backdrop-blur:bg-popover/75"
-            >
-              <DropdownMenuItem
-                onClick={() =>
-                  hasSelection &&
-                  onChangeSelectedText?.({ ...selectedText!, verticalAlign: "top" })
-                }
-                className={cn("gap-2", activeVerticalAlign === "top" && "bg-muted")}
-              >
-                <AlignVerticalJustifyStart className="h-4 w-4" />
-                Top
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  hasSelection &&
-                  onChangeSelectedText?.({ ...selectedText!, verticalAlign: "center" })
-                }
-                className={cn("gap-2", activeVerticalAlign === "center" && "bg-muted")}
-              >
-                <AlignVerticalJustifyCenter className="h-4 w-4" />
-                Center
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  hasSelection &&
-                  onChangeSelectedText?.({ ...selectedText!, verticalAlign: "bottom" })
-                }
-                className={cn("gap-2", activeVerticalAlign === "bottom" && "bg-muted")}
-              >
-                <AlignVerticalJustifyEnd className="h-4 w-4" />
-                Bottom
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Vertical align wurde entfernt: Text ist immer vertikal zentriert */}
         </div>
 
         {/* Done Button - rechts oben */}
