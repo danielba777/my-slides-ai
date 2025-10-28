@@ -1,15 +1,20 @@
 "use client";
 
-import { Sparkles, Wand2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AiAvatarPromptInput } from "@/components/dashboard/ai-avatars/PromptInput";
 import { AiAvatarTemplateGrid } from "@/components/dashboard/ai-avatars/TemplateGrid";
-import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AiAvatarTemplate } from "@/types/ai-avatars";
+
+type GenerationJob = {
+  id: string;
+  startedAt: string;
+  expectedImages?: number;
+};
+
+const EXPECTED_GENERATION_BATCH_SIZE = 4;
 
 export default function AiAvatarDashboardPage() {
   const [prompt, setPrompt] = useState("");
@@ -20,6 +25,12 @@ export default function AiAvatarDashboardPage() {
   );
   const [isLoadingRecent, setIsLoadingRecent] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [pendingGenerations, setPendingGenerations] = useState<
+    Array<{ id: string; startedAt: number }>
+  >([]);
+  const [activeTab, setActiveTab] = useState<"recent" | "templates">(
+    "templates",
+  );
   const [activeTab, setActiveTab] = useState<"recent" | "templates">("templates");
 
   const [limits, setLimits] = useState<{ aiLeft: number; unlimited: boolean } | null>(null);
@@ -42,7 +53,7 @@ export default function AiAvatarDashboardPage() {
     })();
   }, []);
 
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     try {
       setIsLoadingTemplates(true);
       const response = await fetch("/api/ai-avatars/templates");
@@ -57,17 +68,71 @@ export default function AiAvatarDashboardPage() {
     } finally {
       setIsLoadingTemplates(false);
     }
-  };
+  }, []);
 
-  const loadRecentCreations = async () => {
+  const loadRecentCreations = useCallback(async () => {
     try {
       setIsLoadingRecent(true);
-      // Placeholder: Hook up to user-generated avatars once API is ready.
+      const response = await fetch("/api/ai-avatars/creations", {
+        method: "GET",
+        cache: "no-store",
+      });
+      const data = (await response.json().catch(() => null)) as
+        | AiAvatarTemplate[]
+        | { error?: string }
+        | null;
+
+      if (!response.ok || !Array.isArray(data)) {
+        throw new Error("Failed to load generated avatars");
+      }
+
+      setRecentCreations(data);
+    } catch (error) {
+      console.error("Error loading recent AI avatars:", error);
       setRecentCreations([]);
+      toast.error("Erstellte Avatare konnten nicht geladen werden");
     } finally {
       setIsLoadingRecent(false);
     }
-  };
+  }, []);
+
+  const fetchPendingJobs = useCallback(async () => {
+    try {
+      const response = await fetch("/api/ai-avatars/jobs", {
+        method: "GET",
+        cache: "no-store",
+      });
+      const data = (await response.json().catch(() => null)) as
+        | GenerationJob[]
+        | { error?: string }
+        | null;
+
+      if (!response.ok || !Array.isArray(data)) {
+        throw new Error("Failed to load generation jobs");
+      }
+
+      const placeholders: Array<{ id: string; startedAt: number }> = [];
+      data.forEach((job) => {
+        const startedAt = new Date(job.startedAt ?? Date.now()).getTime();
+        const count = Math.max(
+          job.expectedImages ?? EXPECTED_GENERATION_BATCH_SIZE,
+          1,
+        );
+        for (let index = 0; index < count; index += 1) {
+          placeholders.push({
+            id: `${job.id}-${index}`,
+            startedAt,
+          });
+        }
+      });
+
+      setPendingGenerations(placeholders);
+      return data;
+    } catch (error) {
+      console.error("Error loading generation jobs:", error);
+      return null;
+    }
+  }, []);
 
   const handleCopyPrompt = (value: string) => {
     setPrompt(value);
@@ -78,10 +143,79 @@ export default function AiAvatarDashboardPage() {
   };
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) {
+    const trimmedPrompt = prompt.trim();
+    if (!trimmedPrompt) {
       toast.error("Bitte gib einen Prompt ein");
       return;
     }
+
+    const startedAt = Date.now();
+    const tempPrefix = `pending-${startedAt}`;
+    const tempPlaceholders = Array.from(
+      { length: EXPECTED_GENERATION_BATCH_SIZE },
+      (_, index) => ({
+        id: `${tempPrefix}-${index}`,
+        startedAt,
+      }),
+    );
+
+    setPrompt("");
+    setActiveTab("recent");
+    setPendingGenerations((prev) => [...tempPlaceholders, ...prev]);
+    setIsGenerating(true);
+    void (async () => {
+      try {
+        const response = await fetch("/api/ai-avatars/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: trimmedPrompt }),
+        });
+        const data = (await response.json().catch(() => null)) as
+          | { job?: GenerationJob; error?: string }
+          | null;
+
+        if (!response.ok || !data?.job?.id) {
+          throw new Error(
+            (data?.error as string | undefined) ??
+              "Generation konnte nicht gestartet werden",
+          );
+        }
+
+        const jobStartedAt = new Date(data.job.startedAt ?? Date.now()).getTime();
+        const expectedImages = Math.max(
+          data.job.expectedImages ?? EXPECTED_GENERATION_BATCH_SIZE,
+          1,
+        );
+
+        const jobPlaceholders = Array.from({ length: expectedImages }, (_, index) => ({
+          id: `${data.job!.id}-${index}`,
+          startedAt: jobStartedAt,
+        }));
+
+        setPendingGenerations((prev) => {
+          const filtered = prev.filter(
+            (item) => !item.id.startsWith(`${tempPrefix}-`),
+          );
+          const merged = [...jobPlaceholders, ...filtered];
+          const unique = new Map<string, { id: string; startedAt: number }>();
+          merged.forEach((item) => {
+            if (!unique.has(item.id)) {
+              unique.set(item.id, item);
+            }
+          });
+          return Array.from(unique.values());
+        });
+
+        toast.info("Avatar-Generierung gestartet");
+        void fetchPendingJobs();
+      } catch (error) {
+        console.error("Generation failed to start", error);
+        setPendingGenerations((prev) =>
+          prev.filter((item) => !item.id.startsWith(`${tempPrefix}-`)),
+        );
+        toast.error(
+          error instanceof Error ? error.message : "Generation fehlgeschlagen",
+        );
     const canGenerate = limits?.unlimited || (typeof limits?.aiLeft === "number" && limits.aiLeft >= 2);
     if (!canGenerate) {
       toast.error("Not enough AI credits");
@@ -99,31 +233,37 @@ export default function AiAvatarDashboardPage() {
       if (!response.ok || !Array.isArray(data?.images) || data.images.length === 0) {
         throw new Error(data?.error || "Generation fehlgeschlagen");
       }
-
-      const creations: AiAvatarTemplate[] = data.images.map(
-        (image: { minUrl?: string; rawUrl?: string }, index: number) => ({
-          id: `${data.id ?? "generated"}-${Date.now()}-${index}`,
-          prompt: prompt.trim(),
-          imageUrl: image?.minUrl ?? image?.rawUrl ?? "",
-          rawImageUrl: image?.rawUrl,
-          createdAt: new Date().toISOString(),
-        }),
-      );
-
-      setRecentCreations((prev) =>
-        [...creations, ...prev].slice(0, 18),
-      );
-      setActiveTab("recent");
-      toast.success("Avatar generiert");
-    } catch (error) {
-      console.error("Generation failed", error);
-      toast.error(
-        error instanceof Error ? error.message : "Generation fehlgeschlagen",
-      );
-    } finally {
-      setIsGenerating(false);
-    }
+    })();
+    setIsGenerating(false);
   };
+
+  useEffect(() => {
+    void loadTemplates();
+    void loadRecentCreations();
+    void fetchPendingJobs();
+  }, [loadTemplates, loadRecentCreations, fetchPendingJobs]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void fetchPendingJobs();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [fetchPendingJobs]);
+
+  const previousPendingCount = useRef(0);
+
+  useEffect(() => {
+    if (
+      previousPendingCount.current > 0 &&
+      pendingGenerations.length === 0
+    ) {
+      void loadRecentCreations();
+    }
+    previousPendingCount.current = pendingGenerations.length;
+  }, [pendingGenerations.length, loadRecentCreations]);
 
   const templatesCountLabel = useMemo(
     () => `${templates.length} Template${templates.length === 1 ? "" : "s"}`,
@@ -134,6 +274,13 @@ export default function AiAvatarDashboardPage() {
     <div className="notebook-section relative h-full w-full">
       <div className="space-y-10 py-12">
         <div className="mx-auto w-full max-w-5xl space-y-6 px-6">
+          <AiAvatarPromptInput
+            value={prompt}
+            onChange={setPrompt}
+            onShowTemplates={() => setActiveTab("templates")}
+            onGenerate={handleGenerate}
+            isGenerating={isGenerating}
+          />
           <div className="flex items-center justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold">AI Avatar Studio</h1>
@@ -189,61 +336,73 @@ export default function AiAvatarDashboardPage() {
           </div>
         </div>
 
-        <Tabs
-          value={activeTab}
-          onValueChange={(value) =>
-            setActiveTab(value as "recent" | "templates")
-          }
-          className="space-y-4 px-6"
-        >
-          <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-muted/70 p-1">
-            <TabsTrigger
-              value="recent"
-              className="rounded-xl text-sm data-[state=active]:bg-background"
+        {/* Simple text toggle instead of Tabbar */}
+        <div className="px-6">
+          <div className="flex items-center gap-4 text-xl font-semibold text-zinc-500">
+            <button
+              type="button"
+              onClick={() => setActiveTab("recent")}
+              className={
+                `transition-colors hover:text-foreground` +
+                (activeTab === "recent"
+                  ? "font-medium text-foreground"
+                  : "text-muted-foreground")
+              }
+              aria-current={activeTab === "recent" ? "page" : undefined}
             >
               Recently created
-            </TabsTrigger>
-            <TabsTrigger
-              value="templates"
-              className="rounded-xl text-sm data-[state=active]:bg-background"
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("templates")}
+              className={
+                `transition-colors hover:text-foreground` +
+                (activeTab === "templates"
+                  ? "font-medium text-foreground"
+                  : "text-muted-foreground")
+              }
+              aria-current={activeTab === "templates" ? "page" : undefined}
             >
               Templates
-            </TabsTrigger>
-          </TabsList>
+            </button>
+          </div>
+        </div>
 
-          <TabsContent value="recent" className="mt-0">
-            {isLoadingRecent ? (
-              <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed">
-                <Spinner className="h-6 w-6" />
-              </div>
-            ) : (
-              <AiAvatarTemplateGrid
-                templates={recentCreations}
-                onCopy={handleCopyPrompt}
-              />
-            )}
-          </TabsContent>
-
-          <TabsContent value="templates" className="mt-0 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Templates</h2>
-              <span className="text-sm text-muted-foreground">
-                {templatesCountLabel}
-              </span>
+        {/* Content sections */}
+        <div className="px-6">
+          {activeTab === "recent" && (
+            <div className="mt-4">
+              {isLoadingRecent &&
+              recentCreations.length === 0 &&
+              pendingGenerations.length === 0 ? (
+                <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed">
+                  <Spinner className="h-6 w-6" />
+                </div>
+              ) : (
+                <AiAvatarTemplateGrid
+                  templates={recentCreations}
+                  showOpenInNewTab
+                  loadingPlaceholders={pendingGenerations}
+                />
+              )}
             </div>
-            {isLoadingTemplates ? (
-              <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed">
-                <Spinner className="h-6 w-6" />
-              </div>
-            ) : (
-              <AiAvatarTemplateGrid
-                templates={templates}
-                onCopy={handleCopyPrompt}
-              />
-            )}
-          </TabsContent>
-        </Tabs>
+          )}
+
+          {activeTab === "templates" && (
+            <div className="mt-4">
+              {isLoadingTemplates ? (
+                <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed">
+                  <Spinner className="h-6 w-6" />
+                </div>
+              ) : (
+                <AiAvatarTemplateGrid
+                  templates={templates}
+                  onCopy={handleCopyPrompt}
+                />
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
-}
