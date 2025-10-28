@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { stripe } from "@/server/stripe";
-import { planFromPrice, carryOverCreditsOnPlanChange } from "@/server/billing";
+import type Stripe from "stripe";
+import {
+  planFromPrice,
+  carryOverCreditsOnPlanChange,
+  isActiveStripeSubscriptionStatus,
+  mapStripeSubscriptionStatus,
+} from "@/server/billing";
 import { PLAN_CREDITS } from "@/lib/billing";
 import { FREE_SLIDESHOW_QUOTA } from "@/lib/billing";
 
@@ -10,6 +16,11 @@ import { FREE_SLIDESHOW_QUOTA } from "@/lib/billing";
 function dateFromUnix(sec?: number | null) {
   return sec ? new Date(sec * 1000) : new Date();
 }
+
+type SubscriptionWithPeriods = Stripe.Subscription & {
+  current_period_start?: number | null;
+  current_period_end?: number | null;
+};
 
 export async function POST() {
   try {
@@ -45,9 +56,11 @@ export async function POST() {
       limit: 10,
     });
 
+    const subscriptionData = subs.data as SubscriptionWithPeriods[];
     // aktive / relevante Sub finden
-    const active = subs.data.find((s) =>
-      ["active", "trialing", "past_due", "incomplete"].includes(s.status)
+    const active = subscriptionData.find(
+      (s): s is SubscriptionWithPeriods =>
+        isActiveStripeSubscriptionStatus(s.status),
     );
 
     if (!active) {
@@ -75,7 +88,20 @@ export async function POST() {
 
     // 3) Plan aus Price-ID ableiten (ENV müssen korrekt gesetzt sein)
     // Nach dem Expand ist price ein Objekt
-    const priceId = (active.items?.data?.[0]?.price as { id?: string } | undefined)?.id;
+    const firstItem = active.items?.data?.[0];
+    const rawPrice = firstItem?.price;
+    const priceId =
+      typeof rawPrice === "string" ? rawPrice : rawPrice?.id ?? undefined;
+    if (!priceId) {
+      return NextResponse.json(
+        {
+          error: "Active subscription missing price id",
+          hint: "Ensure subscription items expand price data",
+        },
+        { status: 400 },
+      );
+    }
+
     const plan = planFromPrice(priceId);
     console.log("[/api/billing/sync] priceId:", priceId, "→ plan:", plan);
     if (!plan) {
@@ -89,22 +115,23 @@ export async function POST() {
       );
     }
 
-    const periodStart = dateFromUnix(active.current_period_start);
-    const periodEnd = dateFromUnix(active.current_period_end);
+    const periodStart = dateFromUnix(active.current_period_start ?? null);
+    const periodEnd = dateFromUnix(active.current_period_end ?? null);
+    const status = mapStripeSubscriptionStatus(active.status);
 
     // 4) Subscription upsert
-      await db.subscription.upsert({
+    await db.subscription.upsert({
       where: { stripeSubscriptionId: active.id },
       create: {
         userId: user.id,
         stripeSubscriptionId: active.id,
-        stripePriceId: priceId ?? null,
-        status: (active.status as string).toUpperCase() as any,
+        stripePriceId: priceId,
+        status,
         currentPeriodEnd: periodEnd,
       },
       update: {
-        stripePriceId: priceId ?? null,
-        status: (active.status as string).toUpperCase() as any,
+        stripePriceId: priceId,
+        status,
         currentPeriodEnd: periodEnd,
       },
     });

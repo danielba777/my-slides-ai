@@ -2,8 +2,16 @@
 import "server-only";
 import { db } from "@/server/db";
 import { env } from "@/env";
-import type { CreditBalance, Plan } from "@prisma/client";
+import type {
+  CreditBalance,
+  Plan,
+  Prisma,
+  SubscriptionStatus,
+} from "@prisma/client";
+import type Stripe from "stripe";
 import { PLAN_CREDITS, FREE_SLIDESHOW_QUOTA } from "@/lib/billing";
+
+type BillingTransactionClient = Prisma.TransactionClient;
 
 export function planFromPrice(priceId?: string): Plan | undefined {
   if (!priceId) return undefined;
@@ -14,7 +22,10 @@ export function planFromPrice(priceId?: string): Plan | undefined {
   return undefined;
 }
 
-export async function normalizeCreditBalance(tx: typeof db, userId: string): Promise<CreditBalance | null> {
+export async function normalizeCreditBalance(
+  tx: BillingTransactionClient,
+  userId: string,
+): Promise<CreditBalance | null> {
   const records = await tx.creditBalance.findMany({
     where: { userId },
     orderBy: { updatedAt: "desc" },
@@ -39,16 +50,16 @@ export async function normalizeCreditBalance(tx: typeof db, userId: string): Pro
 
 export async function getUsageLimits(userId: string) {
   return await db.$transaction(async (tx) => {
-    const [sub, rawBal] = await Promise.all([
-      tx.subscription.findFirst({
-        where: { userId, status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] } },
-        orderBy: { updatedAt: "desc" },
+    const [userRecord, rawBal] = await Promise.all([
+      tx.user.findUnique({
+        where: { id: userId },
+        select: { plan: true },
       }),
       normalizeCreditBalance(tx, userId),
     ]);
     let bal = rawBal;
 
-    const plan = sub?.plan ?? null;
+    const plan = userRecord?.plan ?? null;
     const allowances = plan ? PLAN_CREDITS[plan] : null;
     const unlimitedSlides = !!allowances && allowances.credits < 0;
     const unlimitedAi = !!allowances && allowances.ai < 0;
@@ -110,11 +121,14 @@ export async function ensureAndConsumeCredits(userId: string, args: ConsumeArgs)
   const cost = Math.max(1, args.cost ?? (args.kind === "ai" ? 2 : 1));
   console.debug("[billing] ensureAndConsumeCredits:start", { userId, args, cost });
   return await db.$transaction(async (tx) => {
-    const sub = await tx.subscription.findFirst({
-      where: { userId, status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] } },
-      orderBy: { updatedAt: "desc" },
-    });
-    const plan = sub?.plan ?? null;
+    const [sub, userRecord] = await Promise.all([
+      tx.subscription.findFirst({
+        where: { userId, status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] } },
+        orderBy: { updatedAt: "desc" },
+      }),
+      tx.user.findUnique({ where: { id: userId }, select: { plan: true } }),
+    ]);
+    const plan = userRecord?.plan ?? null;
     const allowances = plan ? PLAN_CREDITS[plan] : null;
     const unlimitedSlides = !!allowances && allowances.credits < 0;
     const unlimitedAi = !!allowances && allowances.ai < 0;
@@ -212,7 +226,7 @@ export async function ensureAndConsumeCredits(userId: string, args: ConsumeArgs)
  * - Unlimited: stored as sentinel -1 with usage reset
  */
 export async function carryOverCreditsOnPlanChange(
-  tx: typeof db,
+  tx: BillingTransactionClient,
   userId: string,
   oldPlan: Plan | null,
   newPlan: Plan,
@@ -321,3 +335,33 @@ export async function carryOverCreditsOnPlanChange(
   console.debug("[billing] carryOverCreditsOnPlanChange:end", { userId, newPlan, storedCredits, storedAiCredits, newPeriodEnd });
 }
 
+const STRIPE_STATUS_MAP: Record<Stripe.Subscription.Status, SubscriptionStatus> =
+  {
+    active: "ACTIVE",
+    trialing: "TRIALING",
+    past_due: "PAST_DUE",
+    incomplete: "INCOMPLETE",
+    incomplete_expired: "INCOMPLETE_EXPIRED",
+    canceled: "CANCELED",
+    unpaid: "UNPAID",
+    paused: "PAST_DUE",
+  };
+
+const ACTIVE_STRIPE_STATUSES = new Set<Stripe.Subscription.Status>([
+  "active",
+  "trialing",
+  "past_due",
+  "incomplete",
+]);
+
+export function mapStripeSubscriptionStatus(
+  status: Stripe.Subscription.Status,
+): SubscriptionStatus {
+  return STRIPE_STATUS_MAP[status] ?? "INCOMPLETE";
+}
+
+export function isActiveStripeSubscriptionStatus(
+  status: Stripe.Subscription.Status,
+): boolean {
+  return ACTIVE_STRIPE_STATUSES.has(status);
+}

@@ -24,10 +24,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
     }
 
-    let customerId = session.user.stripeCustomerId as string | undefined;
+    const dbUser = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { stripeCustomerId: true, email: true },
+    });
+    if (!dbUser) {
+      console.warn("[STRIPE] User not found for checkout", { userId: session.user.id });
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    let customerId = dbUser.stripeCustomerId ?? undefined;
     if (!customerId) {
       const customer = await stripe.customers.create({
-        email: session.user.email ?? undefined,
+        email: session.user.email ?? dbUser.email ?? undefined,
         metadata: { userId: session.user.id },
       });
       customerId = customer.id;
