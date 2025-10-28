@@ -136,7 +136,7 @@ function fitContain(dstW: number, dstH: number, natW: number, natH: number) {
   const h = natH * r;
   const x = (dstW - w) / 2;
   const y = (dstH - h) / 2;
-  return { w, h, x, y };
+  return { w, h, x, y, scale: r };
 }
 
 function fitCover(dstW: number, dstH: number, natW: number, natH: number) {
@@ -145,7 +145,7 @@ function fitCover(dstW: number, dstH: number, natW: number, natH: number) {
   const h = natH * r;
   const x = (dstW - w) / 2;
   const y = (dstH - h) / 2;
-  return { w, h, x, y };
+  return { w, h, x, y, scale: r };
 }
 
 function drawRoundedRect(
@@ -442,9 +442,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const [dimBg, setDimBg] = React.useState(false);
 
   // --- Globaler State für Dim-Overlay ---
-  const dimOverlaySlideId = usePresentationState((s) => s.dimOverlaySlideId);
-  const setDimOverlaySlideId = usePresentationState((s) => s.setDimOverlaySlideId);
-
   // Sicherer Wrapper: nur aufrufen, wenn wirklich eine Funktion übergeben wurde
   const onLayout = useCallback(
     (next: SlideTextElement[]) => {
@@ -1742,41 +1739,40 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       // 1) Hintergrund
       if (patch.background) {
         applyToActive((l) => {
-          const prevBg = l.background ?? {};
+          const prevBg = l.background;
           const targetOpacity =
-            patch.background?.opacity ?? prevBg.opacity ?? 0;
+            patch.background?.opacity ?? prevBg?.opacity ?? 0;
           const fallbackPadding =
             patch.background?.paddingX ??
             patch.background?.paddingY ??
-            prevBg.paddingX ??
-            prevBg.paddingY ??
+            prevBg?.paddingX ??
+            prevBg?.paddingY ??
             TIKTOK_BACKGROUND_PADDING;
           const nextBackground = {
             ...prevBg,
             ...patch.background,
             mode:
               patch.background?.mode ??
-              prevBg.mode ??
+              prevBg?.mode ??
               TIKTOK_BACKGROUND_MODE,
             color:
               patch.background?.color ??
-              prevBg.color ??
+              prevBg?.color ??
               TIKTOK_BACKGROUND_COLOR,
             opacity: targetOpacity,
             enabled:
-              patch.background?.enabled ??
-              targetOpacity > 0,
+              patch.background?.enabled ?? targetOpacity > 0,
             paddingX: patch.background?.paddingX ?? fallbackPadding,
             paddingY:
               patch.background?.paddingY ??
-              prevBg.paddingY ??
+              prevBg?.paddingY ??
               fallbackPadding,
             radius:
               patch.background?.radius ??
-              prevBg.radius ??
+              prevBg?.radius ??
               TIKTOK_BACKGROUND_RADIUS,
             lineOverlap:
-              patch.background?.lineOverlap ?? prevBg.lineOverlap ?? 0,
+              patch.background?.lineOverlap ?? prevBg?.lineOverlap ?? 0,
           };
           return { ...l, background: nextBackground };
         });
