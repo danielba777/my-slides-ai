@@ -1,148 +1,178 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-**_ Begin Patch
-_** Update File: src/components/presentation/presentation-page/SlideContainer.tsx
+# src/components/marketing/MarketingLibraryPreview.tsx
+
 @@
--import { GripVertical, Plus, Trash } from "lucide-react";
-+import { GripVertical, Plus, Trash, ArrowRight } from "lucide-react";
-@@
+-type DisplayPost = {
 
-- const { addSlide, deleteSlideAt } = useSlideOperations();
+- id: string;
+- likeCount: number;
+- viewCount: number;
+- imageUrl: string | null;
+- title: string;
+- creator: string;
+- trending: boolean;
+- isPlaceholder?: boolean;
+  -};
+  +type DisplayPost = {
 
-* const { addSlide, deleteSlideAt } = useSlideOperations();
-* // For random image swap based on the currently selected (sub)category
-* const slides = usePresentationState((s) => s.slides);
-* const setSlides = usePresentationState((s) => s.setSlides);
-* const activeImageSetId = usePresentationState((s) => s.imageSetId);
+* id: string;
+* likeCount: number;
+* viewCount: number;
+* imageUrl: string | null;
+* title?: string; // optional, wird nicht mehr angezeigt
+* creator?: string; // optional, wird nicht mehr angezeigt
+* trending: boolean;
+* isPlaceholder?: boolean;
+  +};
   @@
-  const deleteSlide = () => {
-  deleteSlideAt(index);
-  };
-*
-* // Collect all image URLs from a given image set (including children)
-* async function collectImagesFromSetTree(imageSetId: string): Promise<string[]> {
-* try {
-*      const res = await fetch("/api/imagesets");
-*      if (!res.ok) return [];
-*      const allSets = (await res.json()) as Array<any>;
-*
-*      const byId = new Map<string, any>();
-*      allSets.forEach((s) => byId.set(s.id, s));
-*
-*      const start = byId.get(imageSetId);
-*      if (!start) return [];
-*
-*      const stack: any[] = [start];
-*      const urls: string[] = [];
-*      while (stack.length) {
-*        const cur = stack.pop();
-*        if (Array.isArray(cur?.images)) {
-*          cur.images.forEach((img: any) => img?.url && urls.push(img.url));
-*        }
-*        if (Array.isArray(cur?.children)) {
-*          cur.children.forEach((ch: any) => stack.push(ch));
-*        } else if (cur?._count?.children > 0 && Array.isArray(allSets)) {
-*          // Fallback if children not materialized
-*          allSets.forEach((s) => {
-*            if (s?.parentId === cur.id) stack.push(s);
-*          });
-*        }
-*      }
-*      return urls;
-* } catch {
-*      return [];
-* }
-* }
-*
-* // Action: pick next random image from the active (sub)category and swap into this slide
-* const handleNextRandomImage = async () => {
-* if (!activeImageSetId) {
-*      console.warn("No image set selected. Pick a category in 'Edit Image' first.");
-*      return;
-* }
-* const urls = await collectImagesFromSetTree(activeImageSetId);
-* if (urls.length === 0) {
-*      console.warn("Selected image set has no images.");
-*      return;
-* }
-* const nextUrl = urls[Math.floor(Math.random() * urls.length)];
-* const updated = slides.slice();
-* const cur = updated[index];
-* if (!cur) return;
-* updated[index] = {
-*      ...cur,
-*      rootImage: {
-*        ...(cur.rootImage ?? {}),
-*        url: nextUrl,
-*      },
-* };
-* setSlides(updated);
-* };
+  -const PLACEHOLDER_POSTS: DisplayPost[] = [
+  +const PLACEHOLDER_POSTS: DisplayPost[] = [
+  {
+  id: "placeholder-0",
+  likeCount: 6_240,
+  viewCount: 128_400,
+  imageUrl: null,
+
+- title: "Viral slideshow 1",
+- creator: "Creator 1",
+  trending: true,
+  isPlaceholder: true,
+  },
+  {
+  id: "placeholder-1",
+  likeCount: 12_950,
+  viewCount: 256_800,
+  imageUrl: null,
+- title: "Viral slideshow 2",
+- creator: "Creator 2",
+  trending: true,
+  isPlaceholder: true,
+  },
+  {
+  id: "placeholder-2",
+  likeCount: 8_100,
+  viewCount: 201_500,
+  imageUrl: null,
+- title: "Viral slideshow 3",
+- creator: "Creator 3",
+  trending: true,
+  isPlaceholder: true,
+  },
+  {
+  id: "placeholder-3",
+  likeCount: 4_380,
+  viewCount: 97_200,
+  imageUrl: null,
+- title: "Viral slideshow 4",
+- creator: "Creator 4",
+  trending: false,
+  isPlaceholder: true,
+  },
+  {
+  id: "placeholder-4",
+  likeCount: 3_520,
+  viewCount: 72_900,
+  imageUrl: null,
+- title: "Viral slideshow 5",
+- creator: "Creator 5",
+  trending: false,
+  isPlaceholder: true,
+  },
+  {
+  id: "placeholder-5",
+  likeCount: 17_600,
+  viewCount: 312_400,
+  imageUrl: null,
+- title: "Viral slideshow 6",
+- creator: "Creator 6",
+  trending: false,
+  isPlaceholder: true,
+  },
+  {
+  id: "placeholder-6",
+  likeCount: 2_310,
+  viewCount: 58_400,
+  imageUrl: null,
+- title: "Viral slideshow 7",
+- creator: "Creator 7",
+  trending: false,
+  isPlaceholder: true,
+  },
+  {
+  id: "placeholder-7",
+  likeCount: 9_020,
+  viewCount: 146_900,
+  imageUrl: null,
+- title: "Viral slideshow 8",
+- creator: "Creator 8",
+  trending: false,
+  isPlaceholder: true,
+  },
+  ];
+  @@
+  const topEight = useMemo<DisplayPost[]>(() => {
+  if (!posts.length) return [];
+  return [...posts]
+  .sort((a, b) => b.viewCount - a.viewCount)
+  .slice(0, 8)
+  .map((post, index) => ({
+  id: post.id,
+  likeCount: post.likeCount,
+  viewCount: post.viewCount,
+  imageUrl: post.slides?.[0]?.imageUrl ?? null,
+-        title: post.title || `Viral slideshow ${index + 1}`,
+-        creator: post.creator || `Creator ${index + 1}`,
+
+*        title: post.title ?? "",
+*        creator: post.creator ?? "",
+           trending: index < 3,
+         }));
+  }, [posts]);
   @@
 
--              <button
+-                    {post.imageUrl && !isPlaceholder ? (
 
-*              <button
-                 ref={setActivatorNodeRef as React.Ref<HTMLButtonElement>}
-                 {.listeners}
-                 {.attributes}
+*                    {post.imageUrl && !isPlaceholder ? (
+                       <img
+                         src={post.imageUrl}
 
--                className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus:outline-none focus-visible:outline-none"
--                aria-label="Folienposition ziehen"
--                title="Verschieben"
+-                        alt={post.title}
 
-*                className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus:outline-none focus-visible:outline-none"
-*                aria-label="Drag slide position"
-*                title="Move"
-               >
-                 <GripVertical className="h-4 w-4" />
-               </button>
+*                        alt="slide preview"
+                           className="h-full w-full object-cover transition duration-700 group-hover:rotate-1 group-hover:scale-110"
+                           loading="lazy"
+                         />
+                       ) : (
+  @@
 
-               {/* Neuer: Persönliche Bilder (ersetzt den Edit/Canvas-Button) */}
-               <PersonalImagePickerButton index={index} />
+-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4">
+-                      <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+-                        <span className="flex items-center gap-1 text-base font-semibold text-white">
+-                          <PlayIcon className="h-4 w-4" />
+-                          {formatCount(post.viewCount)} Views
+-                        </span>
+-                        <span className="flex items-center gap-1 text-base font-semibold text-white">
+-                          <HeartIcon className="h-4 w-4" />
+-                          {formatCount(post.likeCount)} Likes
+-                        </span>
+-                        {post.title && (
+-                          <span className="line-clamp-2 text-sm text-gray-200">
+-                            „{post.title}"
+-                          </span>
+-                        )}
+-                      </div>
+-                    </div>
 
-*              {/* Next random image from active category */}
-*              <Button
-*                variant="ghost"
-*                size="icon"
-*                className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
-*                onClick={handleNextRandomImage}
-*                aria-label="Next image"
-*                title="Next image"
-*              >
-*                <ArrowRight className="h-4 w-4" />
-*              </Button>
-*               {/* Neue Folie darunter */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
-                  onClick={() => addSlide("after", index)}
-
--                aria-label="Neue Folie darunter"
--                title="Neue Folie darunter"
-
-*                aria-label="Add next slide"
-*                title="Add next slide"
-               >
-                 <Plus className="h-4 w-4" />
-               </Button>
-
-               {/* Löschen */}
-               <AlertDialog>
-                 <AlertDialogTrigger asChild>
-                   <Button
-                     variant="ghost"
-                     size="icon"
-                     className="h-9 w-9 rounded-md text-muted-foreground hover:text-destructive"
-
--                    aria-label="Folie löschen"
--                    title="Folie löschen"
-
-*                    aria-label="Delete slide"
-*                    title="Delete slide"
-                     >
-                       <Trash className="h-4 w-4" />
-                     </Button>
-                   </AlertDialogTrigger>
-  \*\*\_ End Patch
+*                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4">
+*                      <div className="flex flex-col gap-1">
+*                        <span className="flex items-center gap-1 text-base font-semibold text-white">
+*                          <PlayIcon className="h-4 w-4" />
+*                          {formatCount(post.viewCount)} Views
+*                        </span>
+*                        <span className="flex items-center gap-1 text-base font-semibold text-white">
+*                          <HeartIcon className="h-4 w-4" />
+*                          {formatCount(post.likeCount)} Likes
+*                        </span>
+*                      </div>
+*                    </div>

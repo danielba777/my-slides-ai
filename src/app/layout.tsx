@@ -1,5 +1,5 @@
 import NextAuthProvider from "@/provider/NextAuthProvider";
-import TanStackQueryProvider from "@/provider/TanstackProvider";
+import TanstackQueryProvider from "@/components/providers/TanstackQueryProvider";
 import { ThemeProvider } from "@/provider/theme-provider";
 import "@/styles/globals.css";
 import { type Metadata } from "next";
@@ -63,7 +63,7 @@ export default function RootLayout({
         className={`${tiktokSans.variable} font-sans antialiased bg-[#F3F4EF]`}
         suppressHydrationWarning
       >
-        <TanStackQueryProvider>
+        <TanstackQueryProvider>
           <NextAuthProvider>
             <ThemeProvider
               attribute="class"
@@ -73,7 +73,7 @@ export default function RootLayout({
               {children}
             </ThemeProvider>
           </NextAuthProvider>
-        </TanStackQueryProvider>
+        </TanstackQueryProvider>
 
         {/* ESM + Fallback */}
         <Script
