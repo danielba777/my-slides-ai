@@ -12,7 +12,9 @@ export default function OverlayImageEditorLayer({ slideId }: { slideId: string }
   const getCanvas = React.useCallback(() => {
     const idx = slides.findIndex((s) => s.id === slideId);
     if (idx < 0) return { idx: -1, c: null as CanvasDoc | null };
-    const c = (slides[idx].canvas ?? null) as CanvasDoc | null;
+    const slide = slides[idx];
+    if (!slide) return { idx: -1, c: null as CanvasDoc | null };
+    const c = (slide.canvas ?? null) as CanvasDoc | null;
     return { idx, c };
   }, [slides, slideId]);
 
