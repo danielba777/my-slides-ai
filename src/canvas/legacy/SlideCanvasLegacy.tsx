@@ -1,6 +1,7 @@
 // apps/dashboard/src/app/(components)/SlideCanvas.tsx
 "use client";
 
+import { loadImageDecoded } from "@/canvas/konva-helpers";
 import LegacyEditorToolbar from "@/canvas/LegacyEditorToolbar";
 import {
   TIKTOK_BACKGROUND_COLOR,
@@ -13,9 +14,9 @@ import {
   TIKTOK_TEXT_COLOR,
 } from "@/canvas/tiktokDefaults";
 import type { CanvasImageNode } from "@/canvas/types";
-import { loadImageDecoded } from "@/canvas/konva-helpers";
 import { measureWrappedText } from "@/lib/textMetrics";
 import type { SlideTextElement } from "@/lib/types";
+import { usePresentationState } from "@/states/presentation-state";
 import { AlignCenter, AlignLeft, AlignRight } from "lucide-react";
 import React, {
   forwardRef,
@@ -26,7 +27,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { usePresentationState } from "@/states/presentation-state";
 
 // UI-Event aus der Toolbar:
 // window.dispatchEvent(new CustomEvent("canvas:text-bg", { detail: { enabled: boolean, mode: "block" | "blob" } }))
@@ -81,6 +81,8 @@ const PADDING = 8;
 const BASE_FONT_PX = 72;
 // Zusätzlicher Puffer für Descender (z. B. g, y, p, q, j), damit beim Export nichts abgeschnitten wird
 const DESCENT_PAD = Math.ceil(BASE_FONT_PX * 0.25); // ~25 % der Basis-Fonthöhe
+// Mindestabstand zwischen Textboxen (skaliert leicht mit Basisgröße)
+const MIN_TEXT_GAP = Math.max(1, Math.round(BASE_FONT_PX * 0.03));
 
 // Feste Opazität für das globale Abdunkeln (lesbarer TikTok-Look)
 const DIM_OVERLAY_OPACITY = 0.28; // muss mit Preview übereinstimmen
@@ -354,8 +356,7 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
             mode: el.background.mode ?? TIKTOK_BACKGROUND_MODE,
             color: el.background.color ?? TIKTOK_BACKGROUND_COLOR,
             opacity: el.background.opacity ?? TIKTOK_BACKGROUND_OPACITY,
-            paddingX:
-              el.background.paddingX ?? TIKTOK_BACKGROUND_PADDING,
+            paddingX: el.background.paddingX ?? TIKTOK_BACKGROUND_PADDING,
             paddingY:
               el.background.paddingY ??
               el.background.paddingX ??
@@ -443,7 +444,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
   // --- Globaler State für Dim-Overlay ---
   const dimOverlaySlideId = usePresentationState((s) => s.dimOverlaySlideId);
-  const setDimOverlaySlideId = usePresentationState((s) => s.setDimOverlaySlideId);
+  const setDimOverlaySlideId = usePresentationState(
+    (s) => s.setDimOverlaySlideId,
+  );
 
   // Sicherer Wrapper: nur aufrufen, wenn wirklich eine Funktion übergeben wurde
   const onLayout = useCallback(
@@ -486,6 +489,34 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const setOutlineColor = (color: string) => {
     applyToActive((l) => ({ ...l, outlineEnabled: true, outlineColor: color }));
   };
+
+  /**
+   * - Verhindert Überlappungen vertikal benachbarter Text-Layer.
+   * - Annahmen:
+   * - - Rotation ~ 0 (gilt bei uns)
+   * - - width/height sind gesetzt (Auto-Height ist bereits berechnet)
+   */
+  const enforceMinVerticalSpacing = useCallback((layers: TextLayer[]) => {
+    const next = [...layers].sort((a, b) => a.y - b.y);
+    for (let i = 1; i < next.length; i++) {
+      const prev = next[i - 1];
+      const cur = next[i];
+      // Nur Text-Layer betrachten
+      // (bei dir sind es hier ohnehin Text-Layer in diesem Array)
+      const prevTop = prev.y - (prev.height ?? 0) / 2;
+      const prevBottom = prev.y + (prev.height ?? 0) / 2;
+      const curTop = cur.y - (cur.height ?? 0) / 2;
+      const neededTop = prevBottom + MIN_TEXT_GAP;
+      if (curTop < neededTop) {
+        const curHalf = (cur.height ?? 0) / 2;
+        const newY = neededTop + curHalf;
+        cur.y = Math.round(newY);
+      }
+    }
+    // ursprüngliche Reihenfolge zurückgeben, aber mit aktualisierten y
+    const map = new Map(next.map((l) => [l.id, l.y]));
+    return layers.map((l) => (map.has(l.id) ? { ...l, y: map.get(l.id)! } : l));
+  }, []);
 
   // === Text hinzufügen ===
   const addNewTextLayer = () => {
@@ -727,6 +758,18 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     if (fromParent) setTextLayers(mapLayoutToLayers(layout) as any);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutSig]);
+
+  // Wenn Text-Layer entstehen/ändern (z. B. 4 Prompts → 4 Boxen),
+  // gleiche automatisch vertikal auf Abstand aus.
+  useEffect(() => {
+    setTextLayers((prev) => {
+      if (!prev || prev.length <= 1) return prev;
+      return enforceMinVerticalSpacing(prev);
+    });
+  }, [
+    enforceMinVerticalSpacing,
+    /* Trigger bei Layout-Änderungen: */ textLayers.length,
+  ]);
 
   // Preview size
   const [previewSize, setPreviewSize] = useState({
@@ -1412,11 +1455,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       const outlineEnabled = (layer as any).outlineEnabled;
 
-      const outlineWidth =
-        (layer as any).outlineWidth ?? TIKTOK_OUTLINE_WIDTH;
+      const outlineWidth = (layer as any).outlineWidth ?? TIKTOK_OUTLINE_WIDTH;
 
-      const outlineColor =
-        (layer as any).outlineColor ?? TIKTOK_OUTLINE_COLOR;
+      const outlineColor = (layer as any).outlineColor ?? TIKTOK_OUTLINE_COLOR;
 
       const scaledOutlineRadius =
         outlineEnabled && outlineWidth > 0
@@ -1629,7 +1670,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             exportCtx.fillText(raw, -layer.width / 2 + PADDING + textW, yPos);
           } else {
             exportCtx.textAlign = "center";
-            exportCtx.fillText(raw, -layer.width / 2 + PADDING + textW / 2, yPos);
+            exportCtx.fillText(
+              raw,
+              -layer.width / 2 + PADDING + textW / 2,
+              yPos,
+            );
           }
         } else {
           let visualWidth = 0;
@@ -1641,7 +1686,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           else if (layer.align === "right")
             startX = -layer.width / 2 + PADDING + textW - visualWidth;
           else startX = -layer.width / 2 + PADDING + (textW - visualWidth) / 2;
-          perGlyph((ch, x, yy) => exportCtx.fillText(ch, x, yy), raw, startX, yPos);
+          perGlyph(
+            (ch, x, yy) => exportCtx.fillText(ch, x, yy),
+            raw,
+            startX,
+            yPos,
+          );
         }
         exportCtx.restore();
       };
@@ -1699,7 +1749,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     return new Promise<Blob>((resolve, reject) => {
       offscreenCanvas.toBlob(
         (blob) => (blob ? resolve(blob) : reject(new Error("Export failed"))),
-        "image/png"
+        "image/png",
       );
     });
   }, [textLayers, imageUrl, scale, offset, overlayNodes, natSizeMap]);
@@ -1755,22 +1805,16 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             ...prevBg,
             ...patch.background,
             mode:
-              patch.background?.mode ??
-              prevBg.mode ??
-              TIKTOK_BACKGROUND_MODE,
+              patch.background?.mode ?? prevBg.mode ?? TIKTOK_BACKGROUND_MODE,
             color:
               patch.background?.color ??
               prevBg.color ??
               TIKTOK_BACKGROUND_COLOR,
             opacity: targetOpacity,
-            enabled:
-              patch.background?.enabled ??
-              targetOpacity > 0,
+            enabled: patch.background?.enabled ?? targetOpacity > 0,
             paddingX: patch.background?.paddingX ?? fallbackPadding,
             paddingY:
-              patch.background?.paddingY ??
-              prevBg.paddingY ??
-              fallbackPadding,
+              patch.background?.paddingY ?? prevBg.paddingY ?? fallbackPadding,
             radius:
               patch.background?.radius ??
               prevBg.radius ??
@@ -1858,7 +1902,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       // Support direct 'weight' (needed for Bold button in toolbar)
       if (typeof (patch as any).weight === "string") {
         const w = (patch as any).weight as any;
-        applyToActive((l) => ({ ...l, weight: w === "bold" ? "bold" : "regular" }));
+        applyToActive((l) => ({
+          ...l,
+          weight: w === "bold" ? "bold" : "regular",
+        }));
       }
       if (typeof (patch as any).fontStyle === "string") {
         const isItalic = ((patch as any).fontStyle as string) === "italic";
@@ -1878,9 +1925,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const [uiOutlineWidth, setUiOutlineWidth] =
     useState<number>(TIKTOK_OUTLINE_WIDTH);
   const [uiTextColor, setUiTextColor] = useState<string>(TIKTOK_TEXT_COLOR);
-  const [uiOutlineColor, setUiOutlineColor] = useState<string>(
-    TIKTOK_OUTLINE_COLOR,
-  );
+  const [uiOutlineColor, setUiOutlineColor] =
+    useState<string>(TIKTOK_OUTLINE_COLOR);
 
   const toggleBoldUI = () => {
     setUiBold((v) => !v);
@@ -2000,8 +2046,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                     // Toolbar liest 'fill' für Textfarbe
                     fill: (active as any).color ?? TIKTOK_TEXT_COLOR,
                     // Toolbar liest 'stroke' + 'strokeWidth' für Kontur
-                    stroke: (active as any).outlineColor ?? TIKTOK_OUTLINE_COLOR,
-                    outlineColor: (active as any).outlineColor ?? TIKTOK_OUTLINE_COLOR,
+                    stroke:
+                      (active as any).outlineColor ?? TIKTOK_OUTLINE_COLOR,
+                    outlineColor:
+                      (active as any).outlineColor ?? TIKTOK_OUTLINE_COLOR,
                     strokeWidth: (active as any).outlineWidth ?? 0,
                     // Bold / Italic
                     fontWeight:
@@ -2278,7 +2326,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             <div className="absolute inset-0 bg-black" />
           )}
 
-                              {/* Per-slide dim overlay: liegt ÜBER dem Background <img>, aber UNTER allen Overlays/Text */}
+          {/* Per-slide dim overlay: liegt ÜBER dem Background <img>, aber UNTER allen Overlays/Text */}
           {dimBg && (
             <div
               className="absolute inset-0 pointer-events-none"
@@ -2752,4 +2800,3 @@ function ToolbarSizedByCanvas({
     </div>
   );
 }
-
