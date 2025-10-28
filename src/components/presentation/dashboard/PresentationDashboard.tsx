@@ -46,6 +46,23 @@ export function PresentationDashboard({
     setPresentationInput,
   } = usePresentationState();
 
+  const [limits, setLimits] = useState<{ slidesLeft: number; unlimited: boolean } | null>(null);
+  const [limitsLoading, setLimitsLoading] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLimitsLoading(true);
+        const res = await fetch("/api/billing/limits", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        setLimits({ slidesLeft: data?.slidesLeft ?? 0, unlimited: !!data?.unlimited });
+      } finally {
+        setLimitsLoading(false);
+      }
+    };
+    void load();
+  }, []);
   const [templatePosts, setTemplatePosts] = useState<TemplatePost[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [templateError, setTemplateError] = useState<string | null>(null);
@@ -99,7 +116,7 @@ export function PresentationDashboard({
 
     void fetchTemplates();
   }, [showTemplates, templatePosts.length, isLoadingTemplates]);
-
+  const canGenerate = limits?.unlimited || (typeof limits?.slidesLeft === "number" && limits.slidesLeft > 0);
   const promptCards = useMemo(
     () =>
       templatePosts.map((post) => {
@@ -173,18 +190,22 @@ export function PresentationDashboard({
         <div className="space-y-8">
           <PresentationInput handleGenerate={handleGenerate} />
           <ImageCollectionSelector />
-          <div className="grid gap-4 items-end md:grid-cols-6">
-            <PresentationControls className="md:col-span-5" />
+          <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-2">
             <Button
-              onClick={handleGenerate}
-              disabled={!presentationInput.trim() || isGeneratingOutline}
-              variant={isGeneratingOutline ? "loading" : "default"}
-              className="w-full gap-2 md:col-span-1 md:w-auto md:justify-center"
+              className="gap-2"
+              onClick={() => (canGenerate ? handleGenerate() : router.push("/#pricing"))}
+              disabled={isGeneratingOutline || !presentationInput.trim() || limitsLoading}
+              variant={canGenerate ? "default" : "secondary"}
             >
               <Wand2 className="h-4 w-4" />
-              Generate
+              {canGenerate ? "Generate" : "Upgrade Now"}
             </Button>
           </div>
+          <div className="text-xs text-muted-foreground">
+            {limits?.unlimited ? "Usage: unlimited" : `Usage: ${limits?.slidesLeft ?? 0} left`}
+          </div>
+        </div>
         </div>
       </div>
 
