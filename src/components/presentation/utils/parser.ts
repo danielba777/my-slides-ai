@@ -136,6 +136,12 @@ export type RootImage = {
   // New: Support for 4-image grid
   useGrid?: boolean;
   gridImages?: ImageGridItem[];
+  // Optional metadata to track originating image set/category
+  imageSetId?: string;
+  imageSetName?: string;
+  parentImageSetId?: string | null;
+  parentImageSetName?: string | null;
+  imageCategory?: string | null;
 };
 // Updated slide type to be a structured object instead of just an array
 export type PlateSlide = {

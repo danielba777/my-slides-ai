@@ -15,7 +15,10 @@ import { useEditorReadOnly } from "platejs/react";
 import { Resizable } from "re-resizable";
 import { useState } from "react";
 import { MultiSlideImageSelector } from "../../presentation-page/MultiSlideImageSelector";
-import { SingleSlideImageSelector } from "../../presentation-page/SingleSlideImageSelector";
+import {
+  SingleSlideImageSelector,
+  type SelectedImageResult,
+} from "../../presentation-page/SingleSlideImageSelector";
 import { type RootImage as RootImageType } from "../../utils/parser";
 import ImagePlaceholder from "./image-placeholder";
 import { PresentationImageEditor } from "./presentation-image-editor";
@@ -96,15 +99,26 @@ export default function RootImage({
   };
 
   // Handle single image selection
-  const handleSingleImageSelect = (imageUrl: string) => {
+  const handleSingleImageSelect = (selection: SelectedImageResult) => {
     setSlides(
       slides.map((slide, index) => {
         if (slideIndex !== index) return slide;
+        const prevRoot = slide.rootImage ?? { query: "" };
         return {
           ...slide,
           rootImage: {
-            ...slide.rootImage!,
-            url: imageUrl,
+            ...prevRoot,
+            url: selection.url,
+            useGrid: false,
+            gridImages: undefined,
+            imageSetId: selection.imageSetId ?? prevRoot.imageSetId,
+            imageSetName: selection.imageSetName ?? prevRoot.imageSetName,
+            parentImageSetId:
+              selection.parentSetId ?? prevRoot.parentImageSetId ?? null,
+            parentImageSetName:
+              selection.parentSetName ?? prevRoot.parentImageSetName ?? null,
+            imageCategory:
+              selection.category ?? prevRoot.imageCategory ?? null,
           },
         };
       }),

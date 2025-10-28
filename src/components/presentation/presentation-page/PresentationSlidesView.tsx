@@ -24,7 +24,10 @@ import { PresentModeHeader } from "../dashboard/PresentModeHeader";
 import { ThinkingDisplay } from "../dashboard/ThinkingDisplay";
 import { MultiSlideImageSelector } from "./MultiSlideImageSelector";
 import OverlayImageEditorLayer from "./OverlayImageEditorLayer";
-import { SingleSlideImageSelector } from "./SingleSlideImageSelector";
+import {
+  SingleSlideImageSelector,
+  type SelectedImageResult,
+} from "./SingleSlideImageSelector";
 import { SortableSlide } from "./SortableSlide";
 import StickyDownloadActions from "./StickyDownloadActions";
 const SlideCanvas = dynamic(() => import("@/canvas/SlideCanvasAdapter"), {
@@ -179,7 +182,7 @@ const SlideFrame = memo(function SlideFrame({
   }, [editingOverlaySlideId, slide.id]);
 
   // Handler für die Bild-Auswahl
-  const handleImageSelect = (imageUrl: string) => {
+  const handleImageSelect = (selection: SelectedImageResult) => {
     const { slides, setSlides } = usePresentationState.getState();
     const updated = slides.slice();
     const i = updated.findIndex((x) => x.id === slide.id);
@@ -191,7 +194,22 @@ const SlideFrame = memo(function SlideFrame({
     // Update nur das rootImage dieser Slide
     updated[i] = {
       ...currentSlide,
-      rootImage: { url: imageUrl, query: "" },
+      rootImage: {
+        query: currentSlide.rootImage?.query ?? "",
+        url: selection.url,
+        useGrid: false,
+        gridImages: undefined,
+        imageSetId:
+          selection.imageSetId ?? currentSlide.rootImage?.imageSetId,
+        imageSetName:
+          selection.imageSetName ?? currentSlide.rootImage?.imageSetName,
+        parentImageSetId:
+          selection.parentSetId ?? currentSlide.rootImage?.parentImageSetId ?? null,
+        parentImageSetName:
+          selection.parentSetName ?? currentSlide.rootImage?.parentImageSetName ?? null,
+        imageCategory:
+          selection.category ?? currentSlide.rootImage?.imageCategory ?? null,
+      },
     };
     setSlides(updated);
   };

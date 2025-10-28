@@ -18,7 +18,14 @@ import { cn } from "@/lib/utils";
 import { usePresentationState } from "@/states/presentation-state";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Image as ImageIcon, Plus, Trash } from "lucide-react";
+import {
+  ArrowRight,
+  GripVertical,
+  Image as ImageIcon,
+  Loader2,
+  Plus,
+  Trash,
+} from "lucide-react";
 import React, { useEffect, useState } from "react";
 import PersonalImageSelectorDialog from "./PersonalImageSelectorDialog";
 
@@ -81,9 +88,62 @@ export function SlideContainer({
   }, [isDragging]);
 
   const { addSlide, deleteSlideAt } = useSlideOperations();
+  const setSlides = usePresentationState((s) => s.setSlides);
+  const presentationImageSetId = usePresentationState((s) => s.imageSetId);
+  const [isShuffling, setIsShuffling] = useState(false);
+  const activeImageSetId =
+    currentSlide?.rootImage?.imageSetId ?? presentationImageSetId ?? null;
+  const canShuffle = Boolean(activeImageSetId);
 
   const deleteSlide = () => {
     deleteSlideAt(index);
+  };
+
+  const handleShuffleImage = async () => {
+    const imageSetId = activeImageSetId;
+    if (!imageSetId || isShuffling) return;
+
+    setIsShuffling(true);
+    try {
+      const response = await fetch(
+        `/api/imagesets/${imageSetId}/random-image`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch random image");
+      }
+      const data = await response.json();
+      const nextUrl =
+        data?.imageUrl ??
+        data?.url ??
+        data?.image?.url ??
+        (Array.isArray(data?.images) ? data.images[0]?.url : undefined);
+      if (!nextUrl) {
+        throw new Error("Missing image URL");
+      }
+      const state = usePresentationState.getState();
+      const updated = state.slides.slice();
+      const idx = updated.findIndex((slideItem) => slideItem.id === id);
+      if (idx >= 0) {
+        const prevRoot = updated[idx].rootImage ?? { query: "" };
+        updated[idx] = {
+          ...updated[idx],
+          rootImage: {
+            ...prevRoot,
+            query: prevRoot.query ?? "",
+            url: nextUrl,
+            useGrid: false,
+            gridImages: undefined,
+            imageSetId,
+          },
+        };
+        setSlides(updated);
+      }
+    } catch (error) {
+      console.error("Failed to fetch random image", error);
+    } finally {
+      setIsShuffling(false);
+    }
   };
 
   return (
@@ -154,6 +214,27 @@ export function SlideContainer({
                 title="Add next slide"
               >
                 <Plus className="h-4 w-4" />
+              </Button>
+
+              {/* Zufallsbild innerhalb der Kategorie */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
+                onClick={handleShuffleImage}
+                aria-label="Next image in category"
+                title={
+                  canShuffle
+                    ? "Random image from current category"
+                    : "Select an image category first"
+                }
+                disabled={!canShuffle || isShuffling}
+              >
+                {isShuffling ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowRight className="h-4 w-4" />
+                )}
               </Button>
 
               {/* Löschen */}

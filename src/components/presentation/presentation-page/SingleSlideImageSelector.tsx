@@ -30,10 +30,19 @@ interface ImageSet {
   children?: ImageSet[];
 }
 
+export type SelectedImageResult = {
+  url: string;
+  imageSetId?: string;
+  imageSetName?: string;
+  parentSetId?: string | null;
+  parentSetName?: string | null;
+  category?: string | null;
+};
+
 interface SingleSlideImageSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectImage: (imageUrl: string) => void;
+  onSelectImage: (selection: SelectedImageResult) => void;
 }
 
 export function SingleSlideImageSelector({
@@ -42,7 +51,11 @@ export function SingleSlideImageSelector({
   onSelectImage,
 }: SingleSlideImageSelectorProps) {
   const [selectedSet, setSelectedSet] = useState<ImageSet | null>(null);
-  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
+  const [pendingSelection, setPendingSelection] = useState<{
+    url: string;
+    imageSet: ImageSet | null;
+    parentSet: ImageSet | null;
+  } | null>(null);
   const [imageSets, setImageSets] = useState<ImageSet[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"community" | "mine">("community");
@@ -78,7 +91,7 @@ export function SingleSlideImageSelector({
   useEffect(() => {
     if (isOpen) {
       void loadImageSets();
-      setPendingImageUrl(null);
+      setPendingSelection(null);
       setSelectedSet(null);
       setCurrentPage(1);
       setDrillDownParent(null); // Reset drill-down when opening dialog
@@ -139,17 +152,35 @@ export function SingleSlideImageSelector({
   }, [imageSets, drillDownParent]);
 
   const handleSelectImage = (imageUrl: string) => {
-    setPendingImageUrl(imageUrl);
+    const effectiveParent =
+      drillDownParent && drillDownParent.id !== selectedSet?.id
+        ? drillDownParent
+        : null;
+    setPendingSelection({
+      url: imageUrl,
+      imageSet: selectedSet,
+      parentSet: effectiveParent,
+    });
   };
 
   const handleSave = () => {
-    if (pendingImageUrl) {
-      onSelectImage(pendingImageUrl);
+    if (pendingSelection) {
+      const { imageSet, parentSet, url } = pendingSelection;
+      onSelectImage({
+        url,
+        imageSetId: imageSet?.id,
+        imageSetName: imageSet?.name,
+        parentSetId:
+          imageSet?.parentId ?? parentSet?.id ?? null,
+        parentSetName: parentSet?.name ?? null,
+        category: imageSet?.category ?? parentSet?.category ?? null,
+      });
       onClose();
     }
   };
 
   const handleSelectSet = (set: ImageSet) => {
+    setPendingSelection(null);
     // Check if this set has children
     const hasChildren =
       (set.children && set.children.length > 0) ||
@@ -165,6 +196,7 @@ export function SingleSlideImageSelector({
   };
 
   const handleBackToTopLevel = () => {
+    setPendingSelection(null);
     setDrillDownParent(null);
   };
 
@@ -389,7 +421,7 @@ export function SingleSlideImageSelector({
                 className={cn(
                   "aspect-square rounded-lg overflow-hidden transition-all relative",
                   "hover:ring-2 hover:ring-blue-400 hover:scale-105",
-                  pendingImageUrl === img.url &&
+                  pendingSelection?.url === img.url &&
                     "ring-4 ring-blue-500 scale-105",
                 )}
               >
@@ -398,7 +430,7 @@ export function SingleSlideImageSelector({
                   alt={`${selectedSet.name} ${startIndex + idx + 1}`}
                   className="w-full h-full object-cover"
                 />
-                {pendingImageUrl === img.url && (
+                {pendingSelection?.url === img.url && (
                   <div className="absolute inset-0 bg-blue-500/20" />
                 )}
               </button>
@@ -462,7 +494,7 @@ export function SingleSlideImageSelector({
                 onClick={() => {
                   if (selectedSet) {
                     setSelectedSet(null);
-                    setPendingImageUrl(null);
+                    setPendingSelection(null);
                   } else if (drillDownParent) {
                     handleBackToTopLevel();
                   }
@@ -529,7 +561,7 @@ export function SingleSlideImageSelector({
             Cancel
           </Button>
           {selectedSet && (
-            <Button onClick={handleSave} disabled={!pendingImageUrl}>
+            <Button onClick={handleSave} disabled={!pendingSelection}>
               Apply Image
             </Button>
           )}
