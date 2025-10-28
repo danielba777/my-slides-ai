@@ -1,10 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AiAvatarPromptInput } from "@/components/dashboard/ai-avatars/PromptInput";
-import { AiAvatarTemplateGrid } from "@/components/dashboard/ai-avatars/TemplateGrid";
+import {
+  AiAvatarTemplateGrid,
+  AI_AVATAR_GRID_COLUMNS,
+} from "@/components/dashboard/ai-avatars/TemplateGrid";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { AiAvatarTemplate } from "@/types/ai-avatars";
 
@@ -16,6 +20,7 @@ type GenerationJob = {
 
 const EXPECTED_GENERATION_BATCH_SIZE = 4;
 const DEFAULT_STYLE_ID = "1cb4b936-77bf-4f9a-9039-f3d349a4cdbe";
+const ROW_INCREMENT = 3;
 
 type ThemeOption = {
   name: string;
@@ -128,6 +133,23 @@ export default function AiAvatarDashboardPage() {
     null,
   );
   const [quality, setQuality] = useState<"basic" | "high">("high");
+  const [templateRows, setTemplateRows] = useState(3);
+  const [recentRows, setRecentRows] = useState(3);
+  const maxTemplateRows = useMemo(() => {
+    return Math.max(
+      1,
+      Math.ceil(templates.length / AI_AVATAR_GRID_COLUMNS),
+    );
+  }, [templates.length]);
+  const maxRecentRows = useMemo(() => {
+    return Math.max(
+      1,
+      Math.ceil(recentCreations.length / AI_AVATAR_GRID_COLUMNS),
+    );
+  }, [recentCreations.length]);
+  const canShowMoreTemplates = templateRows < maxTemplateRows;
+  const canShowMoreRecent = recentRows < maxRecentRows;
+
 
   const [limits, setLimits] = useState<{
     aiLeft: number;
@@ -520,8 +542,26 @@ export default function AiAvatarDashboardPage() {
                   templates={recentCreations}
                   showOpenInNewTab
                   loadingPlaceholders={pendingGenerations}
+                  rows={recentRows}
                 />
               )}
+              {!isLoadingRecent &&
+                recentCreations.length > 0 &&
+                canShowMoreRecent && (
+                  <div className="mt-4 flex justify-center">
+                    <Button
+                      variant="outline"
+                      className="rounded-full px-6"
+                      onClick={() =>
+                        setRecentRows((prev) =>
+                          Math.min(prev + ROW_INCREMENT, maxRecentRows),
+                        )
+                      }
+                    >
+                      Show more
+                    </Button>
+                  </div>
+                )}
             </div>
           )}
 
@@ -535,7 +575,23 @@ export default function AiAvatarDashboardPage() {
                 <AiAvatarTemplateGrid
                   templates={templates}
                   onCopy={handleCopyPrompt}
+                  rows={templateRows}
                 />
+              )}
+              {!isLoadingTemplates && templates.length > 0 && canShowMoreTemplates && (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    variant="outline"
+                    className="rounded-full px-6"
+                    onClick={() =>
+                      setTemplateRows((prev) =>
+                        Math.min(prev + ROW_INCREMENT, maxTemplateRows),
+                      )
+                    }
+                  >
+                    Show more
+                  </Button>
+                </div>
               )}
             </div>
           )}

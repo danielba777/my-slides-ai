@@ -114,9 +114,10 @@ async function processGenerationJob({
   quality: "basic" | "high";
 }) {
   const randomSeed = Math.floor(Math.random() * 1_000_000);
-  // Vor Start atomar 2 AI-Credits abziehen
+  const creditCost = quality === "basic" ? 1 : 2;
+  // Vor Start atomar Credits abziehen (1 bei basic, 2 bei high)
   try {
-    await ensureAndConsumeCredits(userId, { kind: "ai", cost: 2 });
+    await ensureAndConsumeCredits(userId, { kind: "ai", cost: creditCost });
   } catch (e: any) {
     if (e?.code === "INSUFFICIENT_AI_CREDITS") {
       return NextResponse.json(
