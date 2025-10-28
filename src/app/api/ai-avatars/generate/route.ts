@@ -1,7 +1,6 @@
 import { env } from "@/env";
 import { auth } from "@/server/auth";
 import { NextResponse } from "next/server";
-import { auth } from "@/server/auth";
 import { ensureAndConsumeCredits } from "@/server/billing";
 
 const API_BASE = "https://api.302.ai";
@@ -110,16 +109,6 @@ async function processGenerationJob({
     }
     throw e;
   }
-
-const payload = {
-  quality: "basic",
-  aspect_ratio: "2:3",
-  prompt: prompt.trim(),
-  negative_prompt: "",
-  enhance_prompt: false,
-  seed: 38459,
-  style_id: "1cb4b936-77bf-4f9a-9039-f3d349a4cdbe",
-};
 
   const payload = {
     quality: "basic",
