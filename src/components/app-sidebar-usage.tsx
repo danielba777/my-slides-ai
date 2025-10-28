@@ -1,7 +1,9 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface UsageResponse {
@@ -116,28 +118,33 @@ export function SidebarUsageSummary() {
   }
 
   return (
-    <div className="rounded-xl border border-zinc-300 px-3 py-2 text-sm text-muted-foreground bg-zinc-100">
-      <div className="mt-2 text-sm text-center font-medium text-foreground">
+    <div
+      className={cn(
+        "rounded-xl border px-3 py-2 text-xs",
+        "bg-[#F7F8F3] border-sidebar-border/80 text-sidebar-foreground/90",
+      )}
+    >
+      <div className="mt-2 text-sm text-center font-medium text-sidebar-foreground">
         <span>{renderSlides()}</span>
-        <span className="mx-3 text-muted-foreground">|</span>
+        <span className="mx-2 text-sidebar-foreground/60">|</span>
         <span>{renderAiCredits()}</span>
       </div>
-      <div className="flex items-center justify-center text-foreground mt-1">
+      <div className="flex items-center justify-center text-sidebar-foreground text-center mt-2">
         {usage.plan ? (
-          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          <span className="text-[11px] uppercase tracking-wide text-sidebar-foreground/60">
             {usage.plan} Plan
           </span>
         ) : (
-          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          <span className="text-[11px] uppercase tracking-wide text-sidebar-foreground/60">
             No active subscription
           </span>
         )}
       </div>
-      <div className="mt-1">
+      <div className="mt-3">
         <Button
           variant="outline"
           size="sm"
-          className="w-full rounded-full text-xs"
+          className="w-full rounded-full border-sidebar-border/80 bg-[#F7F8F3]/60 text-sidebar-foreground hover:bg-sidebar/70 disabled:opacity-40"
           disabled={!usage.hasActiveSubscription || isBillingRedirecting}
           onClick={async () => {
             if (!usage.hasActiveSubscription) {
