@@ -1,230 +1,261 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-**_ a/src/canvas/legacy/SlideCanvasLegacy.tsx
---- b/src/canvas/legacy/SlideCanvasLegacy.tsx
+**_ Begin Patch
+_** Update File: src/components/presentation/presentation-page/SlideContainer.tsx
 @@
-// Mindestabstand zwischen Textboxen (skaliert leicht mit Basisgröße)
--const MIN_TEXT_GAP = Math.max(1, Math.round(BASE_FONT_PX _ 0.03));
-+// halbierter Gap, damit die Boxen dichter beieinander liegen (User-Wunsch)
-+const MIN*TEXT_GAP = Math.max(1, Math.round(BASE_FONT_PX * 0.015));
-diff
-Code kopieren
-\_** a/src/canvas/LegacyEditorToolbar.tsx
---- b/src/canvas/LegacyEditorToolbar.tsx
-@@
+const { addSlide, deleteSlideAt } = useSlideOperations();
 
--              onChangeSelectedText?.({
--                .selectedText!,
-
-*              onChangeSelectedText?.({
-*                ...selectedText!,
-                   strokeEnabled: true,
-                   outlineEnabled: true,
-                   strokeWidth: TIKTOK_OUTLINE_WIDTH,
-                   outlineWidth: TIKTOK_OUTLINE_WIDTH,
-                   stroke: currentColor,
-                   outlineColor: currentColor,
-                 });
+- const slides = usePresentationState((s) => s.slides);
+- const setSlides = usePresentationState((s) => s.setSlides);
+- const activeImageSetId = usePresentationState((s) => s.imageSetId);
   @@
+  const deleteSlide = () => {
+  deleteSlideAt(index);
+  };
 
--              if (bgEnabled) {
-
-*              if (bgEnabled) {
-                 setTextBgOpacity(0);
-
--                onChangeSelectedText?.({
--                  ...selectedText!,
-
-*                onChangeSelectedText?.({
-*                  ...selectedText!,
-                     background: {
-                       ...(selectedBackground ?? {}),
-                       opacity: 0,
-                       enabled: false,
-                       paddingX: TIKTOK_BACKGROUND_PADDING,
+- // Helper: Alle Bilder eines Sets (inkl. Kind-Sets) einsammeln
+- async function collectImagesFromSetTree(imageSetId: string): Promise<string[]> {
+- try {
+-      const res = await fetch("/api/imagesets");
+-      if (!res.ok) return [];
+-      const allSets = (await res.json()) as Array<any>;
+-
+-      const byId = new Map<string, any>();
+-      allSets.forEach((s) => byId.set(s.id, s));
+-
+-      const start = byId.get(imageSetId);
+-      if (!start) return [];
+-
+-      const stack: any[] = [start];
+-      const urls: string[] = [];
+-      while (stack.length) {
+-        const cur = stack.pop();
+-        if (Array.isArray(cur?.images)) {
+-          cur.images.forEach((img: any) => img?.url && urls.push(img.url));
+-        }
+-        if (Array.isArray(cur?.children)) {
+-          cur.children.forEach((ch: any) => stack.push(ch));
+-        } else if (cur?._count?.children > 0 && Array.isArray(allSets)) {
+-          // Fallback: falls Kinder nicht materialisiert sind, nimm alle mit parentId === cur.id
+-          allSets.forEach((s) => {
+-            if (s?.parentId === cur.id) stack.push(s);
+-          });
+-        }
+-      }
+-      return urls;
+- } catch {
+-      return [];
+- }
+- }
+-
+- // Aktion: Nächstes Random-Bild aus der aktiven Kategorie setzen
+- const handleNextRandomImage = async () => {
+- const slide = slides[index];
+- if (!slide || !activeImageSetId) {
+-      // Kein aktives Set gewählt → sanfter Hinweis
+-      console.warn("No image set selected. Pick a category in 'Edit Image' first.");
+-      return;
+- }
+-
+- const urls = await collectImagesFromSetTree(activeImageSetId);
+- if (urls.length === 0) {
+-      console.warn("Selected image set has no images.");
+-      return;
+- }
+- const nextUrl = urls[Math.floor(Math.random() * urls.length)];
+-
+- // Single-Image: url austauschen. Grid lassen wir unverändert (User-Anforderung bezog sich auf „das Bild“).
+- const updated = slides.slice();
+- const cur = updated[index];
+- updated[index] = {
+-      ...cur,
+-      rootImage: {
+-        ...(cur?.rootImage ?? {}),
+-        url: nextUrl,
+-      },
+- };
+- setSlides(updated);
+- };
+- return (
+  <div
+  ref={setNodeRef}
+  style={style}
+  className={cn(
   @@
-  const nextBackground = {
-  enabled: true,
-  mode: TIKTOK_BACKGROUND_MODE,
-  color: nextColor,
-  opacity: TIKTOK_BACKGROUND_OPACITY,
-  paddingX: TIKTOK_BACKGROUND_PADDING,
-  paddingY: TIKTOK_BACKGROUND_PADDING,
-  radius: TIKTOK_BACKGROUND_RADIUS,
-  lineOverlap: selectedBackground?.lineOverlap ?? 0,
-  } as SlideTextElement["background"];
+  {!isPresenting && !isReadOnly && (
+  <div
+  className={cn(
+  "z-[1001] mt-3 w-full",
+  )}
+  aria-label="Slide toolbar" >
+  <div className="mx-auto flex w-full max-w-[760px] items-center justify-center gap-2 rounded-md bg-background/95 p-2 shadow-sm backdrop-blur">
+  {/_ Drag-Handle _/}
+  <button
+  ref={setActivatorNodeRef as React.Ref<HTMLButtonElement>}
+  {...listeners}
+  {...attributes}
 
--              onChangeSelectedText?.({
--                .selectedText!,
+*                className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus:outline-none focus-visible:outline-none"
+*                aria-label="Folienposition ziehen"
+*                title="Verschieben"
 
-*              onChangeSelectedText?.({
-*                ...selectedText!,
-                   background: nextBackground,
-                 });
+-                className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus:outline-none focus-visible:outline-none"
+-                aria-label="Drag slide position"
+-                title="Move"
+               >
+                 <GripVertical className="h-4 w-4" />
+               </button>
+
+               {/* Neuer: Persönliche Bilder (ersetzt den Edit/Canvas-Button) */}
+               <PersonalImagePickerButton index={index} />
+
+-
+-              {/* Next random image from active category */}
+-              <Button
+-                variant="ghost"
+-                size="icon"
+-                className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
+-                onClick={handleNextRandomImage}
+-                aria-label="Next image"
+-                title="Next image"
+-              >
+-                <ArrowRight className="h-4 w-4" />
+-              </Button>
+
+               {/* Neue Folie darunter */}
+               <Button
+                 variant="ghost"
+                 size="icon"
+                 className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
+                 onClick={() => addSlide("after", index)}
+
+*                aria-label="Neue Folie darunter"
+*                title="Neue Folie darunter"
+
+-                aria-label="Add slide below"
+-                title="Add slide below"
+                 >
+                   <Plus className="h-4 w-4" />
+                 </Button>
+
+                 {/* Löschen */}
+  **_ End Patch
   diff
   Code kopieren
-  \*\*\* a/src/canvas/SlideCanvasAdapter.tsx
-  --- b/src/canvas/SlideCanvasAdapter.tsx
+  _** Begin Patch
+  _\*\* Update File: src/components/plate/ui/fixed-toolbar-buttons.tsx
   @@
-  import type { SlideTextElement } from "@/lib/types";
-  +import {
-* TIKTOK_OUTLINE_COLOR,
-* TIKTOK_OUTLINE_WIDTH,
-  +} from "@/canvas/tiktokDefaults";
+  return (
+  <div className="flex w-full">
+  {/_ Linke Sektion: immer sichtbarer "Text +" Button \*/}
+  <ToolbarGroup>
+  <button
+  onClick={handleAddText}
+
+*          aria-label="Text hinzufügen"
+*          title="Text hinzufügen"
+
+-          aria-label="Add text"
+-          title="Add text"
+             className="inline-flex items-center justify-center whitespace-nowrap rounded-xl border border-border/80 bg-background/90 text-sm font-medium shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-0 h-9 w-9"
+           >
+             <Plus className="h-4 w-4" />
+           </button>
+         </ToolbarGroup>
+  **_ End Patch
+  diff
+  Code kopieren
+  _** Begin Patch
+  \*\*\* Update File: src/components/presentation/presentation-page/SingleSlideImageSelector.tsx
   @@
-  const handleToolbarPatch = useCallback(
-  (patch: Partial<SlideTextElement>) => {
-  // 1) Hintergrund
-  if (patch.background) {
-  applyToActive((l) => {
-  @@
-  return { ...l, background: nextBackground };
-  });
+  -interface SingleSlideImageSelectorProps {
+  +interface SingleSlideImageSelectorProps {
+  isOpen: boolean;
+  onClose: () => void;
+
+* onSelectImage: (imageUrl: string) => void;
+
+- onSelectImage: (imageUrl: string, imageSetId?: string) => void;
   }
-  // 2) Typografie / Layout
-  if (typeof patch.lineHeight === "number") {
+  @@
 
--        applyToActive((l) => ({ ...l, lineHeight: patch.lineHeight! }));
+* const handleSelectImage = (imageUrl: string) => {
+* setPendingImageUrl(imageUrl);
 
-*        applyToActive((l) => ({ ...l, lineHeight: patch.lineHeight! }));
-       }
-       if (typeof patch.letterSpacing === "number") {
+- const handleSelectImage = (imageUrl: string) => {
+- setPendingImageUrl(imageUrl);
+  };
+  @@
 
--        applyToActive((l) => ({ ...l, letterSpacing: patch.letterSpacing! }));
+* const handleSave = () => {
+* if (pendingImageUrl) {
+*      onSelectImage(pendingImageUrl);
+*      onClose();
+* }
+* };
 
-*        applyToActive((l) => ({ ...l, letterSpacing: patch.letterSpacing! }));
-       }
+- const handleSave = () => {
+- if (pendingImageUrl) {
+-      onSelectImage(pendingImageUrl, selectedSet?.id ?? drillDownParent?.id ?? undefined);
+-      onClose();
+- }
+- };
+  **_ End Patch
+  diff
+  Code kopieren
+  _** Begin Patch
+  \*\*\* Update File: src/components/presentation/presentation-page/PresentationSlidesView.tsx
+  @@
 
--      if (patch.align) {
--        applyToActive((l) => ({ .l, align: patch.align as any }));
--      }
+* // Handler für die Bild-Auswahl
+* const handleImageSelect = (imageUrl: string) => {
 
-*      if (patch.align) {
-*        applyToActive((l) => ({ ...l, align: patch.align as any }));
-*      }
-       // Toolbar liefert "fontSize" → mappen auf scale (BASE_FONT_PX * scale)
-       if (
-         typeof (patch as any).fontSize === "number" &&
-         Number.isFinite((patch as any).fontSize)
-       ) {
-         const nextScale = Math.max(
-           0.2,
-           Math.min(4, (patch as any).fontSize / BASE_FONT_PX),
-         );
+- // Handler für die Bild-Auswahl
+- const handleImageSelect = (imageUrl: string, imageSetId?: string) => {
+  const { slides, setSlides } = usePresentationState.getState();
+  const updated = slides.slice();
+  const i = updated.findIndex((x) => x.id === slide.id);
+  if (i < 0) return;
 
--        applyToActive((l) => ({ .l, scale: nextScale }));
+  const currentSlide = updated[i];
+  if (!currentSlide) return;
 
-*        applyToActive((l) => ({ ...l, scale: nextScale }));
-       }
+  // Update nur das rootImage dieser Slide
+  updated[i] = {
 
-       // Farben
-       if (typeof (patch as any).fill === "string") {
-         const c = (patch as any).fill as string;
+*      ...currentSlide,
+*      rootImage: { url: imageUrl, query: "" },
 
--        applyToActive((l) => ({ .l, color: c }));
+-      ...currentSlide,
+-      rootImage: { ...(currentSlide.rootImage ?? {}), url: imageUrl, query: "" },
+       };
+       setSlides(updated);
+  };
+  **_ End Patch
+  diff
+  Code kopieren
+  _** Begin Patch
+  \*\*\* Update File: src/components/presentation/editor/custom-elements/root-image.tsx
+  @@
 
-*        applyToActive((l) => ({ ...l, color: c }));
-       }
+* const handleSingleImageSelect = (imageUrl: string) => {
 
-       // === Outline/Stroke Mapping robust machen ===
+- const handleSingleImageSelect = (imageUrl: string, \_imageSetId?: string) => {
+  setSlides(
+  slides.map((slide, index) => {
+  if (slideIndex !== index) return slide;
+  return {
+  ...slide,
+  rootImage: {
 
-*      // width-Änderung
-       if (typeof (patch as any).strokeWidth === "number") {
-         const w = (patch as any).strokeWidth as number;
+*            ...(slide.rootImage!),
+*            url: imageUrl,
 
--        applyToActive((l: any) => ({
--          .l,
--          outlineEnabled: w > 0,
--          outlineWidth: w,
--        }));
-
-*        applyToActive((l: any) => ({
-*          ...l,
-*          outlineEnabled: w > 0,
-*          outlineWidth: w,
-*        }));
-       }
-*      // explizite outlineWidth
-*      if (typeof (patch as any).outlineWidth === "number") {
-*        const w = (patch as any).outlineWidth as number;
-*        applyToActive((l: any) => ({
-*          ...l,
-*          outlineEnabled: w > 0,
-*          outlineWidth: w,
-*        }));
-*      }
-*      // Farbänderung
-       if (typeof (patch as any).stroke === "string") {
-         const c = (patch as any).stroke as string;
-
--        applyToActive((l: any) => ({
--          .l,
--          outlineEnabled: true,
--          outlineColor: c,
--          outlineWidth:
--            l.outlineWidth && l.outlineWidth > 0
--              ? l.outlineWidth
--              : TIKTOK_OUTLINE_WIDTH,
--        }));
-
-*        applyToActive((l: any) => ({
-*          ...l,
-*          outlineEnabled: true,
-*          outlineColor: c,
-*          outlineWidth:
-*            l.outlineWidth && l.outlineWidth > 0
-*              ? l.outlineWidth
-*              : TIKTOK_OUTLINE_WIDTH,
-*        }));
-       }
-*      // explizite outlineColor
-*      if (typeof (patch as any).outlineColor === "string") {
-*        const c = (patch as any).outlineColor as string;
-*        applyToActive((l: any) => ({
-*          ...l,
-*          outlineEnabled: true,
-*          outlineColor: c,
-*          outlineWidth:
-*            l.outlineWidth && l.outlineWidth > 0
-*              ? l.outlineWidth
-*              : TIKTOK_OUTLINE_WIDTH,
-*        }));
-*      }
-*      // explizite Toggles (kommen vom Toolbar-Button)
-*      if (typeof (patch as any).outlineEnabled === "boolean") {
-*        const en = (patch as any).outlineEnabled as boolean;
-*        applyToActive((l: any) => ({
-*          ...l,
-*          outlineEnabled: en,
-*          outlineWidth: en
-*            ? l.outlineWidth && l.outlineWidth > 0
-*              ? l.outlineWidth
-*              : TIKTOK_OUTLINE_WIDTH
-*            : 0,
-*          outlineColor: l.outlineColor ?? TIKTOK_OUTLINE_COLOR,
-*        }));
-*      }
-*      if (typeof (patch as any).strokeEnabled === "boolean") {
-*        const en = (patch as any).strokeEnabled as boolean;
-*        applyToActive((l: any) => ({
-*          ...l,
-*          outlineEnabled: en,
-*          outlineWidth: en
-*            ? l.outlineWidth && l.outlineWidth > 0
-*              ? l.outlineWidth
-*              : TIKTOK_OUTLINE_WIDTH
-*            : 0,
-*          outlineColor: l.outlineColor ?? TIKTOK_OUTLINE_COLOR,
-*        }));
-*      }
-
-       if (typeof (patch as any).fontStyle === "string") {
-         const isItalic = ((patch as any).fontStyle as string) === "italic";
-
--        applyToActive((l: any) => ({ .l, italic: isItalic }));
-
-*        applyToActive((l: any) => ({ ...l, italic: isItalic }));
-       }
-  },
-  [applyToActive],
-  );
+-            ...(slide.rootImage!),
+-            url: imageUrl,
+             },
+           };
+         }),
+       );
+  };
+  \*\*\* End Patch
