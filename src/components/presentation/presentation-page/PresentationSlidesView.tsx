@@ -168,6 +168,7 @@ const SlideFrame = memo(function SlideFrame({
     const i = updated.findIndex((x) => x.id === slide.id);
     if (i < 0) return;
     const current = updated[i];
+    if (!current) return;
     const c = (current.canvas ?? {
       version: DEFAULT_CANVAS.version,
       width: DEFAULT_CANVAS.width,
@@ -332,8 +333,10 @@ const SlideFrame = memo(function SlideFrame({
                                   const updated = slides.slice();
                                   const i = updated.findIndex((x) => x.id === slide.id);
                                   if (i >= 0) {
-                                    const c = (updated[i].canvas ?? docWithBg) as CanvasDoc;
-                                    updated[i] = { ...updated[i], canvas: { ...c, selection: [] } };
+                                    const existing = updated[i];
+                                    if (!existing) return;
+                                    const c = (existing.canvas ?? docWithBg) as CanvasDoc;
+                                    updated[i] = { ...existing, canvas: { ...c, selection: [] } };
                                     setSlides(updated);
                                   }
                                 }}
@@ -350,6 +353,7 @@ const SlideFrame = memo(function SlideFrame({
                                   const i = updated.findIndex((x) => x.id === slide.id);
                                   if (i >= 0) {
                                     const cur = updated[i];
+                                    if (!cur) return;
                                     const c = (cur.canvas ?? docWithBg) as CanvasDoc;
                                     const nodes = (c.nodes ?? []).filter(
                                       (n: any) => !(n?.type === "image" && n?.id === "user-overlay-image"),

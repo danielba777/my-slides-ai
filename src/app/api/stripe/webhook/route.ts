@@ -1,9 +1,23 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import type Stripe from "stripe";
 import { stripe } from "@/server/stripe";
 import { db } from "@/server/db";
 import { FREE_SLIDESHOW_QUOTA } from "@/lib/billing";
-import { planFromPrice, carryOverCreditsOnPlanChange } from "@/server/billing";
+import {
+  planFromPrice,
+  carryOverCreditsOnPlanChange,
+  mapStripeSubscriptionStatus,
+} from "@/server/billing";
+
+type SubscriptionWithPeriods = Stripe.Subscription & {
+  current_period_start?: number | null;
+  current_period_end?: number | null;
+};
+
+type InvoiceWithSubscription = Stripe.Invoice & {
+  subscription?: string | Stripe.Subscription | null;
+};
 
 
 function dateFromUnixOrFallback(unix?: number | null): Date {
@@ -13,6 +27,25 @@ function dateFromUnixOrFallback(unix?: number | null): Date {
   // Fallback: +30 Tage  nur als Sicherheitsnetz, in der Praxis
   // kommt kurz danach ein invoice.payment_succeeded mit korrektem Wert.
   return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+}
+
+function toSubscriptionWithPeriods(
+  subscription: Stripe.Subscription | Stripe.Response<Stripe.Subscription>,
+): SubscriptionWithPeriods {
+  const maybeResponse = subscription as Stripe.Response<Stripe.Subscription>;
+  const data = (maybeResponse && "data" in maybeResponse)
+    ? maybeResponse.data
+    : subscription;
+  return data as SubscriptionWithPeriods;
+}
+
+function getSubscriptionPriceId(
+  subscription: SubscriptionWithPeriods,
+): string | undefined {
+  const firstItem = subscription.items?.data?.[0];
+  if (!firstItem) return undefined;
+  const price = firstItem.price;
+  return typeof price === "string" ? price : price?.id ?? undefined;
 }
 
 export async function POST(req: Request) {
@@ -43,16 +76,20 @@ export async function POST(req: Request) {
         if (subId) {
           // Achtung: Direkt nach Checkout kann Stripe Sub-Daten noch nachreichen.
           // Wir holen sie und nutzen Fallbacks.
-          const subscription = await stripe.subscriptions.retrieve(subId);
-          const priceId = subscription.items.data[0]?.price?.id as string | undefined;
+          const subscriptionRaw = await stripe.subscriptions.retrieve(subId, {
+            expand: ["items.data.price"],
+          });
+          const subscription = toSubscriptionWithPeriods(subscriptionRaw);
+          const priceId = getSubscriptionPriceId(subscription);
           const plan = planFromPrice(priceId);
           console.log("[webhook]", evt.type, "priceId:", priceId, " plan:", plan);
-          if (!plan) break;
+          if (!plan || !priceId) break;
 
           const periodStart = subscription.current_period_start
             ? new Date(subscription.current_period_start * 1000)
             : new Date();
-          const periodEnd = dateFromUnixOrFallback(subscription.current_period_end);
+          const periodEnd = dateFromUnixOrFallback(subscription.current_period_end ?? null);
+          const status = mapStripeSubscriptionStatus(subscription.status);
 
           await db.$transaction(async (tx) => {
             const dbUser = await tx.user.findUnique({
@@ -69,12 +106,12 @@ export async function POST(req: Request) {
                 userId: user.id,
                 stripeSubscriptionId: subId,
                 stripePriceId: priceId,
-                status: "ACTIVE",
+                status,
                 currentPeriodEnd: periodEnd,
               },
               update: {
                 stripePriceId: priceId,
-                status: "ACTIVE",
+                status,
                 currentPeriodEnd: periodEnd,
               },
             });
@@ -116,18 +153,23 @@ export async function POST(req: Request) {
 
       case "customer.subscription.created":
       case "customer.subscription.updated": {
-        const sub = evt.data.object as any;
+        const sub = evt.data.object as SubscriptionWithPeriods;
         const customerId = sub.customer as string;
-        const priceId = sub.items?.data?.[0]?.price?.id as string | undefined;
+        const priceId = getSubscriptionPriceId(sub);
         const plan = planFromPrice(priceId);
         console.log("[webhook]", evt.type, "priceId:", priceId, " plan:", plan);
-        if (!customerId || !plan) break;
+        if (!customerId || !plan || !priceId) break;
 
         const user = await db.user.findFirst({ where: { stripeCustomerId: customerId } });
         if (!user) break;
 
-        const periodStart = sub.current_period_start ? new Date(sub.current_period_start * 1000) : new Date();
-        const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : dateFromUnixOrFallback(null);
+        const periodStart = sub.current_period_start
+          ? new Date(sub.current_period_start * 1000)
+          : new Date();
+        const periodEnd = sub.current_period_end
+          ? new Date(sub.current_period_end * 1000)
+          : dateFromUnixOrFallback(null);
+        const status = mapStripeSubscriptionStatus(sub.status);
 
         await db.$transaction(async (tx) => {
           const dbUser = await tx.user.findUnique({
@@ -141,13 +183,13 @@ export async function POST(req: Request) {
             create: {
               userId: user.id,
               stripeSubscriptionId: sub.id,
-              stripePriceId: priceId ?? null,
-              status: (sub.status as string).toUpperCase() as any,
+              stripePriceId: priceId,
+              status,
               currentPeriodEnd: periodEnd,
             },
             update: {
-              stripePriceId: priceId ?? null,
-              status: (sub.status as string).toUpperCase() as any,
+              stripePriceId: priceId,
+              status,
               currentPeriodEnd: periodEnd,
             },
           });
@@ -167,7 +209,7 @@ export async function POST(req: Request) {
       }
 
       case "customer.subscription.deleted": {
-        const sub = evt.data.object as any;
+        const sub = evt.data.object as SubscriptionWithPeriods;
         const user = await db.user.findFirst({
           where: { subscriptions: { some: { stripeSubscriptionId: sub.id } } },
         });
@@ -203,45 +245,61 @@ export async function POST(req: Request) {
       }
 
       case "invoice.payment_succeeded": {
-        const invoice = evt.data.object as any;
-        const subId = invoice.subscription as string | undefined;
+        const invoice = evt.data.object as InvoiceWithSubscription;
+        const subId =
+          typeof invoice.subscription === "string"
+            ? (invoice.subscription as string)
+            : invoice.subscription?.id ?? undefined;
         if (!subId) break;
 
         // WICHTIG: bei retrieve  "items.data.price" expanden
-        const sub = await stripe.subscriptions.retrieve(subId, {
+        const subRaw = await stripe.subscriptions.retrieve(subId, {
           expand: ["items.data.price"],
         });
+        const sub = toSubscriptionWithPeriods(subRaw);
         const customerId = sub.customer as string;
         const user = await db.user.findFirst({ where: { stripeCustomerId: customerId } });
         if (!user) break;
 
-        const priceId = (sub.items?.data?.[0]?.price as { id?: string } | undefined)?.id;
+        const priceId = getSubscriptionPriceId(sub);
         const plan = planFromPrice(priceId);
         console.log("[webhook]", evt.type, "priceId:", priceId, " plan:", plan);
-        if (!plan) break;
+        if (!plan || !priceId) break;
 
-        const periodStart = sub.current_period_start ? new Date(sub.current_period_start * 1000) : new Date();
-        const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : dateFromUnixOrFallback(null);
+        const periodStart = sub.current_period_start
+          ? new Date(sub.current_period_start * 1000)
+          : new Date();
+        const periodEnd = sub.current_period_end
+          ? new Date(sub.current_period_end * 1000)
+          : dateFromUnixOrFallback(null);
+        const status = mapStripeSubscriptionStatus(sub.status);
 
-        await db.subscription.upsert({
-          where: { stripeSubscriptionId: sub.id },
-          create: {
-            userId: user.id,
-            stripeSubscriptionId: sub.id,
-            stripePriceId: priceId ?? null,
-            status: (sub.status as string).toUpperCase() as any,
-            currentPeriodEnd: periodEnd,
-          },
-          update: {
-            stripePriceId: priceId ?? null,
-            status: (sub.status as string).toUpperCase() as any,
-            currentPeriodEnd: periodEnd,
-          },
-        });
-
-                  // ALLES in einer TX erledigen (periodEnd bereits oben bestimmt)
+        // ALLES in einer TX erledigen (periodEnd bereits oben bestimmt)
         await db.$transaction(async (tx) => {
-          const oldPlan = (await tx.user.findUnique({ where: { id: user.id }, select: { plan: true } }))?.plan ?? null;
+          const oldPlan =
+            (
+              await tx.user.findUnique({
+                where: { id: user.id },
+                select: { plan: true },
+              })
+            )?.plan ?? null;
+
+          await tx.subscription.upsert({
+            where: { stripeSubscriptionId: sub.id },
+            create: {
+              userId: user.id,
+              stripeSubscriptionId: sub.id,
+              stripePriceId: priceId,
+              status,
+              currentPeriodEnd: periodEnd,
+            },
+            update: {
+              stripePriceId: priceId,
+              status,
+              currentPeriodEnd: periodEnd,
+            },
+          });
+
           await carryOverCreditsOnPlanChange(tx, user.id, oldPlan, plan, periodEnd);
           const userUpdate: {
             plan: typeof plan;
@@ -258,21 +316,6 @@ export async function POST(req: Request) {
             where: { id: user.id },
             data: userUpdate,
           });
-          await tx.subscription.upsert({
-            where: { stripeSubscriptionId: subId },
-            create: {
-              userId: user.id,
-              stripeSubscriptionId: subId,
-              stripePriceId: priceId ?? null,
-              status: "ACTIVE",
-              currentPeriodEnd: periodEnd,
-            },
-            update: {
-              stripePriceId: priceId ?? null,
-              status: "ACTIVE",
-              currentPeriodEnd: periodEnd,
-            },
-          });
         });
         break;
       }
@@ -287,5 +330,3 @@ export async function POST(req: Request) {
     );
   }
 }
-
-

@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AiAvatarPromptInput } from "@/components/dashboard/ai-avatars/PromptInput";
 import { AiAvatarTemplateGrid } from "@/components/dashboard/ai-avatars/TemplateGrid";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { AiAvatarTemplate } from "@/types/ai-avatars";
+import { Wand2 } from "lucide-react";
 
 type GenerationJob = {
   id: string;
@@ -31,26 +33,31 @@ export default function AiAvatarDashboardPage() {
   const [activeTab, setActiveTab] = useState<"recent" | "templates">(
     "templates",
   );
-  const [activeTab, setActiveTab] = useState<"recent" | "templates">("templates");
 
-  const [limits, setLimits] = useState<{ aiLeft: number; unlimited: boolean } | null>(null);
+  const [limits, setLimits] =
+    useState<{ aiLeft: number; unlimited: boolean } | null>(null);
   const [limitsLoading, setLimitsLoading] = useState(false);
 
-  useEffect(() => {
-    void loadTemplates();
-    void loadRecentCreations();
-
-    void (async () => {
-      try {
-        setLimitsLoading(true);
-        const res = await fetch("/api/billing/limits", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json();
-        setLimits({ aiLeft: data?.aiLeft ?? 0, unlimited: !!data?.unlimited });
-      } finally {
-        setLimitsLoading(false);
+  const fetchUsageLimits = useCallback(async () => {
+    try {
+      setLimitsLoading(true);
+      const response = await fetch("/api/billing/limits", { cache: "no-store" });
+      if (!response.ok) {
+        return;
       }
-    })();
+      const data = await response.json().catch(() => null);
+      if (!data) {
+        return;
+      }
+      setLimits({
+        aiLeft: typeof data.aiLeft === "number" ? data.aiLeft : 0,
+        unlimited: Boolean(data.unlimited),
+      });
+    } catch (error) {
+      console.error("Failed to fetch usage limits", error);
+    } finally {
+      setLimitsLoading(false);
+    }
   }, []);
 
   const loadTemplates = useCallback(async () => {
@@ -134,6 +141,16 @@ export default function AiAvatarDashboardPage() {
     }
   }, []);
 
+  useEffect(() => {
+    void loadTemplates();
+    void loadRecentCreations();
+    void fetchPendingJobs();
+  }, [loadTemplates, loadRecentCreations, fetchPendingJobs]);
+
+  useEffect(() => {
+    void fetchUsageLimits();
+  }, [fetchUsageLimits]);
+
   const handleCopyPrompt = (value: string) => {
     setPrompt(value);
     navigator.clipboard
@@ -146,6 +163,17 @@ export default function AiAvatarDashboardPage() {
     const trimmedPrompt = prompt.trim();
     if (!trimmedPrompt) {
       toast.error("Bitte gib einen Prompt ein");
+      return;
+    }
+
+    if (
+      limits &&
+      !limits.unlimited &&
+      typeof limits.aiLeft === "number" &&
+      limits.aiLeft < 2
+    ) {
+      toast.error("Not enough AI credits");
+      window.location.href = "/#pricing";
       return;
     }
 
@@ -163,85 +191,69 @@ export default function AiAvatarDashboardPage() {
     setActiveTab("recent");
     setPendingGenerations((prev) => [...tempPlaceholders, ...prev]);
     setIsGenerating(true);
-    void (async () => {
-      try {
-        const response = await fetch("/api/ai-avatars/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: trimmedPrompt }),
-        });
-        const data = (await response.json().catch(() => null)) as
-          | { job?: GenerationJob; error?: string }
-          | null;
 
-        if (!response.ok || !data?.job?.id) {
-          throw new Error(
-            (data?.error as string | undefined) ??
-              "Generation konnte nicht gestartet werden",
-          );
-        }
-
-        const jobStartedAt = new Date(data.job.startedAt ?? Date.now()).getTime();
-        const expectedImages = Math.max(
-          data.job.expectedImages ?? EXPECTED_GENERATION_BATCH_SIZE,
-          1,
-        );
-
-        const jobPlaceholders = Array.from({ length: expectedImages }, (_, index) => ({
-          id: `${data.job!.id}-${index}`,
-          startedAt: jobStartedAt,
-        }));
-
-        setPendingGenerations((prev) => {
-          const filtered = prev.filter(
-            (item) => !item.id.startsWith(`${tempPrefix}-`),
-          );
-          const merged = [...jobPlaceholders, ...filtered];
-          const unique = new Map<string, { id: string; startedAt: number }>();
-          merged.forEach((item) => {
-            if (!unique.has(item.id)) {
-              unique.set(item.id, item);
-            }
-          });
-          return Array.from(unique.values());
-        });
-
-        toast.info("Avatar-Generierung gestartet");
-        void fetchPendingJobs();
-      } catch (error) {
-        console.error("Generation failed to start", error);
-        setPendingGenerations((prev) =>
-          prev.filter((item) => !item.id.startsWith(`${tempPrefix}-`)),
-        );
-        toast.error(
-          error instanceof Error ? error.message : "Generation fehlgeschlagen",
-        );
-    const canGenerate = limits?.unlimited || (typeof limits?.aiLeft === "number" && limits.aiLeft >= 2);
-    if (!canGenerate) {
-      toast.error("Not enough AI credits");
-      window.location.href = "/#pricing";
-      return;
-    }
-       setIsGenerating(true);
     try {
       const response = await fetch("/api/ai-avatars/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt: trimmedPrompt }),
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !Array.isArray(data?.images) || data.images.length === 0) {
-        throw new Error(data?.error || "Generation fehlgeschlagen");
-      }
-    })();
-    setIsGenerating(false);
-  };
+      const data = (await response.json().catch(() => null)) as
+        | { job?: GenerationJob; error?: string }
+        | null;
 
-  useEffect(() => {
-    void loadTemplates();
-    void loadRecentCreations();
-    void fetchPendingJobs();
-  }, [loadTemplates, loadRecentCreations, fetchPendingJobs]);
+      if (!response.ok || !data?.job?.id) {
+        throw new Error(
+          (data?.error as string | undefined) ??
+            "Generation konnte nicht gestartet werden",
+        );
+      }
+
+      const jobStartedAt = new Date(
+        data.job.startedAt ?? Date.now(),
+      ).getTime();
+      const expectedImages = Math.max(
+        data.job.expectedImages ?? EXPECTED_GENERATION_BATCH_SIZE,
+        1,
+      );
+
+      const jobPlaceholders = Array.from(
+        { length: expectedImages },
+        (_, index) => ({
+          id: `${data.job!.id}-${index}`,
+          startedAt: jobStartedAt,
+        }),
+      );
+
+      setPendingGenerations((prev) => {
+        const filtered = prev.filter(
+          (item) => !item.id.startsWith(`${tempPrefix}-`),
+        );
+        const merged = [...jobPlaceholders, ...filtered];
+        const unique = new Map<string, { id: string; startedAt: number }>();
+        merged.forEach((item) => {
+          if (!unique.has(item.id)) {
+            unique.set(item.id, item);
+          }
+        });
+        return Array.from(unique.values());
+      });
+
+      toast.info("Avatar-Generierung gestartet");
+      void fetchPendingJobs();
+      void fetchUsageLimits();
+    } catch (error) {
+      console.error("Generation failed to start", error);
+      setPendingGenerations((prev) =>
+        prev.filter((item) => !item.id.startsWith(`${tempPrefix}-`)),
+      );
+      toast.error(
+        error instanceof Error ? error.message : "Generation fehlgeschlagen",
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -265,11 +277,6 @@ export default function AiAvatarDashboardPage() {
     previousPendingCount.current = pendingGenerations.length;
   }, [pendingGenerations.length, loadRecentCreations]);
 
-  const templatesCountLabel = useMemo(
-    () => `${templates.length} Template${templates.length === 1 ? "" : "s"}`,
-    [templates.length],
-  );
-
   return (
     <div className="notebook-section relative h-full w-full">
       <div className="space-y-10 py-12">
@@ -281,6 +288,15 @@ export default function AiAvatarDashboardPage() {
             onGenerate={handleGenerate}
             isGenerating={isGenerating}
           />
+          {(limitsLoading || limits) && (
+            <div className="flex justify-end text-xs text-muted-foreground">
+              {limitsLoading
+                ? "Checking AI credits…"
+                : limits?.unlimited
+                  ? "Usage: unlimited"
+                  : `Usage: ${limits?.aiLeft ?? 0} AI credits left`}
+            </div>
+          )}
           <div className="flex items-center justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold">AI Avatar Studio</h1>
@@ -297,42 +313,6 @@ export default function AiAvatarDashboardPage() {
               <Wand2 className="h-4 w-4" />
               Refresh templates
             </Button>
-          </div>
-
-        <AiAvatarPromptInput
-          value={prompt}
-          onChange={setPrompt}
-          onShowTemplates={() => setActiveTab("templates")}
-        />
-        <div className="flex flex-col items-end gap-1">
-            <Button
-              className="gap-2"
-              onClick={async () => {
-                const canGenerate = limits?.unlimited || (typeof limits?.aiLeft === "number" && limits.aiLeft >= 2);
-                if (canGenerate) {
-                  await handleGenerate();
-                } else {
-                  window.location.href = "/#pricing";
-                }
-              }}
-              disabled={isGenerating || !prompt.trim() || limitsLoading}
-              variant={limits?.unlimited || (limits?.aiLeft ?? 0) >= 2 ? "default" : "secondary"}
-            >
-              {isGenerating ? (
-                <>
-                  <Spinner className="h-4 w-4" />
-                  Generating…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4" />
-                  {(limits?.unlimited || (limits?.aiLeft ?? 0) >= 2) ? "Generate" : "Upgrade Now"}
-                </>
-              )}
-            </Button>
-            <div className="text-xs text-muted-foreground">
-              {limits?.unlimited ? "Usage: unlimited" : `Usage: ${limits?.aiLeft ?? 0} AI credits left`}
-            </div>
           </div>
         </div>
 
@@ -406,3 +386,4 @@ export default function AiAvatarDashboardPage() {
       </div>
     </div>
   );
+}

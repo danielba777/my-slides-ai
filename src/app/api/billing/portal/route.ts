@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { stripe } from "@/server/stripe";
-import { env } from "@/env";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -23,7 +22,7 @@ export async function POST(req: Request) {
   // Build a valid absolute origin:
   // - Prefer NEXT_PUBLIC_APP_URL if it includes an explicit scheme
   // - Else fall back to the current request's origin
-  const fromEnv = env.NEXT_PUBLIC_APP_URL?.trim();
+  const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.trim();
   const hasScheme = !!fromEnv && /^https?:\/\//i.test(fromEnv);
   const origin = (hasScheme ? fromEnv! : new URL(req.url).origin).replace(/\/+$/, "");
 

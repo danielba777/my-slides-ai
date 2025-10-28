@@ -139,7 +139,7 @@ function fitContain(dstW: number, dstH: number, natW: number, natH: number) {
   const h = natH * r;
   const x = (dstW - w) / 2;
   const y = (dstH - h) / 2;
-  return { w, h, x, y };
+  return { w, h, x, y, scale: r };
 }
 
 function fitCover(dstW: number, dstH: number, natW: number, natH: number) {
@@ -148,7 +148,7 @@ function fitCover(dstW: number, dstH: number, natW: number, natH: number) {
   const h = natH * r;
   const x = (dstW - w) / 2;
   const y = (dstH - h) / 2;
-  return { w, h, x, y };
+  return { w, h, x, y, scale: r };
 }
 
 function drawRoundedRect(
