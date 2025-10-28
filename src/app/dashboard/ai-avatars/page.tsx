@@ -127,6 +127,7 @@ export default function AiAvatarDashboardPage() {
   const [selectedThemeName, setSelectedThemeName] = useState<string | null>(
     null,
   );
+  const [quality, setQuality] = useState<"basic" | "high">("high");
 
   const [limits, setLimits] = useState<{
     aiLeft: number;
@@ -278,6 +279,7 @@ export default function AiAvatarDashboardPage() {
     setIsThemeMenuOpen(false);
     const startedAt = Date.now();
     const styleIdToUse = selectedStyleId ?? DEFAULT_STYLE_ID;
+    const qualityToUse = quality;
     const tempPrefix = `pending-${startedAt}`;
     const tempPlaceholders = Array.from(
       { length: EXPECTED_GENERATION_BATCH_SIZE },
@@ -296,7 +298,11 @@ export default function AiAvatarDashboardPage() {
       const response = await fetch("/api/ai-avatars/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: trimmedPrompt, styleId: styleIdToUse }),
+        body: JSON.stringify({
+          prompt: trimmedPrompt,
+          styleId: styleIdToUse,
+          quality: qualityToUse,
+        }),
       });
       const data = (await response.json().catch(() => null)) as {
         job?: GenerationJob;
@@ -382,6 +388,8 @@ export default function AiAvatarDashboardPage() {
             onChange={setPrompt}
             onGenerate={handleGenerate}
             onToggleThemes={() => setIsThemeMenuOpen((previous) => !previous)}
+            onQualityChange={setQuality}
+            quality={quality}
             hasSelectedTheme={Boolean(selectedStyleId)}
             selectedThemeImages={(() => {
               if (selectedThemeName) {

@@ -34,9 +34,10 @@ export async function POST(request: Request) {
     }
 
     const userId = session.user.id;
-    const { prompt, styleId } = (await request.json()) as {
+    const { prompt, styleId, quality } = (await request.json()) as {
       prompt?: string;
       styleId?: string;
+      quality?: "basic" | "high";
     };
 
     if (!prompt || !prompt.trim()) {
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
       typeof styleId === "string" && styleId.trim().length > 0
         ? styleId.trim()
         : DEFAULT_STYLE_ID;
+    const effectiveQuality: "basic" | "high" =
+      quality === "high" || quality === "basic" ? quality : "high";
     const apiKey = process.env["302AI_KEY"];
     if (!apiKey) {
       return NextResponse.json(
@@ -73,6 +76,7 @@ export async function POST(request: Request) {
       expectedImages: job.expectedImages ?? EXPECTED_GENERATION_BATCH_SIZE,
       userId: session.user.id,
       styleId: effectiveStyleId,
+      quality: effectiveQuality,
     });
 
     return NextResponse.json({
@@ -99,6 +103,7 @@ async function processGenerationJob({
   expectedImages,
   userId,
   styleId,
+  quality,
 }: {
   externalApiKey: string;
   jobId: string;
@@ -106,6 +111,7 @@ async function processGenerationJob({
   expectedImages: number;
   userId: string;
   styleId: string;
+  quality: "basic" | "high";
 }) {
   const randomSeed = Math.floor(Math.random() * 1_000_000);
   // Vor Start atomar 2 AI-Credits abziehen
@@ -122,7 +128,7 @@ async function processGenerationJob({
   }
 
   const payload = {
-    quality: "basic",
+    quality,
     aspect_ratio: "2:3",
     prompt,
     negative_prompt: "",
