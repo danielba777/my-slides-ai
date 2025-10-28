@@ -31,7 +31,8 @@ export function MarketingHero({ session }: { session: boolean }) {
       <div
         className="absolute inset-0 opacity-40"
         style={{
-          background: "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(48, 70, 116, 0.25) 0%, rgba(48, 70, 116, 0.12) 30%, transparent 70%)",
+          background:
+            "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(48, 70, 116, 0.25) 0%, rgba(48, 70, 116, 0.12) 30%, transparent 70%)",
         }}
       />
 
@@ -151,10 +152,10 @@ export function MarketingHero({ session }: { session: boolean }) {
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
                   <ZapIcon className="w-5 h-5 text-white" />
                 </div>
-                <h3 className="text-white font-semibold">Live in 10 min</h3>
+                <h3 className="text-white font-semibold">Live in seconds</h3>
               </div>
               <p className="text-gray-300 text-sm leading-relaxed">
-                From hook to export without any fiddling.
+                From idea to finished slides instantly. No setup, no hassle.
               </p>
             </div>
 
@@ -177,9 +178,7 @@ export function MarketingHero({ session }: { session: boolean }) {
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
                   <CheckCircle2Icon className="w-5 h-5 text-white" />
                 </div>
-                <h3 className="text-white font-semibold">
-                  Looks handcrafted
-                </h3>
+                <h3 className="text-white font-semibold">Looks handcrafted</h3>
               </div>
               <p className="text-gray-300 text-sm leading-relaxed">
                 Creator aesthetic instead of AI vibe. Natural and trustworthy.
@@ -206,9 +205,7 @@ export function MarketingHero({ session }: { session: boolean }) {
                   <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
                     50K+
                   </div>
-                  <div className="text-sm text-gray-300/90">
-                    Happy creators
-                  </div>
+                  <div className="text-sm text-gray-300/90">Happy creators</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
