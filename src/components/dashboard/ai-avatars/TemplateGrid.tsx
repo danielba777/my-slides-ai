@@ -10,20 +10,23 @@ type TemplateGridProps = {
   onCopy?: (prompt: string) => void;
   showOpenInNewTab?: boolean;
   loadingPlaceholders?: Array<{ id: string; startedAt: number }>;
+  rows?: number;
 };
 
-const COLUMNS = 6;
-const ROWS = 3;
-const TOTAL_CELLS = COLUMNS * ROWS;
+export const AI_AVATAR_GRID_COLUMNS = 6;
+const DEFAULT_ROWS = 3;
 
 export function AiAvatarTemplateGrid({
   templates,
   onCopy,
   showOpenInNewTab = false,
   loadingPlaceholders = [],
+  rows = DEFAULT_ROWS,
 }: TemplateGridProps) {
   const [addedId, setAddedId] = useState<string | null>(null);
-  const maxTemplates = Math.max(TOTAL_CELLS - loadingPlaceholders.length, 0);
+  const safeRows = Math.max(Math.floor(rows), 1);
+  const totalCells = AI_AVATAR_GRID_COLUMNS * safeRows;
+  const maxTemplates = Math.max(totalCells - loadingPlaceholders.length, 0);
   const visibleTemplates = templates.slice(0, maxTemplates);
 
   const gridItems: Array<
@@ -40,7 +43,7 @@ export function AiAvatarTemplateGrid({
     })),
   ];
 
-  const placeholders = Math.max(TOTAL_CELLS - gridItems.length, 0);
+  const placeholders = Math.max(totalCells - gridItems.length, 0);
 
   return (
     <div className="grid w-full grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">

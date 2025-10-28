@@ -1,14 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AiAvatarPromptInput } from "@/components/dashboard/ai-avatars/PromptInput";
-import { AiAvatarTemplateGrid } from "@/components/dashboard/ai-avatars/TemplateGrid";
+import {
+  AiAvatarTemplateGrid,
+  AI_AVATAR_GRID_COLUMNS,
+} from "@/components/dashboard/ai-avatars/TemplateGrid";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { AiAvatarTemplate } from "@/types/ai-avatars";
-import { Wand2 } from "lucide-react";
 
 type GenerationJob = {
   id: string;
@@ -17,6 +19,98 @@ type GenerationJob = {
 };
 
 const EXPECTED_GENERATION_BATCH_SIZE = 4;
+const DEFAULT_STYLE_ID = "1cb4b936-77bf-4f9a-9039-f3d349a4cdbe";
+const ROW_INCREMENT = 3;
+
+type ThemeOption = {
+  name: string;
+  imagePaths: string[];
+  prompt: string;
+  styleId: string;
+};
+
+const THEME_OPTIONS: ThemeOption[] = [
+  {
+    name: "Baby Doll Makeup",
+    prompt: "Baby Doll Makeup aesthetic portrait",
+    styleId: "b7c621b5-9d3c-46a3-8efb-4cdfbc592271",
+    imagePaths: [
+      "/ai-avatar-themes/baby_doll_makeup_01.png",
+      "/ai-avatar-themes/baby_doll_makeup_02.png",
+      "/ai-avatar-themes/baby_doll_makeup_03.png",
+    ],
+  },
+  {
+    name: "0.5 Selfie",
+    prompt: "0.5 selfie captured on wide angle lens",
+    styleId: "8dd89de9-1cff-402e-88a8-580c29d91473",
+    imagePaths: [
+      "/ai-avatar-themes/05_selfie_01.png",
+      "/ai-avatar-themes/05_selfie_02.png",
+      "/ai-avatar-themes/05_selfie_03.png",
+    ],
+  },
+  {
+    name: "0.5 Outfit",
+    prompt: "0.5 outfit fashion streetwear showcase",
+    styleId: "71fecd8c-6696-42df-b5eb-f69e4150ca01",
+    imagePaths: [
+      "/ai-avatar-themes/05_outfit_01.png",
+      "/ai-avatar-themes/05_outfit_02.png",
+      "/ai-avatar-themes/05_outfit_03.png",
+    ],
+  },
+  {
+    name: "Sitting on the Street",
+    prompt: "portrait sitting on the street urban candid",
+    styleId: "7696fd45-6e67-47d7-b800-096ce21cd449",
+    imagePaths: [
+      "/ai-avatar-themes/sitting_on_street_01.png",
+      "/ai-avatar-themes/sitting_on_street_02.png",
+      "/ai-avatar-themes/sitting_on_street_03.png",
+    ],
+  },
+  {
+    name: "Amalfi Summer",
+    prompt: "Amalfi summer holiday sunlight portrait",
+    styleId: "dab472a6-23f4-4cf8-98fe-f3e256f1b549",
+    imagePaths: [
+      "/ai-avatar-themes/amalfi_summer_01.png",
+      "/ai-avatar-themes/amalfi_summer_02.png",
+      "/ai-avatar-themes/amalfi_summer_03.png",
+    ],
+  },
+  {
+    name: "Self Care",
+    prompt: "self care cozy indoor portrait",
+    styleId: "d24c016c-9fb1-47d0-9909-19f57a2830d4",
+    imagePaths: [
+      "/ai-avatar-themes/self_care_01.png",
+      "/ai-avatar-themes/self_care_02.png",
+      "/ai-avatar-themes/self_care_03.png",
+    ],
+  },
+  {
+    name: "Elevator Mirror",
+    prompt: "elevator mirror selfie chic outfit",
+    styleId: "524be50a-4388-4ff5-a843-a73d2dd7ef87",
+    imagePaths: [
+      "/ai-avatar-themes/elevator_mirror_01.png",
+      "/ai-avatar-themes/elevator_mirror_02.png",
+      "/ai-avatar-themes/elevator_mirror_03.png",
+    ],
+  },
+  {
+    name: "Rainy Day",
+    prompt: "rainy day moody portrait",
+    styleId: "53bdadfa-8eb6-4eaa-8923-ebece4faa91c",
+    imagePaths: [
+      "/ai-avatar-themes/rainy_day_01.png",
+      "/ai-avatar-themes/rainy_day_02.png",
+      "/ai-avatar-themes/rainy_day_03.png",
+    ],
+  },
+];
 
 export default function AiAvatarDashboardPage() {
   const [prompt, setPrompt] = useState("");
@@ -33,15 +127,42 @@ export default function AiAvatarDashboardPage() {
   const [activeTab, setActiveTab] = useState<"recent" | "templates">(
     "templates",
   );
+  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+  const [selectedStyleId, setSelectedStyleId] = useState<string | null>(null);
+  const [selectedThemeName, setSelectedThemeName] = useState<string | null>(
+    null,
+  );
+  const [quality, setQuality] = useState<"basic" | "high">("high");
+  const [templateRows, setTemplateRows] = useState(3);
+  const [recentRows, setRecentRows] = useState(3);
+  const maxTemplateRows = useMemo(() => {
+    return Math.max(
+      1,
+      Math.ceil(templates.length / AI_AVATAR_GRID_COLUMNS),
+    );
+  }, [templates.length]);
+  const maxRecentRows = useMemo(() => {
+    return Math.max(
+      1,
+      Math.ceil(recentCreations.length / AI_AVATAR_GRID_COLUMNS),
+    );
+  }, [recentCreations.length]);
+  const canShowMoreTemplates = templateRows < maxTemplateRows;
+  const canShowMoreRecent = recentRows < maxRecentRows;
 
-  const [limits, setLimits] =
-    useState<{ aiLeft: number; unlimited: boolean } | null>(null);
+
+  const [limits, setLimits] = useState<{
+    aiLeft: number;
+    unlimited: boolean;
+  } | null>(null);
   const [limitsLoading, setLimitsLoading] = useState(false);
 
   const fetchUsageLimits = useCallback(async () => {
     try {
       setLimitsLoading(true);
-      const response = await fetch("/api/billing/limits", { cache: "no-store" });
+      const response = await fetch("/api/billing/limits", {
+        cache: "no-store",
+      });
       if (!response.ok) {
         return;
       }
@@ -177,7 +298,10 @@ export default function AiAvatarDashboardPage() {
       return;
     }
 
+    setIsThemeMenuOpen(false);
     const startedAt = Date.now();
+    const styleIdToUse = selectedStyleId ?? DEFAULT_STYLE_ID;
+    const qualityToUse = quality;
     const tempPrefix = `pending-${startedAt}`;
     const tempPlaceholders = Array.from(
       { length: EXPECTED_GENERATION_BATCH_SIZE },
@@ -196,11 +320,16 @@ export default function AiAvatarDashboardPage() {
       const response = await fetch("/api/ai-avatars/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: trimmedPrompt }),
+        body: JSON.stringify({
+          prompt: trimmedPrompt,
+          styleId: styleIdToUse,
+          quality: qualityToUse,
+        }),
       });
-      const data = (await response.json().catch(() => null)) as
-        | { job?: GenerationJob; error?: string }
-        | null;
+      const data = (await response.json().catch(() => null)) as {
+        job?: GenerationJob;
+        error?: string;
+      } | null;
 
       if (!response.ok || !data?.job?.id) {
         throw new Error(
@@ -209,9 +338,7 @@ export default function AiAvatarDashboardPage() {
         );
       }
 
-      const jobStartedAt = new Date(
-        data.job.startedAt ?? Date.now(),
-      ).getTime();
+      const jobStartedAt = new Date(data.job.startedAt ?? Date.now()).getTime();
       const expectedImages = Math.max(
         data.job.expectedImages ?? EXPECTED_GENERATION_BATCH_SIZE,
         1,
@@ -268,10 +395,7 @@ export default function AiAvatarDashboardPage() {
   const previousPendingCount = useRef(0);
 
   useEffect(() => {
-    if (
-      previousPendingCount.current > 0 &&
-      pendingGenerations.length === 0
-    ) {
+    if (previousPendingCount.current > 0 && pendingGenerations.length === 0) {
       void loadRecentCreations();
     }
     previousPendingCount.current = pendingGenerations.length;
@@ -284,8 +408,27 @@ export default function AiAvatarDashboardPage() {
           <AiAvatarPromptInput
             value={prompt}
             onChange={setPrompt}
-            onShowTemplates={() => setActiveTab("templates")}
             onGenerate={handleGenerate}
+            onToggleThemes={() => setIsThemeMenuOpen((previous) => !previous)}
+            onQualityChange={setQuality}
+            quality={quality}
+            hasSelectedTheme={Boolean(selectedStyleId)}
+            selectedThemeImages={(() => {
+              if (selectedThemeName) {
+                const theme = THEME_OPTIONS.find(
+                  (item) => item.name === selectedThemeName,
+                );
+                if (theme) {
+                  return theme.imagePaths.slice(0, 3);
+                }
+              }
+              return THEME_OPTIONS.slice(0, 3).map(
+                (theme, index) =>
+                  theme.imagePaths[index % theme.imagePaths.length] ??
+                  theme.imagePaths[0] ??
+                  "/ai-avatar-themes/baby_doll_makeup_01.png",
+              );
+            })()}
             isGenerating={isGenerating}
           />
           {(limitsLoading || limits) && (
@@ -297,24 +440,60 @@ export default function AiAvatarDashboardPage() {
                   : `Usage: ${limits?.aiLeft ?? 0} AI credits left`}
             </div>
           )}
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold">AI Avatar Studio</h1>
-              <p className="text-sm text-muted-foreground">
-                Starte mit einem eigenen Prompt oder übernimm eine bestehende
-                Vorlage.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => void loadTemplates()}
-            >
-              <Wand2 className="h-4 w-4" />
-              Refresh templates
-            </Button>
-          </div>
         </div>
+
+        {isThemeMenuOpen && (
+          <div className="px-6">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {THEME_OPTIONS.map((theme) => {
+                const isActive = selectedThemeName === theme.name;
+                return (
+                  <button
+                    key={theme.name}
+                    type="button"
+                    onClick={() => {
+                      if (isActive) {
+                        setSelectedStyleId(null);
+                        setSelectedThemeName(null);
+                        setIsThemeMenuOpen(false);
+                        toast.success("Standard-Theme aktiviert");
+                        return;
+                      }
+                      setSelectedStyleId(theme.styleId);
+                      setSelectedThemeName(theme.name);
+                      setIsThemeMenuOpen(false);
+                      toast.success(`${theme.name} Theme ausgewählt`);
+                    }}
+                    className={`group flex h-full flex-col rounded-2xl border border-2 bg-white/70 p-4 text-left transition hover:-translate-y-1 hover:border-foreground/30 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                      isActive
+                        ? "border-blue-500 shadow-lg"
+                        : "border-muted shadow-sm"
+                    }`}
+                  >
+                    <div className="text-sm font-semibold text-foreground">
+                      {theme.name}
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-lg">
+                      {theme.imagePaths.map((path) => (
+                        <div
+                          key={path}
+                          className="aspect-[2/3] overflow-hidden"
+                        >
+                          <img
+                            src={path}
+                            alt={`${theme.name} preview`}
+                            className="h-full w-full object-cover transition group-hover:opacity-95"
+                            loading="lazy"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Simple text toggle instead of Tabbar */}
         <div className="px-6">
@@ -363,8 +542,26 @@ export default function AiAvatarDashboardPage() {
                   templates={recentCreations}
                   showOpenInNewTab
                   loadingPlaceholders={pendingGenerations}
+                  rows={recentRows}
                 />
               )}
+              {!isLoadingRecent &&
+                recentCreations.length > 0 &&
+                canShowMoreRecent && (
+                  <div className="mt-4 flex justify-center">
+                    <Button
+                      variant="outline"
+                      className="rounded-full px-6"
+                      onClick={() =>
+                        setRecentRows((prev) =>
+                          Math.min(prev + ROW_INCREMENT, maxRecentRows),
+                        )
+                      }
+                    >
+                      Show more
+                    </Button>
+                  </div>
+                )}
             </div>
           )}
 
@@ -378,7 +575,23 @@ export default function AiAvatarDashboardPage() {
                 <AiAvatarTemplateGrid
                   templates={templates}
                   onCopy={handleCopyPrompt}
+                  rows={templateRows}
                 />
+              )}
+              {!isLoadingTemplates && templates.length > 0 && canShowMoreTemplates && (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    variant="outline"
+                    className="rounded-full px-6"
+                    onClick={() =>
+                      setTemplateRows((prev) =>
+                        Math.min(prev + ROW_INCREMENT, maxTemplateRows),
+                      )
+                    }
+                  >
+                    Show more
+                  </Button>
+                </div>
               )}
             </div>
           )}
