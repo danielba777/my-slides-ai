@@ -1,148 +1,330 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-**_ Begin Patch
-_** Update File: src/components/presentation/presentation-page/SlideContainer.tsx
+*** Begin Patch
+*** Update File: src/app/dashboard/connections/page.tsx
 @@
--import { GripVertical, Plus, Trash } from "lucide-react";
-+import { GripVertical, Plus, Trash, ArrowRight } from "lucide-react";
+-import PageHeader from "@/components/dashboard/PageHeader";
+-import { ConnectionCard } from "@/components/connections/connection-card";
++import PageHeader from "@/components/dashboard/PageHeader";
++import { ConnectionCard } from "@/components/connections/connection-card";
+ 
+ export default function ConnectionsPage() {
+   return (
+     <>
+-      <PageHeader
+-        title="Connections"
+-        description="Link external services to streamline your workflow."
+-      />
++      {/* Nur eine Headline, KEINE Beschreibung darunter */}
++      <PageHeader title="Connections" />
+       <ConnectionCard />
+     </>
+   );
+ }
+*** End Patch
+diff
+Code kopieren
+*** Begin Patch
+*** Update File: src/components/connections/connection-card.tsx
 @@
-
-- const { addSlide, deleteSlideAt } = useSlideOperations();
-
-* const { addSlide, deleteSlideAt } = useSlideOperations();
-* // For random image swap based on the currently selected (sub)category
-* const slides = usePresentationState((s) => s.slides);
-* const setSlides = usePresentationState((s) => s.setSlides);
-* const activeImageSetId = usePresentationState((s) => s.imageSetId);
-  @@
-  const deleteSlide = () => {
-  deleteSlideAt(index);
-  };
-*
-* // Collect all image URLs from a given image set (including children)
-* async function collectImagesFromSetTree(imageSetId: string): Promise<string[]> {
-* try {
-*      const res = await fetch("/api/imagesets");
-*      if (!res.ok) return [];
-*      const allSets = (await res.json()) as Array<any>;
-*
-*      const byId = new Map<string, any>();
-*      allSets.forEach((s) => byId.set(s.id, s));
-*
-*      const start = byId.get(imageSetId);
-*      if (!start) return [];
-*
-*      const stack: any[] = [start];
-*      const urls: string[] = [];
-*      while (stack.length) {
-*        const cur = stack.pop();
-*        if (Array.isArray(cur?.images)) {
-*          cur.images.forEach((img: any) => img?.url && urls.push(img.url));
-*        }
-*        if (Array.isArray(cur?.children)) {
-*          cur.children.forEach((ch: any) => stack.push(ch));
-*        } else if (cur?._count?.children > 0 && Array.isArray(allSets)) {
-*          // Fallback if children not materialized
-*          allSets.forEach((s) => {
-*            if (s?.parentId === cur.id) stack.push(s);
-*          });
-*        }
-*      }
-*      return urls;
-* } catch {
-*      return [];
-* }
-* }
-*
-* // Action: pick next random image from the active (sub)category and swap into this slide
-* const handleNextRandomImage = async () => {
-* if (!activeImageSetId) {
-*      console.warn("No image set selected. Pick a category in 'Edit Image' first.");
-*      return;
-* }
-* const urls = await collectImagesFromSetTree(activeImageSetId);
-* if (urls.length === 0) {
-*      console.warn("Selected image set has no images.");
-*      return;
-* }
-* const nextUrl = urls[Math.floor(Math.random() * urls.length)];
-* const updated = slides.slice();
-* const cur = updated[index];
-* if (!cur) return;
-* updated[index] = {
-*      ...cur,
-*      rootImage: {
-*        ...(cur.rootImage ?? {}),
-*        url: nextUrl,
-*      },
-* };
-* setSlides(updated);
-* };
-  @@
-
--              <button
-
-*              <button
-                 ref={setActivatorNodeRef as React.Ref<HTMLButtonElement>}
-                 {.listeners}
-                 {.attributes}
-
--                className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus:outline-none focus-visible:outline-none"
--                aria-label="Folienposition ziehen"
--                title="Verschieben"
-
-*                className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus:outline-none focus-visible:outline-none"
-*                aria-label="Drag slide position"
-*                title="Move"
-               >
-                 <GripVertical className="h-4 w-4" />
-               </button>
-
-               {/* Neuer: Persönliche Bilder (ersetzt den Edit/Canvas-Button) */}
-               <PersonalImagePickerButton index={index} />
-
-*              {/* Next random image from active category */}
-*              <Button
-*                variant="ghost"
-*                size="icon"
-*                className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
-*                onClick={handleNextRandomImage}
-*                aria-label="Next image"
-*                title="Next image"
-*              >
-*                <ArrowRight className="h-4 w-4" />
-*              </Button>
-*               {/* Neue Folie darunter */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
-                  onClick={() => addSlide("after", index)}
-
--                aria-label="Neue Folie darunter"
--                title="Neue Folie darunter"
-
-*                aria-label="Add next slide"
-*                title="Add next slide"
-               >
-                 <Plus className="h-4 w-4" />
-               </Button>
-
-               {/* Löschen */}
-               <AlertDialog>
-                 <AlertDialogTrigger asChild>
-                   <Button
-                     variant="ghost"
-                     size="icon"
-                     className="h-9 w-9 rounded-md text-muted-foreground hover:text-destructive"
-
--                    aria-label="Folie löschen"
--                    title="Folie löschen"
-
-*                    aria-label="Delete slide"
-*                    title="Delete slide"
-                     >
-                       <Trash className="h-4 w-4" />
-                     </Button>
-                   </AlertDialogTrigger>
-  \*\*\_ End Patch
+-"use client";
+-
+-import { useCallback, useEffect, useMemo, useState } from "react";
+-
+-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+-import { Badge } from "@/components/ui/badge";
+-import { Button } from "@/components/ui/button";
+-import { Spinner } from "@/components/ui/spinner";
+-import {
+-  ConnectedTikTokAccount,
+-  useTikTokAccounts,
+-} from "@/hooks/use-tiktok-accounts";
+-import IonIcon from "@reacticons/ionicons";
+-import { defineCustomElements } from "ionicons/loader";
+-import { toast } from "sonner";
+-
+-type ConnectionState = "idle" | "loading";
+-
+-export function ConnectionCard() {
+-  const [connectionState, setConnectionState] =
+-    useState<ConnectionState>("idle");
+-  const {
+-    accounts,
+-    loading: accountsLoading,
+-    error,
+-    refresh,
+-  } = useTikTokAccounts();
+-
+-  useEffect(() => {
+-    if (typeof window !== "undefined") {
+-      defineCustomElements(window);
+-    }
+-  }, []);
+-
+-  useEffect(() => {
+-    if (error) {
+-      toast.error(error);
+-    }
+-  }, [error]);
+-
+-  const sortedAccounts = useMemo(
+-    () =>
+-      [...accounts].sort(
+-        (a, b) =>
+-          new Date(b.connectedAt).getTime() - new Date(a.connectedAt).getTime(),
+-      ),
+-    [accounts],
+-  );
+-
+-  const handleConnect = useCallback(async () => {
+-    setConnectionState("loading");
+-
+-    try {
+-      const startResponse = await fetch("/api/tiktok/start");
+-      const startPayload = await startResponse.json().catch(() => null);
+-
+-      if (
+-        !startResponse.ok ||
+-        !startPayload ||
+-        typeof startPayload.url !== "string"
+-      ) {
+-        throw new Error(
+-          startPayload && typeof startPayload.error === "string"
+-            ? startPayload.error
+-            : "Unable to start TikTok OAuth flow",
+-        );
+-      }
+-
+-      window.location.href = startPayload.url;
+-    } catch (error) {
+-      const message =
+-        error instanceof Error ? error.message : "TikTok connection failed";
+-      toast.error(message);
+-      setConnectionState("idle");
+-    }
+-  }, []);
+-
+-  const renderAccountLabel = useCallback((account: ConnectedTikTokAccount) => {
+-    return (
+-      account.username ??
+-      account.displayName ??
+-      (account.unionId ? `ID ${account.unionId.slice(0, 8)}` : null) ??
+-      `ID ${account.openId.slice(0, 8)}`
+-    );
+-  }, []);
+-
+-  const renderAccountInitials = useCallback(
+-    (account: ConnectedTikTokAccount) => {
+-      const label = renderAccountLabel(account).trim();
+-      const letters = label.replace(/[^A-Za-z0-9]/g, "");
+-      if (letters.length === 0) {
+-        return "TT";
+-      }
+-      return letters.slice(0, 2).toUpperCase();
+-    },
+-    [renderAccountLabel],
+-  );
+-
+-  return (
+-    <div className="max-w-xl">
+-      <div className="flex items-center gap-4">
+-        <IonIcon name="logo-tiktok" size="large" />
+-        <Button
+-          variant={connectionState === "loading" ? "loading" : "default"}
+-          onClick={handleConnect}
+-          disabled={connectionState === "loading"}
+-        >
+-          {connectionState === "loading" ? "Connecting..." : "Connect TikTok"}
+-        </Button>
+-        {accountsLoading ? (
+-          <div className="flex items-center justify-center py-4">
+-            <Spinner className="h-8 w-8" />
+-          </div>
+-        ) : (
+-          <div className="flex flex-wrap gap-2">
+-            {sortedAccounts.map((account) => (
+-              <Badge
+-                key={account.openId}
+-                variant="secondary"
+-                className="flex items-center gap-2 pr-3"
+-              >
+-                <Avatar className="h-6 w-6">
+-                  <AvatarImage
+-                    alt={renderAccountLabel(account)}
+-                    src={account.avatarUrl ?? undefined}
+-                  />
+-                  <AvatarFallback className="text-[10px]">
+-                    {renderAccountInitials(account)}
+-                  </AvatarFallback>
+-                </Avatar>
+-                <span className="text-xs font-medium">
+-                  {renderAccountLabel(account)}
+-                </span>
+-              </Badge>
+-            ))}
+-          </div>
+-        )}
+-      </div>
+-
+-      <div className="py-4 border-t-2 mt-4">
+-        <Button
+-          variant="outline"
+-          className=""
+-          onClick={() => void refresh()}
+-          disabled={accountsLoading}
+-        >
+-          Refresh
+-        </Button>
+-      </div>
+-    </div>
+-  );
+-}
++"use client";
++
++import { useCallback, useEffect, useMemo, useState } from "react";
++
++import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
++import { Badge } from "@/components/ui/badge";
++import { Button } from "@/components/ui/button";
++import { Spinner } from "@/components/ui/spinner";
++import {
++  ConnectedTikTokAccount,
++  useTikTokAccounts,
++} from "@/hooks/use-tiktok-accounts";
++import IonIcon from "@reacticons/ionicons";
++import { defineCustomElements } from "ionicons/loader";
++import { toast } from "sonner";
++
++type ConnectionState = "idle" | "loading";
++
++export function ConnectionCard() {
++  const [connectionState, setConnectionState] =
++    useState<ConnectionState>("idle");
++  const { accounts, loading: accountsLoading, error } = useTikTokAccounts();
++
++  useEffect(() => {
++    if (typeof window !== "undefined") defineCustomElements(window);
++  }, []);
++
++  useEffect(() => {
++    if (error) toast.error(error);
++  }, [error]);
++
++  const sortedAccounts = useMemo(
++    () =>
++      [...accounts].sort(
++        (a, b) =>
++          new Date(b.connectedAt).getTime() - new Date(a.connectedAt).getTime(),
++      ),
++    [accounts],
++  );
++
++  const handleConnect = useCallback(async () => {
++    setConnectionState("loading");
++    try {
++      const r = await fetch("/api/tiktok/start");
++      const j = await r.json().catch(() => null);
++      if (!r.ok || !j?.url) throw new Error(j?.error ?? "Unable to start TikTok OAuth flow");
++      window.location.href = j.url;
++    } catch (e) {
++      toast.error(e instanceof Error ? e.message : "TikTok connection failed");
++      setConnectionState("idle");
++    }
++  }, []);
++
++  const renderAccountLabel = useCallback((account: ConnectedTikTokAccount) => {
++    return (
++      account.username ??
++      account.displayName ??
++      (account.unionId ? `ID ${account.unionId.slice(0, 8)}` : null) ??
++      `ID ${account.openId.slice(0, 8)}`
++    );
++  }, []);
++
++  const renderAccountInitials = useCallback(
++    (account: ConnectedTikTokAccount) => {
++      const label = renderAccountLabel(account).trim();
++      const letters = label.replace(/[^A-Za-z0-9]/g, "");
++      if (letters.length === 0) return "TT";
++      return letters.slice(0, 2).toUpperCase();
++    },
++    [renderAccountLabel],
++  );
++
++  return (
++    <div className="px-1 sm:px-2 lg:px-0">
++      {/* Eine einzelne Card – keine zusätzlichen Headline-Doppler, kein blauer/weißer Balken */}
++      <div className="rounded-xl border p-4 shadow-none">
++        {/* Top-Zeile im Personal-Stil */}
++        <div className="mb-4 flex items-center justify-between gap-3">
++          <Badge className="border-[#304674]/20 bg-[#304674]/10 px-3 py-1 text-[#304674] cursor-default transition-none">
++            <span className="inline-flex items-center gap-2">
++              <IonIcon name="logo-tiktok" />
++              TikTok connected: {sortedAccounts.length}
++            </span>
++          </Badge>
++          <div className="w-full max-w-xs md:w-auto">
++            <Button
++              className="w-full rounded-xl bg-[#304674] text-white"
++              variant={connectionState === "loading" ? "loading" : "default"}
++              onClick={handleConnect}
++              disabled={connectionState === "loading"}
++            >
++              {connectionState === "loading" ? "Connecting..." : "Connect TikTok"}
++            </Button>
++          </div>
++        </div>
++
++        {/* Accounts */}
++        {accountsLoading ? (
++          <div className="flex items-center justify-center py-6">
++            <Spinner className="h-8 w-8" />
++          </div>
++        ) : sortedAccounts.length === 0 ? (
++          <div className="rounded-xl border px-4 py-3 text-sm text-muted-foreground">
++            No TikTok accounts connected yet.
++          </div>
++        ) : (
++          <div className="flex flex-wrap gap-2">
++            {sortedAccounts.map((account) => (
++              <Badge
++                key={account.openId}
++                variant="secondary"
++                className="flex items-center gap-2 pr-3 cursor-default transition-none"
++              >
++                <Avatar className="h-6 w-6">
++                  <AvatarImage
++                    alt={renderAccountLabel(account)}
++                    src={account.avatarUrl ?? undefined}
++                  />
++                  <AvatarFallback className="text-[10px]">
++                    {renderAccountInitials(account)}
++                  </AvatarFallback>
++                </Avatar>
++                <span className="text-xs font-medium">
++                  {renderAccountLabel(account)}
++                </span>
++              </Badge>
++            ))}
++          </div>
++        )}
++      </div>
++    </div>
++  );
++}
+*** End Patch
+diff
+Code kopieren
+*** Begin Patch
+*** Update File: src/components/dashboard/settings/SettingsNav.tsx
+@@
+-const NAV_ITEMS = [
+-  { label: "Personal",    href: "/dashboard/account/personal", icon: "user" },
+-  { label: "Connections", href: "/dashboard/connections",      icon: "link" },
+-  { label: "Billing",     href: "/dashboard/account/billing",  icon: "credit-card" },
+-] as const;
++const NAV_ITEMS = [
++  { label: "Personal",    href: "/dashboard/account/personal", icon: "user" },
++  { label: "Billing",     href: "/dashboard/account/billing",  icon: "credit-card" },
++] as const;
+*** End Patch

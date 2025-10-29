@@ -105,11 +105,12 @@ export default function SideBarDropdown({
           <DropdownMenuItem asChild>
             <Button variant="outline" className="w-full">
               <Link
-                href="/dashboard/account/profile"
-                className="flex h-full w-full items-center justify-center p-2"
-              >
-                <User className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+                href="/dashboard/account/settings"
+                 className="flex h-full w-full items-center justify-center p-2"
+               >
+                 <User className="mr-2 h-4 w-4" />
+
+                <span>Settings</span>
               </Link>
             </Button>
           </DropdownMenuItem>

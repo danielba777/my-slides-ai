@@ -19,23 +19,14 @@ type ConnectionState = "idle" | "loading";
 export function ConnectionCard() {
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("idle");
-  const {
-    accounts,
-    loading: accountsLoading,
-    error,
-    refresh,
-  } = useTikTokAccounts();
+  const { accounts, loading: accountsLoading, error } = useTikTokAccounts();
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      defineCustomElements(window);
-    }
+    if (typeof window !== "undefined") defineCustomElements(window);
   }, []);
 
   useEffect(() => {
-    if (error) {
-      toast.error(error);
-    }
+    if (error) toast.error(error);
   }, [error]);
 
   const sortedAccounts = useMemo(
@@ -49,28 +40,14 @@ export function ConnectionCard() {
 
   const handleConnect = useCallback(async () => {
     setConnectionState("loading");
-
     try {
-      const startResponse = await fetch("/api/tiktok/start");
-      const startPayload = await startResponse.json().catch(() => null);
-
-      if (
-        !startResponse.ok ||
-        !startPayload ||
-        typeof startPayload.url !== "string"
-      ) {
-        throw new Error(
-          startPayload && typeof startPayload.error === "string"
-            ? startPayload.error
-            : "Unable to start TikTok OAuth flow",
-        );
-      }
-
-      window.location.href = startPayload.url;
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "TikTok connection failed";
-      toast.error(message);
+      const r = await fetch("/api/tiktok/start");
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.url)
+        throw new Error(j?.error ?? "Unable to start TikTok OAuth flow");
+      window.location.href = j.url;
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "TikTok connection failed");
       setConnectionState("idle");
     }
   }, []);
@@ -88,28 +65,46 @@ export function ConnectionCard() {
     (account: ConnectedTikTokAccount) => {
       const label = renderAccountLabel(account).trim();
       const letters = label.replace(/[^A-Za-z0-9]/g, "");
-      if (letters.length === 0) {
-        return "TT";
-      }
+      if (letters.length === 0) return "TT";
       return letters.slice(0, 2).toUpperCase();
     },
     [renderAccountLabel],
   );
 
   return (
-    <div className="max-w-xl">
-      <div className="flex items-center gap-4">
-        <IonIcon name="logo-tiktok" size="large" />
-        <Button
-          variant={connectionState === "loading" ? "loading" : "default"}
-          onClick={handleConnect}
-          disabled={connectionState === "loading"}
-        >
-          {connectionState === "loading" ? "Connecting..." : "Connect TikTok"}
-        </Button>
+    <div className="px-1 sm:px-2 lg:px-0">
+      {/* Eine einzelne Card – keine zusätzlichen Headline-Doppler, kein blauer/weißer Balken */}
+      <div className="rounded-xl border p-4 shadow-none">
+        {/* Top-Zeile im Personal-Stil */}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <Badge className="border-[#304674]/20 bg-[#304674]/10 px-3 py-1 text-[#304674] hover:bg-[#304674]/10 hover:text-[#304674] cursor-default transition-none">
+            <span className="inline-flex items-center gap-2">
+              <IonIcon name="logo-tiktok" />
+              TikTok connected: {sortedAccounts.length}
+            </span>
+          </Badge>
+          <div className="w-full max-w-xs md:w-auto">
+            <Button
+              className="w-full rounded-xl bg-[#304674] text-white"
+              variant={connectionState === "loading" ? "loading" : "default"}
+              onClick={handleConnect}
+              disabled={connectionState === "loading"}
+            >
+              {connectionState === "loading"
+                ? "Connecting..."
+                : "Connect TikTok"}
+            </Button>
+          </div>
+        </div>
+
+        {/* Accounts */}
         {accountsLoading ? (
-          <div className="flex items-center justify-center py-4">
+          <div className="flex items-center justify-center py-6">
             <Spinner className="h-8 w-8" />
+          </div>
+        ) : sortedAccounts.length === 0 ? (
+          <div className="rounded-xl border px-4 py-3 text-sm text-muted-foreground">
+            No TikTok accounts connected yet.
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
@@ -117,7 +112,7 @@ export function ConnectionCard() {
               <Badge
                 key={account.openId}
                 variant="secondary"
-                className="flex items-center gap-2 pr-3"
+                className="flex items-center gap-2 pr-3 cursor-default transition-none"
               >
                 <Avatar className="h-6 w-6">
                   <AvatarImage
@@ -135,17 +130,6 @@ export function ConnectionCard() {
             ))}
           </div>
         )}
-      </div>
-
-      <div className="py-4 border-t-2 mt-4">
-        <Button
-          variant="outline"
-          className=""
-          onClick={() => void refresh()}
-          disabled={accountsLoading}
-        >
-          Refresh
-        </Button>
       </div>
     </div>
   );

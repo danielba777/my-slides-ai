@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { PLAN_CREDITS } from "@/lib/billing";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Infinity as InfinityIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -59,10 +60,12 @@ export default function ProfileBilling() {
 
   if (usage.isLoading) {
     return (
-      <div className="px-6 py-10">
-        <Card className="max-w-5xl mx-auto">
+      <div className="px-4 sm:px-6 lg:px-8 py-6">
+        <Card className="mx-auto max-w-5xl rounded-2xl">
           <CardHeader>
-            <CardTitle>Profile & Billing</CardTitle>
+            <CardTitle className="text-2xl md:text-3xl">
+              Profile & Billing
+            </CardTitle>
           </CardHeader>
           <CardContent>Loading…</CardContent>
         </Card>
@@ -78,108 +81,152 @@ export default function ProfileBilling() {
   const data = usage.data;
 
   const hasPlan = !!data.plan;
-  const pack = hasPlan ? (PLAN_CREDITS[data.plan as keyof typeof PLAN_CREDITS] ?? { credits: 0, ai: 0 }) : null;
-  const total   = pack ? (pack.credits < 0 ? Infinity : pack.credits) : 0;
-  const aiTotal = pack ? (pack.ai      < 0 ? Infinity : pack.ai)      : 0;
-  const creditsLeft = data.credits == null ? null : data.credits < 0 ? Infinity : data.credits;
-  const aiLeft      = data.aiCredits == null ? null : data.aiCredits < 0 ? Infinity : data.aiCredits;
-  const used = hasPlan
-    ? Math.max(
-        0,
-        data.usedCredits ?? (total === Infinity || creditsLeft == null ? 0 : total - creditsLeft),
-      )
-    : 0;
-  const aiUsed = hasPlan
-    ? Math.max(
-        0,
-        data.usedAiCredits ?? (aiTotal === Infinity || aiLeft == null ? 0 : aiTotal - aiLeft),
-      )
-    : 0;
-  const pct = !hasPlan || total === 0 || total === Infinity ? 0 : Math.round((Math.min(used, total) / total) * 100);
-  const aiPct = !hasPlan || aiTotal === 0 || aiTotal === Infinity ? 0 : Math.round((Math.min(aiUsed, aiTotal) / aiTotal) * 100);
+  const pack = hasPlan
+    ? (PLAN_CREDITS[data.plan as keyof typeof PLAN_CREDITS] ?? {
+        credits: 0,
+        ai: 0,
+      })
+    : null;
+  const total = pack ? (pack.credits < 0 ? Infinity : pack.credits) : 0;
+  const aiTotal = pack ? (pack.ai < 0 ? Infinity : pack.ai) : 0;
+  // Always show REMAINING like "950/1000"
+  const creditsLeft =
+    data.credits == null ? null : data.credits < 0 ? Infinity : data.credits;
+  const aiLeft =
+    data.aiCredits == null
+      ? null
+      : data.aiCredits < 0
+        ? Infinity
+        : data.aiCredits;
+  const remaining =
+    total === Infinity
+      ? Infinity
+      : (creditsLeft ?? Math.max(0, total - (data.usedCredits ?? 0)));
+  const aiRemaining =
+    aiTotal === Infinity
+      ? Infinity
+      : (aiLeft ?? Math.max(0, aiTotal - (data.usedAiCredits ?? 0)));
+  const remainingPct =
+    total && total !== Infinity
+      ? Math.min(100, Math.round((remaining / total) * 100))
+      : 100;
+  const aiRemainingPct =
+    aiTotal && aiTotal !== Infinity
+      ? Math.min(100, Math.round((aiRemaining / aiTotal) * 100))
+      : 100;
+  // If ~full (>=95% and <100), show 98% filled as requested
+  const displayPct =
+    total === Infinity
+      ? 100
+      : remainingPct >= 95 && remainingPct < 100
+        ? 98
+        : remainingPct;
+  const aiDisplayPct =
+    aiTotal === Infinity
+      ? 100
+      : aiRemainingPct >= 95 && aiRemainingPct < 100
+        ? 98
+        : aiRemainingPct;
   const nextReset = data.resetsAt ? new Date(data.resetsAt) : null;
+  // Plan change UI & handler removed on request
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-8">
-      <div className="max-w-6xl mx-auto grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Plan Card */}
-        <Card className="lg:col-span-1 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-xl">Your plan</CardTitle>
-            {hasPlan ? (
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">{data.plan}</Badge>
-                {data.status && <Badge variant={data.status === "ACTIVE" ? "default" : "secondary"}>{data.status}</Badge>}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">Free</Badge>
-                <Badge variant="outline">No subscription</Badge>
-              </div>
+    <div className="px-1 sm:px-2 lg:px-0">
+      {/* Header */}
+      <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+        <div className="space-y-1">
+          <h2 className="text-xl font-semibold md:text-2xl">
+            Personal & Billing
+          </h2>
+          <div className="inline-flex items-center gap-2">
+            {/* Clearer plan labeling; removes noisy "Current UNLIMITED" */}
+            <Badge className="border-[#304674]/20 bg-[#304674]/10 px-3 py-1 text-[#304674] hover:bg-[#304674]/10 hover:text-[#304674] cursor-default transition-none">
+              Plan: {hasPlan ? data.plan : "Free"}
+            </Badge>
+            {nextReset && (
+              <span className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground">
+                Resets on {nextReset.toLocaleDateString()}
+              </span>
             )}
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {hasPlan ? (
-              data.hasSubscription ? (
-                <Button onClick={async () => {
-                  const r = await fetch("/api/billing/portal", { method: "POST" });
-                  const j = await r.json();
-                  if (j?.url) window.location.href = j.url;
-                  else toast.error("Could not open portal");
-                }}>
-                  Manage subscription
-                </Button>
-              ) : (
-                <Button onClick={() => router.push("/#pricing")}>Choose a plan</Button>
-              )
-            ) : (
-              <Button onClick={() => router.push("/#pricing")}>Choose a plan</Button>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Usage Card */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Usage</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {hasPlan ? (
-              <>
-                {/* Credits */}
-                <div>
-                  <div className="mb-1 flex items-center justify-between">
-                    <span className="text-sm font-medium">Credits</span>
-                    <span className="text-xs text-muted-foreground">
-                      {pack!.credits < 0 ? "∞" : `${used}/${total}`}
-                    </span>
-                  </div>
-                  <Progress value={pack!.credits < 0 ? 0 : pct} />
-                </div>
-                {/* AI Credits */}
-                <div>
-                  <div className="mb-1 flex items-center justify-between">
-                    <span className="text-sm font-medium">AI credits</span>
-                    <span className="text-xs text-muted-foreground">
-                      {pack!.ai < 0 ? "∞" : `${aiUsed}/${aiTotal}`}
-                    </span>
-                  </div>
-                  <Progress value={pack!.ai < 0 ? 0 : aiPct} />
-                </div>
-                {nextReset && (
-                  <div className="text-xs text-muted-foreground">
-                    Resets on {nextReset.toLocaleDateString()}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="text-sm text-muted-foreground">
-                No plan yet — <button className="underline" onClick={() => router.push("/#pricing")}>choose a plan</button> to unlock credits.
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+        <div className="w-full max-w-xs md:w-auto">
+          {hasPlan && data.hasSubscription ? (
+            <Button
+              className="w-full rounded-xl bg-[#304674] text-white hover:opacity-90"
+              onClick={async () => {
+                const r = await fetch("/api/billing/portal", {
+                  method: "POST",
+                });
+                const j = await r.json();
+                if (j?.url) window.location.href = j.url;
+                else toast.error("Could not open portal");
+              }}
+            >
+              Manage subscription
+            </Button>
+          ) : (
+            <Button
+              className="w-full rounded-xl"
+              onClick={() => router.push("/#pricing")}
+            >
+              Choose a plan
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Credits (Remaining) */}
+      <div className="mt-6 rounded-xl border p-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* Credits (remaining) */}
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Credits (remaining)
+            </div>
+            <div className="mt-1 text-lg font-semibold">
+              {total === Infinity ? (
+                <span className="inline-flex items-center gap-1 align-middle">
+                  <InfinityIcon
+                    strokeWidth={2.5}
+                    className="h-4 w-4 -mt-px"
+                    aria-label="Unlimited credits"
+                  />
+                </span>
+              ) : (
+                `${remaining}/${total}`
+              )}
+            </div>
+            <Progress className="mt-2 h-1.5" value={displayPct} />
+          </div>
+          <div className="rounded-lg">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              AI Credits (remaining)
+            </div>
+            <div className="mt-1 text-lg font-semibold">
+              {aiTotal === Infinity ? (
+                <span className="inline-flex items-center gap-1 align-middle">
+                  <InfinityIcon
+                    strokeWidth={2.5}
+                    className="h-4 w-4 -mt-px"
+                    aria-label="Unlimited AI credits"
+                  />
+                </span>
+              ) : (
+                `${aiRemaining}/${aiTotal}`
+              )}
+            </div>
+            <Progress className="mt-2 h-1.5" value={aiDisplayPct} />
+          </div>
+        </div>
+        {nextReset && (
+          <div className="mt-3 text-xs text-muted-foreground">
+            Resets on {nextReset.toLocaleDateString()}
+          </div>
+        )}
+      </div>
+
+      {/* Plan Selector removed on request */}
     </div>
   );
 }

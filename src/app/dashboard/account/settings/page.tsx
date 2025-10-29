@@ -1,9 +1,8 @@
 import { auth } from "@/server/auth";
 import { redirect } from "next/navigation";
-
-export default async function ProfilePage() {
+import SettingsPage from "@/components/dashboard/account/SettingsPage";
+export default async function AccountSettingsPage() {
   const session = await auth();
   if (!session?.user) redirect("/auth/signin");
-  // Alte Route weiterleiten auf die neue Settings-Seite
-  redirect("/dashboard/account/settings");
+  return <SettingsPage />;
 }
