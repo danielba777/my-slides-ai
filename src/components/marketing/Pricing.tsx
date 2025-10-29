@@ -3,11 +3,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion } from "framer-motion";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Section } from "./Section";
 import { toast } from "sonner";
+import { Section } from "./Section";
 
 const tiers = [
   {
@@ -18,7 +17,7 @@ const tiers = [
       "25 monthly credits",
       "50 monthly AI credits",
       "Create slideshows",
-      "Hook + demo videos",
+      "AI avatars",
     ],
   },
   {
@@ -29,7 +28,7 @@ const tiers = [
     features: [
       "100 monthly credits",
       "150 monthly AI credits",
-      "Bulk creation",
+      "Everything from Starter",
       "Priority queue",
     ],
   },
@@ -39,8 +38,8 @@ const tiers = [
     features: [
       "250 monthly credits",
       "300 monthly AI credits",
-      "10 TikTok automations",
-      "Team access",
+      "Everything from Growth",
+      "Priority support",
     ],
   },
   {
@@ -50,7 +49,7 @@ const tiers = [
     features: [
       "Unlimited credits",
       "1,000 monthly AI credits",
-      "Unlimited automations",
+      "Everything from Scale",
       "White-glove support",
     ],
   },
@@ -61,12 +60,13 @@ export function MarketingPricing({ session }: { session: boolean }) {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
   // Mapping der sichtbaren Namen zu den Server-Plan-Keys
-  const PLAN_MAP: Record<string, "STARTER" | "GROWTH" | "SCALE" | "UNLIMITED"> = {
-    Starter: "STARTER",
-    Growth: "GROWTH",
-    Scale: "SCALE",
-    Unlimited: "UNLIMITED",
-  };
+  const PLAN_MAP: Record<string, "STARTER" | "GROWTH" | "SCALE" | "UNLIMITED"> =
+    {
+      Starter: "STARTER",
+      Growth: "GROWTH",
+      Scale: "SCALE",
+      Unlimited: "UNLIMITED",
+    };
 
   async function startCheckout(name: string) {
     // Wenn nicht eingeloggt → zur Sign-in-Seite mit Rücksprung zu gewünschtem Plan
@@ -182,8 +182,8 @@ export function MarketingPricing({ session }: { session: boolean }) {
                   {loadingPlan === PLAN_MAP[t.name]
                     ? "Redirecting…"
                     : t.highlight
-                    ? "Start with Growth"
-                    : "Choose plan"}
+                      ? "Start with Growth"
+                      : "Choose plan"}
                 </Button>
               </div>
             </CardContent>

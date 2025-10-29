@@ -24,6 +24,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { SidebarAccountSection } from "./app-sidebar-account";
+import { SidebarUsageSummary } from "./app-sidebar-usage";
 import { AppLogo } from "./logo/AppLogo";
 
 interface SidebarItem {
@@ -216,7 +217,8 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="space-y-3">
+        <SidebarUsageSummary />
         <SidebarAccountSection />
       </SidebarFooter>
     </Sidebar>

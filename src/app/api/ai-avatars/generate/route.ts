@@ -8,6 +8,7 @@ const GENERATE_ENDPOINT = `${API_BASE}/higgsfield/text2image_soul`;
 const FETCH_ENDPOINT = (id: string) =>
   `${API_BASE}/higgsfield/task/${encodeURIComponent(id)}/fetch`;
 const EXPECTED_GENERATION_BATCH_SIZE = 4;
+const DEFAULT_STYLE_ID = "1cb4b936-77bf-4f9a-9039-f3d349a4cdbe";
 
 type ImageResult = { minUrl?: string; rawUrl?: string };
 type PersistedImage = {
@@ -33,13 +34,23 @@ export async function POST(request: Request) {
     }
 
     const userId = session.user.id;
-    const { prompt } = (await request.json()) as { prompt?: string };
+    const { prompt, styleId, quality } = (await request.json()) as {
+      prompt?: string;
+      styleId?: string;
+      quality?: "basic" | "high";
+    };
 
     if (!prompt || !prompt.trim()) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
     const trimmedPrompt = prompt.trim();
+    const effectiveStyleId =
+      typeof styleId === "string" && styleId.trim().length > 0
+        ? styleId.trim()
+        : DEFAULT_STYLE_ID;
+    const effectiveQuality: "basic" | "high" =
+      quality === "high" || quality === "basic" ? quality : "high";
     const apiKey = process.env["302AI_KEY"];
     if (!apiKey) {
       return NextResponse.json(
@@ -64,6 +75,8 @@ export async function POST(request: Request) {
       prompt: trimmedPrompt,
       expectedImages: job.expectedImages ?? EXPECTED_GENERATION_BATCH_SIZE,
       userId: session.user.id,
+      styleId: effectiveStyleId,
+      quality: effectiveQuality,
     });
 
     return NextResponse.json({
@@ -89,17 +102,22 @@ async function processGenerationJob({
   prompt,
   expectedImages,
   userId,
+  styleId,
+  quality,
 }: {
   externalApiKey: string;
   jobId: string;
   prompt: string;
   expectedImages: number;
   userId: string;
+  styleId: string;
+  quality: "basic" | "high";
 }) {
   const randomSeed = Math.floor(Math.random() * 1_000_000);
-  // Vor Start atomar 2 AI-Credits abziehen
+  const creditCost = quality === "basic" ? 1 : 2;
+  // Vor Start atomar Credits abziehen (1 bei basic, 2 bei high)
   try {
-    await ensureAndConsumeCredits(userId, { kind: "ai", cost: 2 });
+    await ensureAndConsumeCredits(userId, { kind: "ai", cost: creditCost });
   } catch (e: any) {
     if (e?.code === "INSUFFICIENT_AI_CREDITS") {
       return NextResponse.json(
@@ -111,13 +129,13 @@ async function processGenerationJob({
   }
 
   const payload = {
-    quality: "basic",
+    quality,
     aspect_ratio: "2:3",
     prompt,
     negative_prompt: "",
     enhance_prompt: false,
     seed: randomSeed,
-    style_id: "1cb4b936-77bf-4f9a-9039-f3d349a4cdbe",
+    style_id: styleId,
   };
 
   try {

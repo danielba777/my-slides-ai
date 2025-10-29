@@ -23,6 +23,7 @@ export const env = createEnv({
     STRIPE_PRICE_UNLIMITED: z.string().min(1, "Missing STRIPE_PRICE_UNLIMITED"),
     // optional (nur falls irgendwo im Client gebraucht wird → besser als NEXT_PUBLIC_* anlegen)
     STRIPE_PUBLISHABLE_KEY: z.string().optional(),
+    ADMIN_ALLOWED_EMAILS: z.string().optional(),
     NEXTAUTH_URL: z.preprocess(
       (str) => process.env.VERCEL_URL ?? str,
       process.env.VERCEL ? z.string() : z.string().url(),
@@ -54,6 +55,7 @@ export const env = createEnv({
     STRIPE_PRICE_SCALE: process.env.STRIPE_PRICE_SCALE,
     STRIPE_PRICE_UNLIMITED: process.env.STRIPE_PRICE_UNLIMITED,
     STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
+    ADMIN_ALLOWED_EMAILS: process.env.ADMIN_ALLOWED_EMAILS,
   },
 
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
