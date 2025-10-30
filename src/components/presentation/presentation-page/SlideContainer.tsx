@@ -364,6 +364,15 @@ function PersonalImagePickerButton({ index }: { index: number }) {
       width: finalW,
       height: finalH,
       url: imageUrl,
+      // 🔒 Explizit jedes Zuschneiden deaktivieren
+      cropX: 0,
+      cropY: 0,
+      cropWidth: natW,
+      cropHeight: natH,
+      fit: "contain",            // falls der Renderer eine Fit-Strategie kennt
+      preserveAspectRatio: true, // klarstellen, dass nichts verzerrt/cropped wird
+      clipToCanvas: false,       // falls es eine Canvas-Clip-Option gibt → aus
+      mask: false,               // falls Masking im Renderer existiert → aus
     };
 
     const nextCanvas: CanvasDoc = {
@@ -377,6 +386,22 @@ function PersonalImagePickerButton({ index }: { index: number }) {
     setSlides(updated);
     setOpen(false);
   };
+
+  // --- Verhindere Seiten-Scrollen beim Zoomen/Edithieren des Overlay-Bildes ---
+  // Wenn das persönliche Overlay-Bild ausgewählt ist, unterbinden wir global das Wheel-Scrollen,
+  // damit nur das Canvas-Zoomen/Transformieren greift.
+  useEffect(() => {
+    const sel = (slides[index]?.canvas as CanvasDoc | undefined)?.selection ?? [];
+    const overlaySelected = sel.includes("user-overlay-image");
+    if (!overlaySelected) return;
+    const onWheel = (e: WheelEvent) => {
+      // wichtig: passive:false nötig, darum preventDefault hier möglich
+      e.preventDefault();
+    };
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => window.removeEventListener("wheel", onWheel as any, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(slides[index]?.canvas as any)?.selection]);
 
   const onMainButtonClick = () => {
     const slide = slides[index];

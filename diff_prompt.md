@@ -1,72 +1,54 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
 **_ Begin Patch
-_** Update File: src/canvas/legacy/SlideCanvasLegacy.tsx
+_** Update File: src/app/dashboard/image-collections/page.tsx
 @@
 
-- const handleConfirm = (imageUrl: string) => {
+-                <div key={image.id} className="group relative aspect-square overflow-hidden rounded-lg border bg-muted">
+-                  <img src={image.url} alt={image.filename} className="h-full w-full object-cover" />
 
-* const handleConfirm = async (imageUrl: string) => {
-  const updated = slides.slice();
-  if (!updated[index]) return;
+*                <div key={image.id} className="group relative aspect-square overflow-hidden rounded-lg border bg-muted flex items-center justify-center">
+*                  <img src={image.url} alt={image.filename} className="max-h-full max-w-full object-contain" />
+                     <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
+                       <Button variant="destructive" size="sm" onClick={() => deleteImage(image.id)} className="gap-2">
+                         <Trash2 className="h-3 w-3" />
+                         Delete
+                       </Button>
+                     </div>
+                   </div>
+  **_ End Patch
+  diff
+  Code kopieren
+  _** Begin Patch
+  \*\*\* Update File: src/app/dashboard/image-collections/page.tsx
+  @@
 
-  // ➕ Persönliches Bild als Overlay-Node (unter dem Text, über dem BG)
-  const slide = updated[index]!;
-  const canvas = ensureCanvas(slide.canvas as CanvasDoc | undefined);
+-                          <img
+-                            src={image.url}
+-                            alt={`All images preview ${index + 1}`}
+-                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+-                            loading="lazy"
+-                          />
 
-  // Entferne evtl. vorhandenes persönliches Bild (1 pro Slide)
-  const nodesWithoutOld = canvas.nodes.filter(
-  (n: any) => !(n?.type === "image" && n?.id === "user-overlay-image"),
-  );
+*                          <img
+*                            src={image.url}
+*                            alt={`All images preview ${index + 1}`}
+*                            className="max-h-full max-w-full object-contain transition-opacity group-hover:opacity-80"
+*                            loading="lazy"
+*                          />
+  @@
 
-- // Vollflächig initialisieren (Cover/Contain handled der Legacy-Canvas bereits visuell)
-- const personalNode = {
--      id: "user-overlay-image",
--      type: "image" as const,
--      x: 0,
--      y: 0,
--      width: canvas.width,
--      height: canvas.height,
--      url: imageUrl,
-- };
+-                          <img
+-                            src={image.url}
+-                            alt={`${set.name} preview ${index + 1}`}
+-                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+-                            loading="lazy"
+-                          />
 
-* // Bild NATÜRLICH und ZENTRIERT platzieren (kein Zuschneiden, kein Cover)
-* // -> auf natürliche Größe, falls größer als Canvas: proportional auf Canvas einpassen (contain)
-* let natW = canvas.width;
-* let natH = canvas.height;
-* try {
-*      const img = await loadImageDecoded(imageUrl);
-*      natW = img.naturalWidth || natW;
-*      natH = img.naturalHeight || natH;
-* } catch {
-*      // Fallback: halbe Canvasgröße
-*      natW = Math.round(canvas.width * 0.5);
-*      natH = Math.round(canvas.height * 0.5);
-* }
-* const scale = Math.min(1, canvas.width / natW, canvas.height / natH);
-* const finalW = Math.round(natW \* scale);
-* const finalH = Math.round(natH \* scale);
-* const centeredX = Math.round((canvas.width - finalW) / 2);
-* const centeredY = Math.round((canvas.height - finalH) / 2);
-*
-* const personalNode = {
-*      id: "user-overlay-image",
-*      type: "image" as const,
-*      x: centeredX,
-*      y: centeredY,
-*      width: finalW,
-*      height: finalH,
-*      url: imageUrl,
-* };
-       const nextCanvas: CanvasDoc = {
-         ...canvas,
-         nodes: [...nodesWithoutOld, personalNode],
-         // direkt vorselektieren, damit Drag/Zoom sofort funktioniert
-         selection: ["user-overlay-image"],
-       };
-
-       updated[index] = { ...slide, canvas: nextCanvas };
-       setSlides(updated);
-       setOpen(false);
-  };
+*                          <img
+*                            src={image.url}
+*                            alt={`${set.name} preview ${index + 1}`}
+*                            className="max-h-full max-w-full object-contain transition-opacity group-hover:opacity-80"
+*                            loading="lazy"
+*                          />
   \*\*\* End Patch
