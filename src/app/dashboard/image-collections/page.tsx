@@ -132,11 +132,12 @@ export default function ImageCollectionsPage() {
       hasPersonalCategoryTag(set.name);
 
     const belongsToUser = (set: ImageSet) =>
-      isImageSetOwnedByUser(set, userId) ||
-      looksPersonal(set) ||
-      isAiAvatarCollection(set);
+      // Persönliche Sets nur beim Besitzer anzeigen
+      isImageSetOwnedByUser(set, userId) || isAiAvatarCollection(set);
 
-    return sets.filter(belongsToUser);
+    return sets
+      .filter(belongsToUser)
+      .filter((s) => !looksPersonal(s) || isImageSetOwnedByUser(s, userId));
   }, [sets, session?.user?.id]);
 
   function getPreviewImages(set: ImageSet): ImageSetImage[] {
@@ -320,7 +321,7 @@ export default function ImageCollectionsPage() {
                             <img
                               src={image.url}
                               alt={`${set.name} preview ${index + 1}`}
-                              className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                              className="h-full w-full object-contain transition-opacity group-hover:opacity-80"
                               loading="lazy"
                             />
                           </div>

@@ -69,10 +69,11 @@ export default function ImageSetDetailPage() {
 
     setIsUploading(true);
     const formData = new FormData();
-
-    Array.from(uploadFiles).forEach((file) => {
-      formData.append("images", file);
-    });
+    Array.from(uploadFiles).forEach((file) => formData.append("images", file));
+    // 👉 Flags gegen serverseitiges Cropping
+    formData.append("processing", "none");
+    formData.append("fit", "contain");
+    formData.append("keepOriginal", "true");
 
     try {
       const response = await fetch(`/api/imagesets/${id}/upload`, {
@@ -233,11 +234,8 @@ export default function ImageSetDetailPage() {
                   key={image.id}
                   className="relative group aspect-square rounded-lg overflow-hidden border bg-muted"
                 >
-                  <img
-                    src={image.url}
-                    alt={image.filename}
-                    className="w-full h-full object-cover"
-                  />
+                  {/* Thumbs vollständig anzeigen, nicht beschneiden */}
+                  <img src={image.url} alt={image.filename} className="h-full w-full object-contain" />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
                     <Button
                       variant="destructive"

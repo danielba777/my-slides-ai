@@ -1,5 +1,6 @@
 "use client";
 
+import { loadImageDecoded } from "@/canvas/konva-helpers";
 import type { CanvasDoc } from "@/canvas/types";
 import {
   AlertDialog,
@@ -323,7 +324,7 @@ function PersonalImagePickerButton({ index }: { index: number }) {
     };
   };
 
-  const handleConfirm = (imageUrl: string) => {
+  const handleConfirm = async (imageUrl: string) => {
     const updated = slides.slice();
     if (!updated[index]) return;
 
@@ -336,15 +337,42 @@ function PersonalImagePickerButton({ index }: { index: number }) {
       (n: any) => !(n?.type === "image" && n?.id === "user-overlay-image"),
     );
 
-    // Vollflächig initialisieren (Cover/Contain handled der Legacy-Canvas bereits visuell)
+    // Bild NATÜRLICH und ZENTRIERT platzieren (kein Zuschneiden, kein Cover)
+    // -> auf natürliche Größe, falls größer als Canvas: proportional auf Canvas einpassen (contain)
+    let natW = canvas.width;
+    let natH = canvas.height;
+    try {
+      const img = await loadImageDecoded(imageUrl);
+      natW = img.naturalWidth || natW;
+      natH = img.naturalHeight || natH;
+    } catch {
+      // Fallback: halbe Canvasgröße
+      natW = Math.round(canvas.width * 0.5);
+      natH = Math.round(canvas.height * 0.5);
+    }
+    const scale = Math.min(1, canvas.width / natW, canvas.height / natH);
+    const finalW = Math.round(natW * scale);
+    const finalH = Math.round(natH * scale);
+    const centeredX = Math.round((canvas.width - finalW) / 2);
+    const centeredY = Math.round((canvas.height - finalH) / 2);
+
     const personalNode = {
       id: "user-overlay-image",
       type: "image" as const,
-      x: 0,
-      y: 0,
-      width: canvas.width,
-      height: canvas.height,
+      x: centeredX,
+      y: centeredY,
+      width: finalW,
+      height: finalH,
       url: imageUrl,
+      // 🔒 Explizit jedes Zuschneiden deaktivieren
+      cropX: 0,
+      cropY: 0,
+      cropWidth: natW,
+      cropHeight: natH,
+      fit: "contain",            // falls der Renderer eine Fit-Strategie kennt
+      preserveAspectRatio: true, // klarstellen, dass nichts verzerrt/cropped wird
+      clipToCanvas: false,       // falls es eine Canvas-Clip-Option gibt → aus
+      mask: false,               // falls Masking im Renderer existiert → aus
     };
 
     const nextCanvas: CanvasDoc = {
@@ -358,6 +386,22 @@ function PersonalImagePickerButton({ index }: { index: number }) {
     setSlides(updated);
     setOpen(false);
   };
+
+  // --- Verhindere Seiten-Scrollen beim Zoomen/Edithieren des Overlay-Bildes ---
+  // Wenn das persönliche Overlay-Bild ausgewählt ist, unterbinden wir global das Wheel-Scrollen,
+  // damit nur das Canvas-Zoomen/Transformieren greift.
+  useEffect(() => {
+    const sel = (slides[index]?.canvas as CanvasDoc | undefined)?.selection ?? [];
+    const overlaySelected = sel.includes("user-overlay-image");
+    if (!overlaySelected) return;
+    const onWheel = (e: WheelEvent) => {
+      // wichtig: passive:false nötig, darum preventDefault hier möglich
+      e.preventDefault();
+    };
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => window.removeEventListener("wheel", onWheel as any, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(slides[index]?.canvas as any)?.selection]);
 
   const onMainButtonClick = () => {
     const slide = slides[index];

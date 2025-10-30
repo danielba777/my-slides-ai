@@ -178,6 +178,7 @@ model UserImageCollection {
   imageSetId String   @unique
   name       String?
   slug       String?
+  email      String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
 

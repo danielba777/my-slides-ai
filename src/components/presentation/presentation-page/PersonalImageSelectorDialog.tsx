@@ -124,9 +124,8 @@ export default function PersonalImageSelectorDialog({
 
   const belongsToUser = useCallback(
     (set: ImageSet) =>
-      checkOwnership(set, userId ?? null) ||
-      looksPersonal(set) ||
-      isAiAvatarCollection(set),
+      // Persönliche Sets zählen nur für den Besitzer als "mine"
+      checkOwnership(set, userId ?? null) || isAiAvatarCollection(set),
     [isAiAvatarCollection, looksPersonal, userId],
   );
 
@@ -137,9 +136,15 @@ export default function PersonalImageSelectorDialog({
           ? drillDownParent.children
           : imageSets.filter((set) => set.parentId === drillDownParent.id)) ??
         [];
-      return children.filter(belongsToUser);
+      return children
+        .filter(belongsToUser)
+        // Safety: niemals Personal anderer in der Liste
+        .filter((s) => !looksPersonal(s) || checkOwnership(s, userId ?? null));
     }
-    return imageSets.filter((set) => !set.parentId).filter(belongsToUser);
+    return imageSets
+      .filter((set) => !set.parentId)
+      .filter(belongsToUser)
+      .filter((s) => !looksPersonal(s) || checkOwnership(s, userId ?? null));
   }, [belongsToUser, drillDownParent, imageSets]);
 
   const getPreviewImages = (set: ImageSet): ImageSetImage[] => {
