@@ -145,6 +145,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {/*
         <SidebarGroup>
           <SidebarGroupLabel>Configuration</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -166,6 +167,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        */}
         <SidebarGroup>
           <SidebarGroupLabel>Posts</SidebarGroupLabel>
           <SidebarGroupContent>
