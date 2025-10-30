@@ -61,7 +61,7 @@ export function TikTokPostButton() {
         const png = await exporter();
         const jpg = await blobToJpeg(png, 1080, 1620);
         const dataUrl = await blobToDataUrl(jpg);
-        const fileName = `${String(index + 1).padStart(2, "0")}.jpg`;
+        const fileName = `${String(index + 1).padStart(3, "0")}.jpg`;
         imageFiles.push({ name: fileName, blob: jpg });
         previews.push({ id, index, dataUrl });
       }
@@ -72,13 +72,46 @@ export function TikTokPostButton() {
       }
 
       const zipBlob = await zipFiles(imageFiles);
-      const zipDataUrl = await blobToDataUrl(zipBlob);
+      const zipFile = new File(
+        [zipBlob],
+        `${presentationTitle.replace(/[^\w\-]+/g, "_")}-${Date.now()}.zip`,
+        { type: "application/zip" },
+      );
+      const formData = new FormData();
+      formData.append("slides", zipFile);
+
+      const uploadResponse = await fetch(
+        "/api/slideshow-library/posts/upload",
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+      if (!uploadResponse.ok) {
+        toast.error("Failed to store slideshow package. Please try again.");
+        return;
+      }
+      const uploadPayload = (await uploadResponse.json().catch(() => null)) as
+        | Array<{ url?: string }>
+        | { error?: string }
+        | null;
+      const zipUrl = Array.isArray(uploadPayload)
+        ? uploadPayload[0]?.url ?? null
+        : null;
+      if (!zipUrl) {
+        console.error(
+          "Unexpected upload response",
+          uploadPayload,
+        );
+        toast.error("Received an invalid upload response.");
+        return;
+      }
 
       setPrepared({
         presentationId: presentationId ?? null,
         presentationTitle,
         defaultCaption,
-        zipDataUrl,
+        zipUrl,
         slides: previews,
         preparedAt: Date.now(),
       });

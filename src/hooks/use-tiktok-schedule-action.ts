@@ -217,6 +217,8 @@ export function useTikTokScheduleAction(
       },
     };
 
+    console.debug("[TikTokSchedule] Payload", payload);
+
     try {
       const response = await fetch("/api/tests/tiktok-schedule", {
         method: "POST",
@@ -224,16 +226,27 @@ export function useTikTokScheduleAction(
         body: JSON.stringify(payload),
       });
 
-      const data = (await response.json().catch(() => null)) as
-        | TikTokScheduleResult
-        | { error?: string }
-        | null;
+      const rawResponseText = await response.text();
+      let data: TikTokScheduleResult | { error?: string } | null = null;
+      try {
+        data = JSON.parse(rawResponseText) as
+          | TikTokScheduleResult
+          | { error?: string }
+          | null;
+      } catch {
+        data = null;
+      }
 
       if (!response.ok || !data || typeof data !== "object" || !("scheduled" in data)) {
         const message =
           data && typeof data === "object" && "error" in data && typeof data.error === "string"
             ? data.error
-            : "TikTok scheduling failed";
+            : rawResponseText || "TikTok scheduling failed";
+        console.error("[TikTokSchedule] Request failed", {
+          status: response.status,
+          statusText: response.statusText,
+          body: rawResponseText,
+        });
         setError(message);
         toast.error(message);
         return;
@@ -242,6 +255,7 @@ export function useTikTokScheduleAction(
       setResult(data);
       toast.success("TikTok post was scheduled successfully");
     } catch (err) {
+      console.error("[TikTokSchedule] Unexpected error", err, { payload });
       const message = err instanceof Error ? err.message : "Unknown error";
       setError(message);
       toast.error(message);
