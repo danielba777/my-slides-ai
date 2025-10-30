@@ -52,6 +52,21 @@ export default function CustomImagesetsAdminPage() {
   const [data, setData] = useState<ImageSet[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Besitzer-E-Mails laden
+  const [owners, setOwners] = useState<Record<string, { userId: string; email: string | null }>>({});
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/admin/user-image-collections", { cache: "no-store" });
+        if (!res.ok) return;
+        const list = (await res.json()) as Array<{ imageSetId: string; userId: string; email: string | null }>;
+        const map: Record<string, { userId: string; email: string | null }> = {};
+        for (const row of list) map[row.imageSetId] = { userId: row.userId, email: row.email ?? null };
+        setOwners(map);
+      } catch {}
+    })();
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
@@ -121,11 +136,18 @@ export default function CustomImagesetsAdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {flat.map((set) => (
+                  {flat.map((set) => {
+                    const owner = owners[set.id];
+                    return (
                     <TableRow key={set.id}>
                       <TableCell>
-                        <div className="flex items-center" style={{ paddingLeft: `${set.level * 16}px` }}>
+                        <div className="flex items-center gap-3" style={{ paddingLeft: `${set.level * 16}px` }}>
                           <span className="font-medium">{set.name}</span>
+                          {owner?.email && (
+                            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                              {owner.email}
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{set.slug || "-"}</TableCell>
@@ -140,7 +162,8 @@ export default function CustomImagesetsAdminPage() {
                         </Badge>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

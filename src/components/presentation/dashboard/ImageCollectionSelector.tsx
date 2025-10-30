@@ -125,8 +125,8 @@ export const ImageCollectionSelector: React.FC = () => {
 
   const belongsToUser = useCallback(
     (set: ImageSet) =>
+      // Nur dann "mine", wenn wirklich im Besitz ODER eine AI-Avatar-Systemkollektion
       checkOwnership(set, userId ?? null) ||
-      looksPersonal(set) ||
       isAiAvatarCollection(set),
     [isAiAvatarCollection, looksPersonal, userId],
   );
@@ -134,36 +134,33 @@ export const ImageCollectionSelector: React.FC = () => {
   const { communitySets, mySets } = useMemo(() => {
     // If drilling down, show only children of selected parent
     if (drillDownParent) {
-      const children = drillDownParent.children || [];
+      const children =
+        (drillDownParent.children && drillDownParent.children.length > 0
+          ? drillDownParent.children
+          : imageSets.filter((set) => set.parentId === drillDownParent.id)) ??
+        [];
       const community: ImageSet[] = [];
       const mine: ImageSet[] = [];
-
-      children.forEach((set) => {
-        if (belongsToUser(set)) {
-          mine.push(set);
-        } else {
-          community.push(set);
+      for (const c of children) {
+        if (belongsToUser(c)) {
+          mine.push(c);
+        } else if (
+          // persönliche Sets niemals in Community anzeigen
+          !looksPersonal(c)
+        ) {
+          community.push(c);
         }
-      });
-
+      }
       return { communitySets: community, mySets: mine };
     }
 
-    // Otherwise show top-level sets
-    const community: ImageSet[] = [];
-    const mine: ImageSet[] = [];
-    const topLevelSets = imageSets.filter((set) => !set.parentId);
-
-    topLevelSets.forEach((set) => {
-      if (belongsToUser(set)) {
-        mine.push(set);
-      } else {
-        community.push(set);
-      }
-    });
-
+    const community = imageSets
+      .filter((s) => !belongsToUser(s))
+      // persönliche Sets global verbergen
+      .filter((s) => !looksPersonal(s));
+    const mine = imageSets.filter(belongsToUser);
     return { communitySets: community, mySets: mine };
-  }, [belongsToUser, imageSets, drillDownParent]);
+  }, [belongsToUser, drillDownParent, imageSets, looksPersonal]);
 
   const handleSelectSet = (set: ImageSet) => {
     // Check if this set has children

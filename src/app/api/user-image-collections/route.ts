@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
       imageSetId: body.imageSetId,
       name: body.name ?? null,
       slug: body.slug ?? null,
+      email: session.user.email ?? null,
     });
 
     return NextResponse.json({ success: true });

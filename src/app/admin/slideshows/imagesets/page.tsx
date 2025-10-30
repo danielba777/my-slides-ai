@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { hasPersonalCategoryTag } from "@/lib/image-set-ownership";
+import { useMemo } from "react";
 
 interface ImageSet {
   id: string;
@@ -37,24 +38,11 @@ function removePersonalCollections(sets: ImageSet[] | undefined): ImageSet[] {
   if (!Array.isArray(sets)) {
     return [];
   }
-
   const filtered: ImageSet[] = [];
-
   for (const set of sets) {
-    const isPersonal =
-      hasPersonalCategoryTag(set.category) ||
-      hasPersonalCategoryTag(set.slug) ||
-      hasPersonalCategoryTag(set.name);
-    // Community view should only list shared sets
-    if (isPersonal) {
-      continue;
-    }
-
-    let nextChildren: ImageSet[] | undefined;
-    if (Array.isArray(set.children) && set.children.length > 0) {
-      nextChildren = removePersonalCollections(set.children);
-    }
-
+    const nextChildren = Array.isArray(set.children)
+      ? set.children.filter((c) => !hasPersonalCategoryTag(c.category))
+      : [];
     filtered.push(
       nextChildren && nextChildren.length > 0
         ? { ...set, children: nextChildren }
@@ -86,22 +74,35 @@ export default function ImageSetsAdminPage() {
   });
 
   useEffect(() => {
-    loadImageSets();
+    (async () => {
+    try {
+    setIsLoading(true);
+    const res = await fetch("/api/imagesets", { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to load image sets");
+    const json = (await res.json()) as ImageSet[];
+
+        const cleaned = removePersonalCollections(json);
+        setImageSets(cleaned);
+      } catch (e) {
+        console.error(e);
+        toast.error("Fehler beim Laden der Imagesets");
+      } finally {
+        setIsLoading(false);
+      }
+  })();
   }, []);
 
   const loadImageSets = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/imagesets", { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error("Failed to fetch image sets");
-      }
-      const data = await response.json();
-      // Wichtig: Im "Imagesets"-Bereich nur Community anzeigen – Personal rausfiltern
-      setImageSets(removePersonalCollections(data));
-    } catch (error) {
-      console.error("Error loading image sets:", error);
-      toast.error("Fehler beim Laden der Bilder-Sets");
+      const res = await fetch("/api/imagesets", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load image sets");
+      const json = (await res.json()) as ImageSet[];
+      const cleaned = removePersonalCollections(json);
+      setImageSets(cleaned);
+    } catch (e) {
+      console.error(e);
+      toast.error("Fehler beim Laden der Imagesets");
     } finally {
       setIsLoading(false);
     }

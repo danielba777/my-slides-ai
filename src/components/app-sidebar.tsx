@@ -145,7 +145,6 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {/*
         <SidebarGroup>
           <SidebarGroupLabel>Ressources</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -167,7 +166,6 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        */}
         <SidebarGroup>
           <SidebarGroupLabel>Posts</SidebarGroupLabel>
           <SidebarGroupContent>

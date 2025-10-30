@@ -5,10 +5,10 @@ type OwnedRow = { imageSetId: string };
 
 /**
  * Stellt sicher, dass die Tabelle "UserImageCollection" existiert.
- * Wird idempotent aufgerufen (CREATE TABLE IF NOT EXISTS).
+ * WICHTIG: DDL-Befehle einzeln ausführen (keine Multi-Statements).
  */
 async function ensureOwnershipTable() {
-  // Tabelle + Indexe nur anlegen, wenn sie fehlen
+  // 1) Tabelle anlegen (falls nicht vorhanden)
   await db.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "UserImageCollection" (
       "id" UUID PRIMARY KEY,
@@ -18,9 +18,19 @@ async function ensureOwnershipTable() {
       "slug" TEXT,
       "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
+    )
+  `);
+
+  // 2) Index separat anlegen
+  await db.$executeRawUnsafe(`
     CREATE INDEX IF NOT EXISTS "idx_user_image_collection_user"
-      ON "UserImageCollection" ("userId");
+      ON "UserImageCollection" ("userId")
+  `);
+
+  // 3) Spalte email hinzufügen (idempotent)
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "UserImageCollection"
+    ADD COLUMN IF NOT EXISTS "email" TEXT
   `);
 }
 
@@ -94,35 +104,30 @@ export async function markImageSetOwnedByUser(options: {
   imageSetId: string;
   name?: string | null;
   slug?: string | null;
+  email?: string | null;
 }) {
-  const { userId, imageSetId, name, slug } = options;
-  const recordId = randomUUID();
-  try {
-    await db.$executeRaw`
-      INSERT INTO "UserImageCollection" ("id", "userId", "imageSetId", "name", "slug", "createdAt", "updatedAt")
-      VALUES (${recordId}, ${userId}, ${imageSetId}, ${name ?? ""}, ${slug ?? null}, NOW(), NOW())
-       ON CONFLICT ("imageSetId") DO UPDATE
-       SET "userId" = EXCLUDED."userId",
-           "name" = EXCLUDED."name",
-           "slug" = EXCLUDED."slug",
-           "updatedAt" = NOW()
-    `;
-  } catch (err) {
-    if (isMissingRelationError(err)) {
-      await ensureOwnershipTable();
-      await db.$executeRaw`
-        INSERT INTO "UserImageCollection" ("id", "userId", "imageSetId", "name", "slug", "createdAt", "updatedAt")
-        VALUES (${recordId}, ${userId}, ${imageSetId}, ${name ?? ""}, ${slug ?? null}, NOW(), NOW())
-           ON CONFLICT ("imageSetId") DO UPDATE
-           SET "userId" = EXCLUDED."userId",
-               "name" = EXCLUDED."name",
-               "slug" = EXCLUDED."slug",
-               "updatedAt" = NOW()
-         `;
-    } else {
-      throw err;
-    }
-  }
+  await ensureOwnershipTable();
+  const { userId, imageSetId, name = null, slug = null, email = null } = options;
+  // Upsert: falls (imageSetId) schon existiert, aktualisiere Metadaten + Email
+  await db.$executeRawUnsafe(
+    `
+INSERT INTO "UserImageCollection" ("id","userId","imageSetId","name","slug","email")
+VALUES ($1,$2,$3,$4,$5,$6)
+ON CONFLICT ("imageSetId")
+DO UPDATE SET
+     "userId" = EXCLUDED."userId",
+     "name" = EXCLUDED."name",
+     "slug" = EXCLUDED."slug",
+     "email" = EXCLUDED."email",
+     "updatedAt" = NOW()
+`,
+    randomUUID(),
+    userId,
+    imageSetId,
+    name,
+    slug,
+    email
+  );
 }
 
 export async function unmarkImageSetOwnedByUser(options: {
@@ -146,4 +151,12 @@ export async function unmarkImageSetOwnedByUser(options: {
       throw err;
     }
   }
+}
+
+export async function getAllImageSetOwnersWithEmail() {
+  await ensureOwnershipTable();
+  const rows = await db.$queryRawUnsafe<{ imageSetId: string; userId: string; email: string | null }[]>(
+    `SELECT "imageSetId","userId","email" FROM "UserImageCollection"`
+  );
+  return rows;
 }
