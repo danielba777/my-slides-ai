@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
   annotateImageSetOwnership,
+  hasPersonalCategoryTag,
   isImageSetOwnedByUser as checkOwnership,
 } from "@/lib/image-set-ownership";
 import { usePresentationState } from "@/states/presentation-state";
@@ -114,18 +115,20 @@ export const ImageCollectionSelector: React.FC = () => {
     );
   }, []);
 
+  const looksPersonal = useCallback(
+    (set: ImageSet) =>
+      hasPersonalCategoryTag(set.category) ||
+      hasPersonalCategoryTag(set.slug) ||
+      hasPersonalCategoryTag(set.name),
+    [],
+  );
+
   const belongsToUser = useCallback(
-    (set: ImageSet) => {
-      const category = set.category?.toLowerCase() ?? "";
-      return (
-        checkOwnership(set, userId ?? null) ||
-        category === "personal" ||
-        category === "mine" ||
-        category === "user" ||
-        isAiAvatarCollection(set)
-      );
-    },
-    [isAiAvatarCollection, userId],
+    (set: ImageSet) =>
+      checkOwnership(set, userId ?? null) ||
+      looksPersonal(set) ||
+      isAiAvatarCollection(set),
+    [isAiAvatarCollection, looksPersonal, userId],
   );
 
   const { communitySets, mySets } = useMemo(() => {

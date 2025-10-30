@@ -1,6 +1,6 @@
-// src/app/admin/slideshows/custom-imagesets/page.tsx
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
@@ -13,43 +13,39 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Folder } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { hasPersonalCategoryTag } from "@/lib/image-set-ownership";
 
 type ImageSet = {
   id: string;
   name: string;
   slug: string | null;
-  isActive: boolean;
-  createdAt: string;
+  category?: string | null;
   parentId?: string | null;
   children?: ImageSet[];
-  _count: { images: number; children?: number };
-  category?: string | null;
+  _count?: { images?: number; children?: number };
 };
 
-function keepOnlyPersonal(sets: ImageSet[] | undefined): ImageSet[] {
-  if (!Array.isArray(sets)) return [];
-  const out: ImageSet[] = [];
+function isPersonalSet(set: ImageSet | null | undefined): set is ImageSet {
+  if (!set) {
+    return false;
+  }
+  return (
+    hasPersonalCategoryTag(set.category) ||
+    hasPersonalCategoryTag(set.slug) ||
+    hasPersonalCategoryTag(set.name)
+  );
+}
+
+function flattenTree(sets: ImageSet[] = [], level = 0): Array<ImageSet & { level: number }> {
+  const out: Array<ImageSet & { level: number }> = [];
   for (const s of sets) {
-    const cat = (s.category ?? "").toLowerCase();
-    const isPersonal = cat === "personal" || cat === "mine" || cat === "user";
-    let children: ImageSet[] | undefined;
-    if (s.children?.length) children = keepOnlyPersonal(s.children);
-    if (isPersonal || (children && children.length > 0)) {
-      out.push({ ...s, children });
+    out.push({ ...s, level });
+    if (s.children?.length) {
+      out.push(...flattenTree(s.children, level + 1));
     }
   }
   return out;
-}
-
-function flattenTree(sets: ImageSet[], level = 0): Array<ImageSet & { level: number }> {
-  const list: Array<ImageSet & { level: number }> = [];
-  for (const s of sets) {
-    list.push({ ...s, level });
-    if (s.children?.length) list.push(...flattenTree(s.children, level + 1));
-  }
-  return list;
 }
 
 export default function CustomImagesetsAdminPage() {
@@ -60,10 +56,23 @@ export default function CustomImagesetsAdminPage() {
     (async () => {
       try {
         setLoading(true);
-        const res = await fetch("/api/imagesets");
-        if (!res.ok) throw new Error("Failed to fetch image sets");
-        const all = (await res.json()) as ImageSet[];
-        setData(keepOnlyPersonal(all));
+        const r = await fetch("/api/imagesets", { cache: "no-store" });
+        if (!r.ok) throw new Error("Failed to fetch image sets");
+        const json = (await r.json()) as ImageSet[];
+
+        // Admin → "Custom Imagesets": nur die persönlichen/user-erstellten Sets anzeigen
+        // Wir filtern auf Kategorie personal/mine/user (inkl. verschachtelte Bäume)
+        const filterPersonal = (arr: ImageSet[] = []): ImageSet[] =>
+          arr
+            .filter((s) => isPersonalSet(s))
+            .map((s) => ({
+              ...s,
+              children: s.children ? filterPersonal(s.children) : [],
+            }));
+
+        // Falls die API alle Top-Level mischt, schneiden wir gezielt auf persönliche zu:
+        const personalOnly = filterPersonal(json);
+        setData(personalOnly);
       } catch (e) {
         console.error(e);
         toast.error("Fehler beim Laden der Custom Imagesets");
@@ -93,10 +102,12 @@ export default function CustomImagesetsAdminPage() {
               <Spinner />
             </div>
           ) : flat.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Folder className="h-16 w-16 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium mb-2">Keine Custom Imagesets</p>
-              <p className="text-sm">Sie erscheinen automatisch, wenn Nutzer:innen Collections anlegen.</p>
+            <div className="py-12 text-center text-muted-foreground">
+              <Folder className="mx-auto mb-4 h-16 w-16 opacity-50" />
+              <p className="mb-2 text-lg font-medium">Keine Custom Imagesets</p>
+              <p className="text-sm">
+                Sie erscheinen automatisch, wenn Nutzer:innen Collections anlegen.
+              </p>
             </div>
           ) : (
             <div className="rounded-md border">

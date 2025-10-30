@@ -33,6 +33,34 @@ const OWNER_CANDIDATE_KEYS = [
 
 const NESTED_OWNER_KEYS = ["id", "userId", "ownerId", "creatorId", "authorId", "createdById"];
 
+export const PERSONAL_CATEGORY_KEYWORDS = [
+  "personal",
+  "custom",
+  "mine",
+  "user",
+  "private",
+  "owned",
+  "my",
+  "avatar",
+];
+
+export function hasPersonalCategoryTag(
+  value?: string | null,
+): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.toString().trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  return PERSONAL_CATEGORY_KEYWORDS.some((keyword) =>
+    normalized.includes(keyword),
+  );
+}
+
 export function normalizeOwnershipFlag(value: unknown): boolean {
   if (typeof value === "boolean") {
     return value;

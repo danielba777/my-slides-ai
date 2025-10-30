@@ -158,7 +158,7 @@ export function MarketingLibraryPreview() {
   return (
     <section
       id="library"
-      className="relative overflow-hidden px-5 pt-16 sm:px-6"
+      className="relative overflow-visible px-5 pt-16 sm:px-6"
     >
       <div className="relative mx-auto max-w-7xl">
         <motion.div
@@ -234,7 +234,7 @@ export function MarketingLibraryPreview() {
                       <img
                         src={post.imageUrl}
                         alt="slide preview"
-                        className="h-full w-full object-cover transition duration-700 group-hover:rotate-1 group-hover:scale-110"
+                        className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
                         loading="lazy"
                       />
                     ) : (

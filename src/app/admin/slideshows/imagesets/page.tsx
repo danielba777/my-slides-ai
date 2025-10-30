@@ -19,6 +19,7 @@ import { Edit, Folder, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { hasPersonalCategoryTag } from "@/lib/image-set-ownership";
 
 interface ImageSet {
   id: string;
@@ -40,10 +41,12 @@ function removePersonalCollections(sets: ImageSet[] | undefined): ImageSet[] {
   const filtered: ImageSet[] = [];
 
   for (const set of sets) {
-    const category = (set.category ?? "").toLowerCase();
-    // Community-Ansicht: ausschließlich Community zeigen
-    // => alle user-erstellten Kategorien verbergen
-    if (category === "personal" || category === "mine" || category === "user") {
+    const isPersonal =
+      hasPersonalCategoryTag(set.category) ||
+      hasPersonalCategoryTag(set.slug) ||
+      hasPersonalCategoryTag(set.name);
+    // Community view should only list shared sets
+    if (isPersonal) {
       continue;
     }
 

@@ -19,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   annotateImageSetOwnership,
+  hasPersonalCategoryTag,
   isImageSetOwnedByUser,
 } from "@/lib/image-set-ownership";
 import { cn } from "@/lib/utils";
@@ -114,7 +115,6 @@ export default function ImageCollectionsPage() {
   const mySets = useMemo(() => {
     const userId = session?.user?.id ?? null;
 
-    // gleiche Heuristik wie in deinen Selektoren verwenden:
     const isAiAvatarCollection = (set: ImageSet) => {
       const slug = (set.slug ?? "").toLowerCase();
       const name = (set.name ?? "").toLowerCase();
@@ -126,19 +126,15 @@ export default function ImageCollectionsPage() {
       );
     };
 
-    const belongsToUser = (set: ImageSet) => {
-      const category = (set.category ?? "").toLowerCase();
-      return (
-        // expliziter Besitz (Flag/Heuristik + ownedIds aus /api/user-image-collections)
-        isImageSetOwnedByUser(set, userId) ||
-        // persönliche Sammlungen immer im Account zeigen
-        category === "personal" ||
-        category === "mine" ||
-        category === "user" ||
-        // Ausnahme: AI Avatars zählen wir ebenfalls zu "meins"
-        isAiAvatarCollection(set)
-      );
-    };
+    const looksPersonal = (set: ImageSet) =>
+      hasPersonalCategoryTag(set.category) ||
+      hasPersonalCategoryTag(set.slug) ||
+      hasPersonalCategoryTag(set.name);
+
+    const belongsToUser = (set: ImageSet) =>
+      isImageSetOwnedByUser(set, userId) ||
+      looksPersonal(set) ||
+      isAiAvatarCollection(set);
 
     return sets.filter(belongsToUser);
   }, [sets, session?.user?.id]);
@@ -215,10 +211,7 @@ export default function ImageCollectionsPage() {
     }
   }
 
-  function editSet(e: MouseEvent, set: ImageSet) {
-    e.stopPropagation();
-    router.push(`/dashboard/image-collections/${set.id}`);
-  }
+  // Edit-Button wird entfernt – Öffnen passiert über Card-Klick
 
   async function createSet() {
     if (!newName.trim()) {
@@ -295,17 +288,17 @@ export default function ImageCollectionsPage() {
         <ScrollArea className="h-full max-h-full pr-4">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {mySets.map((set) => {
-              const previewImages = getPreviewImages(set);
+               const previewImages = getPreviewImages(set);
 
-              return (
-                <div
-                  key={set.id}
-                  onClick={() => handleOpen(set)}
-                  className="group relative cursor-pointer overflow-visible rounded-lg border border-transparent bg-card p-2 transition hover:border-muted-foreground/30"
-                >
-                  <div className="mb-2 truncate text-base font-medium text-foreground">
-                    {set.name}
-                  </div>
+               return (
+                 <div
+                   key={set.id}
+                   onClick={() => handleOpen(set)}
+                   className="group relative cursor-pointer overflow-visible rounded-lg border border-transparent bg-card p-2 transition hover:border-muted-foreground/30"
+                 >
+                     <div className="mb-2 truncate text-base font-medium text-foreground">
+                       {set.name}
+                     </div>
 
                   {previewImages.length ? (
                     <div className="overflow-hidden">
@@ -335,30 +328,24 @@ export default function ImageCollectionsPage() {
                       No preview images available
                     </div>
                   )}
-
-                  <div className="pointer-events-none absolute inset-0 hidden items-center justify-between px-3 py-2 group-hover:flex">
-                    <div className="pointer-events-auto">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={(event) => editSet(event, set)}
-                      >
-                        Edit
-                      </Button>
-                    </div>
-                    <div className="pointer-events-auto">
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={(event) => deleteSet(event, set)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                  {/* Runder roter Delete-Button als Floating-Action in der Ecke */}
+                  <button
+                    title="Delete collection"
+                    onClick={(e) => deleteSet(e as unknown as MouseEvent, set)}
+                    className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white opacity-0 shadow transition group-hover:opacity-100 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                  >
+                    {/* lucide-trash Icon wird via Tailwind im SVG gestylt */}
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                    </svg>
+                  </button>
+                   </div>
+                 );
+               })}
 
             <button
               type="button"

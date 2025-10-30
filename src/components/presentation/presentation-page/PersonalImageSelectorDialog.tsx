@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
   annotateImageSetOwnership,
+  hasPersonalCategoryTag,
   isImageSetOwnedByUser as checkOwnership,
 } from "@/lib/image-set-ownership";
 
@@ -113,18 +114,20 @@ export default function PersonalImageSelectorDialog({
     );
   }, []);
 
+  const looksPersonal = useCallback(
+    (set: ImageSet) =>
+      hasPersonalCategoryTag(set.category) ||
+      hasPersonalCategoryTag(set.slug) ||
+      hasPersonalCategoryTag(set.name),
+    [],
+  );
+
   const belongsToUser = useCallback(
-    (set: ImageSet) => {
-      const category = set.category?.toLowerCase() ?? "";
-      return (
-        checkOwnership(set, userId ?? null) ||
-        category === "personal" ||
-        category === "mine" ||
-        category === "user" ||
-        isAiAvatarCollection(set)
-      );
-    },
-    [isAiAvatarCollection, userId],
+    (set: ImageSet) =>
+      checkOwnership(set, userId ?? null) ||
+      looksPersonal(set) ||
+      isAiAvatarCollection(set),
+    [isAiAvatarCollection, looksPersonal, userId],
   );
 
   const availableCollections = useMemo(() => {
@@ -391,9 +394,9 @@ export default function PersonalImageSelectorDialog({
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t px-6 py-4">
-          <Button variant="ghost" asChild>
-            <Link href="/dashboard/image-collections">Manage collections</Link>
-          </Button>
+          <Link href="/dashboard/image-collections">
+            <Button variant="ghost">Manage collections</Button>
+          </Link>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

@@ -66,7 +66,7 @@ export function MarketingHero({ session }: { session: boolean }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-3 rounded-full border border-indigo-300/20 bg-indigo-500/10 backdrop-blur-sm px-4 py-2 text-xs sm:text-sm font-medium text-indigo-200 shadow-lg mb-6"
+            className="inline-flex items-center gap-3 rounded-full border border-indigo-300/20 bg-indigo-500/10 backdrop-blur-sm px-4 py-2 text-xs sm:text-sm font-medium text-indigo-200 shadow-lg mb-2 sm:mb-4 lg:mb-6 mt-[-0.5rem] sm:mt-[-1rem]"
           >
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
@@ -84,7 +84,7 @@ export function MarketingHero({ session }: { session: boolean }) {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.08, duration: 0.7 }}
-            className="py-8 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight text-white"
+            className="py-4 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight text-white"
           >
             <span className="block">Automate TikTok slides</span>
             {/* Mobile ≈3 Zeilen, ab sm → 2 Zeilen */}
@@ -101,11 +101,10 @@ export function MarketingHero({ session }: { session: boolean }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.15, duration: 0.6 }}
-            className="mt-8 pb-8 text-lg sm:text-xl lg:text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed font-light"
+            className="mt-2 pb-8 text-lg sm:text-xl lg:text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed font-light"
           >
-            Planning, production, and publishing in minutes. Professional
-            typography, pixel-perfect slides, and automations that never feel
-            like obvious AI output.
+            Create viral TikTok slides in seconds. Visually stunning, authentic,
+            and built to perform.
           </motion.p>
 
           {/* CTA buttons */}
@@ -197,19 +196,19 @@ export function MarketingHero({ session }: { session: boolean }) {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                 <div className="text-center">
                   <div className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 mb-1">
-                    250M+
+                    10M+
                   </div>
                   <div className="text-sm text-gray-300/90">TikTok Views</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-                    50K+
+                    100+
                   </div>
                   <div className="text-sm text-gray-300/90">Happy creators</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-                    1M+
+                    20K+
                   </div>
                   <div className="text-sm text-gray-300/90">
                     Slides produced
@@ -217,7 +216,7 @@ export function MarketingHero({ session }: { session: boolean }) {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-                    98%
+                    100%
                   </div>
                   <div className="text-sm text-gray-300/90">Success rate</div>
                 </div>
