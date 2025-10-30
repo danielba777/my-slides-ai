@@ -61,7 +61,7 @@ export function TikTokPostButton() {
         const png = await exporter();
         const jpg = await blobToJpeg(png, 1080, 1620);
         const dataUrl = await blobToDataUrl(jpg);
-        const fileName = `${String(index + 1).padStart(2, "0")}.jpg`;
+        const fileName = `${String(index + 1).padStart(3, "0")}.jpg`;
         imageFiles.push({ name: fileName, blob: jpg });
         previews.push({ id, index, dataUrl });
       }
