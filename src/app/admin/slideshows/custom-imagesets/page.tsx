@@ -59,7 +59,8 @@ export default function CustomImagesetsAdminPage() {
       try {
         const res = await fetch("/api/admin/user-image-collections", { cache: "no-store" });
         if (!res.ok) return;
-        const list = (await res.json()) as Array<{ imageSetId: string; userId: string; email: string | null }>;
+        const response = await res.json();
+        const list = response.owners as Array<{ imageSetId: string; userId: string; email: string | null }> || [];
         const map: Record<string, { userId: string; email: string | null }> = {};
         for (const row of list) map[row.imageSetId] = { userId: row.userId, email: row.email ?? null };
         setOwners(map);
@@ -71,23 +72,28 @@ export default function CustomImagesetsAdminPage() {
     (async () => {
       try {
         setLoading(true);
-        const r = await fetch("/api/imagesets", { cache: "no-store" });
-        if (!r.ok) throw new Error("Failed to fetch image sets");
-        const json = (await r.json()) as ImageSet[];
+        const [setsRes, ownedRes] = await Promise.all([
+          fetch("/api/imagesets", { cache: "no-store" }),
+          fetch("/api/user-image-collections/all", { cache: "no-store" }),
+        ]);
+        if (!setsRes.ok) throw new Error("Failed to fetch image sets");
+        const json = (await setsRes.json()) as ImageSet[];
+        const ownedIds: string[] = ownedRes.ok
+          ? ((await ownedRes.json()) as { allOwnedIds?: string[] }).allOwnedIds ?? []
+          : [];
+        const owned = new Set(ownedIds);
 
-        // Admin → "Custom Imagesets": nur die persönlichen/user-erstellten Sets anzeigen
-        // Wir filtern auf Kategorie personal/mine/user (inkl. verschachtelte Bäume)
-        const filterPersonal = (arr: ImageSet[] = []): ImageSet[] =>
+        // Admin → "Custom Imagesets": alle User-Collections anzeigen:
+        // Kriterium: in Ownership-Tabelle ODER als 'personal' getaggt.
+        const filterCustom = (arr: ImageSet[] = []): ImageSet[] =>
           arr
-            .filter((s) => isPersonalSet(s))
+            .filter((s) => owned.has(s.id) || isPersonalSet(s))
             .map((s) => ({
               ...s,
-              children: s.children ? filterPersonal(s.children) : [],
+              children: s.children ? filterCustom(s.children) : [],
             }));
 
-        // Falls die API alle Top-Level mischt, schneiden wir gezielt auf persönliche zu:
-        const personalOnly = filterPersonal(json);
-        setData(personalOnly);
+        setData(filterCustom(json));
       } catch (e) {
         console.error(e);
         toast.error("Fehler beim Laden der Custom Imagesets");
@@ -129,7 +135,8 @@ export default function CustomImagesetsAdminPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[50%]">Name</TableHead>
+                    <TableHead className="w-[38%]">Name</TableHead>
+                    <TableHead className="w-[22%]">Erstellt von (Email)</TableHead>
                     <TableHead>Slug</TableHead>
                     <TableHead>Kategorie</TableHead>
                     <TableHead className="text-right">Bilder</TableHead>
@@ -141,14 +148,16 @@ export default function CustomImagesetsAdminPage() {
                     return (
                     <TableRow key={set.id}>
                       <TableCell>
-                        <div className="flex items-center gap-3" style={{ paddingLeft: `${set.level * 16}px` }}>
+                        <div className="flex items-center" style={{ paddingLeft: `${set.level * 16}px` }}>
                           <span className="font-medium">{set.name}</span>
-                          {owner?.email && (
-                            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                              {owner.email}
-                            </span>
-                          )}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {owners[set.id]?.email ? (
+                          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                            {owners[set.id]?.email}
+                          </span>
+                        ) : "–"}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{set.slug || "-"}</TableCell>
                       <TableCell>

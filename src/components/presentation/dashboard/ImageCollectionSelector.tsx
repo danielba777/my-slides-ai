@@ -48,6 +48,7 @@ export const ImageCollectionSelector: React.FC = () => {
   const [imageSets, setImageSets] = useState<ImageSet[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"community" | "mine">("community");
+  const [allOwned, setAllOwned] = useState<Set<string>>(new Set());
 
   // Drill-down navigation state
   const [drillDownParent, setDrillDownParent] = useState<ImageSet | null>(null);
@@ -55,9 +56,10 @@ export const ImageCollectionSelector: React.FC = () => {
   const loadImageSets = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [setsRes, ownedRes] = await Promise.all([
+      const [setsRes, ownedRes, allRes] = await Promise.all([
         fetch("/api/imagesets", { cache: "no-store" }),
         fetch("/api/user-image-collections", { cache: "no-store" }),
+        fetch("/api/user-image-collections/all", { cache: "no-store" }),
       ]);
 
       if (!setsRes.ok) {
@@ -67,6 +69,9 @@ export const ImageCollectionSelector: React.FC = () => {
       const data = (await setsRes.json()) as unknown;
       const ownedPayload = ownedRes.ok ? await ownedRes.json() : null;
       const ownedIds = new Set<string>(ownedPayload?.ownedIds ?? []);
+      const allPayload = allRes.ok ? await allRes.json() : null;
+      const allOwnedIds = new Set<string>(allPayload?.allOwnedIds ?? []);
+      setAllOwned(allOwnedIds);
 
       if (Array.isArray(data)) {
         const normalized = data.map((set: ImageSet) =>
@@ -115,20 +120,14 @@ export const ImageCollectionSelector: React.FC = () => {
     );
   }, []);
 
-  const looksPersonal = useCallback(
-    (set: ImageSet) =>
-      hasPersonalCategoryTag(set.category) ||
-      hasPersonalCategoryTag(set.slug) ||
-      hasPersonalCategoryTag(set.name),
-    [],
-  );
+  // Tags sind nicht mehr ausschlaggebend für Sichtbarkeit
+  const looksPersonal = useCallback(() => false, []);
 
+  // "looksPersonal" darf NICHT dazu führen, dass fremde Sets angezeigt werden!
   const belongsToUser = useCallback(
     (set: ImageSet) =>
-      // Nur dann "mine", wenn wirklich im Besitz ODER eine AI-Avatar-Systemkollektion
-      checkOwnership(set, userId ?? null) ||
-      isAiAvatarCollection(set),
-    [isAiAvatarCollection, looksPersonal, userId],
+      checkOwnership(set, userId ?? null) || isAiAvatarCollection(set),
+    [isAiAvatarCollection, userId],
   );
 
   const { communitySets, mySets } = useMemo(() => {
@@ -154,13 +153,14 @@ export const ImageCollectionSelector: React.FC = () => {
       return { communitySets: community, mySets: mine };
     }
 
-    const community = imageSets
-      .filter((s) => !belongsToUser(s))
-      // persönliche Sets global verbergen
-      .filter((s) => !looksPersonal(s));
-    const mine = imageSets.filter(belongsToUser);
+    const topLevel = drillDownParent
+      ? imageSets.filter((s) => s.parentId === drillDownParent.id)
+      : imageSets.filter((s) => !s.parentId);
+    const mine = topLevel.filter(belongsToUser);
+    // Community blendet ALLE privat markierten Sets aus
+    const community = topLevel.filter((s) => !allOwned.has(s.id));
     return { communitySets: community, mySets: mine };
-  }, [belongsToUser, drillDownParent, imageSets, looksPersonal]);
+  }, [belongsToUser, drillDownParent, imageSets, allOwned]);
 
   const handleSelectSet = (set: ImageSet) => {
     // Check if this set has children

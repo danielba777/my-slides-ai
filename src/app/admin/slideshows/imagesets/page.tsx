@@ -17,10 +17,9 @@ import {
 } from "@/components/ui/table";
 import { Edit, Folder, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { hasPersonalCategoryTag } from "@/lib/image-set-ownership";
-import { useMemo } from "react";
 
 interface ImageSet {
   id: string;
@@ -34,24 +33,10 @@ interface ImageSet {
   category?: string | null;
 }
 
-function removePersonalCollections(sets: ImageSet[] | undefined): ImageSet[] {
-  if (!Array.isArray(sets)) {
-    return [];
-  }
-  const filtered: ImageSet[] = [];
-  for (const set of sets) {
-    const nextChildren = Array.isArray(set.children)
-      ? set.children.filter((c) => !hasPersonalCategoryTag(c.category))
-      : [];
-    filtered.push(
-      nextChildren && nextChildren.length > 0
-        ? { ...set, children: nextChildren }
-        : { ...set, children: nextChildren },
-    );
-  }
-
-  return filtered;
-}
+const isAiAvatars = (s: ImageSet) => {
+  const t = `${s.slug ?? ""} ${s.name ?? ""} ${s.category ?? ""}`.toLowerCase();
+  return t.includes("avatar");
+};
 
 export default function ImageSetsAdminPage() {
   const router = useRouter();
@@ -59,6 +44,20 @@ export default function ImageSetsAdminPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [parentForNew, setParentForNew] = useState<string | null>(null);
+
+  // Alle von Usern "owned" (private) Sets global ausblenden
+  const [allOwned, setAllOwned] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch("/api/user-image-collections/all", { cache: "no-store" });
+        const j = r.ok ? ((await r.json()) as { allOwnedIds?: string[] }) : { allOwnedIds: [] };
+        setAllOwned(new Set(j.allOwnedIds ?? []));
+      } catch {
+        setAllOwned(new Set());
+      }
+    })();
+  }, []);
 
   // Form state für neues ImageSet
   const [newImageSet, setNewImageSet] = useState({
@@ -73,6 +72,15 @@ export default function ImageSetsAdminPage() {
     isActive: true,
   });
 
+  // Filterfunktion MUSS innerhalb der Komponente auf allOwned zugreifen
+  const removePrivateCollections = useMemo(
+    () =>
+      (list: ImageSet[]) =>
+        // AI Avatars IMMER zeigen, alle owned (private) ausblenden
+        list.filter((s) => isAiAvatars(s) || !allOwned.has(s.id)),
+    [allOwned],
+  );
+
   useEffect(() => {
     (async () => {
     try {
@@ -81,8 +89,8 @@ export default function ImageSetsAdminPage() {
     if (!res.ok) throw new Error("Failed to load image sets");
     const json = (await res.json()) as ImageSet[];
 
-        const cleaned = removePersonalCollections(json);
-        setImageSets(cleaned);
+        const visible = removePrivateCollections(json);
+        setImageSets(visible);
       } catch (e) {
         console.error(e);
         toast.error("Fehler beim Laden der Imagesets");
@@ -90,7 +98,7 @@ export default function ImageSetsAdminPage() {
         setIsLoading(false);
       }
   })();
-  }, []);
+  }, [removePrivateCollections]);
 
   const loadImageSets = async () => {
     try {
@@ -98,8 +106,8 @@ export default function ImageSetsAdminPage() {
       const res = await fetch("/api/imagesets", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to load image sets");
       const json = (await res.json()) as ImageSet[];
-      const cleaned = removePersonalCollections(json);
-      setImageSets(cleaned);
+      const visible = removePrivateCollections(json);
+      setImageSets(visible);
     } catch (e) {
       console.error(e);
       toast.error("Fehler beim Laden der Imagesets");
