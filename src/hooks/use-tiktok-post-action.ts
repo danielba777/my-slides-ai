@@ -36,6 +36,7 @@ export interface TikTokPostResult {
   status: "processing" | "success" | "failed" | "inbox";
   postId?: string;
   releaseUrl?: string;
+  error?: string;
 }
 
 interface PostStartResponse {
@@ -185,6 +186,19 @@ export function useTikTokPostAction(
       return;
     }
 
+    const requestBody = {
+      openId: form.openId,
+      caption: form.caption,
+      mediaUrl: form.mediaUrl,
+      mediaType: form.mediaType,
+      thumbnailTimestampMs: form.thumbnailTimestampMs,
+      autoAddMusic: form.autoAddMusic,
+      postMode: form.postMode,
+      contentPostingMethod: form.contentPostingMethod,
+    };
+
+    console.debug("[TikTokPost] Payload", requestBody);
+
     setSubmitting(true);
     setError(null);
     setResult(null);
@@ -193,22 +207,19 @@ export function useTikTokPostAction(
       const response = await fetch("/api/tests/tiktok-post", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          openId: form.openId,
-          caption: form.caption,
-          mediaUrl: form.mediaUrl,
-          mediaType: form.mediaType,
-          thumbnailTimestampMs: form.thumbnailTimestampMs,
-          autoAddMusic: form.autoAddMusic,
-          postMode: form.postMode,
-          contentPostingMethod: form.contentPostingMethod,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
-      const payload = (await response.json().catch(() => null)) as
-        | PostStartResponse
-        | { error?: string }
-        | null;
+      const rawResponseText = await response.text();
+      let payload: PostStartResponse | { error?: string } | null = null;
+      try {
+        payload = JSON.parse(rawResponseText) as
+          | PostStartResponse
+          | { error?: string }
+          | null;
+      } catch {
+        payload = null;
+      }
 
       if (!response.ok || !payload || typeof payload !== "object" || !("status" in payload)) {
         const message =
@@ -217,7 +228,12 @@ export function useTikTokPostAction(
           "error" in payload &&
           typeof payload.error === "string"
             ? payload.error
-            : "TikTok posting failed";
+            : rawResponseText || "TikTok posting failed";
+        console.error("[TikTokPost] Request failed", {
+          status: response.status,
+          statusText: response.statusText,
+          body: rawResponseText,
+        });
         setError(message);
         toast.error(message);
         return;
@@ -242,7 +258,11 @@ export function useTikTokPostAction(
           } else if (finalStatus.status === "inbox") {
             toast.success("TikTok post saved to TikTok Inbox drafts");
           } else if (finalStatus.status === "failed") {
-            toast.error("TikTok post was rejected by TikTok");
+            toast.error(
+              finalStatus.error ??
+                "TikTok post was rejected by TikTok. Check console for details.",
+            );
+            console.error("[TikTokPost] Final status failure", finalStatus);
           }
         } catch (pollError) {
           const message =
@@ -260,6 +280,7 @@ export function useTikTokPostAction(
         status: payload.status,
       });
     } catch (err) {
+      console.error("[TikTokPost] Unexpected error", err, { requestBody });
       const message = err instanceof Error ? err.message : "Unknown error";
       setError(message);
       toast.error(message);
