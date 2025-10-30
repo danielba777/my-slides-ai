@@ -1,54 +1,79 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-**_ Begin Patch
-_** Update File: src/app/dashboard/image-collections/page.tsx
+\*\*\* a/src/canvas/legacy/SlideCanvasLegacy.tsx
+--- b/src/canvas/legacy/SlideCanvasLegacy.tsx
 @@
+// 1) Background zeichnen (inkl. optionalem Dim)
+exportCtx.fillStyle = "#000000";
+exportCtx.fillRect(0, 0, W, H);
 
--                <div key={image.id} className="group relative aspect-square overflow-hidden rounded-lg border bg-muted">
--                  <img src={image.url} alt={image.filename} className="h-full w-full object-cover" />
+// 1.5) Dim-Overlay nur auf den Background anwenden
+if (dimBg) {
+exportCtx.save();
+exportCtx.fillStyle = `rgba(0,0,0,${DIM_OVERLAY_OPACITY})`;
+exportCtx.fillRect(0, 0, W, H);
+exportCtx.restore();
+}
 
-*                <div key={image.id} className="group relative aspect-square overflow-hidden rounded-lg border bg-muted flex items-center justify-center">
-*                  <img src={image.url} alt={image.filename} className="max-h-full max-w-full object-contain" />
-                     <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
-                       <Button variant="destructive" size="sm" onClick={() => deleteImage(image.id)} className="gap-2">
-                         <Trash2 className="h-3 w-3" />
-                         Delete
-                       </Button>
-                     </div>
-                   </div>
-  **_ End Patch
-  diff
-  Code kopieren
-  _** Begin Patch
-  \*\*\* Update File: src/app/dashboard/image-collections/page.tsx
+- // (hier wurden früher keine Overlays gezeichnet)
+
+* // 2) ➕ Overlay-Bilder (z. B. „Personal Images“) zeichnen
+* // -> über dem Background (inkl. Dim), aber UNTER dem Text
+* for (const n of overlayNodes) {
+* const isGridImage = n.id.startsWith("canvas-grid-image-");
+* let left: number, top: number, w: number, h: number;
+*
+* if (isGridImage) {
+*      // Grid-Bilder liegen bereits in Canvas-Koordinaten / Zellgröße
+*      left = n.x;
+*      top = n.y;
+*      w = n.width;
+*      h = n.height;
+* } else {
+*      // Normale Overlays (Logos/Personal Images): contain-fit wie in der Preview
+*      const nat = natSizeMap[n.id] || { w: 1, h: 1 };
+*      const f = fitContain(n.width, n.height, nat.w, nat.h);
+*      left = Math.round(n.x + f.x);
+*      top  = Math.round(n.y + f.y);
+*      w    = Math.round(f.w);
+*      h    = Math.round(f.h);
+* }
+*
+* // Bild laden und zeichnen (CORS-safe)
+* // Wichtig: crossOrigin setzen, wie bereits im Preview
+* // und Promise-basiert nacheinander zeichnen, um Reihenfolge stabil zu halten.
+* // eslint-disable-next-line no-await-in-loop
+* await new Promise<void>((res) => {
+*      const img = new Image();
+*      img.onload = () => {
+*        try {
+*          exportCtx.drawImage(img, left, top, w, h);
+*        } catch {}
+*        res();
+*      };
+*      img.onerror = () => res();
+*      img.crossOrigin = "anonymous";
+*      img.src = n.url;
+* });
+* }
+
+- // 3) Text zeichnen …
+
+* // 3) Text zeichnen (liegt ÜBER den Overlays)
+  // (… bestehender Text-Render-Code bleibt unverändert …)
   @@
 
--                          <img
--                            src={image.url}
--                            alt={`All images preview ${index + 1}`}
--                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
--                            loading="lazy"
--                          />
+- // ➕ Overlays ins PNG rendern
+- for (const n of overlayNodes) {
+- const isGridImage = n.id.startsWith("canvas-grid-image-");
+- // . (GANZER Block entfernt; Overlays werden jetzt VOR dem Text gezeichnet)
+- }
 
-*                          <img
-*                            src={image.url}
-*                            alt={`All images preview ${index + 1}`}
-*                            className="max-h-full max-w-full object-contain transition-opacity group-hover:opacity-80"
-*                            loading="lazy"
-*                          />
-  @@
+* // (kein Overlay-Rendering mehr NACH dem Text – Overlays wurden bereits davor gezeichnet)
 
--                          <img
--                            src={image.url}
--                            alt={`${set.name} preview ${index + 1}`}
--                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
--                            loading="lazy"
--                          />
-
-*                          <img
-*                            src={image.url}
-*                            alt={`${set.name} preview ${index + 1}`}
-*                            className="max-h-full max-w-full object-contain transition-opacity group-hover:opacity-80"
-*                            loading="lazy"
-*                          />
-  \*\*\* End Patch
+  return new Promise<Blob>((resolve, reject) => {
+  offscreenCanvas.toBlob(
+  (blob) => (blob ? resolve(blob) : reject(new Error("Export failed"))),
+  "image/png",
+  );
+  });

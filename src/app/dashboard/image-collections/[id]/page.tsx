@@ -64,9 +64,16 @@ export default function ImageSetDetailPage() {
     setIsUploading(true);
     const formData = new FormData();
     Array.from(uploadFiles).forEach((file) => formData.append("images", file));
+    // 👉 Flags gegen serverseitiges Cropping
+    formData.append("processing", "none");
+    formData.append("fit", "contain");
+    formData.append("keepOriginal", "true");
 
     try {
-      const response = await fetch(`/api/imagesets/${id}/upload`, { method: "POST", body: formData });
+      const response = await fetch(`/api/imagesets/${id}/upload`, {
+      method: "POST",
+      body: formData,
+    });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         throw new Error(err?.error ?? "Fehler beim Hochladen der Bilder");
@@ -129,7 +136,8 @@ export default function ImageSetDetailPage() {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {imageSet?.images?.map((image) => (
                 <div key={image.id} className="group relative aspect-square overflow-hidden rounded-lg border bg-muted">
-                  <img src={image.url} alt={image.filename} className="h-full w-full object-cover" />
+                  {/* Thumbs vollständig anzeigen, nicht beschneiden */}
+                  <img src={image.url} alt={image.filename} className="h-full w-full object-contain" />
                   <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
                     <Button variant="destructive" size="sm" onClick={() => deleteImage(image.id)} className="gap-2">
                       <Trash2 className="h-3 w-3" />

@@ -445,7 +445,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
   // --- Globaler State für Dim-Overlay ---
   // Feld heißt in der State-Definition 'editingOverlaySlideId'
- const dimOverlaySlideId = usePresentationState((s) => s.editingOverlaySlideId);
+  const dimOverlaySlideId = usePresentationState(
+    (s) => s.editingOverlaySlideId,
+  );
   const setDimOverlaySlideId = usePresentationState(
     (s) => s.setEditingOverlaySlideId,
   );
@@ -780,16 +782,14 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         outlineEnabled?: boolean;
         outlineWidth?: number;
         outlineColor?: string;
-      })[]
-    ) => (
-      TextLayer & {
-        autoHeight?: boolean;
-        italic?: boolean;
-        outlineEnabled?: boolean;
-        outlineWidth?: number;
-        outlineColor?: string;
-      }
-    )[]);
+      })[],
+    ) => (TextLayer & {
+      autoHeight?: boolean;
+      italic?: boolean;
+      outlineEnabled?: boolean;
+      outlineWidth?: number;
+      outlineColor?: string;
+    })[]);
   }, [
     enforceMinVerticalSpacing,
     /* Trigger bei Layout-Änderungen: */ textLayers.length,
@@ -1320,7 +1320,42 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       exportCtx.restore();
     }
 
-    // Text (skip fully off-canvas)
+  // 2) ➕ Overlay-Bilder (z. B. "Personal Images") zeichnen
+  // -> über dem Background (inkl. Dim), aber UNTER dem Text
+  for (const n of overlayNodes) {
+      const isGridImage = n.id.startsWith("canvas-grid-image-");
+      let left: number, top: number, w: number, h: number;
+      if (isGridImage) {
+        // Grid-Bilder: exakt auf Zellgröße
+        left = n.x;
+        top = n.y;
+        w = n.width;
+        h = n.height;
+      } else {
+        // Normale Overlays (Logos/Personal): contain-fit wie in der Preview
+        const nat = natSizeMap[n.id] || { w: 1, h: 1 };
+        const f = fitContain(n.width, n.height, nat.w, nat.h);
+        left = Math.round(n.x + f.x);
+        top = Math.round(n.y + f.y);
+        w = Math.round(f.w);
+        h = Math.round(f.h);
+      }
+      await new Promise<void>((res) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            exportCtx.drawImage(img, left, top, w, h);
+          } catch {}
+          res();
+        };
+        img.onerror = () => res();
+        img.crossOrigin = "anonymous";
+        img.src = n.url;
+      });
+    }
+
+    // 3) Text zeichnen (liegt ÜBER den Overlays)
+  // (… bestehender Text-Render-Code bleibt unverändert …)
     const sorted = [...textLayers].sort((a, b) => a.zIndex - b.zIndex);
     for (const layer of sorted) {
       if (!layer.content) continue;
@@ -1733,42 +1768,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       exportCtx.restore();
     }
 
-    // ➕ Overlays ins PNG rendern
-    for (const n of overlayNodes) {
-      const isGridImage = n.id.startsWith("canvas-grid-image-");
-
-      // Grid-Bilder haben immer 2:3 Format wie das Canvas
-      // -> Direkt auf Zellgröße skalieren, keine fitContain/fitCover Berechnung
-      let left: number, top: number, w: number, h: number;
-
-      if (isGridImage) {
-        left = n.x;
-        top = n.y;
-        w = n.width;
-        h = n.height;
-      } else {
-        // Für andere Overlay-Bilder (z.B. Logos) fitContain verwenden
-        const nat = natSizeMap[n.id] || { w: 1, h: 1 };
-        const f = fitContain(n.width, n.height, nat.w, nat.h);
-        left = Math.round(n.x + f.x);
-        top = Math.round(n.y + f.y);
-        w = Math.round(f.w);
-        h = Math.round(f.h);
-      }
-
-      await new Promise<void>((res) => {
-        const img = new Image();
-        img.onload = () => {
-          try {
-            exportCtx.drawImage(img, left, top, w, h);
-          } catch {}
-          res();
-        };
-        img.onerror = () => res();
-        img.crossOrigin = "anonymous";
-        img.src = n.url;
-      });
-    }
+    // (kein Overlay-Rendering mehr NACH dem Text – Overlays wurden bereits davor gezeichnet)
 
     return new Promise<Blob>((resolve, reject) => {
       offscreenCanvas.toBlob(
@@ -1821,7 +1821,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             opacity?: number;
             paddingX?: number;
             paddingY?: number;
-            mode?: 'block' | 'blob';
+            mode?: "block" | "blob";
             color?: string;
             radius?: number;
             lineOverlap?: number;
@@ -1838,8 +1838,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           const nextBackground = {
             ...prevBg,
             ...patch.background,
-            mode:
-              (patch.background?.mode ?? prevBg.mode ?? TIKTOK_BACKGROUND_MODE) as 'block' | 'blob',
+            mode: (patch.background?.mode ??
+              prevBg.mode ??
+              TIKTOK_BACKGROUND_MODE) as "block" | "blob",
             color:
               patch.background?.color ??
               prevBg.color ??
