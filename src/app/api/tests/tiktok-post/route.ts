@@ -24,6 +24,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing openId or mediaUrl" }, { status: 400 });
   }
 
+  console.log("[TikTokPostAPI] Incoming request", {
+    openId: body.openId,
+    mediaUrl: body.mediaUrl,
+    mediaType: body.mediaType,
+    postMode: body.postMode,
+    contentPostingMethod: body.contentPostingMethod,
+  });
+
   const inferredContentMethod =
     body.contentPostingMethod ??
     (body.mediaType === "photo"
@@ -60,6 +68,8 @@ export async function POST(request: Request) {
     },
   };
 
+  console.log("[TikTokPostAPI] Outgoing payload", payload);
+
   try {
     const response = await fetch(
       `${env.SLIDESCOCKPIT_API}/integrations/social/tiktok/${encodeURIComponent(
@@ -75,17 +85,36 @@ export async function POST(request: Request) {
       },
     );
 
-    const data = await response.json().catch(() => null);
+    const rawResponseText = await response.text();
+    let data: unknown = null;
+    try {
+      data = JSON.parse(rawResponseText);
+    } catch {
+      data = null;
+    }
+
+    console.log("[TikTokPostAPI] Upstream response", {
+      status: response.status,
+      statusText: response.statusText,
+      body: rawResponseText,
+    });
 
     if (!response.ok) {
       const message =
-        data && typeof data.error === "string"
-          ? data.error
-          : "TikTok posting failed";
-      return NextResponse.json({ error: message }, { status: response.status });
+        data &&
+        typeof data === "object" &&
+        data !== null &&
+        "error" in data &&
+        typeof (data as { error?: string }).error === "string"
+          ? (data as { error: string }).error
+          : rawResponseText || "TikTok posting failed";
+      return NextResponse.json(
+        { error: message, upstreamBody: rawResponseText },
+        { status: response.status },
+      );
     }
 
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(data ?? rawResponseText, { status: response.status });
   } catch (error) {
     console.error("TikTok posting request failed", error);
     return NextResponse.json({ error: "Unable to reach SlidesCockpit API" }, { status: 500 });

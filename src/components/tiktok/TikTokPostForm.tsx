@@ -316,6 +316,11 @@ export function TikTokPostForm({
             <p>
               <span className="font-semibold">Status:</span> {result.status}
             </p>
+            {result.error && (
+              <p className="text-sm text-destructive">
+                <span className="font-semibold">Error:</span> {result.error}
+              </p>
+            )}
           </div>
         )}
       </CardContent>

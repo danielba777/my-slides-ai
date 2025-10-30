@@ -23,9 +23,14 @@ export default function CreateSlideshowPostPage() {
       postMode: "INBOX",
       contentPostingMethod: "MEDIA_UPLOAD",
       thumbnailTimestampMs: undefined,
+      mediaUrl: prepared?.zipUrl ?? "",
     },
   });
-  const scheduleAction = useTikTokScheduleAction();
+  const scheduleAction = useTikTokScheduleAction({
+    defaultValues: { mediaUrl: prepared?.zipUrl ?? "" },
+  });
+  const updatePostField = postAction.updateField;
+  const updateScheduleField = scheduleAction.updateField;
 
   const presentationId = prepared?.presentationId ?? null;
   const presentationTitle = prepared?.presentationTitle ?? "Slideshow";
@@ -40,6 +45,12 @@ export default function CreateSlideshowPostPage() {
     }
     setCurrentSlide((prev) => Math.min(prev, slides.length - 1));
   }, [slides.length]);
+
+  useEffect(() => {
+    if (!prepared?.zipUrl) return;
+    updatePostField("mediaUrl", prepared.zipUrl);
+    updateScheduleField("mediaUrl", prepared.zipUrl);
+  }, [prepared?.zipUrl, updatePostField, updateScheduleField]);
 
   const fallbackContent = (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-12 text-center">
@@ -57,9 +68,9 @@ export default function CreateSlideshowPostPage() {
   );
 
   const handleDownloadZip = () => {
-    if (!prepared?.zipDataUrl) return;
+    if (!prepared?.zipUrl) return;
     const link = document.createElement("a");
-    link.href = prepared.zipDataUrl;
+    link.href = prepared.zipUrl;
     link.download = `${presentationTitle.replace(/[^\w\-]+/g, "_")}.zip`;
     document.body.appendChild(link);
     link.click();
@@ -90,7 +101,7 @@ export default function CreateSlideshowPostPage() {
           <Button variant="ghost" onClick={() => router.push(backTarget)}>
             Back to slideshow
           </Button>
-          {prepared.zipDataUrl && (
+          {prepared.zipUrl && (
             <Button onClick={handleDownloadZip} variant="secondary">
               Download JPG (.zip)
             </Button>
@@ -145,9 +156,9 @@ export default function CreateSlideshowPostPage() {
               </p>
             ) : (
               <>
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="ghost"
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="ghost"
                     size="icon"
                     onClick={() =>
                       setCurrentSlide(
