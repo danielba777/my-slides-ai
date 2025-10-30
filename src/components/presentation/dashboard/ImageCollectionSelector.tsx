@@ -120,8 +120,14 @@ export const ImageCollectionSelector: React.FC = () => {
     );
   }, []);
 
-  // Tags sind nicht mehr ausschlaggebend für Sichtbarkeit
-  const looksPersonal = useCallback(() => false, []);
+  // Korrigierte Signatur: nimmt ein ImageSet entgegen und liefert boolean
+  const looksPersonal = useCallback(
+    (set: ImageSet) =>
+      hasPersonalCategoryTag(set.category) ||
+      hasPersonalCategoryTag(set.slug) ||
+      hasPersonalCategoryTag(set.name),
+    [],
+  );
 
   // "looksPersonal" darf NICHT dazu führen, dass fremde Sets angezeigt werden!
   const belongsToUser = useCallback(
@@ -130,37 +136,68 @@ export const ImageCollectionSelector: React.FC = () => {
     [isAiAvatarCollection, userId],
   );
 
-  const { communitySets, mySets } = useMemo(() => {
-    // If drilling down, show only children of selected parent
-    if (drillDownParent) {
-      const children =
-        (drillDownParent.children && drillDownParent.children.length > 0
-          ? drillDownParent.children
-          : imageSets.filter((set) => set.parentId === drillDownParent.id)) ??
-        [];
-      const community: ImageSet[] = [];
-      const mine: ImageSet[] = [];
-      for (const c of children) {
-        if (belongsToUser(c)) {
-          mine.push(c);
-        } else if (
-          // persönliche Sets niemals in Community anzeigen
-          !looksPersonal(c)
-        ) {
-          community.push(c);
-        }
-      }
-      return { communitySets: community, mySets: mine };
+  const availableCollections = useMemo(() => {
+    // Kein direkter Zugriff mehr auf drillDownParent.id -> verhindert TS "never"
+    if (!drillDownParent) {
+      // Top-Level Ansicht
+      return imageSets
+        .filter((set) => !set.parentId)
+        .filter(belongsToUser)
+        .filter((s) => !looksPersonal(s) || checkOwnership(s, userId ?? null));
     }
 
-    const topLevel = drillDownParent
-      ? imageSets.filter((s) => s.parentId === drillDownParent.id)
-      : imageSets.filter((s) => !s.parentId);
-    const mine = topLevel.filter(belongsToUser);
-    // Community blendet ALLE privat markierten Sets aus
-    const community = topLevel.filter((s) => !allOwned.has(s.id));
-    return { communitySets: community, mySets: mine };
-  }, [belongsToUser, drillDownParent, imageSets, allOwned]);
+    const parentId = (drillDownParent as { id?: string | number })?.id;
+    const inlineChildren = Array.isArray((drillDownParent as any).children)
+      ? ((drillDownParent as any).children as ImageSet[])
+      : undefined;
+
+    const children: ImageSet[] =
+      (inlineChildren && inlineChildren.length > 0
+        ? inlineChildren
+        : typeof parentId !== "undefined"
+          ? imageSets.filter((set) => set.parentId === parentId)
+          : []) ?? [];
+
+    return children
+      .filter(belongsToUser)
+      .filter((s) => !looksPersonal(s) || checkOwnership(s, userId ?? null));
+  }, [belongsToUser, imageSets, drillDownParent, looksPersonal, userId, checkOwnership]);
+
+  const { communitySets, mySets } = useMemo(() => {
+  // DRILLDOWN: nur Kinder des gewählten Parents
+  if (drillDownParent) {
+      const parentId = drillDownParent?.id ?? null;
+      const children: ImageSet[] =
+        (Array.isArray(drillDownParent.children) && drillDownParent.children.length > 0)
+          ? drillDownParent.children
+          : parentId
+            ? imageSets.filter((set) => set.parentId === parentId)
+            : [];
+
+      const mine = children.filter(belongsToUser);
+      const community = children.filter(
+        (s) =>
+          // absolut keine User-Collections (von irgendwem)
+          !allOwned.has(s.id) &&
+          // keine Personal/Private Tags
+          !looksPersonal(s) &&
+          // AI Avatars niemals in Community
+          !isAiAvatarCollection(s),
+      );
+      return { communitySets: community, mySets: mine };
+  }
+
+  // TOP-LEVEL: nur Wurzeln
+  const topLevel = imageSets.filter((s) => !s.parentId);
+  const mine = topLevel.filter(belongsToUser);
+  const community = topLevel.filter(
+      (s) =>
+        !allOwned.has(s.id) &&
+        !looksPersonal(s) &&
+        !isAiAvatarCollection(s),
+  );
+  return { communitySets: community, mySets: mine };
+}, [belongsToUser, drillDownParent, imageSets, allOwned, looksPersonal, isAiAvatarCollection]);
 
   const handleSelectSet = (set: ImageSet) => {
     // Check if this set has children
