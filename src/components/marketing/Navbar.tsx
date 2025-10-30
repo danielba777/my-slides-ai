@@ -39,8 +39,8 @@ export function MarketingNavbar({ session }: { session: boolean }) {
         >
           {/* Left: Logo + Name */}
           <Link href="/" className="flex items-center gap-2 lg:pl-4 pl-0">
-            <AppLogo size={26} />
-            <span className="text-sm sm:text-base font-semibold tracking-tight text-foreground">
+            <AppLogo size={40} />
+            <span className="text-sm sm:text-xl font-semibold tracking-tight text-foreground">
               SlidesCockpit
             </span>
           </Link>
