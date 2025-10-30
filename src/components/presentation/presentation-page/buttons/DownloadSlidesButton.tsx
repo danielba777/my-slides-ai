@@ -29,7 +29,7 @@ export function DownloadSlidesButton() {
         const png = await exporter();
         // Erzwinge Full-Frame 1080×1620 (2:3) + Rand-Clip, danach nach JPG
         const jpg = await blobToJpeg(png, 1080, 1620);
-        const name = `${String(idx + 1).padStart(2, "0")}.jpg`;
+        const name = `${String(idx + 1).padStart(3, "0")}.jpg`;
         jpgFiles.push({ name, blob: jpg });
       }
       if (jpgFiles.length === 0) return;

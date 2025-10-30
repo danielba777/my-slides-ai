@@ -13,7 +13,13 @@ export async function zipFiles(
   for (const f of files) {
     zip.file(f.name, f.blob);
   }
-  const content = await zip.generateAsync({ type: "blob" });
+  const content = await zip.generateAsync({
+    type: "blob",
+    compression: "DEFLATE",
+    compressionOptions: { level: 9 },
+    streamFiles: false,
+    platform: "UNIX",
+  });
   return content;
 }
 
@@ -29,7 +35,7 @@ export async function loadBlobAsImage(blob: Blob): Promise<HTMLImageElement> {
   });
 }
 
-// Erzwingt Full-Frame-Export 1080x1620 (2:3) und harten Rand-Clip (kein „mittendrin"-Crop)
+// Erzwingt Full-Frame-Export 1080x1620 (2:3) mit zentriertem Cover-Fitting
 export async function normalizeToDesignPNG(
   pngBlob: Blob,
   W = 1080,
@@ -40,14 +46,16 @@ export async function normalizeToDesignPNG(
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
-  // harter Frame-Clip (0,0,W,H)
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, W, H);
-  ctx.clip();
-  // Wichtig: Alles 1:1 in den Frame zeichnen.
-  ctx.drawImage(img, 0, 0, W, H);
-  ctx.restore();
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, W, H);
+
+  const scale = Math.max(W / img.width, H / img.height);
+  const drawWidth = img.width * scale;
+  const drawHeight = img.height * scale;
+  const dx = (W - drawWidth) / 2;
+  const dy = (H - drawHeight) / 2;
+
+  ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
   const out = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob((b) => resolve(b), "image/png"),
   );
@@ -68,7 +76,7 @@ export async function blobToJpeg(
   const ctx = canvas.getContext("2d")!;
   ctx.drawImage(img, 0, 0, W, H);
   const jpg = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92),
+    canvas.toBlob((b) => resolve(b), "image/jpeg", 0.88),
   );
   return jpg ?? normalized;
 }
