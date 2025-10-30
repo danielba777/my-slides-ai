@@ -28,10 +28,24 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const session = await auth();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (session?.user?.id) {
+      // WICHTIG: Owner-Verknüpfung für persönliche Kollektionen
+      headers["x-user-id"] = session.user.id;
+    }
+
+    // Fallback: Wenn kein category-Feld gesetzt ist, aber ein User existiert,
+    // defaulten wir auf "personal", damit die Collection sauber einsortiert wird.
+    const payload =
+      body && typeof body === "object"
+        ? { category: "personal", ...body }
+        : { category: "personal" };
+
     const response = await fetch(`${API_BASE_URL}/imagesets`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      headers,
+      body: JSON.stringify(payload),
     });
     const data = await response.json();
     return NextResponse.json(data);

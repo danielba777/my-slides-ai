@@ -3,11 +3,11 @@ import {
   Calendar,
   CalendarClock,
   FileCheck,
+  Folder,
   Home,
   Images,
   TestTube2,
   User,
-  UserPen,
   type LucideIcon,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -54,11 +54,11 @@ const playgroundItems: SidebarItem[] = [
   },
 ];
 
-const configurationItems: SidebarItem[] = [
+const resourceItems: SidebarItem[] = [
   {
-    title: "Connections",
-    url: "/dashboard/connections",
-    icon: UserPen,
+    title: "Image Collections",
+    url: "/dashboard/image-collections",
+    icon: Folder,
   },
 ];
 
@@ -146,10 +146,10 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>Configuration</SidebarGroupLabel>
+          <SidebarGroupLabel>Ressources</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {configurationItems.map((item) => (
+              {resourceItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild

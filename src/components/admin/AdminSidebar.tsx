@@ -44,6 +44,11 @@ const slideshowItems: SidebarItem[] = [
     icon: ImageIcon,
   },
   {
+    title: "Custom Imagesets",
+    url: "/admin/slideshows/custom-imagesets",
+    icon: ImageIcon,
+  },
+  {
     title: "TikTok Accounts",
     url: "/admin/slideshow-library/accounts",
     icon: Users,

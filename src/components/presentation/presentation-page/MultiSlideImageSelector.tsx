@@ -11,7 +11,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import {
+  annotateImageSetOwnership,
+  isImageSetOwnedByUser as checkOwnership,
+} from "@/lib/image-set-ownership";
 import { ArrowLeft } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface ImageSetImage {
@@ -23,6 +28,7 @@ interface ImageSet {
   id: string;
   name: string;
   category?: string;
+  slug?: string | null;
   images?: ImageSetImage[];
   _count?: { images: number; children?: number };
   isOwnedByUser?: boolean;
@@ -43,6 +49,8 @@ export function MultiSlideImageSelector({
   onSelectImages,
   maxImages = 4,
 }: MultiSlideImageSelectorProps) {
+  const { data: session } = useSession();
+  const userId = session?.user?.id ?? null;
   const [selectedSet, setSelectedSet] = useState<ImageSet | null>(null);
   const [pendingImageUrls, setPendingImageUrls] = useState<string[]>([]);
   const [imageSets, setImageSets] = useState<ImageSet[]>([]);
@@ -58,14 +66,30 @@ export function MultiSlideImageSelector({
   const loadImageSets = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/imagesets");
-      if (!response.ok) {
+      const [setsRes, ownedRes] = await Promise.all([
+        fetch("/api/imagesets", { cache: "no-store" }),
+        fetch("/api/user-image-collections", { cache: "no-store" }),
+      ]);
+
+      if (!setsRes.ok) {
         throw new Error("Failed to fetch image sets");
       }
 
-      const data = await response.json();
+      const data = (await setsRes.json()) as unknown;
+      const ownedPayload = ownedRes.ok
+        ? ((await ownedRes.json()) as { ownedIds?: string[] })
+        : null;
+      const ownedIds = new Set<string>(ownedPayload?.ownedIds ?? []);
+
       if (Array.isArray(data)) {
-        setImageSets(data);
+        const normalized = data.map((set: ImageSet) =>
+          annotateImageSetOwnership(
+            set,
+            userId,
+            ownedIds.has(set.id),
+          ),
+        );
+        setImageSets(normalized);
       } else {
         setImageSets([]);
       }
@@ -75,7 +99,7 @@ export function MultiSlideImageSelector({
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -92,6 +116,31 @@ export function MultiSlideImageSelector({
     setCurrentPage(1);
   }, [selectedSet]);
 
+  const isAiAvatarCollection = useCallback((set: ImageSet) => {
+    const slug = (set.slug ?? "").toLowerCase();
+    const name = (set.name ?? "").toLowerCase();
+    const category = (set.category ?? "").toLowerCase();
+    return (
+      slug.includes("avatar") ||
+      name.includes("avatar") ||
+      category.includes("avatar")
+    );
+  }, []);
+
+  const belongsToUser = useCallback(
+    (set: ImageSet) => {
+      const category = set.category?.toLowerCase() ?? "";
+      return (
+        checkOwnership(set, userId ?? null) ||
+        category === "personal" ||
+        category === "mine" ||
+        category === "user" ||
+        isAiAvatarCollection(set)
+      );
+    },
+    [isAiAvatarCollection, userId],
+  );
+
   const { communitySets, mySets } = useMemo(() => {
     // If drilling down, show only children of selected parent
     if (drillDownParent) {
@@ -100,14 +149,7 @@ export function MultiSlideImageSelector({
       const mine: ImageSet[] = [];
 
       children.forEach((set) => {
-        const category = set.category?.toLowerCase() ?? "";
-        const isMine =
-          Boolean(set.isOwnedByUser) ||
-          category === "personal" ||
-          category === "mine" ||
-          category === "user";
-
-        if (isMine) {
+        if (belongsToUser(set)) {
           mine.push(set);
         } else {
           community.push(set);
@@ -123,14 +165,7 @@ export function MultiSlideImageSelector({
     const topLevelSets = imageSets.filter((set) => !set.parentId);
 
     topLevelSets.forEach((set) => {
-      const category = set.category?.toLowerCase() ?? "";
-      const isMine =
-        Boolean(set.isOwnedByUser) ||
-        category === "personal" ||
-        category === "mine" ||
-        category === "user";
-
-      if (isMine) {
+      if (belongsToUser(set)) {
         mine.push(set);
       } else {
         community.push(set);
@@ -138,7 +173,7 @@ export function MultiSlideImageSelector({
     });
 
     return { communitySets: community, mySets: mine };
-  }, [imageSets, drillDownParent]);
+  }, [belongsToUser, imageSets, drillDownParent]);
 
   const handleSelectImage = (imageUrl: string) => {
     setPendingImageUrls((prev) => {

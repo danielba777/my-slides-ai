@@ -171,6 +171,19 @@ model GeneratedImage {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+/// Verknüpft User mit ihren persönlichen Image-Collections (eigene Ordner/Sets)
+model UserImageCollection {
+  id         String   @id @default(uuid())
+  userId     String
+  imageSetId String   @unique
+  name       String?
+  slug       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@index([userId], map: "idx_user_image_collection_user")
+}
+
 enum UserRole {
   ADMIN
   USER

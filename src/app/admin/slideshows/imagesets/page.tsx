@@ -29,6 +29,37 @@ interface ImageSet {
   parentId?: string | null;
   children?: ImageSet[];
   _count: { images: number; children?: number };
+  category?: string | null;
+}
+
+function removePersonalCollections(sets: ImageSet[] | undefined): ImageSet[] {
+  if (!Array.isArray(sets)) {
+    return [];
+  }
+
+  const filtered: ImageSet[] = [];
+
+  for (const set of sets) {
+    const category = (set.category ?? "").toLowerCase();
+    // Community-Ansicht: ausschließlich Community zeigen
+    // => alle user-erstellten Kategorien verbergen
+    if (category === "personal" || category === "mine" || category === "user") {
+      continue;
+    }
+
+    let nextChildren: ImageSet[] | undefined;
+    if (Array.isArray(set.children) && set.children.length > 0) {
+      nextChildren = removePersonalCollections(set.children);
+    }
+
+    filtered.push(
+      nextChildren && nextChildren.length > 0
+        ? { ...set, children: nextChildren }
+        : { ...set, children: nextChildren },
+    );
+  }
+
+  return filtered;
 }
 
 export default function ImageSetsAdminPage() {
@@ -58,12 +89,13 @@ export default function ImageSetsAdminPage() {
   const loadImageSets = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/imagesets");
+      const response = await fetch("/api/imagesets", { cache: "no-store" });
       if (!response.ok) {
         throw new Error("Failed to fetch image sets");
       }
       const data = await response.json();
-      setImageSets(data);
+      // Wichtig: Im "Imagesets"-Bereich nur Community anzeigen – Personal rausfiltern
+      setImageSets(removePersonalCollections(data));
     } catch (error) {
       console.error("Error loading image sets:", error);
       toast.error("Fehler beim Laden der Bilder-Sets");

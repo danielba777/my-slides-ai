@@ -31,6 +31,24 @@ export default function AdminHomePage() {
           </CardContent>
         </Card>
 
+        {/* Neuer Bereich für von Kund:innen erstellte Sets */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ImageIcon className="h-5 w-5" />
+              Custom Imagesets
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Von Nutzer:innen erstellte Bilder-Sets getrennt verwalten
+            </p>
+            <Link href="/admin/slideshows/custom-imagesets">
+              <Button className="w-full">Custom Imagesets öffnen</Button>
+            </Link>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
