@@ -26,7 +26,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
-export const PRESENTATION_GENERATION_COOKIE = "presentation_generation_pending";
+// Nicht exportieren, sonst verletzt es die erlaubten Next.js App-Exports
+// und triggert den TS2344-Fehler (.next/types/... checkFields).
+const PRESENTATION_GENERATION_COOKIE = "presentation_generation_pending";
 
 function hasPendingCookie() {
   if (typeof document === "undefined") return false;

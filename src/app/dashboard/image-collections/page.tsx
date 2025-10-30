@@ -169,8 +169,12 @@ export default function ImageCollectionsPage() {
       const child = childrenWithImages[idx % childrenWithImages.length];
       const imageIndex = Math.floor(idx / childrenWithImages.length);
 
-      if (child.images && imageIndex < child.images.length) {
-        mixed.push(child.images[imageIndex]);
+      const c = child;
+      if (c && c.images && imageIndex < c.images.length) {
+        const img = c.images[imageIndex];
+        if (img) {
+          mixed.push(img);
+        }
       }
       idx++;
     }

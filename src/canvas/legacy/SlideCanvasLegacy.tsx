@@ -444,9 +444,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const [dimBg, setDimBg] = React.useState(false);
 
   // --- Globaler State für Dim-Overlay ---
-  const dimOverlaySlideId = usePresentationState((s) => s.dimOverlaySlideId);
+  // Feld heißt in der State-Definition 'editingOverlaySlideId'
+ const dimOverlaySlideId = usePresentationState((s) => s.editingOverlaySlideId);
   const setDimOverlaySlideId = usePresentationState(
-    (s) => s.setDimOverlaySlideId,
+    (s) => s.setEditingOverlaySlideId,
   );
 
   // Sicherer Wrapper: nur aufrufen, wenn wirklich eine Funktion übergeben wurde
@@ -504,14 +505,20 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const cur = next[i];
       // Nur Text-Layer betrachten
       // (bei dir sind es hier ohnehin Text-Layer in diesem Array)
+      // Guard gegen 'possibly undefined'
+      if (!prev || !cur) {
+        return;
+      }
       const prevTop = prev.y - (prev.height ?? 0) / 2;
       const prevBottom = prev.y + (prev.height ?? 0) / 2;
       const curTop = cur.y - (cur.height ?? 0) / 2;
       const neededTop = prevBottom + MIN_TEXT_GAP;
       if (curTop < neededTop) {
-        const curHalf = (cur.height ?? 0) / 2;
+        const curHalf = (cur?.height ?? 0) / 2;
         const newY = neededTop + curHalf;
-        cur.y = Math.round(newY);
+        if (cur) {
+          cur.y = Math.round(newY);
+        }
       }
     }
     // ursprüngliche Reihenfolge zurückgeben, aber mit aktualisierten y
@@ -763,10 +770,26 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   // Wenn Text-Layer entstehen/ändern (z. B. 4 Prompts → 4 Boxen),
   // gleiche automatisch vertikal auf Abstand aus.
   useEffect(() => {
-    setTextLayers((prev) => {
+    setTextLayers(((prev) => {
       if (!prev || prev.length <= 1) return prev;
       return enforceMinVerticalSpacing(prev);
-    });
+    }) as (
+      prevState: (TextLayer & {
+        autoHeight?: boolean;
+        italic?: boolean;
+        outlineEnabled?: boolean;
+        outlineWidth?: number;
+        outlineColor?: string;
+      })[]
+    ) => (
+      TextLayer & {
+        autoHeight?: boolean;
+        italic?: boolean;
+        outlineEnabled?: boolean;
+        outlineWidth?: number;
+        outlineColor?: string;
+      }
+    )[]);
   }, [
     enforceMinVerticalSpacing,
     /* Trigger bei Layout-Änderungen: */ textLayers.length,
@@ -1793,7 +1816,17 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       // 1) Hintergrund
       if (patch.background) {
         applyToActive((l) => {
-          const prevBg = l.background ?? {};
+          // Typisierung für Hintergrund-Werte, damit TS nicht mehr über '{}' meckert
+          type BgPatch = {
+            opacity?: number;
+            paddingX?: number;
+            paddingY?: number;
+            mode?: 'block' | 'blob';
+            color?: string;
+            radius?: number;
+            lineOverlap?: number;
+          };
+          const prevBg = (l.background ?? {}) as Partial<BgPatch>;
           const targetOpacity =
             patch.background?.opacity ?? prevBg.opacity ?? 0;
           const fallbackPadding =
@@ -1806,7 +1839,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             ...prevBg,
             ...patch.background,
             mode:
-              patch.background?.mode ?? prevBg.mode ?? TIKTOK_BACKGROUND_MODE,
+              (patch.background?.mode ?? prevBg.mode ?? TIKTOK_BACKGROUND_MODE) as 'block' | 'blob',
             color:
               patch.background?.color ??
               prevBg.color ??

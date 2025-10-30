@@ -125,18 +125,18 @@ export function SlideContainer({
       const updated = state.slides.slice();
       const idx = updated.findIndex((slideItem) => slideItem.id === id);
       if (idx >= 0) {
-        const prevRoot = updated[idx].rootImage ?? { query: "" };
+        // Guard: updated[idx] kann noch nicht existieren
+        const prevRoot = updated[idx]?.rootImage ?? { query: "" };
         updated[idx] = {
-          ...updated[idx],
+          ...(updated[idx] as any),
           rootImage: {
-            ...prevRoot,
-            query: prevRoot.query ?? "",
+            query: prevRoot.query,
             url: nextUrl,
             useGrid: false,
             gridImages: undefined,
             imageSetId,
           },
-        };
+        } as any;
         setSlides(updated);
       }
     } catch (error) {

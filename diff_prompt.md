@@ -1,24 +1,53 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
---- a/src/components/presentation/presentation-page/PersonalImageSelectorDialog.tsx
-+++ b/src/components/presentation/presentation-page/PersonalImageSelectorDialog.tsx
-@@ -... +... @@
+**_ Begin Patch
+_** Update File: src/canvas/legacy/SlideCanvasLegacy.tsx
+@@
 
--        <div className="flex items-center justify-between gap-3 border-t px-6 py-4">
--          <Button variant="ghost" asChild>
--            <Link href="/dashboard/image-collections">Manage collections</Link>
--          </Button>
+- setTextLayers((prev) => {
 
-*        <div className="flex items-center justify-between gap-3 border-t px-6 py-4">
-*          <Link href="/dashboard/image-collections">
-*            <Button variant="ghost">Manage collections</Button>
-*          </Link>
-           <div className="flex items-center gap-2">
-             <Button variant="outline" onClick={() => onOpenChange(false)}>
-               Cancel
-             </Button>
-             <Button onClick={handleApply} disabled={!selectedImageUrl}>
-               Apply Image
-             </Button>
-           </div>
-         </div>
+* setTextLayers(((prev) => {
+  // ... bestehende Logik bleibt unverändert ...
+
+- });
+
+* }) as (
+*      prevState: (TextLayer & {
+*        autoHeight?: boolean;
+*        italic?: boolean;
+*        outlineEnabled?: boolean;
+*        outlineWidth?: number;
+*        outlineColor?: string;
+*      })[]
+* ) => (
+*      TextLayer & {
+*        autoHeight?: boolean;
+*        italic?: boolean;
+*        outlineEnabled?: boolean;
+*        outlineWidth?: number;
+*        outlineColor?: string;
+*      }
+* )[]);
+  @@
+
+-            type BgPatch = {
+
+*            type BgPatch = {
+               opacity?: number;
+               paddingX?: number;
+               paddingY?: number;
+
+-              mode?: unknown;
+
+*              mode?: 'block' | 'blob';
+                 color?: string;
+                 radius?: number;
+                 lineOverlap?: number;
+               };
+               const prevBg = (prev.background ?? {}) as Partial<BgPatch>;
+  @@
+
+-              patch.background?.mode ?? prevBg.mode ?? TIKTOK_BACKGROUND_MODE,
+
+*              (patch.background?.mode ?? prevBg.mode ?? TIKTOK_BACKGROUND_MODE) as 'block' | 'blob',
+  \*\*\* End Patch
