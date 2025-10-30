@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const FILES_BASE_URL =
   process.env.NEXT_PUBLIC_SLIDESCOCKPIT_FILES_BASE ??
@@ -10,7 +10,7 @@ function createUpstreamUrl(pathSegments: string[]): string {
 }
 
 async function proxyRequest(
-  request: Request,
+  request: NextRequest,
   path: string[],
 ): Promise<NextResponse> {
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -85,15 +85,17 @@ async function proxyRequest(
 }
 
 export async function GET(
-  request: Request,
-  { params }: { params: { path: string[] } },
+  request: NextRequest,
+  context: { params: Promise<{ path: string[] }> },
 ) {
-  return proxyRequest(request, params.path);
+  const { path } = await context.params;
+  return proxyRequest(request, path);
 }
 
 export async function HEAD(
-  request: Request,
-  { params }: { params: { path: string[] } },
+  request: NextRequest,
+  context: { params: Promise<{ path: string[] }> },
 ) {
-  return proxyRequest(request, params.path);
+  const { path } = await context.params;
+  return proxyRequest(request, path);
 }

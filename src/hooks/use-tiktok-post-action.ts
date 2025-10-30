@@ -49,6 +49,7 @@ interface StatusResponse {
   status: "processing" | "success" | "failed" | "inbox";
   postId?: string;
   releaseUrl?: string;
+  error?: string;
 }
 
 const DEFAULT_FORM_VALUES: TikTokPostPayload = {
