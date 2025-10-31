@@ -192,6 +192,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {/*
         <SidebarGroup>
           <SidebarGroupLabel className="text-red-500">DEBUG</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -218,6 +219,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        */}
       </SidebarContent>
       <SidebarFooter className="space-y-3">
         <SidebarUsageSummary />
