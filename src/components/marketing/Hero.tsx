@@ -70,9 +70,13 @@ export function MarketingHero({ session }: { session: boolean }) {
         const deduped = Array.from(collected);
         for (let index = deduped.length - 1; index > 0; index--) {
           const swapIndex = Math.floor(Math.random() * (index + 1));
-          const temp = deduped[index];
-          deduped[index] = deduped[swapIndex];
-          deduped[swapIndex] = temp;
+          const current = deduped[index];
+          const swap = deduped[swapIndex];
+          if (current === undefined || swap === undefined) {
+            continue;
+          }
+          deduped[index] = swap;
+          deduped[swapIndex] = current;
         }
 
         setPosterImages(deduped);
@@ -93,34 +97,61 @@ export function MarketingHero({ session }: { session: boolean }) {
 
   const posterMatrix = useMemo(() => {
     const perRow = HERO_POSTERS_PER_ROW;
+    const totalRows = HERO_POSTER_ROWS;
+    const fallbackRow = Array.from(
+      { length: perRow },
+      () => HERO_BACKGROUND_IMAGE,
+    );
+
+    const createFallbackRows = () =>
+      Array.from({ length: totalRows }, (_, rowIndex) => {
+        const row = [...fallbackRow];
+        if (rowIndex % 2 === 1) {
+          row.reverse();
+        }
+        return row;
+      });
 
     if (!posterImages.length) {
-      return [];
+      return createFallbackRows();
+    }
+
+    const maxUnique = perRow * Math.ceil(totalRows / 2);
+    let pool = posterImages.slice(0, maxUnique);
+
+    if (!pool.length) {
+      return createFallbackRows();
+    }
+
+    if (pool.length < perRow) {
+      const paddedPool = [...pool];
+      for (let index = pool.length; index < perRow; index++) {
+        const fallbackImage =
+          pool[index % pool.length] ?? HERO_BACKGROUND_IMAGE;
+        paddedPool.push(fallbackImage);
+      }
+      pool = paddedPool;
     }
 
     const rows: string[][] = [];
+    for (let rowIndex = 0; rowIndex < totalRows; rowIndex++) {
+      const baseRowIndex = Math.floor(rowIndex / 2);
+      const rowImages: string[] = [];
 
-    for (let index = 0; index < posterImages.length; index += perRow) {
-      rows.push(posterImages.slice(index, index + perRow));
+      for (let columnIndex = 0; columnIndex < perRow; columnIndex++) {
+        const sourceIndex = (baseRowIndex * perRow + columnIndex) % pool.length;
+        const image = pool[sourceIndex] ?? HERO_BACKGROUND_IMAGE;
+        rowImages.push(image);
+      }
+
+      if (rowIndex % 2 === 1) {
+        rowImages.reverse();
+      }
+
+      rows.push(rowImages);
     }
 
-    if (rows.length >= HERO_POSTER_ROWS) {
-      return rows;
-    }
-
-    const required = HERO_POSTER_ROWS * perRow;
-    const padded = [...posterImages];
-
-    for (let index = posterImages.length; index < required; index++) {
-      padded.push(posterImages[index % posterImages.length]);
-    }
-
-    const paddedRows: string[][] = [];
-    for (let index = 0; index < padded.length; index += perRow) {
-      paddedRows.push(padded.slice(index, index + perRow));
-    }
-
-    return paddedRows;
+    return rows;
   }, [posterImages]);
 
   return (
@@ -130,7 +161,10 @@ export function MarketingHero({ session }: { session: boolean }) {
         <div className="netflix-container-perspective">
           <div className="netflix-container-background">
             {posterMatrix.map((row, rowIndex) => (
-              <div key={`hero-row-${rowIndex}`} className="netflix-box">
+              <div
+                key={`hero-row-${rowIndex}`}
+                className={`netflix-box${rowIndex % 2 === 1 ? " netflix-box--reverse" : ""}`}
+              >
                 {row.map((imageUrl, itemIndex) => (
                   <div
                     key={`hero-row-${rowIndex}-item-${itemIndex}`}
@@ -373,6 +407,10 @@ export function MarketingHero({ session }: { session: boolean }) {
           flex-wrap: nowrap;
           flex-grow: 1;
           transform: translateX(100px) translateY(-120px);
+        }
+        .netflix-box--reverse {
+          justify-content: flex-start;
+          transform: translateX(-100px) translateY(-120px);
         }
 
         .netflix-thumbnail {
