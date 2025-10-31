@@ -5,12 +5,9 @@ import { NextResponse } from "next/server";
 interface RequestPayload {
   openId?: string;
   caption?: string;
-  mediaUrl?: string;
-  mediaType?: "video" | "photo";
-  thumbnailTimestampMs?: number;
-  autoAddMusic?: boolean;
-  postMode?: "INBOX" | "PUBLISH" | "DIRECT_POST" | "MEDIA_UPLOAD";
-  contentPostingMethod?: "UPLOAD" | "MEDIA_UPLOAD" | "DIRECT_POST" | "URL";
+  title?: string;
+  coverIndex?: number;
+  photoImages?: string[];
 }
 
 export async function POST(request: Request) {
@@ -20,51 +17,37 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as RequestPayload | null;
-  if (!body || typeof body.openId !== "string" || typeof body.mediaUrl !== "string") {
-    return NextResponse.json({ error: "Missing openId or mediaUrl" }, { status: 400 });
+  if (
+    !body ||
+    typeof body.openId !== "string" ||
+    !Array.isArray(body.photoImages) ||
+    body.photoImages.length === 0
+  ) {
+    return NextResponse.json(
+      { error: "Missing openId or photoImages" },
+      { status: 400 },
+    );
   }
 
   console.log("[TikTokPostAPI] Incoming request", {
     openId: body.openId,
-    mediaUrl: body.mediaUrl,
-    mediaType: body.mediaType,
-    postMode: body.postMode,
-    contentPostingMethod: body.contentPostingMethod,
+    photoImages: body.photoImages,
   });
-
-  const inferredContentMethod =
-    body.contentPostingMethod ??
-    (body.mediaType === "photo"
-      ? body.postMode === "INBOX" || body.postMode === "MEDIA_UPLOAD"
-        ? "MEDIA_UPLOAD"
-        : "DIRECT_POST"
-      : "UPLOAD");
 
   const payload = {
     caption: body.caption ?? "",
-    postMode: body.postMode ?? (inferredContentMethod === "MEDIA_UPLOAD" ? "INBOX" : "PUBLISH"),
-    media: [
-      body.mediaType === "photo"
-        ? {
-            type: "photo" as const,
-            url: body.mediaUrl,
-          }
-        : {
-            type: "video" as const,
-            url: body.mediaUrl,
-            thumbnailTimestampMs: body.thumbnailTimestampMs ?? 1000,
-          },
-    ],
+    postMode: "MEDIA_UPLOAD" as const,
+    media: body.photoImages.map((url) => ({
+      type: "photo" as const,
+      url,
+    })),
     settings: {
-      contentPostingMethod: inferredContentMethod,
-      privacyLevel: "SELF_ONLY" as const,
-      duet: false,
-      comment: false,
-      stitch: false,
-      autoAddMusic: body.autoAddMusic ?? true,
-      videoMadeWithAi: false,
-      brandContentToggle: false,
-      brandOrganicToggle: false,
+      contentPostingMethod: "URL" as const,
+      autoAddMusic: true,
+      title:
+        body.title && body.title.trim().length > 0
+          ? body.title.trim()
+          : undefined,
     },
   };
 

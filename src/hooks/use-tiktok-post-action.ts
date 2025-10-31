@@ -12,23 +12,12 @@ import { toast } from "sonner";
 
 import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 
-export type TikTokPostMediaType = "video" | "photo";
-export type TikTokPostMode = "INBOX" | "PUBLISH" | "DIRECT_POST" | "MEDIA_UPLOAD";
-export type TikTokContentPostingMethod =
-  | "UPLOAD"
-  | "MEDIA_UPLOAD"
-  | "DIRECT_POST"
-  | "URL";
-
 export interface TikTokPostPayload {
   openId: string;
   caption: string;
-  mediaUrl: string;
-  mediaType: TikTokPostMediaType;
-  thumbnailTimestampMs?: number;
-  autoAddMusic: boolean;
-  postMode: TikTokPostMode;
-  contentPostingMethod: TikTokContentPostingMethod;
+  title: string;
+  coverIndex: number;
+  photoImages: string[];
 }
 
 export interface TikTokPostResult {
@@ -55,12 +44,9 @@ interface StatusResponse {
 const DEFAULT_FORM_VALUES: TikTokPostPayload = {
   openId: "",
   caption: "",
-  mediaUrl: "",
-  mediaType: "video",
-  thumbnailTimestampMs: 1000,
-  autoAddMusic: true,
-  postMode: "PUBLISH",
-  contentPostingMethod: "UPLOAD",
+  title: "",
+  coverIndex: 0,
+  photoImages: [],
 };
 
 export interface UseTikTokPostActionOptions {
@@ -78,7 +64,7 @@ export interface UseTikTokPostActionResult {
   result: TikTokPostResult | null;
   error: string | null;
   setError: Dispatch<SetStateAction<string | null>>;
-  handleSubmit: () => Promise<void>;
+  handleSubmit: () => Promise<TikTokPostResult | null>;
   reset: (values?: Partial<TikTokPostPayload>) => void;
   accounts: ReturnType<typeof useTikTokAccounts>["accounts"];
   accountsLoading: boolean;
@@ -162,6 +148,22 @@ export function useTikTokPostAction(
           throw new Error(message);
         }
 
+        if (
+          "failReason" in payload &&
+          typeof (payload as Record<string, unknown>).failReason === "string"
+        ) {
+          (payload as StatusResponse).error = String(
+            (payload as Record<string, unknown>).failReason,
+          );
+        } else if (
+          "fail_reason" in payload &&
+          typeof (payload as Record<string, unknown>).fail_reason === "string"
+        ) {
+          (payload as StatusResponse).error = String(
+            (payload as Record<string, unknown>).fail_reason,
+          );
+        }
+
         if (payload.status !== "processing") {
           return payload;
         }
@@ -176,26 +178,38 @@ export function useTikTokPostAction(
     [],
   );
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (): Promise<TikTokPostResult | null> => {
     if (!form.openId) {
       toast.error("Please select a connected TikTok account");
-      return;
+      return null;
     }
 
-    if (!form.mediaUrl) {
-      toast.error("Please provide a media URL from the files bucket");
-      return;
+    if (!Array.isArray(form.photoImages) || form.photoImages.length === 0) {
+      toast.error("No slide images available for posting");
+      return null;
     }
+
+    const coverIndex = Math.max(
+      0,
+      Math.min(form.coverIndex, form.photoImages.length - 1),
+    );
+
+    const orderedImages = [...form.photoImages];
+    if (coverIndex > 0 && coverIndex < orderedImages.length) {
+      const [cover] = orderedImages.splice(coverIndex, 1);
+      if (cover) {
+        orderedImages.unshift(cover);
+      }
+    }
+
+    const normalizedTitle = form.title?.trim() ?? "";
 
     const requestBody = {
       openId: form.openId,
       caption: form.caption,
-      mediaUrl: form.mediaUrl,
-      mediaType: form.mediaType,
-      thumbnailTimestampMs: form.thumbnailTimestampMs,
-      autoAddMusic: form.autoAddMusic,
-      postMode: form.postMode,
-      contentPostingMethod: form.contentPostingMethod,
+      title: normalizedTitle,
+      coverIndex,
+      photoImages: orderedImages,
     };
 
     console.debug("[TikTokPost] Payload", requestBody);
@@ -237,7 +251,7 @@ export function useTikTokPostAction(
         });
         setError(message);
         toast.error(message);
-        return;
+        throw new Error(message);
       }
 
       if ("accepted" in payload && payload.accepted) {
@@ -251,6 +265,7 @@ export function useTikTokPostAction(
             status: finalStatus.status,
             postId: finalStatus.postId ?? payload.publishId,
             releaseUrl: finalStatus.releaseUrl,
+            error: finalStatus.error,
           };
           setResult(nextResult);
 
@@ -265,26 +280,34 @@ export function useTikTokPostAction(
             );
             console.error("[TikTokPost] Final status failure", finalStatus);
           }
+          return nextResult;
         } catch (pollError) {
           const message =
             pollError instanceof Error
               ? pollError.message
               : "Could not fetch TikTok status";
+          console.error("[TikTokPost] Unexpected error", pollError, {
+            requestBody,
+          });
           setError(message);
           toast.error(message);
+          throw pollError instanceof Error ? pollError : new Error(message);
         }
-        return;
+        return null;
       }
 
-      setResult({
+      const nextResult = {
         publishId: payload.publishId ?? "",
         status: payload.status,
-      });
+      };
+      setResult(nextResult);
+      return nextResult;
     } catch (err) {
       console.error("[TikTokPost] Unexpected error", err, { requestBody });
       const message = err instanceof Error ? err.message : "Unknown error";
       setError(message);
       toast.error(message);
+      throw err instanceof Error ? err : new Error(message);
     } finally {
       setSubmitting(false);
     }

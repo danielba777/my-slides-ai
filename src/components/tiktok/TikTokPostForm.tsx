@@ -2,22 +2,12 @@
 
 import { useEffect, type ComponentProps } from "react";
 
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import {
-  TikTokPostPayload,
-  type UseTikTokPostActionResult,
-} from "@/hooks/use-tiktok-post-action";
+import { type UseTikTokPostActionResult } from "@/hooks/use-tiktok-post-action";
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
 
@@ -27,9 +17,11 @@ interface TikTokPostFormProps {
   cardTitle?: string;
   submitLabel?: string;
   refreshLabel?: string;
-  disableRefreshButton?: boolean;
+  showRefreshButton?: boolean;
   footer?: ComponentProps<typeof CardFooter>["children"];
-  lockedMediaType?: TikTokPostPayload["mediaType"];
+  showSubmitButton?: boolean;
+  renderAccountSelector?: boolean;
+  onSelectAccount?: (openId: string) => void;
 }
 
 export function TikTokPostForm({
@@ -38,16 +30,17 @@ export function TikTokPostForm({
   cardTitle = "Configure post",
   submitLabel = "Trigger TikTok post",
   refreshLabel = "Refresh accounts",
-  disableRefreshButton = false,
+  showRefreshButton = true,
   footer,
-  lockedMediaType,
+  showSubmitButton = true,
+  renderAccountSelector = true,
+  onSelectAccount,
 }: TikTokPostFormProps) {
   const {
     form,
     setForm,
     updateField,
     submitting,
-    result,
     error,
     handleSubmit,
     accounts,
@@ -56,201 +49,117 @@ export function TikTokPostForm({
   } = action;
 
   useEffect(() => {
-    if (!lockedMediaType) return;
     setForm((prev) => {
+      if (prev.photoImages.length === 0 && prev.coverIndex !== 0) {
+        return { ...prev, coverIndex: 0 };
+      }
       if (
-        prev.mediaType === lockedMediaType &&
-        (lockedMediaType !== "photo" ||
-          (prev.postMode === "INBOX" &&
-            prev.contentPostingMethod === "MEDIA_UPLOAD"))
+        prev.photoImages.length > 0 &&
+        prev.coverIndex >= prev.photoImages.length
       ) {
-        return prev;
+        return { ...prev, coverIndex: 0 };
       }
-      const next: TikTokPostPayload = {
-        ...prev,
-        mediaType: lockedMediaType,
-      };
-      if (lockedMediaType === "photo") {
-        next.postMode = "INBOX";
-        next.contentPostingMethod = "MEDIA_UPLOAD";
-        next.thumbnailTimestampMs = undefined;
-      }
-      return next;
+      return prev;
     });
-  }, [lockedMediaType, setForm]);
-
-  const mediaTypeLabel =
-    form.mediaType === "photo" ? "Photo (Carousel)" : "Video";
+  }, [form.photoImages.length, setForm]);
 
   return (
-    <Card className={cn("w-full", className)}>
-      <CardHeader>
-        <CardTitle>{cardTitle}</CardTitle>
-      </CardHeader>
+    <Card
+      className={cn("w-full bg-transparent border-none shadow-none", className)}
+    >
       <CardContent className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+        {renderAccountSelector && (
           <div className="space-y-2">
-            <Label htmlFor="openId">Connected TikTok account</Label>
-            <select
-              id="openId"
-              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              disabled={accountsLoading || accounts.length === 0}
-              value={form.openId}
-              onChange={(event) => updateField("openId", event.target.value)}
-            >
-              {accountsLoading && <option>Loading accounts…</option>}
-              {!accountsLoading && accounts.length === 0 && (
-                <option>No TikTok accounts connected</option>
+            <Label>Connected TikTok account</Label>
+            <div className="flex items-start gap-3">
+              <div className="flex gap-4 overflow-x-auto pb-1">
+                {accountsLoading ? (
+                  <p className="text-sm text-muted-foreground">
+                    Loading accounts…
+                  </p>
+                ) : accounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No TikTok accounts connected.
+                  </p>
+                ) : (
+                  accounts.map((account) => {
+                    const label =
+                      account.username ?? account.displayName ?? account.openId;
+                    const isSelected = form.openId === account.openId;
+                    const initials = label
+                      .split(" ")
+                      .map((part) => part[0]?.toUpperCase())
+                      .join("")
+                      .slice(0, 2);
+
+                    const handleSelect = () => {
+                      if (onSelectAccount) {
+                        onSelectAccount(account.openId);
+                      } else {
+                        updateField("openId", account.openId);
+                      }
+                    };
+
+                    return (
+                      <button
+                        key={account.openId}
+                        type="button"
+                        onClick={handleSelect}
+                        className="flex flex-col items-center gap-2"
+                        aria-pressed={isSelected}
+                      >
+                        <span
+                          className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${isSelected ? "border-primary" : "border-border"}`}
+                        >
+                          {account.avatarUrl ? (
+                            <img
+                              src={account.avatarUrl}
+                              alt={label}
+                              className={`h-14 w-14 rounded-full object-cover transition-all ${isSelected ? "" : "grayscale opacity-70"}`}
+                            />
+                          ) : (
+                            <span
+                              className={`flex h-14 w-14 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground transition-all ${isSelected ? "text-primary" : ""}`}
+                            >
+                              {initials || "TikTok"}
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className={`text-xs ${isSelected ? "font-semibold" : "text-muted-foreground"}`}
+                        >
+                          {label}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              {showRefreshButton && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={accountsLoading}
+                  className="mt-1"
+                  onClick={() => void refreshAccounts()}
+                  title={refreshLabel}
+                >
+                  <RefreshCw className="h-4 w-4" aria-hidden />
+                  <span className="sr-only">{refreshLabel}</span>
+                </Button>
               )}
-              {accounts.map((account) => {
-                const label =
-                  account.username ?? account.displayName ?? account.openId;
-                return (
-                  <option key={account.openId} value={account.openId}>
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            disabled={
-              disableRefreshButton || accountsLoading || accounts.length === 0
-            }
-            className="self-end"
-            onClick={() => void refreshAccounts()}
-            title={refreshLabel}
-          >
-            <RefreshCw className="h-4 w-4" aria-hidden />
-            <span className="sr-only">{refreshLabel}</span>
-          </Button>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="mediaUrl">Media URL</Label>
-          <Input
-            id="mediaUrl"
-            placeholder="https://files.slidescockpit.com/..."
-            value={form.mediaUrl}
-            onChange={(event) => updateField("mediaUrl", event.target.value)}
-          />
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="mediaType">Media type</Label>
-            {lockedMediaType ? (
-              <Input
-                id="mediaType"
-                value={mediaTypeLabel}
-                readOnly
-                disabled
-                className="h-10"
-              />
-            ) : (
-              <select
-                id="mediaType"
-                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                value={form.mediaType}
-                onChange={(event) => {
-                  const nextType =
-                    event.target.value as TikTokPostPayload["mediaType"];
-                  setForm((prev) => ({
-                    ...prev,
-                    mediaType: nextType,
-                    postMode:
-                      nextType === "photo"
-                        ? "INBOX"
-                        : prev.postMode === "INBOX" ||
-                            prev.postMode === "MEDIA_UPLOAD"
-                          ? "PUBLISH"
-                          : prev.postMode,
-                    contentPostingMethod:
-                      nextType === "photo"
-                        ? "MEDIA_UPLOAD"
-                        : prev.contentPostingMethod === "MEDIA_UPLOAD"
-                          ? "UPLOAD"
-                          : prev.contentPostingMethod,
-                  }));
-                }}
-              >
-                <option value="video">Video</option>
-                <option value="photo">Photo (Carousel)</option>
-              </select>
-            )}
-          </div>
-          {form.mediaType === "video" && (
-            <div className="space-y-2">
-              <Label htmlFor="thumbnailTimestamp">
-                Thumbnail timestamp (ms)
-              </Label>
-              <Input
-                id="thumbnailTimestamp"
-                type="number"
-                value={form.thumbnailTimestampMs ?? ""}
-                onChange={(event) =>
-                  updateField(
-                    "thumbnailTimestampMs",
-                    event.target.value === ""
-                      ? undefined
-                      : Number(event.target.value),
-                  )
-                }
-              />
             </div>
-          )}
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="postMode">Post mode</Label>
-            <select
-              id="postMode"
-              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              value={form.postMode}
-              onChange={(event) =>
-                updateField(
-                  "postMode",
-                  event.target.value as TikTokPostPayload["postMode"],
-                )
-              }
-            >
-              <option value="INBOX">Inbox (Draft)</option>
-              <option value="PUBLISH">Direct Publish</option>
-              <option value="MEDIA_UPLOAD">TikTok Media Upload</option>
-              <option value="DIRECT_POST">TikTok Direct Post</option>
-            </select>
-            <p className="text-sm text-muted-foreground">
-              Inbox sends the post to TikTok drafts. Choose PUBLISH or DIRECT_POST
-              to publish immediately.
-            </p>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="contentPostingMethod">Posting method</Label>
-            <select
-              id="contentPostingMethod"
-              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              value={form.contentPostingMethod}
-              onChange={(event) =>
-                updateField(
-                  "contentPostingMethod",
-                  event.target
-                    .value as TikTokPostPayload["contentPostingMethod"],
-                )
-              }
-            >
-              <option value="UPLOAD">Upload (Videos)</option>
-              <option value="MEDIA_UPLOAD">Media Upload (Inbox/Drafts)</option>
-              <option value="DIRECT_POST">Direct Post</option>
-              <option value="URL">Pull from URL</option>
-            </select>
-            <p className="text-sm text-muted-foreground">
-              Choose a method that matches the selected post mode. MEDIA_UPLOAD
-              is required for Inbox drafts.
-            </p>
-          </div>
+        )}
+        <div className="space-y-2">
+          <Label htmlFor="title">Title</Label>
+          <Input
+            id="title"
+            placeholder="Optional title"
+            value={form.title}
+            onChange={(event) => updateField("title", event.target.value)}
+            className="bg-white"
+          />
         </div>
 
         <div className="space-y-2">
@@ -260,78 +169,27 @@ export function TikTokPostForm({
             placeholder="Write the TikTok caption…"
             value={form.caption}
             onChange={(event) => updateField("caption", event.target.value)}
-            rows={4}
+            rows={10}
+            className="bg-white"
           />
-        </div>
-
-        <div className="flex items-start gap-3 rounded-md border border-dashed border-border/70 p-3">
-          <Switch
-            id="auto-music"
-            checked={form.autoAddMusic}
-            onCheckedChange={(checked) =>
-              updateField("autoAddMusic", checked)
-            }
-          />
-          <div>
-            <Label htmlFor="auto-music" className="font-medium">
-              Add music automatically
-            </Label>
-            <p className="text-sm text-muted-foreground">
-              Enabled by default so TikTok can select background music.
-            </p>
-          </div>
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-
-        {result && (
-          <div className="space-y-2 rounded-md border border-muted p-3 text-sm">
-            <p>
-              <span className="font-semibold">Publish ID:</span>{" "}
-              {result.publishId}
-            </p>
-            {result.postId && (
-              <p>
-                <span className="font-semibold">Post ID:</span> {result.postId}
-              </p>
-            )}
-            {result.releaseUrl ? (
-              <p>
-                <span className="font-semibold">Release URL:</span>{" "}
-                <a
-                  href={result.releaseUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-primary underline"
-                >
-                  {result.releaseUrl}
-                </a>
-              </p>
-            ) : (
-              <p className="text-muted-foreground">
-                No release URL available — TikTok does not return a URL for
-                Inbox posts.
-              </p>
-            )}
-            <p>
-              <span className="font-semibold">Status:</span> {result.status}
-            </p>
-            {result.error && (
-              <p className="text-sm text-destructive">
-                <span className="font-semibold">Error:</span> {result.error}
-              </p>
-            )}
-          </div>
-        )}
       </CardContent>
+      {/*
       <CardFooter className="flex items-center gap-4">
         <Button
           onClick={() => void handleSubmit()}
-          disabled={submitting || accountsLoading || accounts.length === 0}
+          disabled={
+            submitting ||
+            accountsLoading ||
+            accounts.length === 0 ||
+            form.photoImages.length === 0
+          }
         >
           {submitting ? "Posting & polling…" : submitLabel}
         </Button>
-        {!disableRefreshButton && (
+        {showRefreshButton && (
           <Button
             variant="outline"
             onClick={() => void refreshAccounts()}
@@ -342,6 +200,22 @@ export function TikTokPostForm({
         )}
         {footer}
       </CardFooter>
+      */}
+      {showSubmitButton && (
+        <CardFooter className="mt-0 flex items-center gap-4">
+          <Button
+            onClick={() => void handleSubmit()}
+            disabled={
+              submitting ||
+              accountsLoading ||
+              accounts.length === 0 ||
+              form.photoImages.length === 0
+            }
+          >
+            {submitting ? "Posting & polling…" : submitLabel}
+          </Button>
+        </CardFooter>
+      )}
     </Card>
   );
 }
