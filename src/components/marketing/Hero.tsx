@@ -10,54 +10,147 @@ import {
   TrendingUpIcon,
   ZapIcon,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Section } from "./Section";
+
+const HERO_BACKGROUND_IMAGE =
+  "https://resizeapi.com/resize-cgi/image/format=auto,fit=cover,width=250,height=375,quality=50/https://r2-us-west.photoai.com/1725085001-91fd3e306fefd581da297aa8bf3dac3f-1.png";
+
+const HERO_POSTER_ROWS = 8;
+const HERO_POSTERS_PER_ROW = 28;
+const HERO_FETCH_LIMIT = 300;
+
+type HeroSlide = {
+  imageUrl?: string | null;
+};
+
+type HeroPost = {
+  slides?: HeroSlide[];
+};
 
 export function MarketingHero({ session }: { session: boolean }) {
   const [email, setEmail] = useState("");
+  const [posterImages, setPosterImages] = useState<string[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchSlides = async () => {
+      try {
+        const response = await fetch(
+          `/api/slideshow-library/posts?limit=${HERO_FETCH_LIMIT}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to load hero slides: ${response.status}`);
+        }
+
+        const data = (await response.json()) as unknown;
+        if (!Array.isArray(data)) return;
+
+        const collected = new Set<string>();
+
+        for (const post of data as HeroPost[]) {
+          if (!post?.slides?.length) continue;
+
+          for (const slide of post.slides) {
+            if (!slide?.imageUrl) continue;
+            collected.add(slide.imageUrl);
+          }
+        }
+
+        if (!collected.size) return;
+
+        const deduped = Array.from(collected);
+        for (let index = deduped.length - 1; index > 0; index--) {
+          const swapIndex = Math.floor(Math.random() * (index + 1));
+          const temp = deduped[index];
+          deduped[index] = deduped[swapIndex];
+          deduped[swapIndex] = temp;
+        }
+
+        setPosterImages(deduped);
+      } catch (error) {
+        if ((error as Error).name === "AbortError") {
+          return;
+        }
+        console.error("Error loading hero slide images", error);
+      }
+    };
+
+    void fetchSlides();
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
+  const posterMatrix = useMemo(() => {
+    const perRow = HERO_POSTERS_PER_ROW;
+
+    if (!posterImages.length) {
+      return [];
+    }
+
+    const rows: string[][] = [];
+
+    for (let index = 0; index < posterImages.length; index += perRow) {
+      rows.push(posterImages.slice(index, index + perRow));
+    }
+
+    if (rows.length >= HERO_POSTER_ROWS) {
+      return rows;
+    }
+
+    const required = HERO_POSTER_ROWS * perRow;
+    const padded = [...posterImages];
+
+    for (let index = posterImages.length; index < required; index++) {
+      padded.push(posterImages[index % posterImages.length]);
+    }
+
+    const paddedRows: string[][] = [];
+    for (let index = 0; index < padded.length; index += perRow) {
+      paddedRows.push(padded.slice(index, index + perRow));
+    }
+
+    return paddedRows;
+  }, [posterImages]);
 
   return (
-    <Section className="relative min-h-[92vh] overflow-hidden bg-slate-950">
-      {/* Background decorations */}
-      <div
-        className="absolute inset-0 opacity-30 bg-repeat"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg%20width='80'%20height='80'%20viewBox='0%200%2080%2080'%20xmlns='http://www.w3.org/2000/svg'%3E%3Cg%20fill='%23304674'%20fill-opacity='0.05'%3E%3Cpath%20d='M40%200h40v40H40z'/%3E%3Cpath%20d='M0%2040h40v40H0z'/%3E%3C/g%3E%3C/svg%3E")`,
-        }}
-      />
-
-      {/* Accent glow */}
-      <div
-        className="absolute inset-0 opacity-40"
-        style={{
-          background:
-            "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(48, 70, 116, 0.25) 0%, rgba(48, 70, 116, 0.12) 30%, transparent 70%)",
-        }}
-      />
-
-      {/* Grid */}
-      <svg
-        className="absolute inset-0 h-full w-full opacity-30"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          <pattern
-            id="grid"
-            width="80"
-            height="80"
-            patternUnits="userSpaceOnUse"
-          >
-            <path
-              d="M 80 0 L 0 0 0 80"
-              fill="none"
-              stroke="rgba(48,70,116,0.15)"
-              strokeWidth="1"
-            />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#grid)" />
-      </svg>
+    <Section className="relative min-h-[92vh] overflow-hidden bg-[#111]">
+      <div className="netflix-container" aria-hidden="true">
+        <div className="netflix-gradient" />
+        <div className="netflix-container-perspective">
+          <div className="netflix-container-background">
+            {posterMatrix.map((row, rowIndex) => (
+              <div key={`hero-row-${rowIndex}`} className="netflix-box">
+                {row.map((imageUrl, itemIndex) => (
+                  <div
+                    key={`hero-row-${rowIndex}-item-${itemIndex}`}
+                    className="netflix-thumbnail relative overflow-hidden"
+                  >
+                    <Image
+                      src={imageUrl}
+                      alt=""
+                      fill
+                      sizes="125px"
+                      style={{ objectFit: "cover", objectPosition: "center" }}
+                      priority={rowIndex < 2}
+                    />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       <div className="relative z-10 flex min-h-[92vh] flex-col justify-center px-5 sm:px-6 lg:pt-20 pt-20 pb-10">
         <div className="mx-auto max-w-5xl text-center">
@@ -225,6 +318,99 @@ export function MarketingHero({ session }: { session: boolean }) {
           </motion.div>
         </div>
       </div>
+      <style jsx global>{`
+        .netflix-container {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          margin-bottom: 56px;
+          background-color: #111;
+          z-index: 1;
+          pointer-events: none;
+        }
+
+        .netflix-gradient {
+          position: absolute;
+          inset: 0;
+          z-index: 2;
+          background: linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.8) 15%,
+            rgba(0, 0, 0, 0.8) 50%,
+            rgba(0, 0, 0, 0.95) 70%,
+            rgba(0, 0, 0, 0.6) 95%,
+            rgba(0, 0, 0, 1) 100%
+          );
+          opacity: 0.65;
+        }
+
+        .netflix-container-perspective {
+          perspective: 500px;
+          height: 100%;
+          position: relative;
+        }
+
+        .netflix-container-background {
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-start;
+          transform: rotateX(365deg) rotateY(352deg) rotateZ(10deg)
+            translateX(1300px);
+          transform-style: preserve-3d;
+          animation: netflix_move 180s linear infinite alternate;
+          will-change: transform;
+        }
+
+        .netflix-box {
+          margin: 0px 0;
+          display: flex;
+          justify-content: flex-end;
+          width: 100%;
+          flex-wrap: nowrap;
+          flex-grow: 1;
+          transform: translateX(100px) translateY(-120px);
+        }
+
+        .netflix-thumbnail {
+          transform-style: preserve-3d;
+          transform: rotateX(20deg) rotateY(0deg) skewX(335deg);
+          min-width: 125px;
+          min-height: 187px;
+          display: inline-block;
+          background-position: center;
+          background-size: cover;
+          margin: 7px;
+          border-radius: 12px;
+          box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
+          opacity: 0.9;
+        }
+
+        .netflix-cover {
+          transform-style: preserve-3d;
+          transform: rotateX(20deg) rotateY(0deg) skewX(335deg);
+          min-width: 120px;
+          min-height: 150px;
+          display: inline-block;
+          background-position: center;
+          background-size: cover;
+          margin: 0 0.2rem;
+        }
+
+        @keyframes netflix_move {
+          from {
+            transform: rotateX(365deg) rotateY(352deg) rotateZ(10deg)
+              translateX(1300px);
+          }
+          to {
+            transform: rotateX(365deg) rotateY(352deg) rotateZ(10deg)
+              translateX(-190px);
+          }
+        }
+      `}</style>
     </Section>
   );
 }

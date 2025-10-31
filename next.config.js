@@ -24,6 +24,18 @@ const config = {
         protocol: "https",
         hostname: "placehold.co",
       },
+      {
+        protocol: "https",
+        hostname: "resizeapi.com",
+      },
+      {
+        protocol: "https",
+        hostname: "files.slidescockpit.com",
+      },
+      {
+        protocol: "https",
+        hostname: "r2-us-west.photoai.com",
+      },
     ],
   },
 };
