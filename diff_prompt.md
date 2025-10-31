@@ -3,71 +3,58 @@ Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst
 **_ Begin Patch
 _** Update File: src/components/presentation/dashboard/ImageCollectionSelector.tsx
 @@
-const { communitySets, mySets } = useMemo(() => {
 
-- // If drilling down, show only children of selected parent
-- if (drillDownParent) {
--      const children =
--        (drillDownParent.children && drillDownParent.children.length > 0
--          ? drillDownParent.children
--          : imageSets.filter((set) => set.parentId === drillDownParent.id)) ??
--        [];
--      const community: ImageSet[] = [];
--      const mine: ImageSet[] = [];
--      for (const c of children) {
--        if (belongsToUser(c)) {
--          mine.push(c);
--        } else if (
--          // persönliche Sets niemals in Community anzeigen
--          !looksPersonal(c)
--        ) {
--          community.push(c);
--        }
--      }
--      return { communitySets: community, mySets: mine };
-- }
--
-- const topLevel = drillDownParent
--      ? imageSets.filter((s) => s.parentId === drillDownParent.id)
--      : imageSets.filter((s) => !s.parentId);
-- const mine = topLevel.filter(belongsToUser);
-- // Community blendet ALLE privat markierten Sets aus
-- const community = topLevel.filter((s) => !allOwned.has(s.id));
-- return { communitySets: community, mySets: mine };
-- }, [belongsToUser, drillDownParent, imageSets, allOwned, looksPersonal]);
+<div className="overflow-hidden">
+<div className="grid grid-cols-5 gap-0">
+{getPreviewImages(selectedImageSet).map(
+(image, index, arr) => (
+<div
+key={image.id ?? `${selectedImageSet.id}-${index}`}
+className={cn(
+"relative h-24 md:h-32 lg:h-40 overflow-hidden",
+index === 0 && "rounded-l-lg",
+index === arr.length - 1 && "rounded-r-lg",
+)} >
 
-* // DRILLDOWN: nur Kinder des gewählten Parents
-* if (drillDownParent) {
-*      const parentId = drillDownParent?.id ?? null;
-*      const children: ImageSet[] =
-*        (Array.isArray(drillDownParent.children) && drillDownParent.children.length > 0)
-*          ? drillDownParent.children
-*          : parentId
-*            ? imageSets.filter((set) => set.parentId === parentId)
-*            : [];
-*
-*      const mine = children.filter(belongsToUser);
-*      const community = children.filter(
-*        (s) =>
-*          // absolut keine User-Collections (von irgendwem)
-*          !allOwned.has(s.id) &&
-*          // keine Personal/Private Tags
-*          !looksPersonal(s) &&
-*          // AI Avatars niemals in Community
-*          !isAiAvatarCollection(s),
-*      );
-*      return { communitySets: community, mySets: mine };
-* }
-*
-* // TOP-LEVEL: nur Wurzeln
-* const topLevel = imageSets.filter((s) => !s.parentId);
-* const mine = topLevel.filter(belongsToUser);
-* const community = topLevel.filter(
-*      (s) =>
-*        !allOwned.has(s.id) &&
-*        !looksPersonal(s) &&
-*        !isAiAvatarCollection(s),
-* );
-* return { communitySets: community, mySets: mine };
-* }, [belongsToUser, drillDownParent, imageSets, allOwned, looksPersonal, isAiAvatarCollection]);
+-                          <img
+
+*                          <img
+                             src={image.url}
+                             alt={`${selectedImageSet.name} preview ${index + 1}`}
+
+-                            className="max-h-full max-w-full object-contain bg-black/5"
+
+*                            className="block h-full w-full object-cover"
+                               loading="lazy"
+                             />
+                           </div>
+                         ),
+                       )}
+                     </div>
+                   </div>
+  \*\*\* End Patch
+  Und zusätzlich noch die andere Preview-Stelle im gleichen File (Liste der Sets), die ebenfalls noch object-contain nutzt — ebenfalls minimal auf object-cover + block, damit es überall konsistent aussieht:
+  codebase
+
+diff
+Code kopieren
+**_ Begin Patch
+_** Update File: src/components/presentation/dashboard/ImageCollectionSelector.tsx
+@@ >
+
+-                          <img
+
+*                          <img
+                             src={image.url}
+                             alt={`${set.name} preview ${index + 1}`}
+
+-                            className="max-h-full max-w-full object-contain bg-black/5 transition-opacity group-hover:opacity-80"
+
+*                            className="block h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                               loading="lazy"
+                             />
+                           </div>
+                         ))}
+                       </div>
+                     </div>
   \*\*\* End Patch

@@ -321,7 +321,7 @@ export default function ImageCollectionsPage() {
                             <img
                               src={image.url}
                               alt={`${set.name} preview ${index + 1}`}
-                              className="h-full w-full object-contain transition-opacity group-hover:opacity-80"
+                              className="block h-full w-full object-cover transition-opacity group-hover:opacity-80"
                               loading="lazy"
                             />
                           </div>

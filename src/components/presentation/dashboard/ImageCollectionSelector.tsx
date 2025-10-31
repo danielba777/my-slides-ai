@@ -346,7 +346,7 @@ export const ImageCollectionSelector: React.FC = () => {
                           <img
                             src={image.url}
                             alt={`All images preview ${index + 1}`}
-                            className="max-h-full max-w-full object-contain bg-black/5 transition-opacity group-hover:opacity-80"
+                            className="block h-full w-full object-cover transition-opacity group-hover:opacity-80"
                             loading="lazy"
                           />
                         </div>
@@ -396,7 +396,7 @@ export const ImageCollectionSelector: React.FC = () => {
                           <img
                             src={image.url}
                             alt={`${set.name} preview ${index + 1}`}
-                            className="max-h-full max-w-full object-contain bg-black/5 transition-opacity group-hover:opacity-80"
+                            className="block h-full w-full object-cover transition-opacity group-hover:opacity-80"
                             loading="lazy"
                           />
                         </div>
@@ -446,7 +446,7 @@ export const ImageCollectionSelector: React.FC = () => {
                           <img
                             src={image.url}
                             alt={`${selectedImageSet.name} preview ${index + 1}`}
-                            className="max-h-full max-w-full object-contain bg-black/5"
+                            className="block h-full w-full object-cover"
                             loading="lazy"
                           />
                         </div>
