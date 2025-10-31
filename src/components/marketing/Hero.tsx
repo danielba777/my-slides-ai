@@ -15,9 +15,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Section } from "./Section";
 
-const HERO_BACKGROUND_IMAGE =
-  "https://resizeapi.com/resize-cgi/image/format=auto,fit=cover,width=250,height=375,quality=50/https://r2-us-west.photoai.com/1725085001-91fd3e306fefd581da297aa8bf3dac3f-1.png";
-
 const HERO_POSTER_ROWS = 8;
 const HERO_POSTERS_PER_ROW = 28;
 const HERO_FETCH_LIMIT = 300;
@@ -98,57 +95,21 @@ export function MarketingHero({ session }: { session: boolean }) {
   const posterMatrix = useMemo(() => {
     const perRow = HERO_POSTERS_PER_ROW;
     const totalRows = HERO_POSTER_ROWS;
-    const fallbackRow = Array.from(
-      { length: perRow },
-      () => HERO_BACKGROUND_IMAGE,
-    );
 
-    const createFallbackRows = () =>
-      Array.from({ length: totalRows }, (_, rowIndex) => {
-        const row = [...fallbackRow];
-        if (rowIndex % 2 === 1) {
-          row.reverse();
-        }
-        return row;
-      });
+    // Until we have real images, render nothing (no placeholders).
+    if (!posterImages.length) return [];
 
-    if (!posterImages.length) {
-      return createFallbackRows();
-    }
-
-    const maxUnique = perRow * Math.ceil(totalRows / 2);
-    let pool = posterImages.slice(0, maxUnique);
-
-    if (!pool.length) {
-      return createFallbackRows();
-    }
-
-    if (pool.length < perRow) {
-      const paddedPool = [...pool];
-      for (let index = pool.length; index < perRow; index++) {
-        const fallbackImage =
-          pool[index % pool.length] ?? HERO_BACKGROUND_IMAGE;
-        paddedPool.push(fallbackImage);
-      }
-      pool = paddedPool;
-    }
-
+    // Create rows with guaranteed even distribution
     const rows: string[][] = [];
     for (let rowIndex = 0; rowIndex < totalRows; rowIndex++) {
-      const baseRowIndex = Math.floor(rowIndex / 2);
-      const rowImages: string[] = [];
-
-      for (let columnIndex = 0; columnIndex < perRow; columnIndex++) {
-        const sourceIndex = (baseRowIndex * perRow + columnIndex) % pool.length;
-        const image = pool[sourceIndex] ?? HERO_BACKGROUND_IMAGE;
-        rowImages.push(image);
+      const row: string[] = [];
+      for (let colIndex = 0; colIndex < perRow; colIndex++) {
+        // Cycle through available images to ensure every position is filled
+        const imageIndex = (rowIndex * perRow + colIndex) % posterImages.length;
+        row.push(posterImages[imageIndex]!);
       }
-
-      if (rowIndex % 2 === 1) {
-        rowImages.reverse();
-      }
-
-      rows.push(rowImages);
+      // Add row without reversing to ensure all images are visible
+      rows.push(row);
     }
 
     return rows;
@@ -156,35 +117,34 @@ export function MarketingHero({ session }: { session: boolean }) {
 
   return (
     <Section className="relative min-h-[92vh] overflow-hidden bg-[#111]">
-      <div className="netflix-container" aria-hidden="true">
-        <div className="netflix-gradient" />
-        <div className="netflix-container-perspective">
-          <div className="netflix-container-background">
-            {posterMatrix.map((row, rowIndex) => (
-              <div
-                key={`hero-row-${rowIndex}`}
-                className={`netflix-box${rowIndex % 2 === 1 ? " netflix-box--reverse" : ""}`}
-              >
-                {row.map((imageUrl, itemIndex) => (
-                  <div
-                    key={`hero-row-${rowIndex}-item-${itemIndex}`}
-                    className="netflix-thumbnail relative overflow-hidden"
-                  >
-                    <Image
-                      src={imageUrl}
-                      alt=""
-                      fill
-                      sizes="125px"
-                      style={{ objectFit: "cover", objectPosition: "center" }}
-                      priority={rowIndex < 2}
-                    />
-                  </div>
-                ))}
-              </div>
-            ))}
+      {posterMatrix.length > 0 && (
+        <div className="netflix-container" aria-hidden="true">
+          <div className="netflix-gradient" />
+          <div className="netflix-container-perspective">
+            <div className="netflix-container-background">
+              {posterMatrix.map((row, rowIndex) => (
+                <div key={`hero-row-${rowIndex}`} className="netflix-box">
+                  {row.map((imageUrl, itemIndex) => (
+                    <div
+                      key={`hero-row-${rowIndex}-item-${itemIndex}`}
+                      className="netflix-thumbnail relative overflow-hidden"
+                    >
+                      <Image
+                        src={imageUrl}
+                        alt=""
+                        fill
+                        sizes="125px"
+                        style={{ objectFit: "cover", objectPosition: "center" }}
+                        priority={rowIndex < 2}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="relative z-10 flex min-h-[92vh] flex-col justify-center px-5 sm:px-6 lg:pt-20 pt-20 pb-10">
         <div className="mx-auto max-w-5xl text-center">
@@ -197,7 +157,7 @@ export function MarketingHero({ session }: { session: boolean }) {
           >
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
-              <span>250M+ views generated with SlidesCockpit</span>
+              <span>10M+ views generated with SlidesCockpit</span>
             </div>
             <div className="hidden sm:block h-4 w-px bg-indigo-300/30"></div>
             <div className="flex items-center gap-1">
