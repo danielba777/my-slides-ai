@@ -10,18 +10,118 @@ import {
   TrendingUpIcon,
   ZapIcon,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Section } from "./Section";
 
 const HERO_BACKGROUND_IMAGE =
   "https://resizeapi.com/resize-cgi/image/format=auto,fit=cover,width=250,height=375,quality=50/https://r2-us-west.photoai.com/1725085001-91fd3e306fefd581da297aa8bf3dac3f-1.png";
 
-const HERO_POSTER_ROWS = 12;
+const HERO_POSTER_ROWS = 8;
 const HERO_POSTERS_PER_ROW = 28;
+const HERO_FETCH_LIMIT = 300;
+
+type HeroSlide = {
+  imageUrl?: string | null;
+};
+
+type HeroPost = {
+  slides?: HeroSlide[];
+};
 
 export function MarketingHero({ session }: { session: boolean }) {
   const [email, setEmail] = useState("");
+  const [posterImages, setPosterImages] = useState<string[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchSlides = async () => {
+      try {
+        const response = await fetch(
+          `/api/slideshow-library/posts?limit=${HERO_FETCH_LIMIT}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to load hero slides: ${response.status}`);
+        }
+
+        const data = (await response.json()) as unknown;
+        if (!Array.isArray(data)) return;
+
+        const collected = new Set<string>();
+
+        for (const post of data as HeroPost[]) {
+          if (!post?.slides?.length) continue;
+
+          for (const slide of post.slides) {
+            if (!slide?.imageUrl) continue;
+            collected.add(slide.imageUrl);
+          }
+        }
+
+        if (!collected.size) return;
+
+        const deduped = Array.from(collected);
+        for (let index = deduped.length - 1; index > 0; index--) {
+          const swapIndex = Math.floor(Math.random() * (index + 1));
+          const temp = deduped[index];
+          deduped[index] = deduped[swapIndex];
+          deduped[swapIndex] = temp;
+        }
+
+        setPosterImages(deduped);
+      } catch (error) {
+        if ((error as Error).name === "AbortError") {
+          return;
+        }
+        console.error("Error loading hero slide images", error);
+      }
+    };
+
+    void fetchSlides();
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
+  const posterMatrix = useMemo(() => {
+    const perRow = HERO_POSTERS_PER_ROW;
+
+    if (!posterImages.length) {
+      return [];
+    }
+
+    const rows: string[][] = [];
+
+    for (let index = 0; index < posterImages.length; index += perRow) {
+      rows.push(posterImages.slice(index, index + perRow));
+    }
+
+    if (rows.length >= HERO_POSTER_ROWS) {
+      return rows;
+    }
+
+    const required = HERO_POSTER_ROWS * perRow;
+    const padded = [...posterImages];
+
+    for (let index = posterImages.length; index < required; index++) {
+      padded.push(posterImages[index % posterImages.length]);
+    }
+
+    const paddedRows: string[][] = [];
+    for (let index = 0; index < padded.length; index += perRow) {
+      paddedRows.push(padded.slice(index, index + perRow));
+    }
+
+    return paddedRows;
+  }, [posterImages]);
 
   return (
     <Section className="relative min-h-[92vh] overflow-hidden bg-[#111]">
@@ -29,19 +129,23 @@ export function MarketingHero({ session }: { session: boolean }) {
         <div className="netflix-gradient" />
         <div className="netflix-container-perspective">
           <div className="netflix-container-background">
-            {Array.from({ length: HERO_POSTER_ROWS }).map((_, rowIndex) => (
+            {posterMatrix.map((row, rowIndex) => (
               <div key={`hero-row-${rowIndex}`} className="netflix-box">
-                {Array.from({ length: HERO_POSTERS_PER_ROW }).map(
-                  (_, itemIndex) => (
-                    <div
-                      key={`hero-row-${rowIndex}-item-${itemIndex}`}
-                      className="netflix-thumbnail"
-                      style={{
-                        backgroundImage: `url(${HERO_BACKGROUND_IMAGE})`,
-                      }}
+                {row.map((imageUrl, itemIndex) => (
+                  <div
+                    key={`hero-row-${rowIndex}-item-${itemIndex}`}
+                    className="netflix-thumbnail relative overflow-hidden"
+                  >
+                    <Image
+                      src={imageUrl}
+                      alt=""
+                      fill
+                      sizes="125px"
+                      style={{ objectFit: "cover", objectPosition: "center" }}
+                      priority={rowIndex < 2}
                     />
-                  ),
-                )}
+                  </div>
+                ))}
               </div>
             ))}
           </div>
