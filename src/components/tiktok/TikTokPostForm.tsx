@@ -2,6 +2,7 @@
 
 import { useEffect, type ComponentProps } from "react";
 
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -12,7 +13,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import { type UseTikTokPostActionResult } from "@/hooks/use-tiktok-post-action";
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
@@ -23,8 +23,9 @@ interface TikTokPostFormProps {
   cardTitle?: string;
   submitLabel?: string;
   refreshLabel?: string;
-  disableRefreshButton?: boolean;
+  showRefreshButton?: boolean;
   footer?: ComponentProps<typeof CardFooter>["children"];
+  showSubmitButton?: boolean;
 }
 
 export function TikTokPostForm({
@@ -33,8 +34,9 @@ export function TikTokPostForm({
   cardTitle = "Configure post",
   submitLabel = "Trigger TikTok post",
   refreshLabel = "Refresh accounts",
-  disableRefreshButton = false,
+  showRefreshButton = true,
   footer,
+  showSubmitButton = true,
 }: TikTokPostFormProps) {
   const {
     form,
@@ -95,20 +97,20 @@ export function TikTokPostForm({
               })}
             </select>
           </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={
-            disableRefreshButton || accountsLoading || accounts.length === 0
-          }
-          className="self-end"
-          onClick={() => void refreshAccounts()}
-          title={refreshLabel}
-        >
-          <RefreshCw className="h-4 w-4" aria-hidden />
-          <span className="sr-only">{refreshLabel}</span>
-        </Button>
-      </div>
+          {showRefreshButton && (
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={accountsLoading || accounts.length === 0}
+              className="self-end"
+              onClick={() => void refreshAccounts()}
+              title={refreshLabel}
+            >
+              <RefreshCw className="h-4 w-4" aria-hidden />
+              <span className="sr-only">{refreshLabel}</span>
+            </Button>
+          )}
+        </div>
         <div className="space-y-2">
           <Label htmlFor="title">Title</Label>
           <Input
@@ -128,56 +130,6 @@ export function TikTokPostForm({
             onChange={(event) => updateField("caption", event.target.value)}
             rows={4}
           />
-        </div>
-
-        <div className="space-y-3">
-          <Label>Slides to post</Label>
-          <p className="text-xs text-muted-foreground">
-            TikTok uses the first image as the cover. Select a slide to move it to the front.
-          </p>
-          {form.photoImages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No slide images were prepared for this presentation.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {form.photoImages.map((url, index) => (
-                <div
-                  key={`${url}-${index}`}
-                  className="flex items-center gap-3 rounded-md border border-border/70 p-3"
-                >
-                  <input
-                    type="radio"
-                    name="coverIndex"
-                    className="h-4 w-4"
-                    checked={form.coverIndex === index}
-                    onChange={() => updateField("coverIndex", index)}
-                    aria-label={`Set slide ${index + 1} as cover`}
-                  />
-                  <div className="flex items-center gap-3">
-                    <div className="h-28 w-20 overflow-hidden rounded-md border bg-muted">
-                      <img
-                        src={url}
-                        alt={`Slide ${index + 1}`}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-sm font-medium">Slide {index + 1}</span>
-                      <code className="text-xs break-all text-muted-foreground">
-                        {url}
-                      </code>
-                      {form.coverIndex === index && (
-                        <span className="text-xs text-primary font-semibold">
-                          Selected cover
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -222,6 +174,7 @@ export function TikTokPostForm({
           </div>
         )}
       </CardContent>
+      {/*
       <CardFooter className="flex items-center gap-4">
         <Button
           onClick={() => void handleSubmit()}
@@ -234,7 +187,7 @@ export function TikTokPostForm({
         >
           {submitting ? "Posting & polling…" : submitLabel}
         </Button>
-        {!disableRefreshButton && (
+        {showRefreshButton && (
           <Button
             variant="outline"
             onClick={() => void refreshAccounts()}
@@ -245,6 +198,22 @@ export function TikTokPostForm({
         )}
         {footer}
       </CardFooter>
+      */}
+      {showSubmitButton && (
+        <CardFooter className="mt-0 flex items-center gap-4">
+          <Button
+            onClick={() => void handleSubmit()}
+            disabled={
+              submitting ||
+              accountsLoading ||
+              accounts.length === 0 ||
+              form.photoImages.length === 0
+            }
+          >
+            {submitting ? "Posting & polling…" : submitLabel}
+          </Button>
+        </CardFooter>
+      )}
     </Card>
   );
 }

@@ -23,6 +23,9 @@ interface TikTokScheduleFormProps {
   cardTitle?: string;
   submitLabel?: string;
   refreshLabel?: string;
+  showRefreshButton?: boolean;
+  showSubmitButton?: boolean;
+  showPublishControls?: boolean;
 }
 
 export function TikTokScheduleForm({
@@ -31,6 +34,9 @@ export function TikTokScheduleForm({
   cardTitle = "Schedule post",
   submitLabel = "Schedule TikTok post",
   refreshLabel = "Refresh accounts",
+  showRefreshButton = true,
+  showSubmitButton = true,
+  showPublishControls = true,
 }: TikTokScheduleFormProps) {
   const {
     form,
@@ -92,18 +98,20 @@ export function TikTokScheduleForm({
               })}
             </select>
           </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={accountsLoading || accounts.length === 0}
-          className="self-end"
-          onClick={() => void refreshAccounts()}
-          title={refreshLabel}
-        >
-          <RefreshCw className="h-4 w-4" aria-hidden />
-          <span className="sr-only">{refreshLabel}</span>
-        </Button>
-      </div>
+          {showRefreshButton && (
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={accountsLoading || accounts.length === 0}
+              className="self-end"
+              onClick={() => void refreshAccounts()}
+              title={refreshLabel}
+            >
+              <RefreshCw className="h-4 w-4" aria-hidden />
+              <span className="sr-only">{refreshLabel}</span>
+            </Button>
+          )}
+        </div>
         <div className="space-y-2">
           <Label htmlFor="schedule-title">Title</Label>
           <Input
@@ -115,18 +123,20 @@ export function TikTokScheduleForm({
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="schedule-publishAt">Publish time (UTC)</Label>
-            <Input
-              id="schedule-publishAt"
-              type="datetime-local"
-              value={form.publishAt}
-              onChange={(event) => updateField("publishAt", event.target.value)}
-            />
-            <p className="text-sm text-muted-foreground">
-              Values are sent to the API as UTC timestamps.
-            </p>
-          </div>
+          {showPublishControls && (
+            <div className="space-y-2">
+              <Label htmlFor="schedule-publishAt">Publish time (UTC)</Label>
+              <Input
+                id="schedule-publishAt"
+                type="datetime-local"
+                value={form.publishAt}
+                onChange={(event) => updateField("publishAt", event.target.value)}
+              />
+              <p className="text-sm text-muted-foreground">
+                Values are sent to the API as UTC timestamps.
+              </p>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="schedule-idempotencyKey">Idempotency key</Label>
             <div className="flex gap-2">
@@ -149,56 +159,6 @@ export function TikTokScheduleForm({
               Reusing keys prevents duplicate jobs in the queue.
             </p>
           </div>
-        </div>
-
-        <div className="space-y-3">
-          <Label>Slides to post</Label>
-          <p className="text-xs text-muted-foreground">
-            TikTok uses the first image as the cover. Select a slide to move it to the front.
-          </p>
-          {form.photoImages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No slide images were prepared for this presentation.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {form.photoImages.map((url, index) => (
-                <div
-                  key={`${url}-${index}`}
-                  className="flex items-center gap-3 rounded-md border border-border/70 p-3"
-                >
-                  <input
-                    type="radio"
-                    name="schedule-coverIndex"
-                    className="h-4 w-4"
-                    checked={form.coverIndex === index}
-                    onChange={() => updateField("coverIndex", index)}
-                    aria-label={`Set slide ${index + 1} as cover`}
-                  />
-                  <div className="flex items-center gap-3">
-                    <div className="h-28 w-20 overflow-hidden rounded-md border bg-muted">
-                      <img
-                        src={url}
-                        alt={`Slide ${index + 1}`}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-sm font-medium">Slide {index + 1}</span>
-                      <code className="text-xs break-all text-muted-foreground">
-                        {url}
-                      </code>
-                      {form.coverIndex === index && (
-                        <span className="text-xs text-primary font-semibold">
-                          Selected cover
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         <div className="space-y-2">
@@ -229,26 +189,32 @@ export function TikTokScheduleForm({
           </div>
         )}
       </CardContent>
-      <CardFooter className="flex items-center gap-4">
-        <Button
-          onClick={() => void handleSubmit()}
-          disabled={
-            submitting ||
-            accountsLoading ||
-            accounts.length === 0 ||
-            form.photoImages.length === 0
-          }
-        >
-          {submitting ? "Scheduling…" : submitLabel}
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => void refreshAccounts()}
-          disabled={accountsLoading}
-        >
-          {refreshLabel}
-        </Button>
-      </CardFooter>
+      {showRefreshButton && (
+        <CardFooter className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            onClick={() => void refreshAccounts()}
+            disabled={accountsLoading}
+          >
+            {refreshLabel}
+          </Button>
+        </CardFooter>
+      )}
+      {showSubmitButton && (
+        <CardFooter className="mt-0 flex items-center gap-4">
+          <Button
+            onClick={() => void handleSubmit()}
+            disabled={
+              submitting ||
+              accountsLoading ||
+              accounts.length === 0 ||
+              form.photoImages.length === 0
+            }
+          >
+            {submitting ? "Scheduling…" : submitLabel}
+          </Button>
+        </CardFooter>
+      )}
     </Card>
   );
 }
