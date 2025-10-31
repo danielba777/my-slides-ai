@@ -64,7 +64,7 @@ export interface UseTikTokPostActionResult {
   result: TikTokPostResult | null;
   error: string | null;
   setError: Dispatch<SetStateAction<string | null>>;
-  handleSubmit: () => Promise<void>;
+  handleSubmit: () => Promise<TikTokPostResult | null>;
   reset: (values?: Partial<TikTokPostPayload>) => void;
   accounts: ReturnType<typeof useTikTokAccounts>["accounts"];
   accountsLoading: boolean;
@@ -178,15 +178,15 @@ export function useTikTokPostAction(
     [],
   );
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (): Promise<TikTokPostResult | null> => {
     if (!form.openId) {
       toast.error("Please select a connected TikTok account");
-      return;
+      return null;
     }
 
     if (!Array.isArray(form.photoImages) || form.photoImages.length === 0) {
       toast.error("No slide images available for posting");
-      return;
+      return null;
     }
 
     const coverIndex = Math.max(
@@ -197,7 +197,9 @@ export function useTikTokPostAction(
     const orderedImages = [...form.photoImages];
     if (coverIndex > 0 && coverIndex < orderedImages.length) {
       const [cover] = orderedImages.splice(coverIndex, 1);
-      orderedImages.unshift(cover);
+      if (cover) {
+        orderedImages.unshift(cover);
+      }
     }
 
     const normalizedTitle = form.title?.trim() ?? "";
@@ -249,7 +251,7 @@ export function useTikTokPostAction(
         });
         setError(message);
         toast.error(message);
-        return;
+        throw new Error(message);
       }
 
       if ("accepted" in payload && payload.accepted) {
@@ -263,6 +265,7 @@ export function useTikTokPostAction(
             status: finalStatus.status,
             postId: finalStatus.postId ?? payload.publishId,
             releaseUrl: finalStatus.releaseUrl,
+            error: finalStatus.error,
           };
           setResult(nextResult);
 
@@ -277,26 +280,34 @@ export function useTikTokPostAction(
             );
             console.error("[TikTokPost] Final status failure", finalStatus);
           }
+          return nextResult;
         } catch (pollError) {
           const message =
             pollError instanceof Error
               ? pollError.message
               : "Could not fetch TikTok status";
+          console.error("[TikTokPost] Unexpected error", pollError, {
+            requestBody,
+          });
           setError(message);
           toast.error(message);
+          throw pollError instanceof Error ? pollError : new Error(message);
         }
-        return;
+        return null;
       }
 
-      setResult({
+      const nextResult = {
         publishId: payload.publishId ?? "",
         status: payload.status,
-      });
+      };
+      setResult(nextResult);
+      return nextResult;
     } catch (err) {
       console.error("[TikTokPost] Unexpected error", err, { requestBody });
       const message = err instanceof Error ? err.message : "Unknown error";
       setError(message);
       toast.error(message);
+      throw err instanceof Error ? err : new Error(message);
     } finally {
       setSubmitting(false);
     }

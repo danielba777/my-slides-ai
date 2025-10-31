@@ -47,7 +47,6 @@ export function TikTokScheduleForm({
     setForm,
     updateField,
     submitting,
-    result,
     error,
     handleSubmit,
     accounts,
@@ -218,21 +217,6 @@ export function TikTokScheduleForm({
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-
-        {result && (
-          <div className="space-y-2 rounded-md border border-muted p-3 text-sm">
-            <p>
-              <span className="font-semibold">Scheduled:</span>{" "}
-              {result.scheduled ? "Yes" : "No"}
-            </p>
-            <p>
-              <span className="font-semibold">Run at:</span> {result.runAt}
-            </p>
-            <p>
-              <span className="font-semibold">Job key:</span> {result.jobKey}
-            </p>
-          </div>
-        )}
       </CardContent>
       {showRefreshButton && (
         <CardFooter className="flex items-center gap-4">

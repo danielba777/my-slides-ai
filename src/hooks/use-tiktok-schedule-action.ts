@@ -43,7 +43,7 @@ export interface UseTikTokScheduleActionResult {
   result: TikTokScheduleResult | null;
   error: string | null;
   setError: Dispatch<SetStateAction<string | null>>;
-  handleSubmit: () => Promise<void>;
+  handleSubmit: () => Promise<TikTokScheduleResult | null>;
   reset: (values?: Partial<TikTokSchedulePayload>) => void;
   accounts: ReturnType<typeof useTikTokAccounts>["accounts"];
   accountsLoading: boolean;
@@ -151,31 +151,31 @@ export function useTikTokScheduleAction(
     updateField("idempotencyKey", `schedule_${Date.now()}`);
   }, [updateField]);
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (): Promise<TikTokScheduleResult | null> => {
     if (!form.openId) {
       toast.error("Please select a connected TikTok account");
-      return;
+      return null;
     }
 
     if (!Array.isArray(form.photoImages) || form.photoImages.length === 0) {
       toast.error("No slide images available for posting");
-      return;
+      return null;
     }
 
     if (!form.publishAt) {
       toast.error("Please pick a publish date");
-      return;
+      return null;
     }
 
     if (!form.idempotencyKey.trim()) {
       toast.error("Please provide an idempotency key");
-      return;
+      return null;
     }
 
     const publishDate = new Date(form.publishAt);
     if (Number.isNaN(publishDate.getTime())) {
       toast.error("Invalid date");
-      return;
+      return null;
     }
 
     setSubmitting(true);
@@ -190,7 +190,9 @@ export function useTikTokScheduleAction(
     const orderedImages = [...form.photoImages];
     if (coverIndex > 0 && coverIndex < orderedImages.length) {
       const [cover] = orderedImages.splice(coverIndex, 1);
-      orderedImages.unshift(cover);
+      if (cover) {
+        orderedImages.unshift(cover);
+      }
     }
 
     const normalizedTitle = form.title?.trim() ?? "";
@@ -243,16 +245,18 @@ export function useTikTokScheduleAction(
         });
         setError(message);
         toast.error(message);
-        return;
+        throw new Error(message);
       }
 
       setResult(data);
       toast.success("TikTok post was scheduled successfully");
+      return data;
     } catch (err) {
       console.error("[TikTokSchedule] Unexpected error", err, { payload });
       const message = err instanceof Error ? err.message : "Unknown error";
       setError(message);
       toast.error(message);
+      throw err instanceof Error ? err : new Error(message);
     } finally {
       setSubmitting(false);
     }

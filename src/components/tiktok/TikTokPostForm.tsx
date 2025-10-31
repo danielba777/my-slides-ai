@@ -41,7 +41,6 @@ export function TikTokPostForm({
     setForm,
     updateField,
     submitting,
-    result,
     error,
     handleSubmit,
     accounts,
@@ -176,46 +175,6 @@ export function TikTokPostForm({
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-
-        {result && (
-          <div className="space-y-2 rounded-md border border-muted p-3 text-sm">
-            <p>
-              <span className="font-semibold">Publish ID:</span>{" "}
-              {result.publishId}
-            </p>
-            {result.postId && (
-              <p>
-                <span className="font-semibold">Post ID:</span> {result.postId}
-              </p>
-            )}
-            {result.releaseUrl ? (
-              <p>
-                <span className="font-semibold">Release URL:</span>{" "}
-                <a
-                  href={result.releaseUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-primary underline"
-                >
-                  {result.releaseUrl}
-                </a>
-              </p>
-            ) : (
-              <p className="text-muted-foreground">
-                No release URL available — TikTok does not return a URL for
-                Inbox posts.
-              </p>
-            )}
-            <p>
-              <span className="font-semibold">Status:</span> {result.status}
-            </p>
-            {result.error && (
-              <p className="text-sm text-destructive">
-                <span className="font-semibold">Error:</span> {result.error}
-              </p>
-            )}
-          </div>
-        )}
       </CardContent>
       {/*
       <CardFooter className="flex items-center gap-4">

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { TikTokPostForm } from "@/components/tiktok/TikTokPostForm";
 import { TikTokScheduleForm } from "@/components/tiktok/TikTokScheduleForm";
@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { useTikTokPostAction } from "@/hooks/use-tiktok-post-action";
 import { useTikTokScheduleAction } from "@/hooks/use-tiktok-schedule-action";
 import { useSlideshowPostState } from "@/states/slideshow-post-state";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
 export default function CreateSlideshowPostPage() {
   const router = useRouter();
@@ -35,10 +35,7 @@ export default function CreateSlideshowPostPage() {
   });
   const updatePostField = postAction.updateField;
   const updateScheduleField = scheduleAction.updateField;
-  const { accounts, accountsLoading, refreshAccounts } = postAction;
-
-  const presentationId = prepared?.presentationId ?? null;
-  const presentationTitle = prepared?.presentationTitle ?? "Slideshow";
+  const { accounts, accountsLoading } = postAction;
 
   const slides = prepared?.slides ?? [];
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -46,6 +43,8 @@ export default function CreateSlideshowPostPage() {
   const [scheduledAt, setScheduledAt] = useState(
     scheduleAction.form.publishAt ?? "",
   );
+  const [finalizing, setFinalizing] = useState(false);
+  const [finalizingMode, setFinalizingMode] = useState<"post" | "schedule" | null>(null);
   useEffect(() => {
     if (slides.length === 0) {
       setCurrentSlide(0);
@@ -76,11 +75,37 @@ export default function CreateSlideshowPostPage() {
   const isPosting = postAction.submitting;
   const isScheduling = scheduleAction.submitting;
 
-  const handlePrimaryAction = () => {
-    if (scheduleEnabled) {
-      void scheduleAction.handleSubmit();
-    } else {
-      void postAction.handleSubmit();
+  const handlePrimaryAction = async () => {
+    if (scheduleEnabled && !scheduledAt) {
+      return;
+    }
+
+    const mode: "post" | "schedule" = scheduleEnabled ? "schedule" : "post";
+    setFinalizing(true);
+    setFinalizingMode(mode);
+
+    let redirected = false;
+    try {
+      if (mode === "schedule") {
+        const result = await scheduleAction.handleSubmit();
+        if (result?.scheduled) {
+          redirected = true;
+          router.push("/dashboard/posts/scheduled");
+        }
+      } else {
+        const result = await postAction.handleSubmit();
+        if (result && (result.status === "inbox" || result.status === "success")) {
+          redirected = true;
+          router.push("/dashboard/posts/posted");
+        }
+      }
+    } catch (error) {
+      console.error("[CreateSlideshowPostPage] Submission failed", error);
+    } finally {
+      if (!redirected) {
+        setFinalizing(false);
+        setFinalizingMode(null);
+      }
     }
   };
 
@@ -119,13 +144,6 @@ export default function CreateSlideshowPostPage() {
       </Button>
     </div>
   );
-
-  const backTarget = useMemo(() => {
-    if (presentationId) {
-      return `/dashboard/slideshows/${presentationId}`;
-    }
-    return "/dashboard/slideshows";
-  }, [presentationId]);
 
   if (!prepared) {
     return fallbackContent;
@@ -325,10 +343,14 @@ export default function CreateSlideshowPostPage() {
 
               <Button
                 size="lg"
-                onClick={handlePrimaryAction}
+                onClick={() => void handlePrimaryAction()}
                 disabled={
                   isPosting ||
                   isScheduling ||
+                  accountsLoading ||
+                  accounts.length === 0 ||
+                  !postAction.form.openId ||
+                  finalizing ||
                   (scheduleEnabled && !scheduledAt) ||
                   postAction.form.photoImages.length === 0
                 }
@@ -345,6 +367,19 @@ export default function CreateSlideshowPostPage() {
           </aside>
         </div>
       </div>
+
+      {finalizing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur">
+          <div className="flex flex-col items-center gap-3 rounded-lg border bg-card px-6 py-5 shadow-lg">
+            <Loader2 className="h-6 w-6 animate-spin" aria-hidden />
+            <p className="text-sm text-muted-foreground">
+              {finalizingMode === "schedule"
+                ? "Scheduling TikTok post…"
+                : "Posting to TikTok…"}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
