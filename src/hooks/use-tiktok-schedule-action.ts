@@ -12,27 +12,12 @@ import { toast } from "sonner";
 
 import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 
-export type TikTokScheduleMediaType = "photo" | "video";
-export type TikTokSchedulePostMode =
-  | "INBOX"
-  | "PUBLISH"
-  | "DIRECT_POST"
-  | "MEDIA_UPLOAD";
-export type TikTokSchedulePostingMethod =
-  | "UPLOAD"
-  | "MEDIA_UPLOAD"
-  | "DIRECT_POST"
-  | "URL";
-
 export interface TikTokSchedulePayload {
   openId: string;
   caption: string;
-  mediaUrl: string;
-  mediaType: TikTokScheduleMediaType;
-  thumbnailTimestampMs?: number;
-  autoAddMusic: boolean;
-  postMode: TikTokSchedulePostMode;
-  contentPostingMethod: TikTokSchedulePostingMethod;
+  title: string;
+  coverIndex: number;
+  photoImages: string[];
   publishAt: string;
   idempotencyKey: string;
 }
@@ -75,11 +60,9 @@ const createDefaultPublishAt = () => {
 const DEFAULT_SCHEDULE_VALUES: TikTokSchedulePayload = {
   openId: "",
   caption: "",
-  mediaUrl: "",
-  mediaType: "photo",
-  autoAddMusic: true,
-  postMode: "INBOX",
-  contentPostingMethod: "MEDIA_UPLOAD",
+  title: "",
+  coverIndex: 0,
+  photoImages: [],
   publishAt: createDefaultPublishAt(),
   idempotencyKey: `schedule_${Date.now()}`,
 };
@@ -139,6 +122,21 @@ export function useTikTokScheduleAction(
     });
   }, [accounts]);
 
+  useEffect(() => {
+    setForm((prev) => {
+      if (prev.photoImages.length === 0 && prev.coverIndex !== 0) {
+        return { ...prev, coverIndex: 0 };
+      }
+      if (
+        prev.photoImages.length > 0 &&
+        prev.coverIndex >= prev.photoImages.length
+      ) {
+        return { ...prev, coverIndex: 0 };
+      }
+      return prev;
+    });
+  }, [form.photoImages.length, setForm]);
+
   const updateField = useCallback(
     <K extends keyof TikTokSchedulePayload>(
       key: K,
@@ -159,8 +157,8 @@ export function useTikTokScheduleAction(
       return;
     }
 
-    if (!form.mediaUrl) {
-      toast.error("Please provide a media URL from the files bucket");
+    if (!Array.isArray(form.photoImages) || form.photoImages.length === 0) {
+      toast.error("No slide images available for posting");
       return;
     }
 
@@ -184,16 +182,18 @@ export function useTikTokScheduleAction(
     setError(null);
     setResult(null);
 
-    const media =
-      form.mediaType === "photo"
-        ? [{ type: "photo" as const, url: form.mediaUrl }]
-        : [
-            {
-              type: "video" as const,
-              url: form.mediaUrl,
-              thumbnailTimestampMs: form.thumbnailTimestampMs ?? 1000,
-            },
-          ];
+    const coverIndex = Math.max(
+      0,
+      Math.min(form.coverIndex, form.photoImages.length - 1),
+    );
+
+    const orderedImages = [...form.photoImages];
+    if (coverIndex > 0 && coverIndex < orderedImages.length) {
+      const [cover] = orderedImages.splice(coverIndex, 1);
+      orderedImages.unshift(cover);
+    }
+
+    const normalizedTitle = form.title?.trim() ?? "";
 
     const payload = {
       openId: form.openId,
@@ -201,18 +201,12 @@ export function useTikTokScheduleAction(
       idempotencyKey: form.idempotencyKey,
       post: {
         caption: form.caption,
-        postMode: form.postMode,
-        media,
+        postMode: "MEDIA_UPLOAD" as const,
+        media: orderedImages.map((url) => ({ type: "photo" as const, url })),
         settings: {
-          contentPostingMethod: form.contentPostingMethod,
-          privacyLevel: "SELF_ONLY" as const,
-          duet: false,
-          comment: false,
-          stitch: false,
-          autoAddMusic: form.autoAddMusic,
-          videoMadeWithAi: false,
-          brandContentToggle: false,
-          brandOrganicToggle: false,
+          contentPostingMethod: "URL" as const,
+          autoAddMusic: true,
+          title: normalizedTitle.length > 0 ? normalizedTitle : undefined,
         },
       },
     };

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { blobToDataUrl, blobToJpeg, zipFiles } from "@/components/presentation/presentation-page/buttons/export-utils";
+import { blobToDataUrl, blobToJpeg } from "@/components/presentation/presentation-page/buttons/export-utils";
 import { usePresentationState } from "@/states/presentation-state";
 import { useSlideshowPostState } from "@/states/slideshow-post-state";
 import { Rocket } from "lucide-react";
@@ -71,14 +71,10 @@ export function TikTokPostButton() {
         return;
       }
 
-      const zipBlob = await zipFiles(imageFiles);
-      const zipFile = new File(
-        [zipBlob],
-        `${presentationTitle.replace(/[^\w\-]+/g, "_")}-${Date.now()}.zip`,
-        { type: "application/zip" },
-      );
       const formData = new FormData();
-      formData.append("slides", zipFile);
+      for (const file of imageFiles) {
+        formData.append("slides", file.blob, file.name);
+      }
 
       const uploadResponse = await fetch(
         "/api/slideshow-library/posts/upload",
@@ -95,10 +91,20 @@ export function TikTokPostButton() {
         | Array<{ url?: string }>
         | { error?: string }
         | null;
-      const zipUrl = Array.isArray(uploadPayload)
-        ? uploadPayload[0]?.url ?? null
-        : null;
-      if (!zipUrl) {
+
+      if (!Array.isArray(uploadPayload)) {
+        const message =
+          uploadPayload && typeof uploadPayload.error === "string"
+            ? uploadPayload.error
+            : "Failed to upload slides";
+        toast.error(message);
+        return;
+      }
+
+      const imageUrls = uploadPayload
+        .map((item) => (item && typeof item.url === "string" ? item.url : null))
+        .filter((url): url is string => typeof url === "string");
+      if (imageUrls.length !== imageFiles.length) {
         console.error(
           "Unexpected upload response",
           uploadPayload,
@@ -111,7 +117,7 @@ export function TikTokPostButton() {
         presentationId: presentationId ?? null,
         presentationTitle,
         defaultCaption,
-        zipUrl,
+        slideImageUrls: imageUrls,
         slides: previews,
         preparedAt: Date.now(),
       });

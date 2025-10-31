@@ -12,7 +12,7 @@ export interface PreparedSlideshowPost {
   presentationId: string | null;
   presentationTitle: string;
   defaultCaption: string;
-  zipUrl: string | null;
+  slideImageUrls: string[];
   slides: SlidePreviewItem[];
   preparedAt: number;
 }

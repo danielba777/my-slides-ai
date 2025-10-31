@@ -46,6 +46,19 @@ export async function GET(request: Request) {
       body: rawResponseText,
     });
 
+    if (
+      payload &&
+      typeof payload === "object" &&
+      payload !== null
+    ) {
+      const record = payload as Record<string, unknown>;
+      if (typeof record.failReason === "string" && !record.error) {
+        record.error = record.failReason;
+      } else if (typeof record.fail_reason === "string" && !record.error) {
+        record.error = record.fail_reason;
+      }
+    }
+
     if (!response.ok) {
       const message =
         payload &&

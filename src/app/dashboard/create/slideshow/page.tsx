@@ -19,15 +19,17 @@ export default function CreateSlideshowPostPage() {
 
   const postAction = useTikTokPostAction({
     defaultValues: {
-      mediaType: "photo",
-      postMode: "INBOX",
-      contentPostingMethod: "MEDIA_UPLOAD",
-      thumbnailTimestampMs: undefined,
-      mediaUrl: prepared?.zipUrl ?? "",
+      caption: prepared?.defaultCaption ?? "",
+      title: prepared?.presentationTitle ?? "",
+      photoImages: prepared?.slideImageUrls ?? [],
     },
   });
   const scheduleAction = useTikTokScheduleAction({
-    defaultValues: { mediaUrl: prepared?.zipUrl ?? "" },
+    defaultValues: {
+      caption: prepared?.defaultCaption ?? "",
+      title: prepared?.presentationTitle ?? "",
+      photoImages: prepared?.slideImageUrls ?? [],
+    },
   });
   const updatePostField = postAction.updateField;
   const updateScheduleField = scheduleAction.updateField;
@@ -47,10 +49,16 @@ export default function CreateSlideshowPostPage() {
   }, [slides.length]);
 
   useEffect(() => {
-    if (!prepared?.zipUrl) return;
-    updatePostField("mediaUrl", prepared.zipUrl);
-    updateScheduleField("mediaUrl", prepared.zipUrl);
-  }, [prepared?.zipUrl, updatePostField, updateScheduleField]);
+    if (!prepared) return;
+    updatePostField("photoImages", prepared.slideImageUrls ?? []);
+    updateScheduleField("photoImages", prepared.slideImageUrls ?? []);
+    updatePostField("title", prepared.presentationTitle ?? "");
+    updateScheduleField("title", prepared.presentationTitle ?? "");
+    updatePostField("caption", prepared.defaultCaption ?? "");
+    updateScheduleField("caption", prepared.defaultCaption ?? "");
+    updatePostField("coverIndex", 0);
+    updateScheduleField("coverIndex", 0);
+  }, [prepared, updatePostField, updateScheduleField]);
 
   const fallbackContent = (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-12 text-center">
@@ -66,16 +74,6 @@ export default function CreateSlideshowPostPage() {
       </Button>
     </div>
   );
-
-  const handleDownloadZip = () => {
-    if (!prepared?.zipUrl) return;
-    const link = document.createElement("a");
-    link.href = prepared.zipUrl;
-    link.download = `${presentationTitle.replace(/[^\w\-]+/g, "_")}.zip`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   const backTarget = useMemo(() => {
     if (presentationId) {
@@ -101,11 +99,6 @@ export default function CreateSlideshowPostPage() {
           <Button variant="ghost" onClick={() => router.push(backTarget)}>
             Back to slideshow
           </Button>
-          {prepared.zipUrl && (
-            <Button onClick={handleDownloadZip} variant="secondary">
-              Download JPG (.zip)
-            </Button>
-          )}
         </div>
       </header>
 
@@ -126,7 +119,6 @@ export default function CreateSlideshowPostPage() {
                 cardTitle="Post configuration"
                 submitLabel="Trigger TikTok post"
                 refreshLabel="Refresh accounts"
-                lockedMediaType="photo"
               />
             </TabsContent>
             <TabsContent value="schedule" className="mt-6">
@@ -135,7 +127,6 @@ export default function CreateSlideshowPostPage() {
                 cardTitle="Schedule configuration"
                 submitLabel="Schedule TikTok post"
                 refreshLabel="Refresh accounts"
-                lockedMediaType="photo"
               />
             </TabsContent>
           </Tabs>

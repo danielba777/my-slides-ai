@@ -12,23 +12,12 @@ import { toast } from "sonner";
 
 import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 
-export type TikTokPostMediaType = "video" | "photo";
-export type TikTokPostMode = "INBOX" | "PUBLISH" | "DIRECT_POST" | "MEDIA_UPLOAD";
-export type TikTokContentPostingMethod =
-  | "UPLOAD"
-  | "MEDIA_UPLOAD"
-  | "DIRECT_POST"
-  | "URL";
-
 export interface TikTokPostPayload {
   openId: string;
   caption: string;
-  mediaUrl: string;
-  mediaType: TikTokPostMediaType;
-  thumbnailTimestampMs?: number;
-  autoAddMusic: boolean;
-  postMode: TikTokPostMode;
-  contentPostingMethod: TikTokContentPostingMethod;
+  title: string;
+  coverIndex: number;
+  photoImages: string[];
 }
 
 export interface TikTokPostResult {
@@ -55,12 +44,9 @@ interface StatusResponse {
 const DEFAULT_FORM_VALUES: TikTokPostPayload = {
   openId: "",
   caption: "",
-  mediaUrl: "",
-  mediaType: "video",
-  thumbnailTimestampMs: 1000,
-  autoAddMusic: true,
-  postMode: "PUBLISH",
-  contentPostingMethod: "UPLOAD",
+  title: "",
+  coverIndex: 0,
+  photoImages: [],
 };
 
 export interface UseTikTokPostActionOptions {
@@ -162,6 +148,22 @@ export function useTikTokPostAction(
           throw new Error(message);
         }
 
+        if (
+          "failReason" in payload &&
+          typeof (payload as Record<string, unknown>).failReason === "string"
+        ) {
+          (payload as StatusResponse).error = String(
+            (payload as Record<string, unknown>).failReason,
+          );
+        } else if (
+          "fail_reason" in payload &&
+          typeof (payload as Record<string, unknown>).fail_reason === "string"
+        ) {
+          (payload as StatusResponse).error = String(
+            (payload as Record<string, unknown>).fail_reason,
+          );
+        }
+
         if (payload.status !== "processing") {
           return payload;
         }
@@ -182,20 +184,30 @@ export function useTikTokPostAction(
       return;
     }
 
-    if (!form.mediaUrl) {
-      toast.error("Please provide a media URL from the files bucket");
+    if (!Array.isArray(form.photoImages) || form.photoImages.length === 0) {
+      toast.error("No slide images available for posting");
       return;
     }
+
+    const coverIndex = Math.max(
+      0,
+      Math.min(form.coverIndex, form.photoImages.length - 1),
+    );
+
+    const orderedImages = [...form.photoImages];
+    if (coverIndex > 0 && coverIndex < orderedImages.length) {
+      const [cover] = orderedImages.splice(coverIndex, 1);
+      orderedImages.unshift(cover);
+    }
+
+    const normalizedTitle = form.title?.trim() ?? "";
 
     const requestBody = {
       openId: form.openId,
       caption: form.caption,
-      mediaUrl: form.mediaUrl,
-      mediaType: form.mediaType,
-      thumbnailTimestampMs: form.thumbnailTimestampMs,
-      autoAddMusic: form.autoAddMusic,
-      postMode: form.postMode,
-      contentPostingMethod: form.contentPostingMethod,
+      title: normalizedTitle,
+      coverIndex,
+      photoImages: orderedImages,
     };
 
     console.debug("[TikTokPost] Payload", requestBody);
