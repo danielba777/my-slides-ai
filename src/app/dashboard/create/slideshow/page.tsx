@@ -35,6 +35,7 @@ export default function CreateSlideshowPostPage() {
   });
   const updatePostField = postAction.updateField;
   const updateScheduleField = scheduleAction.updateField;
+  const { accounts, accountsLoading, refreshAccounts } = postAction;
 
   const presentationId = prepared?.presentationId ?? null;
   const presentationTitle = prepared?.presentationTitle ?? "Slideshow";
@@ -99,6 +100,11 @@ export default function CreateSlideshowPostPage() {
     updateScheduleField("publishAt", value);
   };
 
+  const handleSelectAccount = (openId: string) => {
+    updatePostField("openId", openId);
+    updateScheduleField("openId", openId);
+  };
+
   const fallbackContent = (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-12 text-center">
       <div className="space-y-2">
@@ -130,19 +136,72 @@ export default function CreateSlideshowPostPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold">Create Slideshow Post</h1>
-          <p className="text-muted-foreground">
-            Configure your slideshow, then post immediately or schedule it for later.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="ghost" onClick={() => router.push(backTarget)}>
-            Back to slideshow
-          </Button>
         </div>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
+          <section className="rounded-lg">
+            <div className="flex items-start gap-3 p-4">
+              <div className="flex gap-4 overflow-x-auto pb-1">
+                {accountsLoading ? (
+                  <p className="text-sm text-muted-foreground">
+                    Loading accounts…
+                  </p>
+                ) : accounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No TikTok accounts connected.
+                  </p>
+                ) : (
+                  accounts.map((account) => {
+                    const label =
+                      account.username ?? account.displayName ?? account.openId;
+                    const isSelected =
+                      postAction.form.openId === account.openId;
+                    const initials = label
+                      .split(" ")
+                      .map((part) => part[0]?.toUpperCase())
+                      .join("")
+                      .slice(0, 2);
+
+                    return (
+                      <button
+                        key={account.openId}
+                        type="button"
+                        onClick={() => handleSelectAccount(account.openId)}
+                        className="flex flex-col items-center gap-2"
+                        aria-pressed={isSelected}
+                      >
+                        <span
+                          className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${isSelected ? "border-blue-500" : "border-border"}`}
+                        >
+                          {account.avatarUrl ? (
+                            <img
+                              src={account.avatarUrl}
+                              alt={label}
+                              className={`h-14 w-14 rounded-full object-cover transition-all ${isSelected ? "" : "grayscale opacity-70"}`}
+                            />
+                          ) : (
+                            <span
+                              className={`flex h-14 w-14 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground transition-all ${isSelected ? "text-primary" : ""}`}
+                            >
+                              {initials || "TikTok"}
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className={`text-xs ${isSelected ? "font-semibold" : "text-muted-foreground"}`}
+                        >
+                          {label}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </section>
+
           <TikTokPostForm
             action={postAction}
             cardTitle="Post configuration"
@@ -150,6 +209,7 @@ export default function CreateSlideshowPostPage() {
             refreshLabel="Refresh accounts"
             showSubmitButton={false}
             showRefreshButton={false}
+            renderAccountSelector={false}
           />
           {scheduleEnabled && (
             <TikTokScheduleForm
@@ -160,6 +220,8 @@ export default function CreateSlideshowPostPage() {
               showSubmitButton={false}
               showRefreshButton={false}
               showPublishControls={false}
+              renderAccountSelector={false}
+              onSelectAccount={handleSelectAccount}
             />
           )}
         </div>
@@ -212,9 +274,6 @@ export default function CreateSlideshowPostPage() {
                     </Button>
                   </div>
                   <div className="flex flex-col items-center gap-2">
-                    <p className="text-xs font-medium uppercase text-muted-foreground">
-                      Slide {currentSlide + 1} of {slides.length}
-                    </p>
                     <div className="flex flex-wrap items-center justify-center gap-2">
                       {slides.map((slide, index) => (
                         <button

@@ -3,13 +3,7 @@
 import { useEffect, type ComponentProps } from "react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +20,8 @@ interface TikTokPostFormProps {
   showRefreshButton?: boolean;
   footer?: ComponentProps<typeof CardFooter>["children"];
   showSubmitButton?: boolean;
+  renderAccountSelector?: boolean;
+  onSelectAccount?: (openId: string) => void;
 }
 
 export function TikTokPostForm({
@@ -37,6 +33,8 @@ export function TikTokPostForm({
   showRefreshButton = true,
   footer,
   showSubmitButton = true,
+  renderAccountSelector = true,
+  onSelectAccount,
 }: TikTokPostFormProps) {
   const {
     form,
@@ -67,50 +65,93 @@ export function TikTokPostForm({
   }, [form.photoImages.length, setForm]);
 
   return (
-    <Card className={cn("w-full", className)}>
-      <CardHeader>
-        <CardTitle>{cardTitle}</CardTitle>
-      </CardHeader>
+    <Card
+      className={cn("w-full bg-transparent border-none shadow-none", className)}
+    >
       <CardContent className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+        {renderAccountSelector && (
           <div className="space-y-2">
-            <Label htmlFor="openId">Connected TikTok account</Label>
-            <select
-              id="openId"
-              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              disabled={accountsLoading || accounts.length === 0}
-              value={form.openId}
-              onChange={(event) => updateField("openId", event.target.value)}
-            >
-              {accountsLoading && <option>Loading accounts…</option>}
-              {!accountsLoading && accounts.length === 0 && (
-                <option>No TikTok accounts connected</option>
+            <Label>Connected TikTok account</Label>
+            <div className="flex items-start gap-3">
+              <div className="flex gap-4 overflow-x-auto pb-1">
+                {accountsLoading ? (
+                  <p className="text-sm text-muted-foreground">
+                    Loading accounts…
+                  </p>
+                ) : accounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No TikTok accounts connected.
+                  </p>
+                ) : (
+                  accounts.map((account) => {
+                    const label =
+                      account.username ?? account.displayName ?? account.openId;
+                    const isSelected = form.openId === account.openId;
+                    const initials = label
+                      .split(" ")
+                      .map((part) => part[0]?.toUpperCase())
+                      .join("")
+                      .slice(0, 2);
+
+                    const handleSelect = () => {
+                      if (onSelectAccount) {
+                        onSelectAccount(account.openId);
+                      } else {
+                        updateField("openId", account.openId);
+                      }
+                    };
+
+                    return (
+                      <button
+                        key={account.openId}
+                        type="button"
+                        onClick={handleSelect}
+                        className="flex flex-col items-center gap-2"
+                        aria-pressed={isSelected}
+                      >
+                        <span
+                          className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${isSelected ? "border-primary" : "border-border"}`}
+                        >
+                          {account.avatarUrl ? (
+                            <img
+                              src={account.avatarUrl}
+                              alt={label}
+                              className={`h-14 w-14 rounded-full object-cover transition-all ${isSelected ? "" : "grayscale opacity-70"}`}
+                            />
+                          ) : (
+                            <span
+                              className={`flex h-14 w-14 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground transition-all ${isSelected ? "text-primary" : ""}`}
+                            >
+                              {initials || "TikTok"}
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className={`text-xs ${isSelected ? "font-semibold" : "text-muted-foreground"}`}
+                        >
+                          {label}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              {showRefreshButton && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={accountsLoading}
+                  className="mt-1"
+                  onClick={() => void refreshAccounts()}
+                  title={refreshLabel}
+                >
+                  <RefreshCw className="h-4 w-4" aria-hidden />
+                  <span className="sr-only">{refreshLabel}</span>
+                </Button>
               )}
-              {accounts.map((account) => {
-                const label =
-                  account.username ?? account.displayName ?? account.openId;
-                return (
-                  <option key={account.openId} value={account.openId}>
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
+            </div>
           </div>
-          {showRefreshButton && (
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={accountsLoading || accounts.length === 0}
-              className="self-end"
-              onClick={() => void refreshAccounts()}
-              title={refreshLabel}
-            >
-              <RefreshCw className="h-4 w-4" aria-hidden />
-              <span className="sr-only">{refreshLabel}</span>
-            </Button>
-          )}
-        </div>
+        )}
         <div className="space-y-2">
           <Label htmlFor="title">Title</Label>
           <Input
@@ -118,6 +159,7 @@ export function TikTokPostForm({
             placeholder="Optional title"
             value={form.title}
             onChange={(event) => updateField("title", event.target.value)}
+            className="bg-white"
           />
         </div>
 
@@ -128,7 +170,8 @@ export function TikTokPostForm({
             placeholder="Write the TikTok caption…"
             value={form.caption}
             onChange={(event) => updateField("caption", event.target.value)}
-            rows={4}
+            rows={10}
+            className="bg-white"
           />
         </div>
 
