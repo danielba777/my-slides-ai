@@ -21,7 +21,13 @@ export async function GET(request: NextRequest) {
 
     const response = await fetch(url);
     const data = await response.json();
-    return NextResponse.json(data);
+    // Browser-/Edge-caching für die Marketing-Hero-Query erlauben
+    return NextResponse.json(data, {
+      headers: {
+        // 5 Minuten frisch, 30 Minuten staled erlauben
+        "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=1800",
+      },
+    });
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to fetch posts" },

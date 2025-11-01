@@ -15,7 +15,11 @@ export async function GET(
       `${API_BASE_URL}/slideshow-library/posts/${id}`,
     );
     const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: {
+        "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=1800",
+      },
+    });
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to fetch post" },
