@@ -2,6 +2,7 @@ import { env } from "@/env";
 import { auth } from "@/server/auth";
 import { NextResponse } from "next/server";
 import { ensureAndConsumeCredits } from "@/server/billing";
+import { db } from "@/server/db";
 
 const API_BASE = "https://api.302.ai";
 const GENERATE_ENDPOINT = `${API_BASE}/higgsfield/text2image_soul`;
@@ -9,6 +10,25 @@ const FETCH_ENDPOINT = (id: string) =>
   `${API_BASE}/higgsfield/task/${encodeURIComponent(id)}/fetch`;
 const EXPECTED_GENERATION_BATCH_SIZE = 4;
 const DEFAULT_STYLE_ID = "1cb4b936-77bf-4f9a-9039-f3d349a4cdbe";
+
+async function ensureUserExists(userId: string, session: any) {
+  const existingUser = await db.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!existingUser) {
+    // Create user in database
+    await db.user.create({
+      data: {
+        id: userId,
+        name: session.user.name,
+        email: session.user.email,
+        image: session.user.image,
+        hasAccess: true, // Give new users access by default
+      },
+    });
+  }
+}
 
 type ImageResult = { minUrl?: string; rawUrl?: string };
 type PersistedImage = {
@@ -34,6 +54,10 @@ export async function POST(request: Request) {
     }
 
     const userId = session.user.id;
+
+    // Ensure user exists in database
+    await ensureUserExists(userId, session);
+
     const { prompt, styleId, quality } = (await request.json()) as {
       prompt?: string;
       styleId?: string;
@@ -51,13 +75,7 @@ export async function POST(request: Request) {
         : DEFAULT_STYLE_ID;
     const effectiveQuality: "basic" | "high" =
       quality === "high" || quality === "basic" ? quality : "high";
-    const apiKey = process.env["302AI_KEY"];
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "302AI_KEY environment variable is missing" },
-        { status: 500 },
-      );
-    }
+    const apiKey = env["302AI_KEY"];
 
     const job = await createGenerationJob({
       prompt: trimmedPrompt,
@@ -354,6 +372,49 @@ async function updateGenerationJobStatus(
   }
 }
 
+async function downloadImageWithRetry(url: string, maxRetries = 3): Promise<ArrayBuffer> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[AI Avatar] Downloading image from ${url} (attempt ${attempt}/${maxRetries})`);
+      const response = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'DNT': '1',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+          'Referer': 'https://302.ai/',
+        },
+      });
+
+      if (response.ok) {
+        return await response.arrayBuffer();
+      }
+
+      console.warn(`[AI Avatar] Download attempt ${attempt} failed with status ${response.status}`);
+
+      if (attempt === maxRetries) {
+        throw new Error(`Failed to download image after ${maxRetries} attempts (last status: ${response.status})`);
+      }
+
+      // Wait before retry (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+
+    } catch (error) {
+      console.warn(`[AI Avatar] Download attempt ${attempt} failed:`, error);
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      // Wait before retry
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+    }
+  }
+  throw new Error('Unexpected error in download retry logic');
+}
+
 async function persistGeneratedImage({
   prompt,
   sourceUrl,
@@ -367,18 +428,22 @@ async function persistGeneratedImage({
   userId: string;
   jobId: string;
 }): Promise<PersistedImage> {
+  // Download the image first with retry logic
+  const imageBuffer = await downloadImageWithRetry(sourceUrl);
+
+  // Send to API with image buffer
+  const formData = new FormData();
+  formData.append('prompt', prompt);
+  formData.append('rawImageUrl', rawImageUrl || '');
+  formData.append('jobId', jobId || '');
+  formData.append('image', new Blob([imageBuffer], { type: 'image/jpeg' }), 'generated-image.jpg');
+
   const response = await fetch(`${env.SLIDESCOCKPIT_API}/ai-avatars/generations`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
       "x-user-id": userId,
     },
-    body: JSON.stringify({
-      prompt,
-      sourceUrl,
-      rawImageUrl,
-      jobId,
-    }),
+    body: formData,
   });
 
   const data = await response.json().catch(() => null);
