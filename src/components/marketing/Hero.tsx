@@ -116,7 +116,7 @@ export function MarketingHero({ session }: { session: boolean }) {
   }, [posterImages]);
 
   return (
-    <Section className="relative min-h-[85vh] overflow-hidden bg-[#111] py-0">
+    <Section className="relative min-h-[85vh] overflow-hidden bg-[#111] py-0 isolate">
       {posterMatrix.length > 0 && (
         <div className="netflix-container" aria-hidden="true">
           <div className="netflix-gradient" />
@@ -320,16 +320,16 @@ export function MarketingHero({ session }: { session: boolean }) {
           width: 100%;
           height: 100%;
           overflow: hidden;
-          margin-bottom: 56px;
           background-color: #111;
-          z-index: 1;
+          z-index: 0;
           pointer-events: none;
+          isolation: isolate;
         }
 
         .netflix-gradient {
           position: absolute;
           inset: 0;
-          z-index: 2;
+          z-index: 1;
           background: linear-gradient(
             to bottom,
             rgba(0, 0, 0, 0.8) 15%,
@@ -339,12 +339,14 @@ export function MarketingHero({ session }: { session: boolean }) {
             rgba(0, 0, 0, 1) 100%
           );
           opacity: 0.65;
+          will-change: auto;
         }
 
         .netflix-container-perspective {
           perspective: 500px;
           height: 100%;
           position: relative;
+          z-index: 0;
         }
 
         .netflix-container-background {
@@ -352,11 +354,12 @@ export function MarketingHero({ session }: { session: boolean }) {
           display: flex;
           flex-direction: column;
           justify-content: flex-start;
-          transform: rotateX(365deg) rotateY(352deg) rotateZ(10deg)
+          transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
             translateX(1300px);
           transform-style: preserve-3d;
           animation: netflix_move 180s linear infinite alternate;
-          will-change: transform;
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
         }
 
         .netflix-box {
@@ -385,6 +388,8 @@ export function MarketingHero({ session }: { session: boolean }) {
           border-radius: 12px;
           box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
           opacity: 0.9;
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
         }
 
         .netflix-cover {
@@ -400,11 +405,11 @@ export function MarketingHero({ session }: { session: boolean }) {
 
         @keyframes netflix_move {
           from {
-            transform: rotateX(365deg) rotateY(352deg) rotateZ(10deg)
+            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
               translateX(1300px);
           }
           to {
-            transform: rotateX(365deg) rotateY(352deg) rotateZ(10deg)
+            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
               translateX(-190px);
           }
         }
