@@ -116,7 +116,7 @@ export function MarketingHero({ session }: { session: boolean }) {
   }, [posterImages]);
 
   return (
-    <Section className="relative min-h-[92vh] overflow-hidden bg-[#111]">
+    <Section className="relative min-h-[85vh] overflow-hidden bg-[#111] py-0 isolate">
       {posterMatrix.length > 0 && (
         <div className="netflix-container" aria-hidden="true">
           <div className="netflix-gradient" />
@@ -146,14 +146,14 @@ export function MarketingHero({ session }: { session: boolean }) {
         </div>
       )}
 
-      <div className="relative z-10 flex min-h-[92vh] flex-col justify-center px-5 sm:px-6 lg:pt-20 pt-20 pb-10">
+      <div className="relative z-10 flex min-h-[89vh] flex-col justify-center px-5 sm:px-6 lg:pt-20 pt-20 pb-10">
         <div className="mx-auto max-w-5xl text-center">
           {/* Status badge */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-3 rounded-full border border-indigo-300/20 bg-indigo-500/10 backdrop-blur-sm px-4 py-2 text-xs sm:text-sm font-medium text-indigo-200 shadow-lg mb-2 sm:mb-4 lg:mb-6 mt-[-0.5rem] sm:mt-[-1rem]"
+            className="inline-flex items-center gap-3 rounded-full border border-indigo-300/20 bg-indigo-500/40 backdrop-blur-sm px-4 py-2 text-xs sm:text-sm font-medium text-indigo-100 shadow-lg mb-2 sm:mb-4 lg:mb-6 mt-[-0.5rem] sm:mt-[-1rem]"
           >
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
@@ -171,7 +171,7 @@ export function MarketingHero({ session }: { session: boolean }) {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.08, duration: 0.7 }}
-            className="py-4 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight text-white"
+            className="py-2 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight text-white"
           >
             <span className="block">Automate TikTok slides</span>
             {/* Mobile ≈3 Zeilen, ab sm → 2 Zeilen */}
@@ -188,7 +188,7 @@ export function MarketingHero({ session }: { session: boolean }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.15, duration: 0.6 }}
-            className="mt-2 pb-8 text-lg sm:text-xl lg:text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed font-light"
+            className="mt-2 pb-4 text-lg sm:text-xl lg:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed font-light"
           >
             Create viral TikTok slides in seconds. Visually stunning, authentic,
             and built to perform.
@@ -199,7 +199,7 @@ export function MarketingHero({ session }: { session: boolean }) {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-5"
+            className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-5"
           >
             {session ? (
               <Link href="/dashboard/home" className="w-full sm:w-auto">
@@ -231,9 +231,9 @@ export function MarketingHero({ session }: { session: boolean }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.5 }}
-            className="mt-20 grid grid-cols-1 sm:grid-cols-3 gap-6 text-left"
+            className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 text-left"
           >
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-white/10 transition-all duration-300">
+            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
                   <ZapIcon className="w-5 h-5 text-white" />
@@ -245,7 +245,7 @@ export function MarketingHero({ session }: { session: boolean }) {
               </p>
             </div>
 
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-white/10 transition-all duration-300">
+            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
                   <BarChart3Icon className="w-5 h-5 text-white" />
@@ -259,7 +259,7 @@ export function MarketingHero({ session }: { session: boolean }) {
               </p>
             </div>
 
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-white/10 transition-all duration-300">
+            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
                   <CheckCircle2Icon className="w-5 h-5 text-white" />
@@ -279,7 +279,7 @@ export function MarketingHero({ session }: { session: boolean }) {
             transition={{ delay: 0.4, duration: 0.6 }}
             className="mt-14 px-4"
           >
-            <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-5 sm:p-6">
+            <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-indigo-500/40 hover:bg-indigo-500/50 duration-300 backdrop-blur-sm p-5 sm:p-6">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                 <div className="text-center">
                   <div className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 mb-1">
@@ -320,16 +320,16 @@ export function MarketingHero({ session }: { session: boolean }) {
           width: 100%;
           height: 100%;
           overflow: hidden;
-          margin-bottom: 56px;
           background-color: #111;
-          z-index: 1;
+          z-index: 0;
           pointer-events: none;
+          isolation: isolate;
         }
 
         .netflix-gradient {
           position: absolute;
           inset: 0;
-          z-index: 2;
+          z-index: 1;
           background: linear-gradient(
             to bottom,
             rgba(0, 0, 0, 0.8) 15%,
@@ -339,12 +339,14 @@ export function MarketingHero({ session }: { session: boolean }) {
             rgba(0, 0, 0, 1) 100%
           );
           opacity: 0.65;
+          will-change: auto;
         }
 
         .netflix-container-perspective {
           perspective: 500px;
           height: 100%;
           position: relative;
+          z-index: 0;
         }
 
         .netflix-container-background {
@@ -352,11 +354,12 @@ export function MarketingHero({ session }: { session: boolean }) {
           display: flex;
           flex-direction: column;
           justify-content: flex-start;
-          transform: rotateX(365deg) rotateY(352deg) rotateZ(10deg)
+          transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
             translateX(1300px);
           transform-style: preserve-3d;
           animation: netflix_move 180s linear infinite alternate;
-          will-change: transform;
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
         }
 
         .netflix-box {
@@ -385,6 +388,8 @@ export function MarketingHero({ session }: { session: boolean }) {
           border-radius: 12px;
           box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
           opacity: 0.9;
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
         }
 
         .netflix-cover {
@@ -400,11 +405,11 @@ export function MarketingHero({ session }: { session: boolean }) {
 
         @keyframes netflix_move {
           from {
-            transform: rotateX(365deg) rotateY(352deg) rotateZ(10deg)
+            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
               translateX(1300px);
           }
           to {
-            transform: rotateX(365deg) rotateY(352deg) rotateZ(10deg)
+            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
               translateX(-190px);
           }
         }
