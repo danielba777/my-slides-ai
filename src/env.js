@@ -11,6 +11,7 @@ export const env = createEnv({
 
     OPENAI_API_KEY: z.string(),
     TOGETHER_AI_API_KEY: z.string(),
+    "302AI_KEY": z.string(),
     GOOGLE_CLIENT_ID: z.string(),
     GOOGLE_CLIENT_SECRET: z.string(),
     UNSPLASH_ACCESS_KEY: z.string(),
@@ -44,6 +45,7 @@ export const env = createEnv({
     NODE_ENV: process.env.NODE_ENV,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     TOGETHER_AI_API_KEY: process.env.TOGETHER_AI_API_KEY,
+    "302AI_KEY": process.env["302AI_KEY"],
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     SLIDESCOCKPIT_API: process.env.SLIDESCOCKPIT_API,
