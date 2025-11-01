@@ -15,11 +15,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Section } from "./Section";
 
-// Deutlich entlasten: weniger Kacheln + geringeres Fetch-Limit
-const HERO_POSTER_ROWS = 5;
-const HERO_POSTERS_PER_ROW = 20;
+// Reduziert anfängliche Bildflut deutlich (weniger Requests, schnellerer Paint)
+const HERO_POSTER_ROWS = 6;
+const HERO_POSTERS_PER_ROW = 16;
 const HERO_FETCH_LIMIT = 120;
-const HERO_MAX_TILES = HERO_POSTER_ROWS * HERO_POSTERS_PER_ROW; // 100
+const HERO_MAX_TILES = HERO_POSTER_ROWS * HERO_POSTERS_PER_ROW;
 
 type HeroSlide = {
   imageUrl?: string | null;
@@ -79,8 +79,10 @@ export function MarketingHero({ session }: { session: boolean }) {
           deduped[swapIndex] = current;
         }
 
-        // Nur so viele Kacheln wie tatsächlich sichtbar benötigt
-        setPosterImages(deduped.slice(0, HERO_MAX_TILES));
+        // Nur so viele Bilder rendern, wie auch sichtbar sind
+        setPosterImages(
+          deduped.slice(0, HERO_POSTER_ROWS * HERO_POSTERS_PER_ROW),
+        );
       } catch (error) {
         if ((error as Error).name === "AbortError") {
           return;
@@ -136,9 +138,9 @@ export function MarketingHero({ session }: { session: boolean }) {
                         src={imageUrl}
                         alt=""
                         fill
-                        sizes="125px"
-                        style={{ objectFit: "cover", objectPosition: "center" }}
-                        priority={rowIndex < 2}
+                        unoptimized
+                        loading="lazy"
+                        className="object-cover"
                       />
                     </div>
                   ))}
