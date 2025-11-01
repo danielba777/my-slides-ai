@@ -1,60 +1,113 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
 **_ Begin Patch
-_** Update File: src/components/presentation/dashboard/ImageCollectionSelector.tsx
+_** Update File: src\canvas\legacy\SlideCanvasLegacy.tsx
 @@
 
-<div className="overflow-hidden">
-<div className="grid grid-cols-5 gap-0">
-{getPreviewImages(selectedImageSet).map(
-(image, index, arr) => (
-<div
-key={image.id ?? `${selectedImageSet.id}-${index}`}
-className={cn(
-"relative h-24 md:h-32 lg:h-40 overflow-hidden",
-index === 0 && "rounded-l-lg",
-index === arr.length - 1 && "rounded-r-lg",
-)} >
+-      const clipRect = {
 
--                          <img
+*      const clipRect = {
+         x: boxLeft,
 
-*                          <img
-                             src={image.url}
-                             alt={`${selectedImageSet.name} preview ${index + 1}`}
+-
+-        y: boxTop,
+-
+-        width: layer.width,
+-
+-        height: layerHeight + DESCENT_PAD,
 
--                            className="max-h-full max-w-full object-contain bg-black/5"
+*        y: boxTop,
+*        width: layer.width,
+*        // exakt wie Preview: keine zusätzliche Descender-Reserve
+*        height: layerHeight,
+         };
+  @@
 
-*                            className="block h-full w-full object-cover"
-                               loading="lazy"
-                             />
-                           </div>
-                         ),
-                       )}
-                     </div>
-                   </div>
+-      exportCtx.font = `${italic ? "italic " : ""}${weight} ${BASE_FONT_PX}px ${layer.fontFamily}`;
+
+*      exportCtx.font = `${italic ? "italic " : ""}${weight} ${BASE_FONT_PX}px ${layer.fontFamily}`;
+       (exportCtx as any).fontKerning = "normal";
+       exportCtx.fillStyle = layer.color;
+
+-      exportCtx.textBaseline = "alphabetic";
+
+*      // identisch zum Preview ausrichten
+*      exportCtx.textBaseline = TEXT_BASELINE as CanvasTextBaseline;
+
+-      const lineHeightPx = BASE_FONT_PX * layer.lineHeight;
+-      const sampleMetrics = exportCtx.measureText("Mg");
+-      const ascentEstimate =
+-        sampleMetrics.actualBoundingBoxAscent ?? BASE_FONT_PX * 0.72;
+-      const descentEstimate =
+-        sampleMetrics.actualBoundingBoxDescent ?? BASE_FONT_PX * 0.28;
+-      const lineGap = Math.max(
+-        0,
+-        lineHeightPx - (ascentEstimate + descentEstimate),
+-      );
+-      const startYTop = boxTop + PADDING + ascentEstimate + lineGap / 2;
+-      let y = startYTop;
+
+*      // benutze exakt die DOM-berechnete Line-Höhe (wie im Preview gemessen)
+*      const lineMeasure = measureWrappedText({
+*        text: String(layer.content ?? ""),
+*        fontFamily: layer.fontFamily ?? "Inter",
+*        fontWeight: weight,
+*        fontStyle: italic ? "italic" : "normal",
+*        fontSizePx: BASE_FONT_PX,
+*        lineHeightPx: BASE_FONT_PX * (layer.lineHeight ?? 1.12),
+*        maxWidthPx: Math.max(8, layer.width),
+*        letterSpacingPx: layer.letterSpacing ?? 0,
+*        whiteSpaceMode: "pre-wrap",
+*        wordBreakMode: "normal",
+*        paddingPx: PADDING,
+*      });
+*      const lineHeightPx = lineMeasure.lineHeight;
+*      // Baseline "middle": erste Zeile genau mittig in ihrer Box starten
+*      let y = boxTop + PADDING + lineHeightPx / 2;
+  @@
+
+-      const drawOuterStrokeLine = (raw: string, yPos: number) => {
+
+*      const drawOuterStrokeLine = (raw: string, yPos: number) => {
+           if (!(outlineEnabled && outlineWidth > 0)) return;
+  @@
+
+-        const ox = off.getContext("2d")!
+-
+-        ox.font = exportCtx.font;
+-        ox.textBaseline = "alphabetic";
+
+*        const ox = off.getContext("2d")!
+*        ox.font = exportCtx.font;
+*        // identisches Baseline-Verhalten wie Hauptkontext
+*        ox.textBaseline = TEXT_BASELINE as CanvasTextBaseline;
   \*\*\* End Patch
-  Und zusätzlich noch die andere Preview-Stelle im gleichen File (Liste der Sets), die ebenfalls noch object-contain nutzt — ebenfalls minimal auf object-cover + block, damit es überall konsistent aussieht:
+  Zusätzlich (falls du es wirklich „bit-genau“ willst) kannst du die letzte unnötige Rundung entfernen, die gelegentlich +1 px erzeugt. Das ist genau der doppelte Ceil, den ich vorhin erklärt habe (nur Export betroffen):
   codebase
 
 diff
 Code kopieren
-**_ Begin Patch
-_** Update File: src/components/presentation/dashboard/ImageCollectionSelector.tsx
-@@ >
+\*\*\* Update File: src\canvas\legacy\SlideCanvasLegacy.tsx
+@@
 
--                          <img
+-      const layerHeight =
 
-*                          <img
-                             src={image.url}
-                             alt={`${set.name} preview ${index + 1}`}
+*      const layerHeight =
+         layer.height && layer.height > 0
+           ? layer.height
+           : Math.max(
+               1,
 
--                            className="max-h-full max-w-full object-contain bg-black/5 transition-opacity group-hover:opacity-80"
+-              Math.ceil(
+-                computeAutoHeightForLayer(
+-                  { ...layer, italic: (layer as any).italic },
+-                  lines,
+-                ),
+-              ),
 
-*                            className="block h-full w-full object-cover transition-opacity group-hover:opacity-80"
-                               loading="lazy"
-                             />
-                           </div>
-                         ))}
-                       </div>
-                     </div>
-  \*\*\* End Patch
+*              // computeAutoHeight(...) liefert bereits gerundete Höhe aus der DOM-Messung
+*              computeAutoHeightForLayer(
+*                { ...layer, italic: (layer as any).italic },
+*                lines,
+*              ),
+             );

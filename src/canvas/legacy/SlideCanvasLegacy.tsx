@@ -1439,21 +1439,13 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       (exportCtx as any).fontKerning = "normal";
 
       exportCtx.fillStyle = layer.color;
-
-      exportCtx.textBaseline = "alphabetic";
+      // Exakt wie im Preview: Baseline auf "middle", damit die Zeilen mittig zur Zeilenhöhe ausgerichtet sind
+      exportCtx.textBaseline = TEXT_BASELINE as CanvasTextBaseline;
 
       const lineHeightPx = BASE_FONT_PX * layer.lineHeight;
-      const sampleMetrics = exportCtx.measureText("Mg");
-      const ascentEstimate =
-        sampleMetrics.actualBoundingBoxAscent ?? BASE_FONT_PX * 0.72;
-      const descentEstimate =
-        sampleMetrics.actualBoundingBoxDescent ?? BASE_FONT_PX * 0.28;
-      const lineGap = Math.max(
-        0,
-        lineHeightPx - (ascentEstimate + descentEstimate),
-      );
-      const startYTop = boxTop + PADDING + ascentEstimate + lineGap / 2;
-      let y = startYTop;
+      // Baseline "middle": Startpunkt ist genau Mitte der ersten Zeile innerhalb des Content-Bereichs
+      const startYCenter = boxTop + PADDING + lineHeightPx / 2;
+      let y = startYCenter;
 
       const bgConfig = layer.background;
       const bgEnabled =
@@ -1630,8 +1622,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         const ox = off.getContext("2d")!;
 
         ox.font = exportCtx.font;
-
-        ox.textBaseline = "alphabetic";
+        // Auch im Offscreen-Stroke identisches Baseline-Verhalten
+        ox.textBaseline = TEXT_BASELINE as CanvasTextBaseline;
 
         (ox as any).fontKerning = "normal";
 
