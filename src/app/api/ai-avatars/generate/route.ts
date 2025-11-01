@@ -76,6 +76,12 @@ export async function POST(request: Request) {
     const effectiveQuality: "basic" | "high" =
       quality === "high" || quality === "basic" ? quality : "high";
     const apiKey = env["302AI_KEY"];
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "AI Avatar generation is currently unavailable" },
+        { status: 503 }
+      );
+    }
 
     const job = await createGenerationJob({
       prompt: trimmedPrompt,

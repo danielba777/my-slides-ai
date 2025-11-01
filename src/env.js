@@ -11,7 +11,7 @@ export const env = createEnv({
 
     OPENAI_API_KEY: z.string(),
     TOGETHER_AI_API_KEY: z.string(),
-    "302AI_KEY": z.string(),
+    "302AI_KEY": z.string().optional(),
     GOOGLE_CLIENT_ID: z.string(),
     GOOGLE_CLIENT_SECRET: z.string(),
     UNSPLASH_ACCESS_KEY: z.string(),
