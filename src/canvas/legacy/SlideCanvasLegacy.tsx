@@ -1389,11 +1389,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           ? layer.height
           : Math.max(
               1,
-              Math.ceil(
-                computeAutoHeightForLayer(
-                  { ...layer, italic: (layer as any).italic },
-                  lines,
-                ),
+              // computeAutoHeight(...) liefert bereits gerundete Höhe aus der DOM-Messung
+              computeAutoHeightForLayer(
+                { ...layer, italic: (layer as any).italic },
+                lines,
               ),
             );
 
@@ -1422,12 +1421,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       const clipRect = {
         x: boxLeft,
-
         y: boxTop,
-
         width: layer.width,
-
-        height: layerHeight + DESCENT_PAD,
+        // exakt wie Preview: keine zusätzliche Descender-Reserve
+        height: layerHeight,
       };
 
       const contentWidth = Math.max(0, layer.width - 2 * PADDING);
@@ -1442,10 +1439,23 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       // Exakt wie im Preview: Baseline auf "middle", damit die Zeilen mittig zur Zeilenhöhe ausgerichtet sind
       exportCtx.textBaseline = TEXT_BASELINE as CanvasTextBaseline;
 
-      const lineHeightPx = BASE_FONT_PX * layer.lineHeight;
-      // Baseline "middle": Startpunkt ist genau Mitte der ersten Zeile innerhalb des Content-Bereichs
-      const startYCenter = boxTop + PADDING + lineHeightPx / 2;
-      let y = startYCenter;
+      // benutze exakt die DOM-berechnete Line-Höhe (wie im Preview gemessen)
+      const lineMeasure = measureWrappedText({
+        text: String(layer.content ?? ""),
+        fontFamily: layer.fontFamily ?? "Inter",
+        fontWeight: weight,
+        fontStyle: italic ? "italic" : "normal",
+        fontSizePx: BASE_FONT_PX,
+        lineHeightPx: BASE_FONT_PX * (layer.lineHeight ?? 1.12),
+        maxWidthPx: Math.max(8, layer.width),
+        letterSpacingPx: layer.letterSpacing ?? 0,
+        whiteSpaceMode: "pre-wrap",
+        wordBreakMode: "normal",
+        paddingPx: PADDING,
+      });
+      const lineHeightPx = lineMeasure.lineHeight;
+      // Baseline "middle": erste Zeile genau mittig in ihrer Box starten
+      let y = boxTop + PADDING + lineHeightPx / 2;
 
       const bgConfig = layer.background;
       const bgEnabled =
