@@ -1,4 +1,4 @@
-export const TIKTOK_OUTLINE_WIDTH = 10;
+export const TIKTOK_OUTLINE_WIDTH = 7;
 export const TIKTOK_OUTLINE_COLOR = "#000000";
 export const TIKTOK_TEXT_COLOR = "#ffffff";
 
