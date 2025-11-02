@@ -27,12 +27,12 @@ type HeroPost = {
   slides?: HeroSlide[];
 };
 
-export function MarketingHero({ 
+export function MarketingHero({
   session,
   category,
   heroTitle,
   heroSubtitle,
-}: { 
+}: {
   session: boolean;
   category?: string;
   heroTitle?: string;
@@ -45,11 +45,13 @@ export function MarketingHero({
 
     const fetchSlides = async () => {
       try {
-        const params = new URLSearchParams({ limit: HERO_FETCH_LIMIT.toString() });
+        const params = new URLSearchParams({
+          limit: HERO_FETCH_LIMIT.toString(),
+        });
         if (category) {
           params.set("category", category);
         }
-        
+
         const response = await fetch(
           `/api/slideshow-library/posts?${params.toString()}`,
           {
@@ -136,7 +138,7 @@ export function MarketingHero({
         <div className="hero-background-container">
           {/* Gradient Overlay */}
           <div className="hero-gradient-overlay" />
-          
+
           {/* Animated Background */}
           <div className="hero-perspective-wrapper">
             <div className="hero-animated-grid">
@@ -151,10 +153,15 @@ export function MarketingHero({
                         src={imageUrl}
                         alt=""
                         fill
+                        /* Nur für die kleinen Kacheln: extrem klein halten */
                         sizes="125px"
-                        unoptimized
-                        style={{ objectFit: "cover", objectPosition: "center" }}
+                        /* Next darf optimieren -> erzeugt AVIF/WebP automatisch */
+                        quality={60}
+                        // Avoid Next.js runtime error: can't set both priority and loading
+                        // Use priority for first 2 rows, lazy for the rest
                         priority={rowIndex < 2}
+                        loading={rowIndex < 2 ? undefined : "lazy"}
+                        style={{ objectFit: "cover", objectPosition: "center" }}
                       />
                     </div>
                   ))}
@@ -196,17 +203,17 @@ export function MarketingHero({
             {heroTitle ? (
               (() => {
                 // Teile den Title in Wörter auf
-                const words = heroTitle.split(' ');
-                
+                const words = heroTitle.split(" ");
+
                 // Wenn weniger als 3 Wörter, zeige alles normal
                 if (words.length < 3) {
                   return <span className="block">{heroTitle}</span>;
                 }
-                
+
                 // Nimm die letzten 2 Wörter für den Gradient
-                const lastTwoWords = words.slice(-2).join(' ');
-                const restOfTitle = words.slice(0, -2).join(' ');
-                
+                const lastTwoWords = words.slice(-2).join(" ");
+                const restOfTitle = words.slice(0, -2).join(" ");
+
                 return (
                   <>
                     <span className="block sm:inline">{restOfTitle}&nbsp;</span>
@@ -237,7 +244,8 @@ export function MarketingHero({
             transition={{ delay: 0.15, duration: 0.6 }}
             className="mt-2 pb-4 text-lg sm:text-xl lg:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed font-light"
           >
-            {heroSubtitle || "Create viral TikTok slides in seconds. Visually stunning, authentic, and built to perform."}
+            {heroSubtitle ||
+              "Create viral TikTok slides in seconds. Visually stunning, authentic, and built to perform."}
           </motion.p>
 
           {/* CTA buttons */}
@@ -419,7 +427,8 @@ export function MarketingHero({
           display: flex;
           flex-direction: column;
           justify-content: flex-start;
-          transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg) translateX(1300px) translateZ(0);
+          transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
+            translateX(1300px) translateZ(0);
           transform-style: preserve-3d;
           animation: heroBackgroundMove 180s linear infinite alternate;
           /* Force GPU acceleration */
@@ -492,10 +501,12 @@ export function MarketingHero({
         /* Optimized Animation */
         @keyframes heroBackgroundMove {
           from {
-            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg) translateX(1300px) translateZ(0);
+            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
+              translateX(1300px) translateZ(0);
           }
           to {
-            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg) translateX(-190px) translateZ(0);
+            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
+              translateX(-190px) translateZ(0);
           }
         }
 

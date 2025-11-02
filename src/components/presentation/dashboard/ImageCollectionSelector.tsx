@@ -20,6 +20,7 @@ import {
 import { usePresentationState } from "@/states/presentation-state";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 
 interface ImageSetImage {
   id?: string;
@@ -343,11 +344,15 @@ export const ImageCollectionSelector: React.FC = () => {
                               "rounded-r-lg",
                           )}
                         >
-                          <img
+                          <Image
                             src={image.url}
                             alt={`All images preview ${index + 1}`}
-                            className="block h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                            width={160}
+                            height={160}
+                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                            quality={30}
                             loading="lazy"
+                            sizes="160px"
                           />
                         </div>
                       ))}
@@ -393,11 +398,15 @@ export const ImageCollectionSelector: React.FC = () => {
                               "rounded-r-lg",
                           )}
                         >
-                          <img
+                          <Image
                             src={image.url}
                             alt={`${set.name} preview ${index + 1}`}
-                            className="block h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                            width={160}
+                            height={160}
+                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                            quality={30}
                             loading="lazy"
+                            sizes="160px"
                           />
                         </div>
                       ))}
@@ -443,11 +452,15 @@ export const ImageCollectionSelector: React.FC = () => {
                             index === arr.length - 1 && "rounded-r-lg",
                           )}
                         >
-                          <img
+                          <Image
                             src={image.url}
                             alt={`${selectedImageSet.name} preview ${index + 1}`}
-                            className="block h-full w-full object-cover"
+                            width={160}
+                            height={160}
+                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                            quality={30}
                             loading="lazy"
+                            sizes="160px"
                           />
                         </div>
                       ),
