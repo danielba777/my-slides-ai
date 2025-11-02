@@ -19,13 +19,11 @@ export async function GET(request: NextRequest) {
       url += `?limit=${limit}`;
     }
 
-    const response = await fetch(url);
+    const response = await fetch(url, { cache: "no-store" });
     const data = await response.json();
-    // Browser-/Edge-caching für die Marketing-Hero-Query erlauben
-    return NextResponse.json(data, {
+        return NextResponse.json(data, {
       headers: {
-        // 5 Minuten frisch, 30 Minuten staled erlauben
-        "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=1800",
+        "Cache-Control": "no-store",
       },
     });
   } catch (error) {

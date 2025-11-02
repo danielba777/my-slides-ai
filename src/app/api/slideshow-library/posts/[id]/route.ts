@@ -13,11 +13,12 @@ export async function GET(
     const { id } = await params;
     const response = await fetch(
       `${API_BASE_URL}/slideshow-library/posts/${id}`,
+      { cache: "no-store" },
     );
     const data = await response.json();
     return NextResponse.json(data, {
       headers: {
-        "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=1800",
+        "Cache-Control": "no-store",
       },
     });
   } catch (error) {

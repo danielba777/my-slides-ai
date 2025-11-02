@@ -11,7 +11,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { Eye, FileText, Plus, Trash2, Users } from "lucide-react";
 import Link from "next/link";
@@ -22,6 +29,7 @@ interface SlideshowPost {
   id: string;
   postId: string;
   caption?: string;
+  categories?: string[];
   likeCount: number;
   viewCount: number;
   commentCount: number;
@@ -57,9 +65,6 @@ export default function SlideshowPostsPage() {
   const [accounts, setAccounts] = useState<SlideshowAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
-  const [editingPostId, setEditingPostId] = useState<string | null>(null);
-  const [promptDraft, setPromptDraft] = useState<string>("");
-  const [savingPostId, setSavingPostId] = useState<string | null>(null);
 
   useEffect(() => {
     loadAccounts();
@@ -68,6 +73,17 @@ export default function SlideshowPostsPage() {
 
   useEffect(() => {
     loadPosts();
+  }, [selectedAccount]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      loadPosts();
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccount]);
 
   const loadAccounts = async () => {
@@ -92,6 +108,7 @@ export default function SlideshowPostsPage() {
 
       const response = await fetch(
         `/api/slideshow-library/posts?${params.toString()}`,
+        { cache: "no-store" },
       );
       if (response.ok) {
         const data = await response.json();
@@ -129,67 +146,6 @@ export default function SlideshowPostsPage() {
     }
   };
 
-  const startEditingPrompt = (post: SlideshowPost) => {
-    setEditingPostId(post.id);
-    setPromptDraft(post.prompt ?? "");
-  };
-
-  const cancelEditingPrompt = () => {
-    setEditingPostId(null);
-    setPromptDraft("");
-  };
-
-  const savePrompt = async (post: SlideshowPost) => {
-    if (savingPostId) {
-      return;
-    }
-
-    const normalizedPrompt = promptDraft.trim();
-    const body = {
-      prompt: normalizedPrompt.length > 0 ? normalizedPrompt : null,
-    };
-
-    try {
-      setSavingPostId(post.id);
-      const response = await fetch(
-        `/api/slideshow-library/posts/${post.id}/prompt`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        },
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(
-          errorData?.error || "Prompt konnte nicht gespeichert werden",
-        );
-      }
-
-      const updated = (await response.json()) as SlideshowPost;
-      setPosts((prev) =>
-        prev.map((existing) =>
-          existing.id === post.id
-            ? { ...existing, prompt: updated.prompt ?? null }
-            : existing,
-        ),
-      );
-      toast.success("Prompt gespeichert");
-      setEditingPostId(null);
-      setPromptDraft("");
-    } catch (error) {
-      console.error("Error saving prompt:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Prompt konnte nicht gespeichert werden",
-      );
-    } finally {
-      setSavingPostId(null);
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -203,7 +159,7 @@ export default function SlideshowPostsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Slideshow Posts</h1>
           <p className="text-muted-foreground">
@@ -222,7 +178,6 @@ export default function SlideshowPostsPage() {
         </Link>
       </div>
 
-      {/* Filter */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center gap-4">
@@ -246,185 +201,177 @@ export default function SlideshowPostsPage() {
 
       {posts.length === 0 ? (
         <Card>
-          <CardContent className="flex items-center justify-center h-64">
+          <CardContent className="flex h-64 items-center justify-center">
             <div className="text-center text-muted-foreground">
-              <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <FileText className="mx-auto mb-4 h-12 w-12 opacity-50" />
               <p>Noch keine Posts vorhanden</p>
               <p className="text-sm">Erstelle deinen ersten Slideshow Post</p>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {posts.map((post) => {
-            const accountFromPost = post.account ?? null;
-            const accountFromList = accounts.find(
-              (candidate) =>
-                candidate.id === (accountFromPost?.id ?? post.accountId),
-            );
-            const profileImageUrl =
-              accountFromPost?.profileImageUrl ??
-              accountFromList?.profileImageUrl;
-            const displayName =
-              accountFromPost?.displayName ??
-              accountFromList?.displayName ??
-              "Unbekannter Account";
-            const usernameValue =
-              accountFromPost?.username ?? accountFromList?.username;
-            const username = usernameValue
-              ? `@${usernameValue}`
-              : "Account unbekannt";
-            const isEditingPrompt = editingPostId === post.id;
-            const isSavingPrompt = savingPostId === post.id;
-            const hasPrompt = (post.prompt ?? "").trim().length > 0;
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Übersicht
+              <Badge variant="secondary" className="text-xs">
+                {posts.length}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[28%]">Post</TableHead>
+                    <TableHead className="w-[20%]">Kategorien</TableHead>
+                    <TableHead className="w-[20%]">Account</TableHead>
+                    <TableHead className="w-[14%]">Performance</TableHead>
+                    <TableHead className="w-[8%]">Status</TableHead>
+                    <TableHead className="w-[10%] text-right">Aktionen</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {posts.map((post) => {
+                    const accountFromPost = post.account ?? null;
+                    const accountFromList = accounts.find(
+                      (candidate) =>
+                        candidate.id ===
+                        (accountFromPost?.id ?? post.accountId),
+                    );
+                    const profileImageUrl =
+                      accountFromPost?.profileImageUrl ??
+                      accountFromList?.profileImageUrl;
+                    const displayName =
+                      accountFromPost?.displayName ??
+                      accountFromList?.displayName ??
+                      "Unbekannter Account";
+                    const usernameValue =
+                      accountFromPost?.username ?? accountFromList?.username;
+                    const username = usernameValue
+                      ? `@${usernameValue}`
+                      : "Account unbekannt";
+                    const categories = Array.isArray(post.categories)
+                      ? post.categories
+                      : [];
 
-            return (
-              <Card key={post.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      {profileImageUrl ? (
-                        <img
-                          src={profileImageUrl}
-                          alt={displayName}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                          <Users className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div>
-                        <CardTitle className="text-base">
-                          {displayName}
-                        </CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          {username}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deletePost(post.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {/* Slideshow Preview */}
-                  <div className="grid grid-cols-3 gap-1">
-                    {post.slides.slice(0, 3).map((slide, index) => (
-                      <div key={slide.id} className="aspect-square">
-                        <img
-                          src={slide.imageUrl}
-                          alt={`Slide ${index + 1}`}
-                          className="w-full h-full object-cover rounded border"
-                        />
-                      </div>
-                    ))}
-                    {post.slideCount > 3 && (
-                      <div className="aspect-square bg-muted rounded border flex items-center justify-center">
-                        <span className="text-xs text-muted-foreground">
-                          +{post.slideCount - 3}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {post.caption && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {post.caption}
-                    </p>
-                  )}
-
-                  <div className="flex gap-2">
-                    <Badge variant="secondary" className="text-xs">
-                      {post.likeCount.toLocaleString()} Likes
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      {post.viewCount.toLocaleString()} Views
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      {post.slideCount} Slides
-                    </Badge>
-                  </div>
-
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(post.publishedAt).toLocaleDateString("de-DE")}
-                  </div>
-
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-semibold uppercase text-muted-foreground">
-                      Prompt
-                    </h3>
-                    {isEditingPrompt ? (
-                      <div className="space-y-2">
-                        <Textarea
-                          value={promptDraft}
-                          onChange={(event) =>
-                            setPromptDraft(event.target.value)
-                          }
-                          rows={4}
-                          placeholder="Prompt hinzufügen, um festzuhalten wie dieser Post erstellt wurde."
-                        />
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={cancelEditingPrompt}
-                            disabled={isSavingPrompt}
-                          >
-                            Abbrechen
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => savePrompt(post)}
-                            disabled={
-                              isSavingPrompt ||
-                              (post.prompt ?? "").trim() === promptDraft.trim()
-                            }
-                          >
-                            {isSavingPrompt ? "Speichert..." : "Speichern"}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
-                          {hasPrompt ? post.prompt : "Kein Prompt hinterlegt."}
-                        </p>
-                        <div className="flex justify-end">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => startEditingPrompt(post)}
-                          >
-                            {hasPrompt
-                              ? "Prompt bearbeiten"
-                              : "Prompt hinzufügen"}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <Link
-                    href={`/admin/slideshow-library/posts/${post.id}`}
-                    className={cn(
-                      buttonVariants({ variant: "outline", size: "sm" }),
-                      "w-full flex items-center justify-center gap-2",
-                    )}
-                  >
-                    <Eye className="h-4 w-4" />
-                    Details ansehen
-                  </Link>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                    return (
+                      <TableRow key={post.id} className="text-sm">
+                        <TableCell className="align-middle">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="h-12 w-12 overflow-hidden rounded border bg-muted">
+                              {post.slides.length > 0 ? (
+                                <img
+                                  src={post.slides[0]?.imageUrl}
+                                  alt={post.caption || `Post ${post.postId}`}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-[10px] text-muted-foreground">
+                                  Kein Bild
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="truncate font-medium">
+                                {`Post ${post.postId}`}
+                              </span>
+                              <Badge variant="outline" className="shrink-0 text-xs">
+                                {post.slideCount} Slides
+                              </Badge>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="align-middle">
+                          {categories.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {categories.map((category) => (
+                                <Badge
+                                  key={`${post.id}-${category}`}
+                                  variant="secondary"
+                                  className="text-xs"
+                                >
+                                  {category}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              Keine Kategorien
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="align-middle">
+                          <div className="flex min-w-0 items-center gap-2">
+                            {profileImageUrl ? (
+                              <img
+                                src={profileImageUrl}
+                                alt={displayName}
+                                className="h-8 w-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                                <Users className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                            )}
+                            <span className="truncate">{displayName}</span>
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              {username}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="align-middle">
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground sm:text-sm">
+                            <span>{post.likeCount.toLocaleString()} Likes</span>
+                            <span>{post.viewCount.toLocaleString()} Views</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="align-middle">
+                          <div className="flex items-center gap-3">
+                            <Badge
+                              variant={post.isActive ? "secondary" : "outline"}
+                              className="shrink-0 text-xs"
+                            >
+                              {post.isActive ? "Aktiv" : "Inaktiv"}
+                            </Badge>
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              {new Date(post.publishedAt).toLocaleDateString(
+                                "de-DE",
+                              )}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="align-middle text-right">
+                          <div className="flex justify-end gap-2">
+                            <Link
+                              href={`/admin/slideshow-library/posts/${post.id}`}
+                              aria-label="Details anzeigen"
+                              className={cn(
+                                buttonVariants({ variant: "outline", size: "icon" }),
+                              )}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => deletePost(post.id)}
+                              className="text-destructive hover:text-destructive"
+                              aria-label="Post löschen"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

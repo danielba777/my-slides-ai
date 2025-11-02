@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,9 +15,10 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Save, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Upload, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import type { KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -44,6 +46,7 @@ export default function CreatePostPage() {
     accountId: accountIdFromUrl || "",
     postId: "",
     caption: "",
+    categories: [] as string[],
     prompt: "",
     likeCount: 0,
     viewCount: 0,
@@ -56,6 +59,7 @@ export default function CreatePostPage() {
   const [uploadedSlides, setUploadedSlides] = useState<UploadedSlide[]>([]);
   const [isUploadingSlides, setIsUploadingSlides] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [categoryInput, setCategoryInput] = useState("");
 
   useEffect(() => {
     loadAccounts();
@@ -70,6 +74,49 @@ export default function CreatePostPage() {
       }
     } catch (error) {
       console.error("Error loading accounts:", error);
+    }
+  };
+
+  const normalizeCategory = (value: string) => value.trim();
+
+  const addCategory = () => {
+    const value = normalizeCategory(categoryInput);
+    if (!value) {
+      return;
+    }
+
+    setFormData((prev) => {
+      const existing = new Set(prev.categories.map((cat) => cat.toLowerCase()));
+      if (existing.has(value.toLowerCase())) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        categories: [...prev.categories, value],
+      };
+    });
+    setCategoryInput("");
+  };
+
+  const removeCategory = (category: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      categories: prev.categories.filter(
+        (existing) => existing.toLowerCase() !== category.toLowerCase(),
+      ),
+    }));
+  };
+
+  const handleCategoryKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addCategory();
+    } else if (event.key === "Backspace" && !categoryInput.length) {
+      setFormData((prev) => ({
+        ...prev,
+        categories: prev.categories.slice(0, -1),
+      }));
     }
   };
 
@@ -145,11 +192,25 @@ export default function CreatePostPage() {
         duration: 3,
       }));
 
+      const categoryMap = new Map<string, string>();
+      for (const category of formData.categories) {
+        const normalized = category.trim();
+        if (!normalized.length) {
+          continue;
+        }
+        const key = normalized.toLowerCase();
+        if (!categoryMap.has(key)) {
+          categoryMap.set(key, normalized);
+        }
+      }
+      const categories = Array.from(categoryMap.values());
+
       const response = await fetch("/api/slideshow-library/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
+          categories,
           prompt:
             formData.prompt.trim().length > 0 ? formData.prompt.trim() : null,
           publishedAt: formData?.publishedAt ? new Date(formData.publishedAt) : undefined,
@@ -269,6 +330,47 @@ export default function CreatePostPage() {
                 placeholder="Post Beschreibung"
                 rows={3}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="categoriesInput">Kategorien</Label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Input
+                  id="categoriesInput"
+                  value={categoryInput}
+                  onChange={(event) => setCategoryInput(event.target.value)}
+                  onKeyDown={handleCategoryKeyDown}
+                  placeholder="Kategorie hinzufügen und Enter drücken"
+                  className="sm:max-w-sm"
+                />
+                <Button type="button" variant="secondary" onClick={addCategory}>
+                  Hinzufügen
+                </Button>
+              </div>
+              {formData.categories.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {formData.categories.map((category) => (
+                    <Badge
+                      key={category}
+                      variant="secondary"
+                      className="flex items-center gap-1"
+                    >
+                      {category}
+                      <button
+                        type="button"
+                        onClick={() => removeCategory(category)}
+                        className="rounded-full p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                        aria-label={`Kategorie ${category} entfernen`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Lege eine oder mehrere Kategorien fest, z. B. „Marketing“ oder „Tutorial“.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="prompt">Prompt (optional)</Label>
