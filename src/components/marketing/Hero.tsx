@@ -130,18 +130,22 @@ export function MarketingHero({
   }, [posterImages]);
 
   return (
-    <Section className="relative min-h-[85vh] overflow-hidden bg-[#111] py-0 isolate">
+    <Section className="relative min-h-[85vh] overflow-hidden bg-[#111] py-0">
+      {/* Netflix Background - Fixed z-index hierarchy */}
       {posterMatrix.length > 0 && (
-        <div className="netflix-container" aria-hidden="true">
-          <div className="netflix-gradient" />
-          <div className="netflix-container-perspective">
-            <div className="netflix-container-background">
+        <div className="hero-background-container">
+          {/* Gradient Overlay */}
+          <div className="hero-gradient-overlay" />
+          
+          {/* Animated Background */}
+          <div className="hero-perspective-wrapper">
+            <div className="hero-animated-grid">
               {posterMatrix.map((row, rowIndex) => (
-                <div key={`hero-row-${rowIndex}`} className="netflix-box">
+                <div key={`hero-row-${rowIndex}`} className="hero-image-row">
                   {row.map((imageUrl, itemIndex) => (
                     <div
                       key={`hero-row-${rowIndex}-item-${itemIndex}`}
-                      className="netflix-thumbnail relative overflow-hidden"
+                      className="hero-image-card"
                     >
                       <Image
                         src={imageUrl}
@@ -161,7 +165,8 @@ export function MarketingHero({
         </div>
       )}
 
-      <div className="relative z-10 flex min-h-[89vh] flex-col justify-center px-5 sm:px-6 lg:pt-20 pt-20 pb-10">
+      {/* Foreground Content - Isolated stacking context */}
+      <div className="hero-content-wrapper">
         <div className="mx-auto max-w-5xl text-center">
           {/* Status badge */}
           <motion.div
@@ -353,8 +358,11 @@ export function MarketingHero({
           </motion.div>
         </div>
       </div>
+
+      {/* Optimized Styles - Fixed z-index hierarchy and GPU acceleration */}
       <style jsx global>{`
-        .netflix-container {
+        /* Background Container - Lowest layer */
+        .hero-background-container {
           position: absolute;
           top: 0;
           left: 0;
@@ -362,15 +370,20 @@ export function MarketingHero({
           height: 100%;
           overflow: hidden;
           background-color: #111;
-          z-index: 0;
+          z-index: 1;
           pointer-events: none;
+          /* Create isolated stacking context */
           isolation: isolate;
+          /* Promote to own layer */
+          will-change: transform;
+          transform: translateZ(0);
         }
 
-        .netflix-gradient {
+        /* Gradient Overlay - Above background */
+        .hero-gradient-overlay {
           position: absolute;
           inset: 0;
-          z-index: 1;
+          z-index: 2;
           background: linear-gradient(
             to bottom,
             rgba(0, 0, 0, 0.8) 15%,
@@ -380,78 +393,123 @@ export function MarketingHero({
             rgba(0, 0, 0, 1) 100%
           );
           opacity: 0.65;
-          will-change: auto;
+          pointer-events: none;
+          /* Fixed property for better performance */
+          will-change: opacity;
         }
 
-        .netflix-container-perspective {
-          perspective: 500px;
+        /* Perspective Wrapper */
+        .hero-perspective-wrapper {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
           height: 100%;
-          position: relative;
-          z-index: 0;
+          perspective: 500px;
+          perspective-origin: center center;
+          z-index: 1;
+          /* Contain layout and paint for performance */
+          contain: layout style paint;
         }
 
-        .netflix-container-background {
+        /* Animated Grid */
+        .hero-animated-grid {
+          width: 100%;
           height: 100%;
           display: flex;
           flex-direction: column;
           justify-content: flex-start;
-          transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
-            translateX(1300px);
+          transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg) translateX(1300px) translateZ(0);
           transform-style: preserve-3d;
-          animation: netflix_move 180s linear infinite alternate;
+          animation: heroBackgroundMove 180s linear infinite alternate;
+          /* Force GPU acceleration */
+          will-change: transform;
           backface-visibility: hidden;
           -webkit-backface-visibility: hidden;
+          -webkit-transform-style: preserve-3d;
         }
 
-        .netflix-box {
-          margin: 0px 0;
+        /* Image Rows */
+        .hero-image-row {
+          margin: 0;
           display: flex;
           justify-content: flex-end;
           width: 100%;
           flex-wrap: nowrap;
           flex-grow: 1;
-          transform: translateX(100px) translateY(-120px);
-        }
-        .netflix-box--reverse {
-          justify-content: flex-start;
-          transform: translateX(-100px) translateY(-120px);
+          transform: translateX(100px) translateY(-120px) translateZ(0);
+          /* Prevent layout thrashing */
+          contain: layout style;
         }
 
-        .netflix-thumbnail {
+        /* Individual Image Cards */
+        .hero-image-card {
+          position: relative;
           transform-style: preserve-3d;
-          transform: rotateX(20deg) rotateY(0deg) skewX(335deg);
+          transform: rotateX(20deg) rotateY(0deg) skewX(335deg) translateZ(0);
           min-width: 125px;
           min-height: 187px;
           display: inline-block;
-          background-position: center;
-          background-size: cover;
           margin: 7px;
           border-radius: 12px;
           box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
           opacity: 0.9;
+          overflow: hidden;
           backface-visibility: hidden;
           -webkit-backface-visibility: hidden;
+          /* Performance optimization */
+          will-change: transform;
         }
 
-        .netflix-cover {
-          transform-style: preserve-3d;
-          transform: rotateX(20deg) rotateY(0deg) skewX(335deg);
-          min-width: 120px;
-          min-height: 150px;
-          display: inline-block;
-          background-position: center;
-          background-size: cover;
-          margin: 0 0.2rem;
+        /* Content Wrapper - Highest layer */
+        .hero-content-wrapper {
+          position: relative;
+          z-index: 100;
+          /* Create new stacking context isolated from background */
+          isolation: isolate;
+          /* Promote to own layer */
+          will-change: transform;
+          transform: translateZ(0);
+          min-height: 89vh;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          padding: 5rem 1.25rem 2.5rem;
         }
 
-        @keyframes netflix_move {
+        @media (min-width: 640px) {
+          .hero-content-wrapper {
+            padding: 5rem 1.5rem 2.5rem;
+          }
+        }
+
+        @media (min-width: 1024px) {
+          .hero-content-wrapper {
+            padding-top: 5rem;
+          }
+        }
+
+        /* Optimized Animation */
+        @keyframes heroBackgroundMove {
           from {
-            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
-              translateX(1300px);
+            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg) translateX(1300px) translateZ(0);
           }
           to {
-            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
-              translateX(-190px);
+            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg) translateX(-190px) translateZ(0);
+          }
+        }
+
+        /* Force hardware acceleration for smooth animation */
+        @media (prefers-reduced-motion: no-preference) {
+          .hero-animated-grid {
+            animation-play-state: running;
+          }
+        }
+
+        /* Pause animation if user prefers reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+          .hero-animated-grid {
+            animation-play-state: paused;
           }
         }
       `}</style>
