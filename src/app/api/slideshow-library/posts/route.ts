@@ -10,13 +10,20 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limit = searchParams.get("limit");
     const accountId = searchParams.get("accountId");
+    const category = searchParams.get("category");
 
     let url = `${API_BASE_URL}/slideshow-library/posts`;
     if (accountId) {
       url = `${API_BASE_URL}/slideshow-library/accounts/${accountId}/posts`;
     }
-    if (limit) {
-      url += `?limit=${limit}`;
+    
+    const params = new URLSearchParams();
+    if (limit) params.set("limit", limit);
+    if (category) params.set("category", category);
+    
+    const paramString = params.toString();
+    if (paramString) {
+      url += `?${paramString}`;
     }
 
     const response = await fetch(url, { cache: "no-store" });

@@ -27,7 +27,17 @@ type HeroPost = {
   slides?: HeroSlide[];
 };
 
-export function MarketingHero({ session }: { session: boolean }) {
+export function MarketingHero({ 
+  session,
+  category,
+  heroTitle,
+  heroSubtitle,
+}: { 
+  session: boolean;
+  category?: string;
+  heroTitle?: string;
+  heroSubtitle?: string;
+}) {
   const [posterImages, setPosterImages] = useState<string[]>([]);
 
   useEffect(() => {
@@ -35,8 +45,13 @@ export function MarketingHero({ session }: { session: boolean }) {
 
     const fetchSlides = async () => {
       try {
+        const params = new URLSearchParams({ limit: HERO_FETCH_LIMIT.toString() });
+        if (category) {
+          params.set("category", category);
+        }
+        
         const response = await fetch(
-          `/api/slideshow-library/posts?limit=${HERO_FETCH_LIMIT}`,
+          `/api/slideshow-library/posts?${params.toString()}`,
           {
             cache: "no-store",
             signal: controller.signal,
@@ -89,7 +104,7 @@ export function MarketingHero({ session }: { session: boolean }) {
     return () => {
       controller.abort();
     };
-  }, []);
+  }, [category]);
 
   const posterMatrix = useMemo(() => {
     const perRow = HERO_POSTERS_PER_ROW;
@@ -173,14 +188,41 @@ export function MarketingHero({ session }: { session: boolean }) {
             transition={{ delay: 0.08, duration: 0.7 }}
             className="py-2 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight text-white"
           >
-            <span className="block">Automate TikTok slides</span>
-            {/* Mobile ≈3 Zeilen, ab sm → 2 Zeilen */}
-            <span className="block sm:inline sm:whitespace-nowrap">
-              that actually&nbsp;
-            </span>
-            <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
-              drive traffic
-            </span>
+            {heroTitle ? (
+              (() => {
+                // Teile den Title in Wörter auf
+                const words = heroTitle.split(' ');
+                
+                // Wenn weniger als 3 Wörter, zeige alles normal
+                if (words.length < 3) {
+                  return <span className="block">{heroTitle}</span>;
+                }
+                
+                // Nimm die letzten 2 Wörter für den Gradient
+                const lastTwoWords = words.slice(-2).join(' ');
+                const restOfTitle = words.slice(0, -2).join(' ');
+                
+                return (
+                  <>
+                    <span className="block sm:inline">{restOfTitle}&nbsp;</span>
+                    <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
+                      {lastTwoWords}
+                    </span>
+                  </>
+                );
+              })()
+            ) : (
+              <>
+                <span className="block">Automate TikTok slides</span>
+                {/* Mobile ≈3 Zeilen, ab sm → 2 Zeilen */}
+                <span className="block sm:inline sm:whitespace-nowrap">
+                  that actually&nbsp;
+                </span>
+                <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
+                  drive traffic
+                </span>
+              </>
+            )}
           </motion.h1>
 
           {/* Subheadline */}
@@ -190,8 +232,7 @@ export function MarketingHero({ session }: { session: boolean }) {
             transition={{ delay: 0.15, duration: 0.6 }}
             className="mt-2 pb-4 text-lg sm:text-xl lg:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed font-light"
           >
-            Create viral TikTok slides in seconds. Visually stunning, authentic,
-            and built to perform.
+            {heroSubtitle || "Create viral TikTok slides in seconds. Visually stunning, authentic, and built to perform."}
           </motion.p>
 
           {/* CTA buttons */}
