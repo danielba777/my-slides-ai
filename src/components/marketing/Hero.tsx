@@ -15,11 +15,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Section } from "./Section";
 
-// Reduziert anfängliche Bildflut deutlich (weniger Requests, schnellerer Paint)
-const HERO_POSTER_ROWS = 6;
-const HERO_POSTERS_PER_ROW = 16;
-const HERO_FETCH_LIMIT = 120;
-const HERO_MAX_TILES = HERO_POSTER_ROWS * HERO_POSTERS_PER_ROW;
+const HERO_POSTER_ROWS = 8;
+const HERO_POSTERS_PER_ROW = 28;
+const HERO_FETCH_LIMIT = 300;
 
 type HeroSlide = {
   imageUrl?: string | null;
@@ -29,8 +27,17 @@ type HeroPost = {
   slides?: HeroSlide[];
 };
 
-export function MarketingHero({ session }: { session: boolean }) {
-  const [email, setEmail] = useState("");
+export function MarketingHero({ 
+  session,
+  category,
+  heroTitle,
+  heroSubtitle,
+}: { 
+  session: boolean;
+  category?: string;
+  heroTitle?: string;
+  heroSubtitle?: string;
+}) {
   const [posterImages, setPosterImages] = useState<string[]>([]);
 
   useEffect(() => {
@@ -38,11 +45,15 @@ export function MarketingHero({ session }: { session: boolean }) {
 
     const fetchSlides = async () => {
       try {
+        const params = new URLSearchParams({ limit: HERO_FETCH_LIMIT.toString() });
+        if (category) {
+          params.set("category", category);
+        }
+        
         const response = await fetch(
-          `/api/slideshow-library/posts?limit=${HERO_FETCH_LIMIT}`,
+          `/api/slideshow-library/posts?${params.toString()}`,
           {
-            // Browser-Caching erlauben (API liefert Cache-Control)
-            // und Abbruch bei Navigationswechsel möglich
+            cache: "no-store",
             signal: controller.signal,
           },
         );
@@ -79,10 +90,7 @@ export function MarketingHero({ session }: { session: boolean }) {
           deduped[swapIndex] = current;
         }
 
-        // Nur so viele Bilder rendern, wie auch sichtbar sind
-        setPosterImages(
-          deduped.slice(0, HERO_POSTER_ROWS * HERO_POSTERS_PER_ROW),
-        );
+        setPosterImages(deduped);
       } catch (error) {
         if ((error as Error).name === "AbortError") {
           return;
@@ -96,7 +104,7 @@ export function MarketingHero({ session }: { session: boolean }) {
     return () => {
       controller.abort();
     };
-  }, []);
+  }, [category]);
 
   const posterMatrix = useMemo(() => {
     const perRow = HERO_POSTERS_PER_ROW;
@@ -110,13 +118,14 @@ export function MarketingHero({ session }: { session: boolean }) {
     for (let rowIndex = 0; rowIndex < totalRows; rowIndex++) {
       const row: string[] = [];
       for (let colIndex = 0; colIndex < perRow; colIndex++) {
-        // Wir haben die Liste bereits hart auf HERO_MAX_TILES begrenzt
-        const imageIndex = rowIndex * perRow + colIndex;
-        const img = posterImages[imageIndex];
-        if (img) row.push(img);
+        // Cycle through available images to ensure every position is filled
+        const imageIndex = (rowIndex * perRow + colIndex) % posterImages.length;
+        row.push(posterImages[imageIndex]!);
       }
+      // Add row without reversing to ensure all images are visible
       rows.push(row);
     }
+
     return rows;
   }, [posterImages]);
 
@@ -138,9 +147,10 @@ export function MarketingHero({ session }: { session: boolean }) {
                         src={imageUrl}
                         alt=""
                         fill
+                        sizes="125px"
                         unoptimized
-                        loading="lazy"
-                        className="object-cover"
+                        style={{ objectFit: "cover", objectPosition: "center" }}
+                        priority={rowIndex < 2}
                       />
                     </div>
                   ))}
@@ -178,14 +188,41 @@ export function MarketingHero({ session }: { session: boolean }) {
             transition={{ delay: 0.08, duration: 0.7 }}
             className="py-2 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight text-white"
           >
-            <span className="block">Automate TikTok slides</span>
-            {/* Mobile ≈3 Zeilen, ab sm → 2 Zeilen */}
-            <span className="block sm:inline sm:whitespace-nowrap">
-              that actually&nbsp;
-            </span>
-            <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
-              drive traffic
-            </span>
+            {heroTitle ? (
+              (() => {
+                // Teile den Title in Wörter auf
+                const words = heroTitle.split(' ');
+                
+                // Wenn weniger als 3 Wörter, zeige alles normal
+                if (words.length < 3) {
+                  return <span className="block">{heroTitle}</span>;
+                }
+                
+                // Nimm die letzten 2 Wörter für den Gradient
+                const lastTwoWords = words.slice(-2).join(' ');
+                const restOfTitle = words.slice(0, -2).join(' ');
+                
+                return (
+                  <>
+                    <span className="block sm:inline">{restOfTitle}&nbsp;</span>
+                    <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
+                      {lastTwoWords}
+                    </span>
+                  </>
+                );
+              })()
+            ) : (
+              <>
+                <span className="block">Automate TikTok slides</span>
+                {/* Mobile ≈3 Zeilen, ab sm → 2 Zeilen */}
+                <span className="block sm:inline sm:whitespace-nowrap">
+                  that actually&nbsp;
+                </span>
+                <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
+                  drive traffic
+                </span>
+              </>
+            )}
           </motion.h1>
 
           {/* Subheadline */}
@@ -195,8 +232,7 @@ export function MarketingHero({ session }: { session: boolean }) {
             transition={{ delay: 0.15, duration: 0.6 }}
             className="mt-2 pb-4 text-lg sm:text-xl lg:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed font-light"
           >
-            Create viral TikTok slides in seconds. Visually stunning, authentic,
-            and built to perform.
+            {heroSubtitle || "Create viral TikTok slides in seconds. Visually stunning, authentic, and built to perform."}
           </motion.p>
 
           {/* CTA buttons */}
@@ -422,18 +458,3 @@ export function MarketingHero({ session }: { session: boolean }) {
     </Section>
   );
 }
-
-// HINWEIS: Beim Rendern der Kacheln (dort wo <Image .../> benutzt wird)
-// sollte für die winzigen Poster unbedingt `unoptimized` + `sizes` gesetzt werden.
-// Beispiel (pseudocode, nur falls dort noch kein props-Objekt steht):
-// <Image
-// src={url}
-// alt=""
-// width={120}
-// height={120}
-// unoptimized
-// loading="lazy"
-// quality={50}
-// sizes="(max-width: 768px) 8vw, (max-width: 1200px) 5vw, 3vw"
-// className="rounded-md object-cover"
-// />

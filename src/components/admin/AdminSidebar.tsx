@@ -15,6 +15,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import {
+  EclipseIcon,
   FileText,
   Home,
   Image as ImageIcon,
@@ -65,6 +66,14 @@ const avatarItems: SidebarItem[] = [
     title: "Templates",
     url: "/admin/ai-avatars/templates",
     icon: ImageIcon,
+  },
+];
+
+const landingpageItems: SidebarItem[] = [
+  {
+    title: "Themes",
+    url: "/admin/landing-page/themes",
+    icon: EclipseIcon,
   },
 ];
 
@@ -127,6 +136,28 @@ export function AdminSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {avatarItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname === item.url}
+                  >
+                    <a href={item.url}>
+                      <item.icon className="h-5 w-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Landing Page</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {landingpageItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
