@@ -15,11 +15,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Section } from "./Section";
 
-// Reduziert anfängliche Bildflut deutlich (weniger Requests, schnellerer Paint)
-const HERO_POSTER_ROWS = 6;
-const HERO_POSTERS_PER_ROW = 16;
-const HERO_FETCH_LIMIT = 120;
-const HERO_MAX_TILES = HERO_POSTER_ROWS * HERO_POSTERS_PER_ROW;
+const HERO_POSTER_ROWS = 8;
+const HERO_POSTERS_PER_ROW = 28;
+const HERO_FETCH_LIMIT = 300;
 
 type HeroSlide = {
   imageUrl?: string | null;
@@ -30,7 +28,6 @@ type HeroPost = {
 };
 
 export function MarketingHero({ session }: { session: boolean }) {
-  const [email, setEmail] = useState("");
   const [posterImages, setPosterImages] = useState<string[]>([]);
 
   useEffect(() => {
@@ -41,8 +38,7 @@ export function MarketingHero({ session }: { session: boolean }) {
         const response = await fetch(
           `/api/slideshow-library/posts?limit=${HERO_FETCH_LIMIT}`,
           {
-            // Browser-Caching erlauben (API liefert Cache-Control)
-            // und Abbruch bei Navigationswechsel möglich
+            cache: "no-store",
             signal: controller.signal,
           },
         );
@@ -79,10 +75,7 @@ export function MarketingHero({ session }: { session: boolean }) {
           deduped[swapIndex] = current;
         }
 
-        // Nur so viele Bilder rendern, wie auch sichtbar sind
-        setPosterImages(
-          deduped.slice(0, HERO_POSTER_ROWS * HERO_POSTERS_PER_ROW),
-        );
+        setPosterImages(deduped);
       } catch (error) {
         if ((error as Error).name === "AbortError") {
           return;
@@ -110,13 +103,14 @@ export function MarketingHero({ session }: { session: boolean }) {
     for (let rowIndex = 0; rowIndex < totalRows; rowIndex++) {
       const row: string[] = [];
       for (let colIndex = 0; colIndex < perRow; colIndex++) {
-        // Wir haben die Liste bereits hart auf HERO_MAX_TILES begrenzt
-        const imageIndex = rowIndex * perRow + colIndex;
-        const img = posterImages[imageIndex];
-        if (img) row.push(img);
+        // Cycle through available images to ensure every position is filled
+        const imageIndex = (rowIndex * perRow + colIndex) % posterImages.length;
+        row.push(posterImages[imageIndex]!);
       }
+      // Add row without reversing to ensure all images are visible
       rows.push(row);
     }
+
     return rows;
   }, [posterImages]);
 
@@ -138,9 +132,10 @@ export function MarketingHero({ session }: { session: boolean }) {
                         src={imageUrl}
                         alt=""
                         fill
+                        sizes="125px"
                         unoptimized
-                        loading="lazy"
-                        className="object-cover"
+                        style={{ objectFit: "cover", objectPosition: "center" }}
+                        priority={rowIndex < 2}
                       />
                     </div>
                   ))}
@@ -422,18 +417,3 @@ export function MarketingHero({ session }: { session: boolean }) {
     </Section>
   );
 }
-
-// HINWEIS: Beim Rendern der Kacheln (dort wo <Image .../> benutzt wird)
-// sollte für die winzigen Poster unbedingt `unoptimized` + `sizes` gesetzt werden.
-// Beispiel (pseudocode, nur falls dort noch kein props-Objekt steht):
-// <Image
-// src={url}
-// alt=""
-// width={120}
-// height={120}
-// unoptimized
-// loading="lazy"
-// quality={50}
-// sizes="(max-width: 768px) 8vw, (max-width: 1200px) 5vw, 3vw"
-// className="rounded-md object-cover"
-// />
