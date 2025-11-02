@@ -8,32 +8,38 @@ interface CategoryPageProps {
   }>;
 }
 
+interface LandingPageTheme {
+  id: string;
+  category: string;
+  heroTitle?: string | null;
+  heroSubtitle?: string | null;
+  description?: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  isActive?: boolean | null;
+}
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { category } = await params;
   const session = await auth();
 
-  // Lade Theme-Daten für die Kategorie
-  let theme = null;
+  let theme: LandingPageTheme | null = null;
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/landing-page-themes/category/${category}`,
-      { cache: "no-store" }
+      `${API_BASE_URL}/api/landing-page-themes/category/${category}`,
+      { cache: "no-store" },
     );
-    
+
     if (response.ok) {
-      theme = await response.json();
-      
-      // Wenn kein Theme gefunden wurde oder Theme ist null, zeige 404
-      if (!theme) {
+      const payload = (await response.json()) as LandingPageTheme | null;
+      if (!payload || payload.isActive === false) {
         notFound();
       }
-      
-      // Prüfe ob Theme aktiv ist
-      if (!theme.isActive) {
-        notFound();
-      }
+      theme = payload;
     } else {
-      // Kein Theme für diese Kategorie -> 404
       notFound();
     }
   } catch (error) {
@@ -42,11 +48,11 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   }
 
   return (
-    <LandingPageContent 
-      session={!!session} 
+    <LandingPageContent
+      session={!!session}
       category={category}
-      heroTitle={theme.heroTitle}
-      heroSubtitle={theme.heroSubtitle}
+      heroTitle={theme?.heroTitle ?? undefined}
+      heroSubtitle={theme?.heroSubtitle ?? undefined}
     />
   );
 }
@@ -54,22 +60,20 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 // Generiere statische Seiten für alle aktiven Themes
 export async function generateStaticParams() {
   try {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/landing-page-themes`,
-      { cache: "no-store" }
-    );
-    
+    const response = await fetch(`${API_BASE_URL}/api/landing-page-themes`, {
+      cache: "no-store",
+    });
+
     if (!response.ok) {
       console.error("Failed to fetch themes for static generation");
       return [];
     }
-    
-    const themes = await response.json();
-    
-    // Nur aktive Themes generieren
+
+    const themes = (await response.json()) as LandingPageTheme[];
+
     return themes
-      .filter((theme: { isActive: boolean }) => theme.isActive)
-      .map((theme: { category: string }) => ({
+      .filter((theme) => theme.isActive !== false)
+      .map((theme) => ({
         category: theme.category,
       }));
   } catch (error) {
@@ -81,21 +85,26 @@ export async function generateStaticParams() {
 // Metadata für SEO
 export async function generateMetadata({ params }: CategoryPageProps) {
   const { category } = await params;
-  
-  // Lade Theme-Daten für Metadata
+
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/landing-page-themes/category/${category}`,
-      { cache: "no-store" }
+      `${API_BASE_URL}/api/landing-page-themes/category/${category}`,
+      { cache: "no-store" },
     );
-    
+
     if (response.ok) {
-      const theme = await response.json();
-      
+      const theme = (await response.json()) as LandingPageTheme | null;
+
       if (theme) {
         return {
-          title: theme.metaTitle || `SlidesCockpit - ${category.charAt(0).toUpperCase() + category.slice(1)} TikTok Slides`,
-          description: theme.metaDescription || `Erstelle virale TikTok Slides zum Thema ${category}.`,
+          title:
+            theme.metaTitle ??
+            `SlidesCockpit - ${
+              category.charAt(0).toUpperCase() + category.slice(1)
+            } TikTok Slides`,
+          description:
+            theme.metaDescription ??
+            `Erstelle virale TikTok Slides zum Thema ${category}.`,
         };
       }
     }
@@ -103,10 +112,10 @@ export async function generateMetadata({ params }: CategoryPageProps) {
     console.error("Error loading theme for metadata:", error);
   }
 
-  // Fallback falls Theme nicht geladen werden konnte
   return {
-    title: `SlidesCockpit - ${category.charAt(0).toUpperCase() + category.slice(1)} TikTok Slides`,
+    title: `SlidesCockpit - ${
+      category.charAt(0).toUpperCase() + category.slice(1)
+    } TikTok Slides`,
     description: `Erstelle virale TikTok Slides zum Thema ${category}.`,
   };
 }
-
