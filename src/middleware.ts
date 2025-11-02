@@ -14,8 +14,33 @@ export async function middleware(request: NextRequest) {
   }
 
   const publicPaths = new Set(["/", "/privacy", "/terms"]);
+
+  let isThemePage = false;
+  if (!session) {
+    const segments = path.split("/").filter(Boolean);
+    if (segments.length === 1) {
+      try {
+        const themeCheckUrl = new URL(
+          `/api/landing-page-themes/category/${segments[0]}`,
+          request.url,
+        );
+        const themeResponse = await fetch(themeCheckUrl, { cache: "no-store" });
+        if (themeResponse.ok) {
+          const theme = await themeResponse.json();
+          if (theme && theme.isActive !== false) {
+            isThemePage = true;
+          }
+        }
+      } catch (error) {
+        console.error("Theme lookup failed in middleware", error);
+      }
+    }
+  }
+
   const isPublicPath =
-    publicPaths.has(path) || path.startsWith("/integrations/social/tiktok");
+    publicPaths.has(path) ||
+    path.startsWith("/integrations/social/tiktok") ||
+    isThemePage;
 
   // If user is not authenticated and trying to access a protected route, redirect to sign-in
   if (
