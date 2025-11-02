@@ -60,7 +60,7 @@ export function AppLogo({
         alt="SlidesCockpit logo"
         width={750}
         height={750}
-        quality={100}
+        quality={85}
         priority={typeof size === "number" && size <= 64}
         className="h-full w-full object-contain"
       />

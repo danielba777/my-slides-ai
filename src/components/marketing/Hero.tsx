@@ -284,7 +284,7 @@ export function MarketingHero({
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
                   <ZapIcon className="w-5 h-5 text-white" />
                 </div>
-                <h3 className="text-white font-semibold">Live in seconds</h3>
+                <h2 className="text-white font-semibold">Live in seconds</h2>
               </div>
               <p className="text-gray-300 text-sm leading-relaxed">
                 From idea to finished slides instantly. No setup, no hassle.
@@ -296,9 +296,9 @@ export function MarketingHero({
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
                   <BarChart3Icon className="w-5 h-5 text-white" />
                 </div>
-                <h3 className="text-white font-semibold">
+                <h2 className="text-white font-semibold">
                   Templates that convert
-                </h3>
+                </h2>
               </div>
               <p className="text-gray-300 text-sm leading-relaxed">
                 Battle-tested winners. More reach, more followers.
@@ -310,7 +310,7 @@ export function MarketingHero({
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
                   <CheckCircle2Icon className="w-5 h-5 text-white" />
                 </div>
-                <h3 className="text-white font-semibold">Looks handcrafted</h3>
+                <h2 className="text-white font-semibold">Looks handcrafted</h2>
               </div>
               <p className="text-gray-300 text-sm leading-relaxed">
                 Creator aesthetic instead of AI vibe. Natural and trustworthy.
