@@ -15,6 +15,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import {
+  Download,
   EclipseIcon,
   FileText,
   Home,
@@ -58,6 +59,11 @@ const slideshowItems: SidebarItem[] = [
     title: "Posts",
     url: "/admin/slideshow-library/posts",
     icon: FileText,
+  },
+  {
+    title: "Download",
+    url: "/admin/slideshows/download",
+    icon: Download,
   },
 ];
 
