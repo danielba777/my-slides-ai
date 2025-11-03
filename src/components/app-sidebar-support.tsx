@@ -183,12 +183,12 @@ export function SidebarSupportButton() {
         }
       }}
     >
-      <SidebarMenu>
+      <SidebarMenu className="text-muted-foreground/80">
         <SidebarMenuItem>
           <DialogTrigger asChild>
             <SidebarMenuButton
               type="button"
-              className="font-semibold"
+              className="font-semibold text-muted-foreground/80 bg-transparent hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               tooltip="Support"
               onClick={() => setIsOpen(true)}
             >

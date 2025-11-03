@@ -24,8 +24,9 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { SidebarAccountSection } from "./app-sidebar-account";
-import { SidebarUsageSummary } from "./app-sidebar-usage";
+import { SidebarSettingsButton } from "./app-sidebar-settings";
 import { SidebarSupportButton } from "./app-sidebar-support";
+import { SidebarUsageSummary } from "./app-sidebar-usage";
 import { AppLogo } from "./logo/AppLogo";
 
 interface SidebarItem {
@@ -220,8 +221,11 @@ export function AppSidebar() {
         </SidebarGroup>
         */}
       </SidebarContent>
-      <SidebarFooter className="space-y-3">
-        <SidebarSupportButton />
+      <SidebarFooter className="space-y-2">
+        <div className="flex flex-col gap-1">
+          <SidebarSettingsButton />
+          <SidebarSupportButton />
+        </div>
         <SidebarUsageSummary />
         <SidebarAccountSection />
       </SidebarFooter>
