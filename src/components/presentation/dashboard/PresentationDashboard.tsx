@@ -66,6 +66,7 @@ export function PresentationDashboard({
   const [templatePosts, setTemplatePosts] = useState<TemplatePost[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [templateError, setTemplateError] = useState<string | null>(null);
+  const [generatingPromptForId, setGeneratingPromptForId] = useState<string | null>(null);
   const compactFormatter = useMemo(
     () =>
       new Intl.NumberFormat("en", {
@@ -97,11 +98,7 @@ export function PresentationDashboard({
           throw new Error("Prompts konnten nicht geladen werden");
         }
         const data = (await response.json()) as TemplatePost[];
-        setTemplatePosts(
-          Array.isArray(data)
-            ? data.filter((post) => (post.prompt ?? "").trim().length > 0)
-            : [],
-        );
+        setTemplatePosts(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error fetching templates:", error);
         setTemplateError(
@@ -117,21 +114,6 @@ export function PresentationDashboard({
     void fetchTemplates();
   }, [showTemplates, templatePosts.length, isLoadingTemplates]);
   const canGenerate = limits?.unlimited || (typeof limits?.slidesLeft === "number" && limits.slidesLeft > 0);
-  const promptCards = useMemo(
-    () =>
-      templatePosts.map((post) => {
-        const primarySlide =
-          post.slides?.find((slide) => slide.imageUrl)?.imageUrl ?? null;
-        return {
-          id: post.id,
-          prompt: post.prompt ?? "",
-          likeCount: post.likeCount,
-          viewCount: post.viewCount,
-          imageUrl: primarySlide,
-        };
-      }),
-    [templatePosts],
-  );
 
   const handleGenerate = async () => {
     if (!presentationInput.trim()) {
@@ -184,6 +166,44 @@ export function PresentationDashboard({
     toast.success("Prompt übernommen");
   };
 
+  const handleGeneratePrompt = async (postId: string, slides: TemplatePost['slides']) => {
+    setGeneratingPromptForId(postId);
+    try {
+      const response = await fetch("/api/slideshow-library/generate-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId, slides }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Prompt konnte nicht generiert werden");
+      }
+
+      const { prompt } = await response.json() as { prompt: string };
+      
+      // Update the post in the state with the new prompt
+      setTemplatePosts(prev => 
+        prev.map(post => 
+          post.id === postId ? { ...post, prompt } : post
+        )
+      );
+
+      // Copy to input
+      setPresentationInput(prompt);
+      setShowTemplates(false);
+      toast.success("Prompt wurde generiert und übernommen");
+    } catch (error) {
+      console.error("Error generating prompt:", error);
+      toast.error(
+        error instanceof Error 
+          ? error.message 
+          : "Prompt konnte nicht generiert werden"
+      );
+    } finally {
+      setGeneratingPromptForId(null);
+    }
+  };
+
   return (
     <div className="notebook-section relative h-full w-full">
       <div className="mx-auto max-w-4xl space-y-12 px-6 py-12">
@@ -220,56 +240,79 @@ export function PresentationDashboard({
               <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
                 {templateError}
               </div>
-            ) : promptCards.length === 0 ? (
+            ) : templatePosts.length === 0 ? (
               <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
                 Keine Prompts vorhanden.
               </div>
             ) : (
               <ScrollArea className="flex-1 pr-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {promptCards.map((card) => (
-                    <div key={card.id} className="flex flex-col gap-2">
-                      <div className="group relative overflow-hidden rounded-xl border bg-muted/30 transition hover:border-primary hover:shadow-lg">
-                        <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
-                          {card.imageUrl ? (
-                            <img
-                              src={card.imageUrl}
-                              alt="Slideshow preview"
-                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
-                              Keine Vorschau
-                            </div>
-                          )}
-                          <div className="absolute inset-x-0 bottom-0 p-3">
-                            <div className="rounded-xl backdrop-blur-sm">
-                              <div className="flex flex-col items-start gap-1 text-xs font-medium text-white">
-                                <span className="flex items-center gap-1">
-                                  <PlayIcon className="h-3.5 w-3.5" />
-                                  {formatCount(card.viewCount)} Views
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <HeartIcon className="h-3.5 w-3.5" />
-                                  {formatCount(card.likeCount)} Likes
-                                </span>
+                  {templatePosts.map((post) => {
+                    const primarySlide =
+                      post.slides?.find((slide) => slide.imageUrl)?.imageUrl ?? null;
+                    const hasPrompt = (post.prompt ?? "").trim().length > 0;
+                    const isGenerating = generatingPromptForId === post.id;
+
+                    return (
+                      <div key={post.id} className="flex flex-col gap-2">
+                        <div className="group relative overflow-hidden rounded-xl border bg-muted/30 transition hover:border-primary hover:shadow-lg">
+                          <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
+                            {primarySlide ? (
+                              <img
+                                src={primarySlide}
+                                alt="Slideshow preview"
+                                className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+                                Keine Vorschau
+                              </div>
+                            )}
+                            <div className="absolute inset-x-0 bottom-0 p-3">
+                              <div className="rounded-xl backdrop-blur-sm">
+                                <div className="flex flex-col items-start gap-1 text-xs font-medium text-white">
+                                  <span className="flex items-center gap-1">
+                                    <PlayIcon className="h-3.5 w-3.5" />
+                                    {formatCount(post.viewCount)} Views
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <HeartIcon className="h-3.5 w-3.5" />
+                                    {formatCount(post.likeCount)} Likes
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
-                      </div>
 
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full gap-2 border-2 border-zinc-900"
-                        onClick={() => handleSelectPrompt(card.prompt)}
-                      >
-                        <PlusIcon className="h-4 w-4" />
-                        Get Prompt
-                      </Button>
-                    </div>
-                  ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full gap-2 border-2 border-zinc-900"
+                          onClick={() => 
+                            hasPrompt 
+                              ? handleSelectPrompt(post.prompt ?? "") 
+                              : handleGeneratePrompt(post.id, post.slides)
+                          }
+                          disabled={isGenerating}
+                        >
+                          {isGenerating ? (
+                            <Spinner className="h-4 w-4" />
+                          ) : hasPrompt ? (
+                            <>
+                              <PlusIcon className="h-4 w-4" />
+                              Use Prompt
+                            </>
+                          ) : (
+                            <>
+                              <Wand2 className="h-4 w-4" />
+                              Get Prompt
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
               </ScrollArea>
             )}
