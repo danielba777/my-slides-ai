@@ -59,12 +59,8 @@ export const metadata: Metadata = {
     title: "SlidesCockpit - Make TikTok Slides & Automate Marketing",
     description:
       "Automated slideshows that drive traffic to your website, app, or business. Generate AI TikToks and create your own gen z marketing team.",
-    images: [
-      // Primär: großes Logo-Bild für Social Cards
-      { url: "/logo-og.png", width: 1200, height: 630, alt: "SlidesCockpit Logo" },
-      // Fallback: bestehendes Favicon, falls logo-og.png (noch) fehlt
-      { url: "/favicon.ico", width: 256, height: 256, alt: "SlidesCockpit Favicon" },
-    ],
+    /* Nutze die stabile dynamische OG-Route statt toter PNG-Referenzen */
+    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
   },
   robots: {
     index: true,
@@ -78,7 +74,7 @@ export const metadata: Metadata = {
     title: "SlidesCockpit - Make TikTok Slides & Automate Marketing",
     description:
       "Automated slideshows that drive traffic to your website, app, or business. Generate AI TikToks and create your own gen z marketing team.",
-    images: ["/logo-og.png", "/favicon.ico"],
+    images: ["/opengraph-image"],
   },
 };
 

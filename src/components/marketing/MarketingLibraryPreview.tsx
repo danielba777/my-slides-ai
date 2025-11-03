@@ -234,19 +234,16 @@ export function MarketingLibraryPreview() {
                       <img
                         src={post.imageUrl}
                         alt="slide preview"
-                        className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
                         loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
+                        className="absolute inset-0 h-full w-full object-cover"
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 text-gray-500 text-sm font-medium">
-                        <div className="text-center">
-                          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-gray-300">
-                            <PlayIcon className="h-6 w-6 text-gray-600" />
-                          </div>
-                          {isPlaceholder ? "Loading preview" : "No preview"}
-                        </div>
-                      </div>
-                    )}
+                       <div className="absolute inset-0">
+                         <div className="h-full w-full rounded-2xl bg-gradient-to-br from-[#e9efff] to-[#f5f8ff]" />
+                       </div>
+                     )}
 
                     {post.trending && !isPlaceholder ? (
                       <motion.div
