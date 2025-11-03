@@ -25,6 +25,13 @@ const config = {
       lastmod: new Date().toISOString(),
     };
   },
+  // Saubere, scanner-freundliche robots.txt
+  robotsTxtOptions: {
+    policies: [
+      { userAgent: "*", allow: "/" },
+    ],
+    additionalSitemaps: ["https://slidescockpit.com/sitemap.xml"],
+  },
 };
 
 export default config;

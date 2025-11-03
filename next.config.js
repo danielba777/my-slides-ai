@@ -51,10 +51,19 @@ const config = {
     remotePatterns: [
       { protocol: "https", hostname: "files.slidescockpit.com" },
       { protocol: "https", hostname: "utfs.io" },
-      { protocol: "https", hostname: "ufs.sh" },
+      { protocol: "https", hostname: "*.ufs.sh" },
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
       { protocol: "https", hostname: "placehold.co" },
+      // TikTok CDN (diverse pXX-Subdomains; nötig für Hero-Slides)
+      {
+        protocol: "https",
+        hostname: "*.tiktokcdn-eu.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.tiktokcdn.com",
+      },
     ],
   },
 

@@ -1,44 +1,106 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
 **_ Begin Patch
-_** Update File: src/app/dashboard/image-collections/page.tsx
+_** Update File: src/components/marketing/Hero.tsx
 @@
+return (
+<Section className="relative min-h-[85vh] overflow-hidden bg-[#111] py-0">
 
--                  {previewImages.length ? (
--                    {/* add symmetric inner padding so previews don't hug the card edges */}
--                    <div className="overflow-hidden rounded-xl px-2">
+-      {/* Netflix Background - Fixed z-index hierarchy */}
+-      {posterMatrix.length > 0 && (
+-        <div className="hero-background-container">
+-          {/* Gradient Overlay */}
+-          <div className="hero-gradient-overlay" />
+-
+-          {/* Animated Background */}
+-          <div className="hero-perspective-wrapper">
+-            <div className="hero-animated-grid">
+-              {posterMatrix.map((row, rowIndex) => (
+-                <div key={`hero-row-${rowIndex}`} className="hero-image-row">
+-                  {row.map((imageUrl, itemIndex) => (
+-                <div
+-                  key={`hero-row-${rowIndex}-item-${itemIndex}`}
+-                  className="hero-image-card" >
+-                      {isTikTokCdn(imageUrl) ? (
+-                        // Fallback auf <img> für TikTok-CDNs → keine Next-Whitelist nötig
+-                        <img
+-                          src={imageUrl}
+-                          alt=""
+-                          loading={rowIndex < 2 ? "eager" : "lazy"}
+-                          className="h-full w-full object-cover"
+-                          decoding="async"
+-                        />
+-                      ) : (
+-                        <Image
+-                          src={imageUrl}
+-                          alt=""
+-                          fill
+-                          /* Nur für die kleinen Kacheln: extrem klein halten */
+-                          sizes="125px"
+-                          /* Next darf optimieren -> erzeugt AVIF/WebP automatisch */
+-                          quality={60}
+-                          // Avoid Next.js runtime error: can't set both priority and loading
+-                          // Use priority for first 2 rows, lazy for the rest
+-                          priority={rowIndex < 2}
+-                          loading={rowIndex < 2 ? undefined : "lazy"}
+-                          style={{ objectFit: "cover", objectPosition: "center" }}
+-                        />
+-                      )}
+-                       </div>
+-                     ))}
+-                   </div>
+-                 ))}
+-                </div>
+-              ))}
+-            </div>
+-          </div>
+-        </div>
+-      )}
 
-*                  {previewImages.length ? (
-*                    <>
-*                      {/* add symmetric inner padding so previews don't hug the card edges */}
-*                      <div className="overflow-hidden rounded-xl px-2">
-  @@
-
--                      </div>
--                    </div>
-
-*                      </div>
-*                    </>
-                     ) : (
-                       <div className="text-xs text-muted-foreground">
-                         No preview images available
-                       </div>
-                     )}
-  @@
-
--            <button
-
-*            {/* bump only the create-card height to match the preview cards */}
-*            <button
-               type="button"
-               onClick={() => setCreating(true)}
-
--              /* bump only the create-card height to match the preview cards */
-                 className="group flex w-full items-center justify-center rounded-xl border-2 border-dashed bg-card p-2 text-sm text-muted-foreground transition hover:border-muted-foreground/60 hover:text-foreground min-h-[136px] md:min-h-[168px] lg:min-h-[200px]"
-               >
-                 <div className="flex items-center gap-2">
-                   <Plus className="h-4 w-4" />
-                   Create collection
-                 </div>
-               </button>
+*      {/* Netflix Background - Fixed z-index hierarchy */}
+*      {posterMatrix.length > 0 && (
+*        <div className="hero-background-container">
+*          {/* Gradient Overlay */}
+*          <div className="hero-gradient-overlay" />
+*
+*          {/* Animated Background */}
+*          <div className="hero-perspective-wrapper">
+*            <div className="hero-animated-grid">
+*              {posterMatrix.map((row, rowIndex) => (
+*                <div key={`hero-row-${rowIndex}`} className="hero-image-row">
+*                  {row.map((imageUrl, itemIndex) => (
+*                    <div
+*                      key={`hero-row-${rowIndex}-item-${itemIndex}`}
+*                      className="hero-image-card"
+*                    >
+*                      {isTikTokCdn(imageUrl) ? (
+*                        // Fallback auf <img> für TikTok-CDNs → keine Next-Whitelist nötig
+*                        <img
+*                          src={imageUrl}
+*                          alt=""
+*                          loading={rowIndex < 2 ? "eager" : "lazy"}
+*                          className="h-full w-full object-cover"
+*                          decoding="async"
+*                        />
+*                      ) : (
+*                        <Image
+*                          src={imageUrl}
+*                          alt=""
+*                          fill
+*                          sizes="125px"
+*                          quality={60}
+*                          // Use priority for first 2 rows, lazy for the rest
+*                          priority={rowIndex < 2}
+*                          loading={rowIndex < 2 ? undefined : "lazy"}
+*                          style={{ objectFit: "cover", objectPosition: "center" }}
+*                        />
+*                      )}
+*                    </div>
+*                  ))}
+*                </div>
+*              ))}
+*            </div>
+*          </div>
+*        </div>
+*      )}
   \*\*\* End Patch

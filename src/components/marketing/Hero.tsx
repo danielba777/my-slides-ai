@@ -112,24 +112,30 @@ export function MarketingHero({
     const perRow = HERO_POSTERS_PER_ROW;
     const totalRows = HERO_POSTER_ROWS;
 
-    // Until we have real images, render nothing (no placeholders).
-    if (!posterImages.length) return [];
+     // Until we have real images, render nothing (no placeholders).
+     if (!posterImages.length) return [];
 
-    // Create rows with guaranteed even distribution
-    const rows: string[][] = [];
-    for (let rowIndex = 0; rowIndex < totalRows; rowIndex++) {
-      const row: string[] = [];
-      for (let colIndex = 0; colIndex < perRow; colIndex++) {
-        // Cycle through available images to ensure every position is filled
-        const imageIndex = (rowIndex * perRow + colIndex) % posterImages.length;
-        row.push(posterImages[imageIndex]!);
-      }
-      // Add row without reversing to ensure all images are visible
-      rows.push(row);
+     const rows: string[][] = [];
+     for (let r = 0; r < totalRows; r++) {
+       const start = r * perRow;
+       const end = start + perRow;
+       rows.push(posterImages.slice(start, end));
+     }
+     return rows;
+
+}, [posterImages]);
+
+  // TikTok-Bilder NICHT über next/image rendern (Host-Whitelist von Next schlägt oft zu).
+  // Alles andere weiter mit next/image (Optimierung bleibt erhalten).
+  const isTikTokCdn = (urlStr: string) => {
+    try {
+      const u = new URL(urlStr);
+      // Beispiele: p16-pu-sign-no.tiktokcdn-eu.com, p19-common-sign-useastred.tiktokcdn-eu.com, ...
+      return /(^|\.)tiktokcdn(?:-eu)?\.com$/i.test(u.hostname);
+    } catch {
+      return false;
     }
-
-    return rows;
-  }, [posterImages]);
+  };
 
   return (
     <Section className="relative min-h-[85vh] overflow-hidden bg-[#111] py-0">
@@ -149,20 +155,31 @@ export function MarketingHero({
                       key={`hero-row-${rowIndex}-item-${itemIndex}`}
                       className="hero-image-card"
                     >
-                      <Image
-                        src={imageUrl}
-                        alt=""
-                        fill
-                        /* Nur für die kleinen Kacheln: extrem klein halten */
-                        sizes="125px"
-                        /* Next darf optimieren -> erzeugt AVIF/WebP automatisch */
-                        quality={60}
-                        // Avoid Next.js runtime error: can't set both priority and loading
-                        // Use priority for first 2 rows, lazy for the rest
-                        priority={rowIndex < 2}
-                        loading={rowIndex < 2 ? undefined : "lazy"}
-                        style={{ objectFit: "cover", objectPosition: "center" }}
-                      />
+                      {isTikTokCdn(imageUrl) ? (
+                        // Fallback auf <img> für TikTok-CDNs → keine Next-Whitelist nötig
+                        <img
+                          src={imageUrl}
+                          alt=""
+                          loading={rowIndex < 2 ? "eager" : "lazy"}
+                          className="h-full w-full object-cover"
+                          decoding="async"
+                        />
+                      ) : (
+                        <Image
+                          src={imageUrl}
+                          alt=""
+                          fill
+                          /* Nur für die kleinen Kacheln: extrem klein halten */
+                          sizes="125px"
+                          /* Next darf optimieren -> erzeugt AVIF/WebP automatisch */
+                          quality={60}
+                          // Avoid Next.js runtime error: can't set both priority and loading
+                          // Use priority for first 2 rows, lazy for the rest
+                          priority={rowIndex < 2}
+                          loading={rowIndex < 2 ? undefined : "lazy"}
+                          style={{ objectFit: "cover", objectPosition: "center" }}
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
