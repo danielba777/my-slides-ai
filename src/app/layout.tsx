@@ -60,22 +60,11 @@ export const metadata: Metadata = {
     description:
       "Automated slideshows that drive traffic to your website, app, or business. Generate AI TikToks and create your own gen z marketing team.",
     images: [
-      {
-        url: "https://slidescockpit.com/favicon.ico",
-        width: 1200,
-        height: 630,
-        alt: "SlidesCockpit",
-      },
+      // Primär: großes Logo-Bild für Social Cards
+      { url: "/logo-og.png", width: 1200, height: 630, alt: "SlidesCockpit Logo" },
+      // Fallback: bestehendes Favicon, falls logo-og.png (noch) fehlt
+      { url: "/favicon.ico", width: 256, height: 256, alt: "SlidesCockpit Favicon" },
     ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    site: "@ArluOfficial",
-    creator: "@ArluOfficial",
-    title: "SlidesCockpit - Make TikTok Slides & Automate Marketing",
-    description:
-      "Automated slideshows that drive traffic to your website, app, or business. Generate AI TikToks and create your own gen z marketing team.",
-    images: ["https://slidescockpit.com/favicon.ico"],
   },
   robots: {
     index: true,
@@ -83,6 +72,13 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: "/favicon.ico",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SlidesCockpit - Make TikTok Slides & Automate Marketing",
+    description:
+      "Automated slideshows that drive traffic to your website, app, or business. Generate AI TikToks and create your own gen z marketing team.",
+    images: ["/logo-og.png", "/favicon.ico"],
   },
 };
 
@@ -96,38 +92,7 @@ export default function RootLayout({
       <head>
         <meta name="color-scheme" content="light dark" />
 
-        {/* JSON-LD: Organization + Website */}
-        <Script
-          id="ld-org"
-          type="application/ld+json"
-          strategy="afterInteractive"
-        >
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Organization",
-            name: "SlidesCockpit",
-            url: "https://slidescockpit.com/",
-            logo: "https://slidescockpit.com/favicon.ico",
-          })}
-        </Script>
-        <Script
-          id="ld-website"
-          type="application/ld+json"
-          strategy="afterInteractive"
-        >
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "WebSite",
-            name: "SlidesCockpit",
-            url: "https://slidescockpit.com/",
-            potentialAction: {
-              "@type": "SearchAction",
-              target: "https://slidescockpit.com/?q={search_term_string}",
-              "query-input": "required name=search_term_string",
-            },
-          })}
-        </Script>
-      </head>
+        </head>
       <body
         className={`${tiktokSans.variable} font-sans antialiased bg-[#F3F4EF]`}
         suppressHydrationWarning
