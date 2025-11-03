@@ -24,8 +24,9 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { SidebarAccountSection } from "./app-sidebar-account";
-import { SidebarUsageSummary } from "./app-sidebar-usage";
+import { SidebarSettingsButton } from "./app-sidebar-settings";
 import { SidebarSupportButton } from "./app-sidebar-support";
+import { SidebarUsageSummary } from "./app-sidebar-usage";
 import { AppLogo } from "./logo/AppLogo";
 
 interface SidebarItem {
@@ -99,7 +100,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarContent>
+      <SidebarContent className="px-2">
         <div className="flex justify-center items-center gap-2 py-4">
           <AppLogo size={32} borderRadius={6} />
           <p className="text-lg font-bold">SlidesCockpit</p>
@@ -126,7 +127,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>Playground</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sm">Playground</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {playgroundItems.map((item) => (
@@ -147,7 +148,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>Ressources</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sm">Ressources</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {resourceItems.map((item) => (
@@ -168,7 +169,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>Posts</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sm">Posts</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {postItems.map((item) => (
@@ -220,8 +221,11 @@ export function AppSidebar() {
         </SidebarGroup>
         */}
       </SidebarContent>
-      <SidebarFooter className="space-y-3">
-        <SidebarSupportButton />
+      <SidebarFooter className="space-y-2">
+        <div className="flex flex-col gap-1 px-2">
+          <SidebarSettingsButton />
+          <SidebarSupportButton />
+        </div>
         <SidebarUsageSummary />
         <SidebarAccountSection />
       </SidebarFooter>

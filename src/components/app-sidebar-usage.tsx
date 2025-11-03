@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -111,8 +112,15 @@ export function SidebarUsageSummary() {
 
   if (isLoading || !usage) {
     return (
-      <div className="rounded-xl border border-muted/40 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-        Loading usage…
+      <div
+        className={cn(
+          "rounded-xl border-zinc-300 border px-3 py-3 text-xs flex flex-col gap-2",
+          "bg-[#F1F2ED]",
+        )}
+      >
+        <Skeleton className="h-4 w-32 mx-auto" />
+        <Skeleton className="h-3 w-28 mx-auto" />
+        <Skeleton className="h-8 w-full rounded-sm" />
       </div>
     );
   }
@@ -120,16 +128,16 @@ export function SidebarUsageSummary() {
   return (
     <div
       className={cn(
-        "rounded-xl border px-3 py-2 text-xs",
-        "bg-[#F7F8F3] border-sidebar-border/80 text-sidebar-foreground/90",
+        "rounded-xl border-zinc-300 border px-3 py-2 text-xs flex flex-col gap-1",
+        "bg-[#F1F2ED] text-sidebar-foreground/90",
       )}
     >
-      <div className="mt-2 text-sm text-center font-medium text-sidebar-foreground">
+      <div className="text-sm text-center font-medium text-sidebar-foreground">
         <span>{renderSlides()}</span>
         <span className="mx-2 text-sidebar-foreground/60">|</span>
         <span>{renderAiCredits()}</span>
       </div>
-      <div className="flex items-center justify-center text-sidebar-foreground text-center mt-2">
+      <div className="flex items-center justify-center text-sidebar-foreground text-center">
         {usage.plan ? (
           <span className="text-[11px] uppercase tracking-wide text-sidebar-foreground/60">
             {usage.plan} Plan
@@ -140,11 +148,11 @@ export function SidebarUsageSummary() {
           </span>
         )}
       </div>
-      <div className="mt-3">
+      <div className="">
         <Button
           variant="outline"
           size="sm"
-          className="w-full rounded-full border-sidebar-border/80 bg-[#F7F8F3]/60 text-sidebar-foreground hover:bg-sidebar/70 disabled:opacity-40"
+          className="w-full rounded-sm border-sidebar-border/80 bg-[#F7F8F3]/60 text-sidebar-foreground hover:bg-sidebar/70 disabled:opacity-40"
           disabled={!usage.hasActiveSubscription || isBillingRedirecting}
           onClick={async () => {
             if (!usage.hasActiveSubscription) {
