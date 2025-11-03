@@ -3,15 +3,26 @@
 import { createEmptyPresentation } from "@/app/_actions/presentation/presentationActions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { usePresentationState } from "@/states/presentation-state";
-import { HeartIcon, PlayIcon, PlusIcon, Wand2 } from "lucide-react";
+import {
+  ArrowUpDown,
+  HeartIcon,
+  PlayIcon,
+  PlusIcon,
+  Wand2,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ImageCollectionSelector } from "./ImageCollectionSelector";
-import { PresentationControls } from "./PresentationControls";
 import { PresentationInput } from "./PresentationInput";
 
 interface TemplatePost {
@@ -46,7 +57,10 @@ export function PresentationDashboard({
     setPresentationInput,
   } = usePresentationState();
 
-  const [limits, setLimits] = useState<{ slidesLeft: number; unlimited: boolean } | null>(null);
+  const [limits, setLimits] = useState<{
+    slidesLeft: number;
+    unlimited: boolean;
+  } | null>(null);
   const [limitsLoading, setLimitsLoading] = useState(false);
 
   useEffect(() => {
@@ -56,7 +70,10 @@ export function PresentationDashboard({
         const res = await fetch("/api/billing/limits", { cache: "no-store" });
         if (!res.ok) return;
         const data = await res.json();
-        setLimits({ slidesLeft: data?.slidesLeft ?? 0, unlimited: !!data?.unlimited });
+        setLimits({
+          slidesLeft: data?.slidesLeft ?? 0,
+          unlimited: !!data?.unlimited,
+        });
       } finally {
         setLimitsLoading(false);
       }
@@ -66,7 +83,12 @@ export function PresentationDashboard({
   const [templatePosts, setTemplatePosts] = useState<TemplatePost[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [templateError, setTemplateError] = useState<string | null>(null);
-  const [generatingPromptForId, setGeneratingPromptForId] = useState<string | null>(null);
+  const [generatingPromptForId, setGeneratingPromptForId] = useState<
+    string | null
+  >(null);
+  const [sortBy, setSortBy] = useState<
+    "views-most" | "views-least" | "likes-most" | "likes-least"
+  >("views-most");
   const compactFormatter = useMemo(
     () =>
       new Intl.NumberFormat("en", {
@@ -113,7 +135,9 @@ export function PresentationDashboard({
 
     void fetchTemplates();
   }, [showTemplates, templatePosts.length, isLoadingTemplates]);
-  const canGenerate = limits?.unlimited || (typeof limits?.slidesLeft === "number" && limits.slidesLeft > 0);
+  const canGenerate =
+    limits?.unlimited ||
+    (typeof limits?.slidesLeft === "number" && limits.slidesLeft > 0);
 
   const handleGenerate = async () => {
     if (!presentationInput.trim()) {
@@ -160,13 +184,10 @@ export function PresentationDashboard({
     }
   };
 
-  const handleSelectPrompt = (prompt: string) => {
-    setPresentationInput(prompt);
-    setShowTemplates(false);
-    toast.success("Prompt übernommen");
-  };
-
-  const handleGeneratePrompt = async (postId: string, slides: TemplatePost['slides']) => {
+  const handleGeneratePrompt = async (
+    postId: string,
+    slides: TemplatePost["slides"],
+  ) => {
     setGeneratingPromptForId(postId);
     try {
       const response = await fetch("/api/slideshow-library/generate-prompt", {
@@ -179,13 +200,11 @@ export function PresentationDashboard({
         throw new Error("Prompt konnte nicht generiert werden");
       }
 
-      const { prompt } = await response.json() as { prompt: string };
-      
+      const { prompt } = (await response.json()) as { prompt: string };
+
       // Update the post in the state with the new prompt
-      setTemplatePosts(prev => 
-        prev.map(post => 
-          post.id === postId ? { ...post, prompt } : post
-        )
+      setTemplatePosts((prev) =>
+        prev.map((post) => (post.id === postId ? { ...post, prompt } : post)),
       );
 
       // Copy to input
@@ -195,12 +214,43 @@ export function PresentationDashboard({
     } catch (error) {
       console.error("Error generating prompt:", error);
       toast.error(
-        error instanceof Error 
-          ? error.message 
-          : "Prompt konnte nicht generiert werden"
+        error instanceof Error
+          ? error.message
+          : "Prompt konnte nicht generiert werden",
       );
     } finally {
       setGeneratingPromptForId(null);
+    }
+  };
+
+  const sortedPosts = useMemo(() => {
+    const posts = [...templatePosts];
+    switch (sortBy) {
+      case "views-most":
+        return posts.sort((a, b) => b.viewCount - a.viewCount);
+      case "views-least":
+        return posts.sort((a, b) => a.viewCount - b.viewCount);
+      case "likes-most":
+        return posts.sort((a, b) => b.likeCount - a.likeCount);
+      case "likes-least":
+        return posts.sort((a, b) => a.likeCount - b.likeCount);
+      default:
+        return posts;
+    }
+  }, [templatePosts, sortBy]);
+
+  const getSortLabel = () => {
+    switch (sortBy) {
+      case "views-most":
+        return "Views (Most)";
+      case "views-least":
+        return "Views (Least)";
+      case "likes-most":
+        return "Likes (Most)";
+      case "likes-least":
+        return "Likes (Least)";
+      default:
+        return "Sort";
     }
   };
 
@@ -211,27 +261,57 @@ export function PresentationDashboard({
           <PresentationInput handleGenerate={handleGenerate} />
           <ImageCollectionSelector />
           <div className="flex flex-col items-end gap-1">
-          <div className="flex items-center gap-2">
-            <Button
-              className="gap-2"
-              onClick={() => (canGenerate ? handleGenerate() : router.push("/#pricing"))}
-              disabled={isGeneratingOutline || !presentationInput.trim() || limitsLoading}
-              variant={canGenerate ? "default" : "secondary"}
-            >
-              <Wand2 className="h-4 w-4" />
-              {canGenerate ? "Generate" : "Upgrade Now"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                className="gap-2"
+                onClick={() =>
+                  canGenerate ? handleGenerate() : router.push("/#pricing")
+                }
+                disabled={
+                  isGeneratingOutline ||
+                  !presentationInput.trim() ||
+                  limitsLoading
+                }
+                variant={canGenerate ? "default" : "secondary"}
+              >
+                <Wand2 className="h-4 w-4" />
+                {canGenerate ? "Generate" : "Upgrade Now"}
+              </Button>
+            </div>
           </div>
-        </div>
         </div>
       </div>
 
       <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
-        <DialogContent className="max-h-[85vh] w-full max-w-6xl overflow-hidden p-0 sm:rounded-xl">
-          <div className="flex h-[74vh] flex-col px-6 pb-6 pt-6 gap-6">
-            <h2 className="text-2xl font-semibold">
-              SlidesCockpit TikTok Library
-            </h2>
+        <DialogContent className="max-h-[95vh] w-full h-full max-w-[95vw] overflow-hidden pt-4 pb-0 px-0 sm:rounded-xl">
+          <div className="flex h-[93vh] flex-col px-6 pb-6 pt-6 gap-6">
+            <div className="flex items-center justify-between pr-4">
+              <h2 className="text-2xl font-semibold">
+                SlidesCockpit TikTok Library
+              </h2>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <ArrowUpDown className="h-4 w-4" />
+                    {getSortLabel()}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setSortBy("views-most")}>
+                    Views (Most)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSortBy("views-least")}>
+                    Views (Least)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSortBy("likes-most")}>
+                    Likes (Most)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSortBy("likes-least")}>
+                    Likes (Least)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             {isLoadingTemplates ? (
               <div className="flex flex-1 items-center justify-center">
                 <Spinner className="h-8 w-8" />
@@ -240,17 +320,17 @@ export function PresentationDashboard({
               <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
                 {templateError}
               </div>
-            ) : templatePosts.length === 0 ? (
+            ) : sortedPosts.length === 0 ? (
               <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                Keine Prompts vorhanden.
+                Keine Posts vorhanden.
               </div>
             ) : (
               <ScrollArea className="flex-1 pr-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {templatePosts.map((post) => {
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7">
+                  {sortedPosts.map((post) => {
                     const primarySlide =
-                      post.slides?.find((slide) => slide.imageUrl)?.imageUrl ?? null;
-                    const hasPrompt = (post.prompt ?? "").trim().length > 0;
+                      post.slides?.find((slide) => slide.imageUrl)?.imageUrl ??
+                      null;
                     const isGenerating = generatingPromptForId === post.id;
 
                     return (
@@ -289,23 +369,16 @@ export function PresentationDashboard({
                           type="button"
                           variant="outline"
                           className="w-full gap-2 border-2 border-zinc-900"
-                          onClick={() => 
-                            hasPrompt 
-                              ? handleSelectPrompt(post.prompt ?? "") 
-                              : handleGeneratePrompt(post.id, post.slides)
+                          onClick={() =>
+                            handleGeneratePrompt(post.id, post.slides)
                           }
                           disabled={isGenerating}
                         >
                           {isGenerating ? (
                             <Spinner className="h-4 w-4" />
-                          ) : hasPrompt ? (
-                            <>
-                              <PlusIcon className="h-4 w-4" />
-                              Use Prompt
-                            </>
                           ) : (
                             <>
-                              <Wand2 className="h-4 w-4" />
+                              <PlusIcon className="h-4 w-4" />
                               Get Prompt
                             </>
                           )}
