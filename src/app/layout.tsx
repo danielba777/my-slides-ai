@@ -1,5 +1,6 @@
-import NextAuthProvider from "@/provider/NextAuthProvider";
 import TanstackQueryProvider from "@/components/providers/TanstackQueryProvider";
+import { ToasterProvider } from "@/components/providers/ToasterProvider";
+import NextAuthProvider from "@/provider/NextAuthProvider";
 import { ThemeProvider } from "@/provider/theme-provider";
 import "@/styles/globals.css";
 import { type Metadata } from "next";
@@ -96,7 +97,11 @@ export default function RootLayout({
         <meta name="color-scheme" content="light dark" />
 
         {/* JSON-LD: Organization + Website */}
-        <Script id="ld-org" type="application/ld+json" strategy="afterInteractive">
+        <Script
+          id="ld-org"
+          type="application/ld+json"
+          strategy="afterInteractive"
+        >
           {JSON.stringify({
             "@context": "https://schema.org",
             "@type": "Organization",
@@ -105,7 +110,11 @@ export default function RootLayout({
             logo: "https://slidescockpit.com/favicon.ico",
           })}
         </Script>
-        <Script id="ld-website" type="application/ld+json" strategy="afterInteractive">
+        <Script
+          id="ld-website"
+          type="application/ld+json"
+          strategy="afterInteractive"
+        >
           {JSON.stringify({
             "@context": "https://schema.org",
             "@type": "WebSite",
@@ -131,6 +140,7 @@ export default function RootLayout({
               disableTransitionOnChange
             >
               {children}
+              <ToasterProvider />
             </ThemeProvider>
           </NextAuthProvider>
         </TanstackQueryProvider>
