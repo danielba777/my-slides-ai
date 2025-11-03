@@ -470,10 +470,11 @@ export function MarketingHero({
           will-change: transform;
         }
 
-        /* Content Wrapper - Highest layer */
+        /* Content Wrapper - keep it BELOW the fixed navbar (navbar is z-50) */
         .hero-content-wrapper {
           position: relative;
-          z-index: 100;
+          /* Navbar has z-50 — set hero below it to avoid overlapping while scrolling */
+          z-index: 20;
           /* Create new stacking context isolated from background */
           isolation: isolate;
           /* Promote to own layer */
