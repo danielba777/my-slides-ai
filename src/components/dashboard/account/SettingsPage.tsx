@@ -29,7 +29,7 @@ export default function SettingsPage() {
               md:sticky md:top-20 h-fit
               rounded-2xl border bg-background/70 p-2
               shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/60
-              md:flex md:flex-col
+              md:flex md:flex-col gap-1
             "
           >
             <div className="px-2 pb-2 pt-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -39,32 +39,36 @@ export default function SettingsPage() {
               value="personal"
               className="
                 group relative w-full justify-start rounded-xl px-3 py-2 text-left
-                transition-colors
-                hover:bg-muted/40
-                data-[state=active]:bg-[#304674]/10 data-[state=active]:ring-1 data-[state=active]:ring-[#304674]/20
+                transition-all duration-200
+                hover:bg-muted/50
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#304674]/40
+                data-[state=active]:bg-[#304674]/12 data-[state=active]:ring-1 data-[state=active]:ring-[#304674]/20
+                aria-selected:font-medium
+                after:content-[''] after:absolute after:left-1.5 after:top-1/2 after:-translate-y-1/2 after:h-5 after:w-1 after:rounded-full after:bg-[#304674] after:opacity-0 group-data-[state=active]:after:opacity-100
               "
             >
               <span className="inline-flex items-center gap-2">
-                <UserRound className="h-4 w-4 opacity-70 group-data-[state=active]:opacity-100" />
+                <UserRound className="h-4 w-4 opacity-70 transition-transform group-hover:scale-105 group-data-[state=active]:opacity-100" />
                 <span>Personal</span>
               </span>
-              <span className="absolute right-2 top-1/2 hidden h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-[#304674] group-data-[state=active]:block" />
             </TabsTrigger>
 
             <TabsTrigger
               value="connections"
               className="
                 group relative mt-1 w-full justify-start rounded-xl px-3 py-2 text-left
-                transition-colors
-                hover:bg-muted/40
-                data-[state=active]:bg-[#304674]/10 data-[state=active]:ring-1 data-[state=active]:ring-[#304674]/20
+                transition-all duration-200
+                hover:bg-muted/50
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#304674]/40
+                data-[state=active]:bg-[#304674]/12 data-[state=active]:ring-1 data-[state=active]:ring-[#304674]/20
+                aria-selected:font-medium
+                after:content-[''] after:absolute after:left-1.5 after:top-1/2 after:-translate-y-1/2 after:h-5 after:w-1 after:rounded-full after:bg-[#304674] after:opacity-0 group-data-[state=active]:after:opacity-100
               "
             >
               <span className="inline-flex items-center gap-2">
-                <Link2 className="h-4 w-4 opacity-70 group-data-[state=active]:opacity-100" />
+                <Link2 className="h-4 w-4 opacity-70 transition-transform group-hover:scale-105 group-data-[state=active]:opacity-100" />
                 <span>Connections</span>
               </span>
-              <span className="absolute right-2 top-1/2 hidden h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-[#304674] group-data-[state=active]:block" />
             </TabsTrigger>
           </TabsList>
 
@@ -72,7 +76,7 @@ export default function SettingsPage() {
           <div className="space-y-6">
             {/* PERSONAL */}
             <TabsContent value="personal" className="m-0">
-              <Card className="overflow-hidden rounded-2xl border bg-card">
+              <Card className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <CardContent className="p-6 md:p-8">
                   <ProfileBilling />
                 </CardContent>
@@ -81,7 +85,7 @@ export default function SettingsPage() {
 
             {/* CONNECTIONS */}
             <TabsContent value="connections" className="m-0">
-              <Card className="overflow-hidden rounded-2xl border bg-card">
+              <Card className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <CardContent className="p-6 md:p-8">
                   <SettingsConnections />
                 </CardContent>
