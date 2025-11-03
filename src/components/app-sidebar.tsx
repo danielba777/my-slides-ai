@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/sidebar";
 import { SidebarAccountSection } from "./app-sidebar-account";
 import { SidebarUsageSummary } from "./app-sidebar-usage";
+import { SidebarSupportButton } from "./app-sidebar-support";
 import { AppLogo } from "./logo/AppLogo";
 
 interface SidebarItem {
@@ -220,6 +221,7 @@ export function AppSidebar() {
         */}
       </SidebarContent>
       <SidebarFooter className="space-y-3">
+        <SidebarSupportButton />
         <SidebarUsageSummary />
         <SidebarAccountSection />
       </SidebarFooter>
