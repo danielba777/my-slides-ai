@@ -3,6 +3,7 @@
 import { Ellipsis, LifeBuoy, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useState, type ReactNode } from "react";
+import toast from "react-hot-toast";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +27,7 @@ type SupportOptionConfig = {
   label: string;
   title: string;
   subject: string;
-  icon: () => ReactNode;
+  icon: ReactNode;
 };
 
 const SUPPORT_OPTIONS: SupportOptionConfig[] = [
@@ -35,21 +36,25 @@ const SUPPORT_OPTIONS: SupportOptionConfig[] = [
     label: "Issue",
     title: "Report an issue",
     subject: "Report an issue",
-    icon: () => <span className="text-3xl leading-none">⚠️</span>,
+    icon: <span className="text-4xl leading-none">⚠️</span>,
   },
   {
     value: "idea",
     label: "Idea",
     title: "Share an idea",
     subject: "Share an idea",
-    icon: () => <span className="text-3xl leading-none">💡</span>,
+    icon: <span className="text-4xl leading-none">💡</span>,
   },
   {
     value: "other",
     label: "Other",
     title: "Tell us anything!",
     subject: "Tell us anything!",
-    icon: () => <Ellipsis className="h-8 w-8" />,
+    icon: (
+      <span className="flex items-center justify-center rounded-full text-foreground">
+        <Ellipsis className="h-9 w-9" strokeWidth={2.8} />
+      </span>
+    ),
   },
 ];
 
@@ -71,6 +76,7 @@ export function SidebarSupportButton() {
   );
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<FormStatus>(createInitialStatus);
+  const [isOpen, setIsOpen] = useState(false);
   const { data: session } = useSession();
 
   const selectedOptionConfig = selectedOption
@@ -98,6 +104,7 @@ export function SidebarSupportButton() {
         success: false,
         error: "Please choose a support topic before sending.",
       });
+      toast.error("Please choose a support topic before sending.");
       return;
     }
 
@@ -111,6 +118,9 @@ export function SidebarSupportButton() {
         error:
           "We could not find your email address. Please contact support directly.",
       });
+      toast.error(
+        "We could not find your email address. Please contact support directly.",
+      );
       return;
     }
 
@@ -121,6 +131,7 @@ export function SidebarSupportButton() {
         success: false,
         error: "Please enter a short description before sending.",
       });
+      toast.error("Please enter a short description before sending.");
       return;
     }
 
@@ -144,14 +155,19 @@ export function SidebarSupportButton() {
         throw new Error(data.error || "Failed to send support request");
       }
 
-      setStatus({ loading: false, success: true, error: null });
+      setStatus(createInitialStatus());
       setMessage("");
+      setIsOpen(false);
+      setTimeout(() => {
+        toast.success("Thanks for your message! We'll respond shortly.");
+      }, 150);
     } catch (error) {
       const messageText =
         error instanceof Error
           ? error.message
           : "Failed to send support request";
       setStatus({ loading: false, success: false, error: messageText });
+      toast.error(messageText);
     }
   };
 
@@ -159,7 +175,9 @@ export function SidebarSupportButton() {
 
   return (
     <Dialog
+      open={isOpen}
       onOpenChange={(open) => {
+        setIsOpen(open);
         if (!open) {
           resetDialog();
         }
@@ -172,6 +190,7 @@ export function SidebarSupportButton() {
               type="button"
               className="font-semibold"
               tooltip="Support"
+              onClick={() => setIsOpen(true)}
             >
               <LifeBuoy className="h-5 w-5" />
               <span className="font-semibold">Support</span>
@@ -180,7 +199,10 @@ export function SidebarSupportButton() {
         </SidebarMenuItem>
       </SidebarMenu>
 
-      <DialogContent shouldHaveClose={false} className="max-w-md space-y-5">
+      <DialogContent
+        shouldHaveClose={false}
+        className="max-w-md space-y-5 bg-white"
+      >
         <div className="flex items-start justify-between">
           <DialogTitle>
             {selectedOptionConfig?.title ?? "What's on your mind?"}
@@ -199,22 +221,16 @@ export function SidebarSupportButton() {
               <Button
                 key={option.value}
                 variant="outline"
-                className="flex flex-col items-center gap-2 py-12"
+                className="flex flex-col items-center gap-3 border-muted/40 bg-muted/30 py-12 text-foreground hover:bg-muted"
                 onClick={() => handleOptionSelect(option)}
               >
-                <span className="text-2xl">{option.icon()}</span>
-                <span className="font-semibold">{option.label}</span>
+                {option.icon}
+                <span className="text-sm font-semibold">{option.label}</span>
               </Button>
             ))}
           </div>
         ) : (
           <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-            {status.success ? (
-              <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700">
-                Thanks for your message! We&apos;ll respond shortly.
-              </div>
-            ) : null}
-
             {status.error ? (
               <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {status.error}
