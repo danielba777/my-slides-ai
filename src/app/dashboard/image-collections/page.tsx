@@ -321,7 +321,8 @@ export default function ImageCollectionsPage() {
                      </div>
 
                   {previewImages.length ? (
-                    <div className="rounded-xl overflow-hidden">
+                    <div className="overflow-hidden -mx-2">
+                      {/* stretch preview to full card width (cancel inner p-2) */}
                       <div className="grid grid-cols-5 gap-0">
                         {previewImages.map((image, index) => (
                           <div
@@ -355,7 +356,8 @@ export default function ImageCollectionsPage() {
             <button
               type="button"
               onClick={() => setCreating(true)}
-              className="group flex w-full items-center justify-center rounded-xl border-2 border-dashed bg-card p-2 text-sm text-muted-foreground transition hover:border-muted-foreground/60 hover:text-foreground h-24 md:h-32 lg:h-40"
+              /* bump only the create-card height to match the preview cards */
+              className="group flex w-full items-center justify-center rounded-xl border-2 border-dashed bg-card p-2 text-sm text-muted-foreground transition hover:border-muted-foreground/60 hover:text-foreground min-h-[136px] md:min-h-[168px] lg:min-h-[200px]"
             >
               <div className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
