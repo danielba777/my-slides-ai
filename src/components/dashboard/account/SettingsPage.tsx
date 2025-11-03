@@ -7,25 +7,21 @@ import { Link2, UserRound } from "lucide-react";
 import SettingsConnections from "./SettingsConnections";
 export default function SettingsPage() {
   return (
-    <div className="px-4 md:px-6 py-8 md:py-10">
-      {/* Page Header */}
-      <div className="mx-auto w-full max-w-6xl">
-        <div className="mb-8 flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-            Settings
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Configure your account, subscription and integrations.
-          </p>
-        </div>
-      </div>
+    <div className="w-full px-10 py-12 space-y-8">
+      {/* Page Header (match dashboard pages) */}
+      <header className="space-y-1">
+        <h1 className="text-3xl font-semibold">Settings</h1>
+        <p className="text-sm text-muted-foreground">
+          Configure your account, subscription and integrations.
+        </p>
+      </header>
 
-      {/* Main */}
-      <Tabs
-        defaultValue="personal"
-        orientation="vertical"
-        className="mx-auto w-full max-w-6xl"
-      >
+       {/* Main */}
+       <Tabs
+         defaultValue="personal"
+         orientation="vertical"
+         className="w-full"
+       >
         <div className="grid grid-cols-1 gap-6 md:grid-cols-[260px_1fr]">
           {/* Left: vertical nav (modern SaaS look) */}
           <TabsList
@@ -85,7 +81,7 @@ export default function SettingsPage() {
 
             {/* CONNECTIONS */}
             <TabsContent value="connections" className="m-0">
-              <Card className="overflow-hidden rounded-2xl bg-card border-0">
+              <Card className="overflow-hidden rounded-2xl border bg-card">
                 <CardContent className="p-6 md:p-8">
                   <SettingsConnections />
                 </CardContent>
