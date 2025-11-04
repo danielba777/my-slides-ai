@@ -70,6 +70,41 @@ function pickFirstString(values: unknown): string | undefined {
   return undefined;
 }
 
+const PREFERRED_IMAGE_EXTENSIONS = [".jpeg", ".jpg", ".png", ".webp"];
+
+function pickPreferredImageUrl(...sources: Array<unknown>): string | undefined {
+  const urls: string[] = [];
+
+  const pushUrl = (value: unknown) => {
+    if (typeof value === "string" && value.trim().length > 0) {
+      urls.push(value.trim());
+    }
+  };
+
+  for (const source of sources) {
+    if (!source) continue;
+    if (Array.isArray(source)) {
+      for (const item of source) {
+        pushUrl(item);
+      }
+    } else {
+      pushUrl(source);
+    }
+  }
+
+  if (urls.length === 0) {
+    return undefined;
+  }
+
+  const hasPreferredExtension = (url: string) => {
+    const base = url.split("?")[0]?.toLowerCase() ?? "";
+    return PREFERRED_IMAGE_EXTENSIONS.some((ext) => base.endsWith(ext));
+  };
+
+  const preferred = urls.find(hasPreferredExtension);
+  return preferred ?? urls[0];
+}
+
 async function callApify(payload: Record<string, unknown>) {
   const response = await fetch(
     `https://api.apify.com/v2/acts/scraptik~tiktok-api/run-sync-get-dataset-items?token=${process.env.APIFY_API_KEY}`,
@@ -261,12 +296,12 @@ export async function ingestTikTokPost({
   const video = (awemeDetail as any)?.video ?? {};
   const imagePostInfo = (awemeDetail as any)?.image_post_info ?? {};
   const coverImage =
-    pickFirstString(video?.cover?.url_list) ??
-    pickFirstString(video?.dynamic_cover?.url_list) ??
-    pickFirstString(video?.origin_cover?.url_list) ??
-    pickFirstString(imagePostInfo?.image_post_cover?.display_image?.url_list) ??
-    pickFirstString(imagePostInfo?.image_post_cover?.thumbnail?.url_list) ??
-    pickFirstString(
+    pickPreferredImageUrl(video?.cover?.url_list) ??
+    pickPreferredImageUrl(video?.dynamic_cover?.url_list) ??
+    pickPreferredImageUrl(video?.origin_cover?.url_list) ??
+    pickPreferredImageUrl(
+      imagePostInfo?.image_post_cover?.display_image?.url_list,
+      imagePostInfo?.image_post_cover?.thumbnail?.url_list,
       imagePostInfo?.image_post_cover?.owner_watermark_image?.url_list,
     );
 
@@ -290,12 +325,12 @@ export async function ingestTikTokPost({
           image,
           index,
         ) => {
-          const imageUrl = pickFirstString([
-            ...(image?.display_image?.url_list ?? []),
-            ...(image?.owner_watermark_image?.url_list ?? []),
-            ...(image?.user_watermark_image?.url_list ?? []),
-            ...(image?.thumbnail?.url_list ?? []),
-          ]);
+        const imageUrl = pickPreferredImageUrl(
+          image?.display_image?.url_list ?? [],
+          image?.owner_watermark_image?.url_list ?? [],
+          image?.user_watermark_image?.url_list ?? [],
+          image?.thumbnail?.url_list ?? [],
+        );
 
           if (!imageUrl) {
             return slides;
