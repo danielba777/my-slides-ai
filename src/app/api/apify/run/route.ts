@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 
 if (!process.env.APIFY_API_KEY) {
   throw new Error("APIFY_API_KEY is not set");
@@ -8,6 +11,12 @@ const API_BASE_URL =
   process.env.SLIDESCOCKPIT_API ||
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:3000";
+
+const SHOULD_SAVE_APIFY_RESPONSES =
+  (process.env.APIFY_SAVE_RESPONSES ?? "").toLowerCase() === "true" ||
+  process.env.NODE_ENV !== "production";
+const APIFY_RESPONSE_DIR =
+  process.env.APIFY_RESPONSE_DIR ?? ".apify-debug-responses";
 
 const toPositiveInt = (value: unknown) => {
   const maybeNumber = Number(value);
@@ -70,6 +79,35 @@ function pickFirstString(values: unknown): string | undefined {
   return undefined;
 }
 
+async function saveApifyResponse(
+  type: "account" | "post" | "unknown",
+  requestPayload: Record<string, unknown>,
+  responsePayload: unknown,
+) {
+  if (!SHOULD_SAVE_APIFY_RESPONSES) {
+    return;
+  }
+
+  try {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `${timestamp}-${type}-${randomUUID()}.txt`;
+    const outputDir = path.resolve(process.cwd(), APIFY_RESPONSE_DIR);
+
+    await mkdir(outputDir, { recursive: true });
+
+    const content = [
+      `Type: ${type}`,
+      `Timestamp: ${new Date().toISOString()}`,
+      `Request: ${JSON.stringify(requestPayload, null, 2)}`,
+      `Response: ${JSON.stringify(responsePayload, null, 2)}`,
+    ].join("\n\n");
+
+    await writeFile(path.join(outputDir, filename), content, "utf8");
+  } catch (error) {
+    console.error("Failed to persist Apify response", error);
+  }
+}
+
 async function callApify(payload: Record<string, unknown>) {
   const response = await fetch(
     `https://api.apify.com/v2/acts/scraptik~tiktok-api/run-sync-get-dataset-items?token=${process.env.APIFY_API_KEY}`,
@@ -81,6 +119,14 @@ async function callApify(payload: Record<string, unknown>) {
   );
 
   const json = await response.json();
+  const responseType =
+    typeof payload.post_awemeId === "string"
+      ? "post"
+      : typeof payload.profile_username === "string"
+        ? "account"
+        : "unknown";
+
+  await saveApifyResponse(responseType, payload, json);
 
   if (!response.ok) {
     throw new ApifyIngestError(
@@ -211,8 +257,7 @@ export async function ingestTikTokPost({
 
     if (!accountData) {
       throw new ApifyIngestError(
-        accountError?.error ??
-          "Failed to create or resolve slideshow account",
+        accountError?.error ?? "Failed to create or resolve slideshow account",
         500,
         {
           details: accountError,
@@ -272,9 +317,7 @@ export async function ingestTikTokPost({
     new Map(
       categories.map((cat) => [cat.toLowerCase(), cat] as [string, string]),
     ).values(),
-  ).filter(
-    (cat): cat is string => typeof cat === "string" && cat.length > 0,
-  );
+  ).filter((cat): cat is string => typeof cat === "string" && cat.length > 0);
 
   const video = (awemeDetail as any)?.video ?? {};
   const imagePostInfo = (awemeDetail as any)?.image_post_info ?? {};
@@ -295,43 +338,51 @@ export async function ingestTikTokPost({
       : undefined;
 
   const defaultSlideDuration =
-    (durationSeconds && durationSeconds > 0 ? durationSeconds : undefined) ??
-    3;
+    (durationSeconds && durationSeconds > 0 ? durationSeconds : undefined) ?? 3;
 
   const imageSlides = Array.isArray(imagePostInfo?.images)
-    ? imagePostInfo.images.reduce<
-        Array<{ slideIndex: number; imageUrl: string; duration?: number }>
-      >((slides, image, index) => {
-        const imageUrl = pickFirstString([
-          ...(image?.display_image?.url_list ?? []),
-          ...(image?.owner_watermark_image?.url_list ?? []),
-          ...(image?.user_watermark_image?.url_list ?? []),
-          ...(image?.thumbnail?.url_list ?? []),
-        ]);
+    ? (imagePostInfo.images as Array<Record<string, any>>).reduce(
+        (
+          slides: Array<{
+            slideIndex: number;
+            imageUrl: string;
+            duration?: number;
+          }>,
+          image,
+          index,
+        ) => {
+          const imageUrl = pickFirstString([
+            ...(image?.display_image?.url_list ?? []),
+            ...(image?.owner_watermark_image?.url_list ?? []),
+            ...(image?.user_watermark_image?.url_list ?? []),
+            ...(image?.thumbnail?.url_list ?? []),
+          ]);
 
-        if (!imageUrl) {
+          if (!imageUrl) {
+            return slides;
+          }
+
+          const perImageDuration = toPositiveInt(
+            image?.duration ??
+              image?.image_duration ??
+              image?.display_image?.duration ??
+              0,
+          );
+
+          slides.push({
+            slideIndex: index,
+            imageUrl,
+            ...(perImageDuration > 0
+              ? { duration: perImageDuration }
+              : defaultSlideDuration > 0
+                ? { duration: defaultSlideDuration }
+                : {}),
+          });
+
           return slides;
-        }
-
-        const perImageDuration = toPositiveInt(
-          image?.duration ??
-            image?.image_duration ??
-            image?.display_image?.duration ??
-            0,
-        );
-
-        slides.push({
-          slideIndex: index,
-          imageUrl,
-          ...(perImageDuration > 0
-            ? { duration: perImageDuration }
-            : defaultSlideDuration > 0
-              ? { duration: defaultSlideDuration }
-              : {}),
-        });
-
-        return slides;
-      }, [])
+        },
+        [],
+      )
     : [];
 
   const slidesPayload =
@@ -363,14 +414,11 @@ export async function ingestTikTokPost({
   };
 
   let postData: any = null;
-  const postResponse = await fetch(
-    `${API_BASE_URL}/slideshow-library/posts`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(postPayload),
-    },
-  );
+  const postResponse = await fetch(`${API_BASE_URL}/slideshow-library/posts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(postPayload),
+  });
 
   if (postResponse.ok) {
     postData = await postResponse.json();
