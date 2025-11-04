@@ -110,6 +110,13 @@ export async function ingestTikTokPost({
   });
 
   const accountDetail = accountFetch.items?.[0] ?? null;
+  const accountUser =
+    accountDetail &&
+    typeof accountDetail === "object" &&
+    (accountDetail as Record<string, unknown>)?.user &&
+    typeof (accountDetail as Record<string, unknown>).user === "object"
+      ? ((accountDetail as Record<string, any>).user ?? accountDetail)
+      : accountDetail;
 
   if (!accountDetail || typeof accountDetail !== "object") {
     throw new ApifyIngestError(
@@ -120,21 +127,21 @@ export async function ingestTikTokPost({
   }
 
   const accountAvatarUrls: Array<unknown> = [
-    ...(accountDetail?.avatar_larger?.url_list ?? []),
-    ...(accountDetail?.avatar_300x300?.url_list ?? []),
-    ...(accountDetail?.avatar_medium?.url_list ?? []),
-    ...(accountDetail?.avatar_thumb?.url_list ?? []),
+    ...(accountUser?.avatar_larger?.url_list ?? []),
+    ...(accountUser?.avatar_300x300?.url_list ?? []),
+    ...(accountUser?.avatar_medium?.url_list ?? []),
+    ...(accountUser?.avatar_thumb?.url_list ?? []),
   ];
   const accountProfileImageUrl = pickFirstString(accountAvatarUrls);
 
   const accountUsername = (
-    accountDetail?.unique_id ??
-    accountDetail?.short_id ??
+    accountUser?.unique_id ??
+    accountUser?.short_id ??
     trimmedProfileUsername
   )
     ?.toString()
     .trim();
-  const accountDisplayName = (accountDetail?.nickname ?? accountUsername)
+  const accountDisplayName = (accountUser?.nickname ?? accountUsername)
     ?.toString()
     .trim();
 
@@ -150,18 +157,18 @@ export async function ingestTikTokPost({
     username: accountUsername,
     displayName: accountDisplayName,
     bio:
-      typeof accountDetail?.signature === "string" &&
-      accountDetail.signature.trim().length
-        ? accountDetail.signature.trim()
+      typeof accountUser?.signature === "string" &&
+      accountUser.signature.trim().length
+        ? accountUser.signature.trim()
         : undefined,
     profileImageUrl: accountProfileImageUrl ?? undefined,
-    followerCount: toPositiveInt(accountDetail?.follower_count),
-    followingCount: toPositiveInt(accountDetail?.following_count),
+    followerCount: toPositiveInt(accountUser?.follower_count),
+    followingCount: toPositiveInt(accountUser?.following_count),
     isVerified: Boolean(
-      accountDetail?.verified ??
-        accountDetail?.custom_verify ??
-        accountDetail?.enterprise_verify_reason ??
-        accountDetail?.is_star,
+      accountUser?.verified ??
+        accountUser?.custom_verify ??
+        accountUser?.enterprise_verify_reason ??
+        accountUser?.is_star,
     ),
   };
 
@@ -204,8 +211,7 @@ export async function ingestTikTokPost({
 
     if (!accountData) {
       throw new ApifyIngestError(
-        accountError?.error ??
-          "Failed to create or resolve slideshow account",
+        accountError?.error ?? "Failed to create or resolve slideshow account",
         500,
         {
           details: accountError,
@@ -242,9 +248,6 @@ export async function ingestTikTokPost({
 
   const author = (awemeDetail as any)?.author ?? accountDetail ?? {};
   const statistics = (awemeDetail as any)?.statistics ?? {};
-  const textExtra = Array.isArray((awemeDetail as any)?.text_extra)
-    ? (awemeDetail as any).text_extra
-    : [];
 
   const awemeIdFromDetail =
     (awemeDetail as any)?.aweme_id?.toString() ?? awemeId;
@@ -255,25 +258,17 @@ export async function ingestTikTokPost({
       : Date.now(),
   );
 
-  const categories = textExtra
-    .map((item: any) => item?.hashtag_name ?? item?.hashtag_name_with_symbol)
-    .filter((value: unknown): value is string => typeof value === "string")
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0);
-
-  const uniqueCategories = Array.from(
-    new Map(
-      categories.map((cat) => [cat.toLowerCase(), cat] as [string, string]),
-    ).values(),
-  ).filter(
-    (cat): cat is string => typeof cat === "string" && cat.length > 0,
-  );
-
   const video = (awemeDetail as any)?.video ?? {};
+  const imagePostInfo = (awemeDetail as any)?.image_post_info ?? {};
   const coverImage =
     pickFirstString(video?.cover?.url_list) ??
     pickFirstString(video?.dynamic_cover?.url_list) ??
-    pickFirstString(video?.origin_cover?.url_list);
+    pickFirstString(video?.origin_cover?.url_list) ??
+    pickFirstString(imagePostInfo?.image_post_cover?.display_image?.url_list) ??
+    pickFirstString(imagePostInfo?.image_post_cover?.thumbnail?.url_list) ??
+    pickFirstString(
+      imagePostInfo?.image_post_cover?.owner_watermark_image?.url_list,
+    );
 
   const durationMs = Number(video?.duration ?? 0);
   const durationSeconds =
@@ -281,21 +276,72 @@ export async function ingestTikTokPost({
       ? Math.round(durationMs / 1000)
       : undefined;
 
-  const slidesPayload = coverImage
-    ? [
-        {
-          slideIndex: 0,
-          imageUrl: coverImage,
-          duration: durationSeconds ?? 3,
+  const defaultSlideDuration =
+    (durationSeconds && durationSeconds > 0 ? durationSeconds : undefined) ?? 3;
+
+  const imageSlides = Array.isArray(imagePostInfo?.images)
+    ? (imagePostInfo.images as Array<Record<string, any>>).reduce(
+        (
+          slides: Array<{
+            slideIndex: number;
+            imageUrl: string;
+            duration?: number;
+          }>,
+          image,
+          index,
+        ) => {
+          const imageUrl = pickFirstString([
+            ...(image?.display_image?.url_list ?? []),
+            ...(image?.owner_watermark_image?.url_list ?? []),
+            ...(image?.user_watermark_image?.url_list ?? []),
+            ...(image?.thumbnail?.url_list ?? []),
+          ]);
+
+          if (!imageUrl) {
+            return slides;
+          }
+
+          const perImageDuration = toPositiveInt(
+            image?.duration ??
+              image?.image_duration ??
+              image?.display_image?.duration ??
+              0,
+          );
+
+          slides.push({
+            slideIndex: index,
+            imageUrl,
+            ...(perImageDuration > 0
+              ? { duration: perImageDuration }
+              : defaultSlideDuration > 0
+                ? { duration: defaultSlideDuration }
+                : {}),
+          });
+
+          return slides;
         },
-      ]
+        [],
+      )
     : [];
+
+  const slidesPayload =
+    imageSlides.length > 0
+      ? imageSlides
+      : coverImage
+        ? [
+            {
+              slideIndex: 0,
+              imageUrl: coverImage,
+              duration: defaultSlideDuration,
+            },
+          ]
+        : [];
 
   const postPayload = {
     accountId: accountData.id,
     postId: awemeIdFromDetail,
     caption: (awemeDetail as any)?.desc ?? null,
-    categories: uniqueCategories,
+    categories: [],
     likeCount: toPositiveInt(statistics?.digg_count),
     viewCount: toPositiveInt(statistics?.play_count),
     commentCount: toPositiveInt(statistics?.comment_count),
@@ -307,14 +353,11 @@ export async function ingestTikTokPost({
   };
 
   let postData: any = null;
-  const postResponse = await fetch(
-    `${API_BASE_URL}/slideshow-library/posts`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(postPayload),
-    },
-  );
+  const postResponse = await fetch(`${API_BASE_URL}/slideshow-library/posts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(postPayload),
+  });
 
   if (postResponse.ok) {
     postData = await postResponse.json();

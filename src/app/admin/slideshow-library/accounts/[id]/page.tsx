@@ -15,7 +15,7 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -58,6 +58,7 @@ interface SlideshowPost {
 export default function AccountDetailPage() {
   const params = useParams();
   const accountId = params.id as string;
+  const router = useRouter();
 
   const [account, setAccount] = useState<SlideshowAccount | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -131,6 +132,37 @@ export default function AccountDetailPage() {
     }
   };
 
+  const deleteAccount = async () => {
+    if (!account) {
+      return;
+    }
+
+    if (
+      !confirm(
+        "Möchtest du diesen Account wirklich löschen? Alle zugehörigen Posts werden ebenfalls entfernt.",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/slideshow-library/accounts/${account.id}`,
+        { method: "DELETE" },
+      );
+
+      if (response.ok) {
+        toast.success("Account gelöscht");
+        router.push("/admin/slideshow-library/accounts");
+      } else {
+        toast.error("Fehler beim Löschen des Accounts");
+      }
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      toast.error("Fehler beim Löschen des Accounts");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -182,6 +214,10 @@ export default function AccountDetailPage() {
           <Button variant="outline" onClick={syncAccount}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Sync
+          </Button>
+          <Button variant="destructive" onClick={deleteAccount}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            Löschen
           </Button>
           <Link
             href={`/admin/slideshow-library/accounts/${account.id}/edit`}
