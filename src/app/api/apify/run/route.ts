@@ -1,7 +1,4 @@
 import { NextResponse } from "next/server";
-import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 
 if (!process.env.APIFY_API_KEY) {
   throw new Error("APIFY_API_KEY is not set");
@@ -11,12 +8,6 @@ const API_BASE_URL =
   process.env.SLIDESCOCKPIT_API ||
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:3000";
-
-const SHOULD_SAVE_APIFY_RESPONSES =
-  (process.env.APIFY_SAVE_RESPONSES ?? "").toLowerCase() === "true" ||
-  process.env.NODE_ENV !== "production";
-const APIFY_RESPONSE_DIR =
-  process.env.APIFY_RESPONSE_DIR ?? ".apify-debug-responses";
 
 const toPositiveInt = (value: unknown) => {
   const maybeNumber = Number(value);
@@ -79,35 +70,6 @@ function pickFirstString(values: unknown): string | undefined {
   return undefined;
 }
 
-async function saveApifyResponse(
-  type: "account" | "post" | "unknown",
-  requestPayload: Record<string, unknown>,
-  responsePayload: unknown,
-) {
-  if (!SHOULD_SAVE_APIFY_RESPONSES) {
-    return;
-  }
-
-  try {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const filename = `${timestamp}-${type}-${randomUUID()}.txt`;
-    const outputDir = path.resolve(process.cwd(), APIFY_RESPONSE_DIR);
-
-    await mkdir(outputDir, { recursive: true });
-
-    const content = [
-      `Type: ${type}`,
-      `Timestamp: ${new Date().toISOString()}`,
-      `Request: ${JSON.stringify(requestPayload, null, 2)}`,
-      `Response: ${JSON.stringify(responsePayload, null, 2)}`,
-    ].join("\n\n");
-
-    await writeFile(path.join(outputDir, filename), content, "utf8");
-  } catch (error) {
-    console.error("Failed to persist Apify response", error);
-  }
-}
-
 async function callApify(payload: Record<string, unknown>) {
   const response = await fetch(
     `https://api.apify.com/v2/acts/scraptik~tiktok-api/run-sync-get-dataset-items?token=${process.env.APIFY_API_KEY}`,
@@ -119,14 +81,6 @@ async function callApify(payload: Record<string, unknown>) {
   );
 
   const json = await response.json();
-  const responseType =
-    typeof payload.post_awemeId === "string"
-      ? "post"
-      : typeof payload.profile_username === "string"
-        ? "account"
-        : "unknown";
-
-  await saveApifyResponse(responseType, payload, json);
 
   if (!response.ok) {
     throw new ApifyIngestError(
@@ -294,9 +248,6 @@ export async function ingestTikTokPost({
 
   const author = (awemeDetail as any)?.author ?? accountDetail ?? {};
   const statistics = (awemeDetail as any)?.statistics ?? {};
-  const textExtra = Array.isArray((awemeDetail as any)?.text_extra)
-    ? (awemeDetail as any).text_extra
-    : [];
 
   const awemeIdFromDetail =
     (awemeDetail as any)?.aweme_id?.toString() ?? awemeId;
@@ -306,18 +257,6 @@ export async function ingestTikTokPost({
       ? publishedAtSeconds * 1000
       : Date.now(),
   );
-
-  const categories = textExtra
-    .map((item: any) => item?.hashtag_name ?? item?.hashtag_name_with_symbol)
-    .filter((value: unknown): value is string => typeof value === "string")
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0);
-
-  const uniqueCategories = Array.from(
-    new Map(
-      categories.map((cat) => [cat.toLowerCase(), cat] as [string, string]),
-    ).values(),
-  ).filter((cat): cat is string => typeof cat === "string" && cat.length > 0);
 
   const video = (awemeDetail as any)?.video ?? {};
   const imagePostInfo = (awemeDetail as any)?.image_post_info ?? {};
@@ -402,7 +341,7 @@ export async function ingestTikTokPost({
     accountId: accountData.id,
     postId: awemeIdFromDetail,
     caption: (awemeDetail as any)?.desc ?? null,
-    categories: uniqueCategories,
+    categories: [],
     likeCount: toPositiveInt(statistics?.digg_count),
     viewCount: toPositiveInt(statistics?.play_count),
     commentCount: toPositiveInt(statistics?.comment_count),
