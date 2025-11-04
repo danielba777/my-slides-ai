@@ -3,13 +3,16 @@ import { Resend } from "resend";
 
 import config from "@/config";
 
-if (!process.env.RESEND_API_KEY) {
-  throw new Error("RESEND_API_KEY is not set");
-}
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 export async function POST(request: Request) {
+  if (!resend) {
+    return NextResponse.json(
+      { error: "RESEND_API_KEY is not set" },
+      { status: 500 },
+    );
+  }
   try {
     const { name, email, subject, message } = await request.json();
 

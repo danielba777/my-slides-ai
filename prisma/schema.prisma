@@ -48,6 +48,9 @@ model User {
   favorites      FavoriteDocument[]
   GeneratedImage GeneratedImage[]
   images         UserImage[]
+  demoVideos     UserDemoVideo[]
+  ugcVideos      UserUGCVideo[]
+  reactionAvatarsCreated ReactionAvatar[] @relation("ReactionAvatarCreatedBy")
 
   // Billing
   stripeCustomerId String?
@@ -201,4 +204,66 @@ enum DocumentType {
   RESEARCH_PAPER
   FLIPBOOK
   PRESENTATION
+}
+
+model ReactionAvatar {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  thumbnailUrl String
+  videoUrl     String
+  order        Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String?
+  createdBy    User?    @relation("ReactionAvatarCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  ugcVideos    UserUGCVideo[]
+}
+
+model UserDemoVideo {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String?
+  videoUrl     String
+  thumbnailUrl String?
+  durationMs   Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  ugcVideos    UserUGCVideo[]
+
+  @@index([userId])
+}
+
+enum UGCVideoStatus {
+  DRAFT
+  PROCESSING
+  READY
+  FAILED
+}
+
+model UserUGCVideo {
+  id                   String         @id @default(cuid())
+  userId               String
+  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title                String?
+  reactionAvatarId     String?
+  reactionAvatar       ReactionAvatar? @relation(fields: [reactionAvatarId], references: [id], onDelete: SetNull)
+  demoVideoId          String?
+  demoVideo            UserDemoVideo? @relation(fields: [demoVideoId], references: [id], onDelete: SetNull)
+  compositeVideoUrl    String
+  compositeThumbnailUrl String?
+  status               UGCVideoStatus @default(PROCESSING)
+  durationMs           Int?
+  processedAt          DateTime?
+  scheduleJobId        String?
+  scheduleRunAt        DateTime?
+  rawSegments          Json?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([reactionAvatarId])
+  @@index([demoVideoId])
 }

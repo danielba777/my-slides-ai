@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 
-if (!process.env.APIFY_API_KEY) {
-  throw new Error("APIFY_API_KEY is not set");
-}
+const APIFY_API_KEY = process.env.APIFY_API_KEY;
 
 const API_BASE_URL =
   process.env.SLIDESCOCKPIT_API ||
@@ -60,6 +58,12 @@ function pickFirstString(values: unknown): string | undefined {
 }
 
 export async function POST(request: Request) {
+  if (!APIFY_API_KEY) {
+    return NextResponse.json(
+      { error: "APIFY_API_KEY is not set" },
+      { status: 500 },
+    );
+  }
   try {
     const { awemeId, profileUsername } = (await request.json()) as {
       awemeId?: string;
@@ -83,7 +87,7 @@ export async function POST(request: Request) {
     const trimmedProfileUsername = profileUsername.trim();
     const callApify = async (payload: Record<string, unknown>) => {
       const response = await fetch(
-        `https://api.apify.com/v2/acts/scraptik~tiktok-api/run-sync-get-dataset-items?token=${process.env.APIFY_API_KEY}`,
+        `https://api.apify.com/v2/acts/scraptik~tiktok-api/run-sync-get-dataset-items?token=${APIFY_API_KEY}`,
         {
           method: "POST",
           headers: {

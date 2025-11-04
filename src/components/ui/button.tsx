@@ -52,20 +52,38 @@ export interface ButtonProps
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button";
+    const isLoadingVariant =
+      variant === "loading" ||
+      variant === "outlineLoading" ||
+      variant === "noBackgroundLoading";
+
+    // WICHTIG: Wenn asChild (Radix Slot) aktiv ist, darf genau EIN React-Element Kind vorhanden sein.
+    // Deshalb geben wir bei asChild IMMER nur das Original-Kind weiter – ohne zusätzliches Spinner-Element.
+    if (asChild) {
+      const Comp = Slot;
+      return (
+        <Comp
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref}
+          {...props}
+        >
+          {props.children}
+        </Comp>
+      );
+    }
+
+    // Standard-<button>-Zweig: Hier dürfen wir Kinder + Spinner rendern.
+    const Comp = "button";
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
+        // Optional: Button während Loading-Varianten deaktivieren
+        disabled={isLoadingVariant || props.disabled}
         {...props}
       >
-        {variant !== "loading" && props.children}
-
-        {(variant === "loading" ||
-          variant === "outlineLoading" ||
-          variant === "noBackgroundLoading") && (
-          <Spinner className="h-4 w-4"></Spinner>
-        )}
+        {!isLoadingVariant && props.children}
+        {isLoadingVariant && <Spinner className="h-4 w-4" />}
       </Comp>
     );
   },

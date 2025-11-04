@@ -20,6 +20,7 @@ import {
   FileText,
   Home,
   Image as ImageIcon,
+  Play,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -72,6 +73,14 @@ const avatarItems: SidebarItem[] = [
     title: "Templates",
     url: "/admin/ai-avatars/templates",
     icon: ImageIcon,
+  },
+];
+
+const ugcItems: SidebarItem[] = [
+  {
+    title: "Reaction Avatars",
+    url: "/admin/ugc/reaction-avatars",
+    icon: Play,
   },
 ];
 
@@ -142,6 +151,28 @@ export function AdminSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {avatarItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname === item.url}
+                  >
+                    <a href={item.url}>
+                      <item.icon className="h-5 w-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>UGC</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {ugcItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild

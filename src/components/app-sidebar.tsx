@@ -6,6 +6,7 @@ import {
   Folder,
   Home,
   Images,
+  Clapperboard,
   TestTube2,
   User,
   type LucideIcon,
@@ -53,6 +54,11 @@ const playgroundItems: SidebarItem[] = [
     title: "AI Avatars",
     url: "/dashboard/ai-avatars",
     icon: User,
+  },
+  {
+    title: "UGC Builder",
+    url: "/dashboard/ugc",
+    icon: Clapperboard,
   },
 ];
 
