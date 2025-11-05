@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePresentationState } from "@/states/presentation-state";
 import {
   ArrowUpDown,
@@ -330,7 +330,7 @@ export function PresentationDashboard({
         viewportRef={
           section === "community" ? communityViewportRef : personalViewportRef
         }
-        className="flex-1 min-h-0 pr-4"
+        className="flex-1 min-h-0 overflow-y-auto pr-4"
       >
         <div className="grid grid-cols-1 gap-4 content-start sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7">
           {posts.map((post) => {
@@ -438,8 +438,8 @@ export function PresentationDashboard({
       </div>
 
       <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
-        <DialogContent className="max-h-[95vh] w-full h-full max-w-[95vw] overflow-hidden pt-4 pb-0 px-0 sm:rounded-xl">
-          <div className="flex h-[93vh] flex-col px-6 pb-6 pt-6 gap-6">
+        <DialogContent className="max-h-[95vh] w-full h-full max-w-[95vw] pt-4 pb-0 px-0 sm:rounded-xl">
+          <div className="flex h-[93vh] min-h-0 flex-col px-6 pb-6 pt-6 gap-6 overflow-hidden">
             <Tabs
               value={templateTab}
               onValueChange={(value) =>
@@ -501,26 +501,23 @@ export function PresentationDashboard({
                 </div>
               ) : (
                 <>
-                  <TabsContent
-                    value="community"
-                    className="mt-4 flex flex-1 min-h-0 flex-col focus:outline-none"
-                  >
-                    {renderTemplateSection(
-                      sortedCommunityPosts,
-                      "Keine Community-Posts vorhanden.",
-                      "community",
-                    )}
-                  </TabsContent>
-                  <TabsContent
-                    value="mine"
-                    className="mt-4 flex flex-1 min-h-0 flex-col focus:outline-none"
-                  >
-                    {renderTemplateSection(
-                      sortedPersonalPosts,
-                      "Du hast noch keine Posts gespeichert.",
-                      "mine",
-                    )}
-                  </TabsContent>
+                  {templateTab === "community" ? (
+                    <div className="mt-4 flex flex-1 min-h-0 flex-col focus:outline-none">
+                      {renderTemplateSection(
+                        sortedCommunityPosts,
+                        "Keine Community-Posts vorhanden.",
+                        "community",
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-4 flex flex-1 min-h-0 flex-col focus:outline-none">
+                      {renderTemplateSection(
+                        sortedPersonalPosts,
+                        "Du hast noch keine Posts gespeichert.",
+                        "mine",
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </Tabs>
