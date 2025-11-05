@@ -5,7 +5,7 @@ import type { User } from "@prisma/client";
  * Liefert alle ImageSet-IDs, die irgendeinem User gehören (private Collections).
  */
 export async function getAllOwnedImageSetIds(): Promise<string[]> {
-  const rows = await db.userImageCollection.findMany({
+  const rows = await db.userPersonalCollection.findMany({
     select: { imageSetId: true },
   });
   return rows.map((r) => r.imageSetId);
@@ -16,7 +16,7 @@ export async function getAllOwnedImageSetIds(): Promise<string[]> {
  */
 export async function getOwnedImageSetIds(userId: string | null): Promise<string[]> {
   if (!userId) return [];
-  const rows = await db.userImageCollection.findMany({
+  const rows = await db.userPersonalCollection.findMany({
     where: { userId },
     select: { imageSetId: true },
   });
@@ -34,7 +34,7 @@ export async function markImageSetOwnedByUser(params: {
   slug?: string | null;
 }) {
   const { imageSetId, userId, email, name, slug } = params;
-  await db.userImageCollection.upsert({
+  await db.userPersonalCollection.upsert({
     where: { imageSetId },
     update: { userId, email: email ?? undefined, name: name ?? undefined, slug: slug ?? undefined },
     create: {
@@ -51,7 +51,7 @@ export async function markImageSetOwnedByUser(params: {
  * Entfernt die Ownership-Markierung (falls je benötigt).
  */
 export async function unmarkImageSetOwnedByUser(imageSetId: string) {
-  await db.userImageCollection.deleteMany({ where: { imageSetId } });
+  await db.userPersonalCollection.deleteMany({ where: { imageSetId } });
 }
 
 /**

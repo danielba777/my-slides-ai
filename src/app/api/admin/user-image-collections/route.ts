@@ -6,7 +6,7 @@ export async function GET() {
   if (!session?.user?.email) {
     return Response.json({ owners: [] }, { status: 200 });
   }
-  const rows = await db.userImageCollection.findMany({
+  const rows = await db.userPersonalCollection.findMany({
     select: { imageSetId: true, name: true, slug: true, userId: true, email: true },
   });
   return Response.json({ owners: rows });
