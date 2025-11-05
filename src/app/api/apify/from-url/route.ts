@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { ApifyIngestError, ingestTikTokPost } from "../run/route";
+import { db } from "@/server/db";
 
 function extractFromTikTokUrl(rawUrl: string) {
   let url: URL;
@@ -37,6 +38,8 @@ function extractFromTikTokUrl(rawUrl: string) {
 
 export async function POST(request: Request) {
   try {
+    const user = await authenticateExtensionUser(request);
+
     const { url } = (await request.json()) as { url?: string };
     if (!url || !url.trim()) {
       throw new ApifyIngestError("Missing url in request body", 400);
@@ -53,7 +56,11 @@ export async function POST(request: Request) {
       profileUsername,
     });
 
-    const result = await ingestTikTokPost({ awemeId, profileUsername });
+    const result = await ingestTikTokPost({
+      awemeId,
+      profileUsername,
+      ownerUserId: user.id,
+    });
 
     console.debug("[apify/from-url] Ingest completed", {
       awemeId,
@@ -82,4 +89,25 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+}
+
+async function authenticateExtensionUser(request: Request) {
+  const authorization = request.headers.get("authorization") ?? "";
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  const token = match?.[1]?.trim();
+
+  if (!token) {
+    throw new ApifyIngestError("Missing extension token", 401);
+  }
+
+  const user = await db.user.findUnique({
+    where: { extensionToken: token },
+    select: { id: true, email: true },
+  });
+
+  if (!user) {
+    throw new ApifyIngestError("Invalid extension token", 401);
+  }
+
+  return user;
 }

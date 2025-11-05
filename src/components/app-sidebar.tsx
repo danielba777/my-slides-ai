@@ -8,6 +8,7 @@ import {
   Images,
   TestTube2,
   User,
+  Bookmark,
   type LucideIcon,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -61,6 +62,11 @@ const resourceItems: SidebarItem[] = [
     title: "Image Collections",
     url: "/dashboard/image-collections",
     icon: Folder,
+  },
+  {
+    title: "Post Collections",
+    url: "/dashboard/post-collections",
+    icon: Bookmark,
   },
 ];
 
@@ -156,7 +162,7 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     className="font-semibold"
-                    isActive={pathname === item.url}
+                    isActive={pathname.startsWith(item.url)}
                   >
                     <a href={item.url}>
                       <item.icon className="w-5 h-5" />
