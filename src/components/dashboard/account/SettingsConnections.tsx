@@ -11,10 +11,12 @@ import {
 import IonIcon from "@reacticons/ionicons";
 import { defineCustomElements } from "ionicons/loader";
 import { toast } from "sonner";
+import { X } from "lucide-react";
 type ConnectionState = "idle" | "loading";
 export default function SettingsConnections() {
   const [state, setState] = useState<ConnectionState>("idle");
-  const { accounts, loading, error } = useTikTokAccounts();
+  const { accounts, loading, error, disconnect } = useTikTokAccounts();
+  const [disconnectingOpenId, setDisconnectingOpenId] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") defineCustomElements(window);
@@ -46,6 +48,31 @@ export default function SettingsConnections() {
       setState("idle");
     }
   }, []);
+
+  const handleDisconnect = useCallback(async (account: ConnectedTikTokAccount) => {
+    if (disconnectingOpenId === account.openId) return;
+
+    const accountLabel = labelFor(account);
+
+    if (!window.confirm(`Are you sure you want to disconnect "${accountLabel}" from SlidesCockpit?`)) {
+      return;
+    }
+
+    setDisconnectingOpenId(account.openId);
+
+    try {
+      const success = await disconnect(account.openId);
+      if (success) {
+        toast.success(`Disconnected "${accountLabel}" from SlidesCockpit`);
+      } else {
+        toast.error(`Failed to disconnect "${accountLabel}"`);
+      }
+    } catch (error) {
+      toast.error(`Failed to disconnect "${accountLabel}"`);
+    } finally {
+      setDisconnectingOpenId(null);
+    }
+  }, [disconnect, disconnectingOpenId]);
 
   const labelFor = (a: ConnectedTikTokAccount) =>
     a.username ??
@@ -97,7 +124,7 @@ export default function SettingsConnections() {
             <Badge
               key={a.openId}
               variant="secondary"
-              className="flex items-center gap-2 pr-3 cursor-default transition-none"
+              className="group relative flex items-center gap-2 pr-8 cursor-default transition-none hover:bg-red-50 hover:border-red-200"
             >
               <Avatar className="h-6 w-6">
                 <AvatarImage alt={labelFor(a)} src={a.avatarUrl ?? undefined} />
@@ -106,6 +133,20 @@ export default function SettingsConnections() {
                 </AvatarFallback>
               </Avatar>
               <span className="text-xs font-medium">{labelFor(a)}</span>
+
+              {/* Disconnect Button */}
+              <button
+                onClick={() => handleDisconnect(a)}
+                disabled={disconnectingOpenId === a.openId}
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-red-100 text-red-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={`Disconnect ${labelFor(a)}`}
+              >
+                {disconnectingOpenId === a.openId ? (
+                  <Spinner className="h-2 w-2" />
+                ) : (
+                  <X className="h-3 w-3" />
+                )}
+              </button>
             </Badge>
           ))}
         </div>

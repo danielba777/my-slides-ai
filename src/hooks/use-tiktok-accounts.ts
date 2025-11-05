@@ -16,6 +16,7 @@ interface UseTikTokAccountsResult {
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
+  disconnect: (openId: string) => Promise<boolean>;
 }
 
 export function useTikTokAccounts(): UseTikTokAccountsResult {
@@ -64,10 +65,36 @@ export function useTikTokAccounts(): UseTikTokAccountsResult {
     }
   }, []);
 
+  const disconnect = useCallback(async (openId: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/tiktok/accounts/${encodeURIComponent(openId)}/disconnect`, {
+        method: "DELETE",
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message =
+          payload && typeof payload.error === "string"
+            ? payload.error
+            : "Unable to disconnect TikTok account";
+        throw new Error(message);
+      }
+
+      // Refresh the accounts list after successful disconnection
+      await refresh();
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to disconnect TikTok account";
+      setError(message);
+      return false;
+    }
+  }, [refresh]);
+
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  return { accounts, loading, error, refresh };
+  return { accounts, loading, error, refresh, disconnect };
 }
 
