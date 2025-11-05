@@ -134,9 +134,11 @@ async function callApify(payload: Record<string, unknown>) {
 export async function ingestTikTokPost({
   awemeId,
   profileUsername,
+  ownerUserId,
 }: {
   awemeId: string;
   profileUsername: string;
+  ownerUserId?: string;
 }) {
   const trimmedProfileUsername = profileUsername.trim();
 
@@ -385,6 +387,7 @@ export async function ingestTikTokPost({
     createdAt: publishedAt.toISOString(),
     duration: durationSeconds,
     slides: slidesPayload,
+    ...(ownerUserId ? { ownerUserId } : {}),
   };
 
   let postData: any = null;
@@ -397,7 +400,7 @@ export async function ingestTikTokPost({
   if (postResponse.ok) {
     postData = await postResponse.json();
   } else {
-    const postError = await postResponse.json().catch(() => ({}));
+      const postError = await postResponse.json().catch(() => ({}));
     const duplicatePost =
       postResponse.status === 409 ||
       (typeof postError?.error === "string" &&
@@ -427,6 +430,25 @@ export async function ingestTikTokPost({
         500,
         postError,
       );
+    }
+  }
+
+  if (ownerUserId && postData?.id) {
+    try {
+      await fetch(`${API_BASE_URL}/slideshow-library/user-posts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: ownerUserId,
+          postId: postData.id,
+        }),
+      });
+    } catch (error) {
+      console.warn("[apify/run] Failed to link post to user", {
+        userId: ownerUserId,
+        postId: postData?.id,
+        error,
+      });
     }
   }
 
