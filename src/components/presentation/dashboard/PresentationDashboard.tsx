@@ -306,7 +306,7 @@ export function PresentationDashboard({
     }
 
     return (
-      <ScrollArea className="flex-1 pr-4">
+      <ScrollArea className="flex-1 min-h-0 pr-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7">
           {posts.map((post) => {
             const primarySlide =
@@ -478,7 +478,7 @@ export function PresentationDashboard({
                 <>
                   <TabsContent
                     value="community"
-                    className="mt-4 flex-1 min-h-0 focus:outline-none"
+                    className="mt-4 flex flex-1 min-h-0 flex-col focus:outline-none"
                   >
                     {renderTemplateSection(
                       sortedCommunityPosts,
@@ -487,7 +487,7 @@ export function PresentationDashboard({
                   </TabsContent>
                   <TabsContent
                     value="mine"
-                    className="mt-4 flex-1 min-h-0 focus:outline-none"
+                    className="mt-4 flex flex-1 min-h-0 flex-col focus:outline-none"
                   >
                     {renderTemplateSection(
                       sortedPersonalPosts,
