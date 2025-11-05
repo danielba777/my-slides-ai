@@ -272,8 +272,9 @@ export async function composeReactionDemoVideo({
       fs.readFile(thumbnailPath),
     ]);
 
+    // Speichere geordnet unter: ugc/hooks/default/<userId>/<timestamp>
     const timestamp = Date.now();
-    const prefix = `ugc_${userId}_${timestamp}`;
+    const prefix = `ugc/hooks/default/${userId}/${timestamp}`;
 
     const [videoUrlUploaded, thumbnailUrlUploaded] = await Promise.all([
       uploadBuffer(videoBuffer, `${prefix}.mp4`),

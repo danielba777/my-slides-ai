@@ -2,11 +2,11 @@
 import {
   Calendar,
   CalendarClock,
+  Clapperboard,
   FileCheck,
   Folder,
   Home,
   Images,
-  Clapperboard,
   TestTube2,
   User,
   type LucideIcon,
@@ -56,7 +56,7 @@ const playgroundItems: SidebarItem[] = [
     icon: User,
   },
   {
-    title: "UGC Builder",
+    title: "Hook + Demo",
     url: "/dashboard/ugc",
     icon: Clapperboard,
   },

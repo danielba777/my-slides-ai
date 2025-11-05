@@ -8,18 +8,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { useUploadThing } from "@/hooks/globals/useUploadthing";
 import type { ReactionAvatar } from "@/types/ugc";
-import { Pencil, Trash2, UploadCloud } from "lucide-react";
 
 type AvatarFormState = {
   name: string;
@@ -42,17 +41,26 @@ const createEmptyForm = (order: number): AvatarFormState => ({
 export default function ReactionAvatarsAdminPage() {
   const [avatars, setAvatars] = useState<ReactionAvatar[]>([]);
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
   const [creating, setCreating] = useState(false);
   const [thumbnailUploading, setThumbnailUploading] = useState(false);
   const [videoUploading, setVideoUploading] = useState(false);
   const [form, setForm] = useState<AvatarFormState>(createEmptyForm(0));
 
   const [editOpen, setEditOpen] = useState(false);
-  const [editingAvatar, setEditingAvatar] = useState<ReactionAvatar | null>(null);
+  const [editingAvatar, setEditingAvatar] = useState<ReactionAvatar | null>(
+    null,
+  );
   const [editForm, setEditForm] = useState<AvatarFormState>(createEmptyForm(0));
   const [editThumbnailUploading, setEditThumbnailUploading] = useState(false);
   const [editVideoUploading, setEditVideoUploading] = useState(false);
   const [editing, setEditing] = useState(false);
+  // 302.ai generation UI
+  const [generateOpen, setGenerateOpen] = useState(false);
+  const [generatePrompt, setGeneratePrompt] = useState("");
+  const [generateCount, setGenerateCount] = useState(1);
+  const [generating, setGenerating] = useState(false);
+  const [targetAvatar, setTargetAvatar] = useState<ReactionAvatar | null>(null);
 
   const { startUpload } = useUploadThing("editorUploader");
 
@@ -65,8 +73,22 @@ export default function ReactionAvatarsAdminPage() {
     return maxOrder + 1;
   }, [avatars]);
 
+  // Beim Öffnen der Seite: zuerst automatisch aus Templates importieren, dann Liste laden.
   useEffect(() => {
-    void loadAvatars();
+    const autoImportAndFetch = async () => {
+      try {
+        await fetch("/api/ugc/reaction-avatars/import-from-templates", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch {
+        // stiller Fail: wenn Import fehlschlägt, zeigen wir einfach den aktuellen Stand
+      } finally {
+        await fetchAvatars();
+      }
+    };
+    void autoImportAndFetch();
   }, []);
 
   useEffect(() => {
@@ -91,35 +113,93 @@ export default function ReactionAvatarsAdminPage() {
     });
   }, [editOpen, editingAvatar]);
 
-  const loadAvatars = async () => {
+  const openGenerateForAvatar = (avatar: ReactionAvatar) => {
+    setTargetAvatar(avatar);
+    setGeneratePrompt("");
+    setGenerateCount(1);
+    setGenerateOpen(true);
+  };
+
+  const doGenerate = async () => {
+    if (!targetAvatar) {
+      toast.error("Kein Avatar ausgewaehlt");
+      return;
+    }
+    if (!generatePrompt.trim()) {
+      toast.error("Prompt darf nicht leer sein");
+      return;
+    }
     try {
-      setLoading(true);
-      const response = await fetch("/api/ugc/reaction-avatars");
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || "Failed to load reaction avatars");
-      }
-      const avatarsData: ReactionAvatar[] = Array.isArray(data?.avatars)
-        ? data.avatars
-        : [];
-      setAvatars(avatarsData);
-      const computedNextOrder =
-        avatarsData.length === 0
-          ? 0
-          : avatarsData.reduce(
-              (acc, avatar) => Math.max(acc, avatar.order ?? 0),
-              0,
-            ) + 1;
-      setForm(createEmptyForm(computedNextOrder));
-    } catch (error) {
-      console.error("[ReactionAvatarsAdmin] loadAvatars failed", error);
-      toast.error(
-        error instanceof Error ? error.message : "Could not load reaction avatars",
-      );
+      setGenerating(true);
+      const res = await fetch("/api/admin/ugc/reaction-avatars/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          avatarIds: [targetAvatar.id],
+          prompt: generatePrompt.trim(),
+          count: generateCount,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Generierung fehlgeschlagen");
+      toast.success("Generiert mit 302.ai (Avatar-4)");
+      // refresh list
+      await fetchAvatars();
+      setGenerateOpen(false);
+      setTargetAvatar(null);
+    } catch (e) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : "Fehler bei 302.ai");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const fetchAvatars = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/ugc/reaction-avatars", {
+        cache: "no-store",
+      });
+      const data = await res.json();
+      setAvatars(Array.isArray(data?.avatars) ? data.avatars : []);
+    } catch (e) {
+      toast.error("Konnte Reaction Avatars nicht laden");
     } finally {
       setLoading(false);
     }
   };
+
+  const importFromTemplates = async () => {
+    setImporting(true);
+    try {
+      const res = await fetch(
+        "/api/ugc/reaction-avatars/import-from-templates",
+        {
+          method: "POST",
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error("Import fehlgeschlagen");
+      } else {
+        const msg =
+          typeof data?.imported === "number"
+            ? `Importiert: ${data.imported} • Übersprungen: ${data.skipped ?? 0}`
+            : "Import abgeschlossen";
+        toast.success(msg);
+        await fetchAvatars();
+      }
+    } catch {
+      toast.error("Import fehlgeschlagen");
+    } finally {
+      setImporting(false);
+    }
+  };
+  const maxOrder = useMemo(
+    () => (avatars.length ? Math.max(...avatars.map((a) => a.order ?? 0)) : 0),
+    [avatars],
+  );
 
   const resetForm = () => {
     setForm(createEmptyForm(nextOrder));
@@ -188,7 +268,9 @@ export default function ReactionAvatarsAdminPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.error || "Avatar konnte nicht gespeichert werden");
+        throw new Error(
+          data?.error || "Avatar konnte nicht gespeichert werden",
+        );
       }
 
       toast.success("Reaction Avatar gespeichert");
@@ -197,7 +279,9 @@ export default function ReactionAvatarsAdminPage() {
     } catch (error) {
       console.error("[ReactionAvatarsAdmin] handleCreate failed", error);
       toast.error(
-        error instanceof Error ? error.message : "Konnte Avatar nicht speichern",
+        error instanceof Error
+          ? error.message
+          : "Konnte Avatar nicht speichern",
       );
     } finally {
       setCreating(false);
@@ -226,7 +310,10 @@ export default function ReactionAvatarsAdminPage() {
     }
   };
 
-  const handleToggleActive = async (avatar: ReactionAvatar, nextValue: boolean) => {
+  const handleToggleActive = async (
+    avatar: ReactionAvatar,
+    nextValue: boolean,
+  ) => {
     try {
       const response = await fetch(`/api/ugc/reaction-avatars/${avatar.id}`, {
         method: "PATCH",
@@ -235,10 +322,14 @@ export default function ReactionAvatarsAdminPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.error || "Avatar konnte nicht aktualisiert werden");
+        throw new Error(
+          data?.error || "Avatar konnte nicht aktualisiert werden",
+        );
       }
       setAvatars((prev) =>
-        prev.map((item) => (item.id === avatar.id ? (data.avatar as ReactionAvatar) : item)),
+        prev.map((item) =>
+          item.id === avatar.id ? (data.avatar as ReactionAvatar) : item,
+        ),
       );
     } catch (error) {
       console.error("[ReactionAvatarsAdmin] toggleActive failed", error);
@@ -263,31 +354,42 @@ export default function ReactionAvatarsAdminPage() {
 
     try {
       setEditing(true);
-      const response = await fetch(`/api/ugc/reaction-avatars/${editingAvatar.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: editForm.name.trim(),
-          description: editForm.description.trim(),
-          thumbnailUrl: editForm.thumbnailUrl.trim(),
-          videoUrl: editForm.videoUrl.trim(),
-          order: Number.isFinite(editForm.order) ? editForm.order : editingAvatar.order ?? 0,
-          isActive: editForm.isActive,
-        }),
-      });
+      const response = await fetch(
+        `/api/ugc/reaction-avatars/${editingAvatar.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: editForm.name.trim(),
+            description: editForm.description.trim(),
+            thumbnailUrl: editForm.thumbnailUrl.trim(),
+            videoUrl: editForm.videoUrl.trim(),
+            order: Number.isFinite(editForm.order)
+              ? editForm.order
+              : (editingAvatar.order ?? 0),
+            isActive: editForm.isActive,
+          }),
+        },
+      );
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.error || "Avatar konnte nicht aktualisiert werden");
+        throw new Error(
+          data?.error || "Avatar konnte nicht aktualisiert werden",
+        );
       }
       toast.success("Avatar aktualisiert");
       setAvatars((prev) =>
-        prev.map((item) => (item.id === editingAvatar.id ? (data.avatar as ReactionAvatar) : item)),
+        prev.map((item) =>
+          item.id === editingAvatar.id ? (data.avatar as ReactionAvatar) : item,
+        ),
       );
       setEditOpen(false);
     } catch (error) {
       console.error("[ReactionAvatarsAdmin] handleEditSubmit failed", error);
       toast.error(
-        error instanceof Error ? error.message : "Konnte Avatar nicht aktualisieren",
+        error instanceof Error
+          ? error.message
+          : "Konnte Avatar nicht aktualisieren",
       );
     } finally {
       setEditing(false);
@@ -295,458 +397,188 @@ export default function ReactionAvatarsAdminPage() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Reaction Avatars</h1>
-          <p className="text-sm text-muted-foreground">
-            Verwalte Reaktionsvideos, die Nutzer in der UGC-Erstellung auswählen können.
-          </p>
-        </div>
-        <div className="text-sm text-muted-foreground">
-          {avatars.length} Avatar{avatars.length === 1 ? "" : "s"}
+    <>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Reaction Avatars</h1>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={importFromTemplates}
+            disabled={importing}
+          >
+            {importing ? "Importiere …" : "Aus Templates importieren"}
+          </Button>
+          <Button
+            onClick={() => {
+              setForm(createEmptyForm(maxOrder + 1));
+              setCreating(true);
+            }}
+          >
+            Neu anlegen
+          </Button>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[420px,1fr]">
-        <Card>
+      {loading ? (
+        <div className="flex items-center gap-2 py-6">
+          <Spinner className="h-4 w-4" />
+          <span>Lade …</span>
+        </div>
+      ) : avatars.length === 0 ? (
+        <Card className="mt-4">
           <CardHeader>
-            <CardTitle>Neuen Reaction Avatar anlegen</CardTitle>
+            <CardTitle>Noch keine Reaction Avatars angelegt.</CardTitle>
           </CardHeader>
-          <CardContent>
-            <form className="space-y-5" onSubmit={handleCreate}>
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={form.name}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, name: event.target.value }))
-                  }
-                  placeholder="z. B. Smiling Camila"
-                />
-              </div>
+          <CardContent className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Du kannst neue Reaction Avatars erstellen oder deine vorhandenen
+              AI-Avatar Templates importieren.
+            </p>
+            <Button onClick={importFromTemplates} disabled={importing}>
+              {importing ? "Importiere …" : "Aus Templates importieren"}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {avatars.map((a) => {
+            const video = a.videoUrl?.trim();
+            const hasHookVideo =
+              !!video && video.length > 0 && video !== "about:blank";
 
-              <div className="space-y-2">
-                <Label htmlFor="description">Beschreibung</Label>
-                <Textarea
-                  id="description"
-                  value={form.description}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, description: event.target.value }))
-                  }
-                  rows={3}
-                  placeholder="Optional: Details zur Stimmung oder Verwendung"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Vorschaubild</Label>
-                <div className="flex items-center gap-3">
+            return (
+              <Card key={a.id}>
+                <CardContent className="space-y-3 pt-6">
                   <Button
-                    type="button"
-                    variant="outline"
-                    disabled={thumbnailUploading}
-                    onClick={() => {
-                      const input = document.createElement("input");
-                      input.type = "file";
-                      input.accept = "image/*";
-                      input.onchange = (event) => {
-                        const file = (event.target as HTMLInputElement).files?.[0];
-                        if (!file) return;
-                        void handleFileUpload(
-                          file,
-                          (url) => setForm((prev) => ({ ...prev, thumbnailUrl: url })),
-                          setThumbnailUploading,
-                          "image",
-                        );
-                      };
-                      input.click();
-                    }}
+                    className="w-full"
+                    onClick={() => openGenerateForAvatar(a)}
+                    disabled={generating && targetAvatar?.id === a.id}
+                    title={a.name}
                   >
-                    {thumbnailUploading ? (
-                      <span className="flex items-center gap-2">
-                        <Spinner className="h-4 w-4" />
-                        Lädt�
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        <UploadCloud className="h-4 w-4" />
-                        Bild hochladen
-                      </span>
-                    )}
+                    {generating && targetAvatar?.id === a.id
+                      ? "Generiere..."
+                      : "Generate Hook Video"}
                   </Button>
-                  <Input
-                    value={form.thumbnailUrl}
-                    onChange={(event) =>
-                      setForm((prev) => ({ ...prev, thumbnailUrl: event.target.value }))
-                    }
-                    placeholder="https://…"
-                  />
-                </div>
-                {form.thumbnailUrl && (
+                  {hasHookVideo && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        if (!video) return;
+                        const target = video.startsWith("http")
+                          ? video
+                          : `${window.location.origin}${video.startsWith("/") ? video : `/${video}`}`;
+                        window.open(target, "_blank", "noopener,noreferrer");
+                      }}
+                    >
+                      Hook Video ansehen
+                    </Button>
+                  )}
+                <div className="aspect-video overflow-hidden rounded-lg bg-muted">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={form.thumbnailUrl}
-                    alt="Thumbnail preview"
-                    className="mt-3 h-40 w-full rounded-lg border object-cover"
-                  />
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label>Reaktionsvideo</Label>
-                <div className="flex items-center gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={videoUploading}
-                    onClick={() => {
-                      const input = document.createElement("input");
-                      input.type = "file";
-                      input.accept = "video/*";
-                      input.onchange = (event) => {
-                        const file = (event.target as HTMLInputElement).files?.[0];
-                        if (!file) return;
-                        void handleFileUpload(
-                          file,
-                          (url) => setForm((prev) => ({ ...prev, videoUrl: url })),
-                          setVideoUploading,
-                          "video",
-                        );
-                      };
-                      input.click();
-                    }}
-                  >
-                    {videoUploading ? (
-                      <span className="flex items-center gap-2">
-                        <Spinner className="h-4 w-4" />
-                        Lädt�
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        <UploadCloud className="h-4 w-4" />
-                        Video hochladen
-                      </span>
-                    )}
-                  </Button>
-                  <Input
-                    value={form.videoUrl}
-                    onChange={(event) =>
-                      setForm((prev) => ({ ...prev, videoUrl: event.target.value }))
-                    }
-                    placeholder="https://…"
+                    src={a.thumbnailUrl}
+                    alt={a.name || "Reaction Avatar"}
+                    className="h-full w-full object-cover"
                   />
                 </div>
-                {form.videoUrl && (
-                  <video
-                    src={form.videoUrl}
-                    controls
-                    className="mt-3 h-48 w-full rounded-lg border bg-black object-cover"
-                  />
-                )}
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border p-3">
-                <div>
-                  <p className="text-sm font-medium">Direkt aktiv</p>
-                  <p className="text-xs text-muted-foreground">
-                    Sichtbar in der Auswahl für alle Nutzer
-                  </p>
-                </div>
-                <Switch
-                  checked={form.isActive}
-                  onCheckedChange={(checked) =>
-                    setForm((prev) => ({ ...prev, isActive: checked }))
-                  }
-                />
-              </div>
-
-              <Button type="submit" className="w-full" disabled={creating}>
-                {creating ? (
-                  <span className="flex items-center gap-2">
-                    <Spinner className="h-4 w-4" />
-                    Speichere�
-                  </span>
-                ) : (
-                  "Reaction Avatar speichern"
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Vorhandene Avatars</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex h-40 items-center justify-center">
-                <Spinner className="h-6 w-6" />
-              </div>
-            ) : avatars.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Noch keine Reaction Avatars angelegt.
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {avatars.map((avatar) => (
-                  <div
-                    key={avatar.id}
-                    className="flex flex-col gap-4 rounded-lg border p-4 sm:flex-row"
-                  >
-                    <div className="w-full sm:w-40">
-                      <img
-                        src={avatar.thumbnailUrl}
-                        alt={avatar.name}
-                        className="h-32 w-full rounded-md object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-base font-semibold">{avatar.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {avatar.description || "Keine Beschreibung"}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => {
-                              setEditingAvatar(avatar);
-                              setEditOpen(true);
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            onClick={() => handleDelete(avatar)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2">
-                        <div>
-                          <p className="text-sm font-medium">
-                            Sichtbar für Nutzer
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Über Toggle deaktivieren
-                          </p>
-                        </div>
-                        <Switch
-                          checked={avatar.isActive ?? true}
-                          onCheckedChange={(checked) => handleToggleActive(avatar, checked)}
-                        />
-                      </div>
-
-                      <div className="rounded-lg border bg-muted/30 p-2">
-                        <video
-                          src={avatar.videoUrl}
-                          controls
-                          className="h-40 w-full rounded-md bg-black object-cover"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
       <Dialog
-        open={editOpen}
-        onOpenChange={(next) => {
-          setEditOpen(next);
-          if (!next) {
-            setEditingAvatar(null);
+        open={generateOpen}
+        onOpenChange={(open) => {
+          setGenerateOpen(open);
+          if (!open) {
+            setTargetAvatar(null);
+            setGeneratePrompt("");
+            setGenerateCount(1);
           }
         }}
       >
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Reaction Avatar bearbeiten</DialogTitle>
+            <DialogTitle>Generate Hook Video</DialogTitle>
+            <DialogDescription>
+              Erzeuge ein 5s Hook-Video mit 302.ai Avatar-4.
+            </DialogDescription>
           </DialogHeader>
-          {editingAvatar ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-3">
-                <Label htmlFor="edit-name">Name</Label>
-                <Input
-                  id="edit-name"
-                  value={editForm.name}
-                  onChange={(event) =>
-                    setEditForm((prev) => ({ ...prev, name: event.target.value }))
-                  }
-                />
-                <Label htmlFor="edit-description">Beschreibung</Label>
-                <Textarea
-                  id="edit-description"
-                  value={editForm.description}
-                  onChange={(event) =>
-                    setEditForm((prev) => ({ ...prev, description: event.target.value }))
-                  }
-                  rows={3}
-                />
-                <Label>Order</Label>
-                <Input
-                  type="number"
-                  value={editForm.order}
-                  onChange={(event) =>
-                    setEditForm((prev) => ({
-                      ...prev,
-                      order: Number.parseInt(event.target.value, 10),
-                    }))
-                  }
-                />
-                <div className="flex items-center justify-between rounded-lg border p-3">
-                  <div>
-                    <p className="text-sm font-medium">Aktiv</p>
-                    <p className="text-xs text-muted-foreground">
-                      Avatar im UGC-Builder anzeigen
-                    </p>
-                  </div>
-                  <Switch
-                    checked={editForm.isActive}
-                    onCheckedChange={(checked) =>
-                      setEditForm((prev) => ({ ...prev, isActive: checked }))
-                    }
+          <div className="space-y-6">
+            {targetAvatar && (
+              <div className="flex items-center gap-4">
+                <div className="h-20 w-20 overflow-hidden rounded-lg bg-muted">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={targetAvatar.thumbnailUrl}
+                    alt={targetAvatar.name ?? "Reaction Avatar"}
+                    className="h-full w-full object-cover"
                   />
                 </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Vorschaubild</Label>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={editThumbnailUploading}
-                      onClick={() => {
-                        const input = document.createElement("input");
-                        input.type = "file";
-                        input.accept = "image/*";
-                        input.onchange = (event) => {
-                          const file = (event.target as HTMLInputElement).files?.[0];
-                          if (!file) return;
-                          void handleFileUpload(
-                            file,
-                            (url) => setEditForm((prev) => ({ ...prev, thumbnailUrl: url })),
-                            setEditThumbnailUploading,
-                            "image",
-                          );
-                        };
-                        input.click();
-                      }}
-                    >
-                      {editThumbnailUploading ? (
-                        <span className="flex items-center gap-2">
-                          <Spinner className="h-4 w-4" />
-                          Lädt�
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-2">
-                          <UploadCloud className="h-4 w-4" />
-                          Bild ändern
-                        </span>
-                      )}
-                    </Button>
-                    <Input
-                      value={editForm.thumbnailUrl}
-                      onChange={(event) =>
-                        setEditForm((prev) => ({ ...prev, thumbnailUrl: event.target.value }))
-                      }
-                    />
-                  </div>
-                  {editForm.thumbnailUrl && (
-                    <img
-                      src={editForm.thumbnailUrl}
-                      alt="Thumbnail preview"
-                      className="mt-2 h-40 w-full rounded-lg border object-cover"
-                    />
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Reaktionsvideo</Label>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={editVideoUploading}
-                      onClick={() => {
-                        const input = document.createElement("input");
-                        input.type = "file";
-                        input.accept = "video/*";
-                        input.onchange = (event) => {
-                          const file = (event.target as HTMLInputElement).files?.[0];
-                          if (!file) return;
-                          void handleFileUpload(
-                            file,
-                            (url) => setEditForm((prev) => ({ ...prev, videoUrl: url })),
-                            setEditVideoUploading,
-                            "video",
-                          );
-                        };
-                        input.click();
-                      }}
-                    >
-                      {editVideoUploading ? (
-                        <span className="flex items-center gap-2">
-                          <Spinner className="h-4 w-4" />
-                          Lädt�
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-2">
-                          <UploadCloud className="h-4 w-4" />
-                          Video ändern
-                        </span>
-                      )}
-                    </Button>
-                    <Input
-                      value={editForm.videoUrl}
-                      onChange={(event) =>
-                        setEditForm((prev) => ({ ...prev, videoUrl: event.target.value }))
-                      }
-                    />
-                  </div>
-                  {editForm.videoUrl && (
-                    <video
-                      src={editForm.videoUrl}
-                      controls
-                      className="mt-2 h-48 w-full rounded-lg border bg-black object-cover"
-                    />
-                  )}
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">{targetAvatar.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Ergebnis ersetzt das vorhandene Video des Avatars.
+                  </p>
                 </div>
               </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="hook-generate-prompt">Prompt</Label>
+              <Textarea
+                id="hook-generate-prompt"
+                value={generatePrompt}
+                onChange={(event) => setGeneratePrompt(event.target.value)}
+                rows={5}
+                placeholder="Beschreibe Hook, Stimmung, Kamera, Sprache ..."
+              />
             </div>
-          ) : null}
-
-          <DialogFooter className="mt-4 flex items-center justify-end gap-2">
-            <Button variant="outline" onClick={() => setEditOpen(false)}>
+            <div className="space-y-2">
+              <Label htmlFor="hook-generate-count">Varianten (1-5)</Label>
+              <Input
+                id="hook-generate-count"
+                type="number"
+                min={1}
+                max={5}
+                value={generateCount}
+                onChange={(event) => {
+                  const next = Number(event.target.value);
+                  if (Number.isNaN(next)) return;
+                  setGenerateCount(Math.min(Math.max(next, 1), 5));
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex flex-row items-center justify-end gap-2 pt-4 sm:space-x-0">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={generating}
+              onClick={() => {
+                setGenerateOpen(false);
+                setTargetAvatar(null);
+                setGeneratePrompt("");
+                setGenerateCount(1);
+              }}
+            >
               Abbrechen
             </Button>
-            <Button onClick={handleEditSubmit} disabled={editing}>
-              {editing ? (
-                <span className="flex items-center gap-2">
-                  <Spinner className="h-4 w-4" />
-                  Speichere�
-                </span>
-              ) : (
-                "Speichern"
-              )}
+            <Button
+              type="button"
+              onClick={doGenerate}
+              disabled={generating}
+            >
+              {generating ? "Generiere..." : "Video erstellen"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
+
+
+
