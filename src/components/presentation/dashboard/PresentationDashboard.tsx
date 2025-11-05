@@ -21,7 +21,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ImageCollectionSelector } from "./ImageCollectionSelector";
 import { PresentationInput } from "./PresentationInput";
@@ -284,6 +284,9 @@ export function PresentationDashboard({
     [sortBy],
   );
 
+  const communityViewportRef = useRef<HTMLDivElement | null>(null);
+  const personalViewportRef = useRef<HTMLDivElement | null>(null);
+
   const sortedCommunityPosts = useMemo(
     () => sortPosts(templateCommunityPosts),
     [sortPosts, templateCommunityPosts],
@@ -293,9 +296,26 @@ export function PresentationDashboard({
     [sortPosts, templatePersonalPosts],
   );
 
+  useEffect(() => {
+    if (!showTemplates) return;
+
+    const viewport =
+      templateTab === "community"
+        ? communityViewportRef.current
+        : personalViewportRef.current;
+
+    if (!viewport) return;
+
+    requestAnimationFrame(() => {
+      viewport.scrollTop = 0;
+      viewport.scrollLeft = 0;
+    });
+  }, [showTemplates, templateTab, sortedCommunityPosts, sortedPersonalPosts]);
+
   const renderTemplateSection = (
     posts: TemplatePost[],
     emptyMessage: string,
+    section: "community" | "mine",
   ) => {
     if (posts.length === 0) {
       return (
@@ -306,8 +326,13 @@ export function PresentationDashboard({
     }
 
     return (
-      <ScrollArea className="flex-1 min-h-0 pr-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7">
+      <ScrollArea
+        viewportRef={
+          section === "community" ? communityViewportRef : personalViewportRef
+        }
+        className="flex-1 min-h-0 pr-4"
+      >
+        <div className="grid grid-cols-1 gap-4 content-start sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7">
           {posts.map((post) => {
             const primarySlide =
               post.slides?.find((slide) => slide.imageUrl)?.imageUrl ?? null;
@@ -483,6 +508,7 @@ export function PresentationDashboard({
                     {renderTemplateSection(
                       sortedCommunityPosts,
                       "Keine Community-Posts vorhanden.",
+                      "community",
                     )}
                   </TabsContent>
                   <TabsContent
@@ -492,6 +518,7 @@ export function PresentationDashboard({
                     {renderTemplateSection(
                       sortedPersonalPosts,
                       "Du hast noch keine Posts gespeichert.",
+                      "mine",
                     )}
                   </TabsContent>
                 </>
