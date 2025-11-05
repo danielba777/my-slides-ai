@@ -1,13 +1,21 @@
 "use client";
 
-import Image from "next/image";
+import {
+  HeartIcon,
+  PlayIcon,
+  RefreshCw,
+  SlidersHorizontal,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Eye, Heart, RefreshCw, UserCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 type SlideshowPostSlide = {
@@ -42,6 +50,8 @@ const compactNumber = new Intl.NumberFormat("en", {
 });
 
 const formatCount = (value: number) => compactNumber.format(value);
+
+type SortOption = "views-desc" | "views-asc" | "likes-desc" | "likes-asc";
 
 export function PostCollectionsClient() {
   const [posts, setPosts] = useState<UserCollectedPost[]>([]);
@@ -90,16 +100,42 @@ export function PostCollectionsClient() {
     void loadPosts();
   }, [loadPosts]);
 
-  const gridPosts = useMemo(
+  const [sortOption, setSortOption] = useState<SortOption>("views-desc");
+
+  const cardItems = useMemo(
     () =>
       posts.map((post) => ({
-        ...post,
-        coverImage: post.slides?.[0]?.imageUrl ?? null,
-        accountLabel:
-          post.account?.displayName ?? post.account?.username ?? "Unknown",
+        id: post.id,
+        imageUrl: post.slides?.[0]?.imageUrl ?? null,
+        likeCount: post.likeCount ?? 0,
+        viewCount: post.viewCount ?? 0,
+        post,
       })),
     [posts],
   );
+
+  const sortedCards = useMemo(() => {
+    switch (sortOption) {
+      case "views-asc":
+        return [...cardItems].sort((a, b) => a.viewCount - b.viewCount);
+      case "likes-desc":
+        return [...cardItems].sort((a, b) => b.likeCount - a.likeCount);
+      case "likes-asc":
+        return [...cardItems].sort((a, b) => a.likeCount - b.likeCount);
+      case "views-desc":
+      default:
+        return [...cardItems].sort((a, b) => b.viewCount - a.viewCount);
+    }
+  }, [cardItems, sortOption]);
+
+  const handleCardClick = useCallback((post: UserCollectedPost) => {
+    const username = post.account?.username;
+    if (!username) {
+      return;
+    }
+    const url = `https://www.tiktok.com/@${username}/video/${post.postId}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, []);
 
   if (isLoading) {
     return (
@@ -124,7 +160,7 @@ export function PostCollectionsClient() {
     );
   }
 
-  if (gridPosts.length === 0) {
+  if (sortedCards.length === 0) {
     return (
       <div className="mx-auto max-w-xl rounded-2xl border border-dashed border-muted-foreground/30 bg-muted/20 p-10 text-center">
         <p className="text-lg font-semibold">No posts saved yet</p>
@@ -146,118 +182,104 @@ export function PostCollectionsClient() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex w-full flex-col gap-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">
-          {gridPosts.length}{" "}
-          {gridPosts.length === 1 ? "post saved" : "posts saved"}
-        </p>
+        <div>
+          <h2 className="text-2xl font-semibold">My Post Collections</h2>
+          <p className="text-muted-foreground">
+            Saved TikTok posts imported through the SlidesCockpit Chrome
+            Extension.
+          </p>
+        </div>
         <div className="flex gap-2">
-          <Button
-            onClick={() => void loadPosts()}
-            variant="outline"
-            size="sm"
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 bg-card text-foreground border border-border shadow-sm hover:bg-card/90"
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                Sort
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => setSortOption("views-desc")}
+                className={cn(
+                  sortOption === "views-desc" &&
+                    "bg-primary/10 text-primary font-medium",
+                )}
+              >
+                Views (Most)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setSortOption("views-asc")}
+                className={cn(
+                  sortOption === "views-asc" &&
+                    "bg-primary/10 text-primary font-medium",
+                )}
+              >
+                Views (Least)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setSortOption("likes-desc")}
+                className={cn(
+                  sortOption === "likes-desc" &&
+                    "bg-primary/10 text-primary font-medium",
+                )}
+              >
+                Likes (Most)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setSortOption("likes-asc")}
+                className={cn(
+                  sortOption === "likes-asc" &&
+                    "bg-primary/10 text-primary font-medium",
+                )}
+              >
+                Likes (Least)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
-      <ScrollArea className="h-[calc(100vh-260px)] pr-2">
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {gridPosts.map((post) => (
-          <Card
-            key={post.id}
-            className="overflow-hidden border border-border/60 bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/75"
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+        {sortedCards.map((item) => (
+          <button
+            type="button"
+            key={item.id}
+            onClick={() => handleCardClick(item.post)}
+            className="group relative block aspect-[2/3] w-full overflow-hidden rounded-xl border bg-muted/30 text-left transition hover:border-primary hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            aria-label="Open TikTok post"
           >
-            <div className="relative aspect-[3/4] bg-muted">
-              {post.coverImage ? (
-                <Image
-                  src={post.coverImage}
-                  alt={post.caption ?? "Post cover"}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 33vw, 25vw"
-                  priority={false}
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                  No preview
-                </div>
-              )}
+            {item.imageUrl ? (
+              <img
+                src={item.imageUrl}
+                alt="Post preview"
+                className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted text-sm text-muted-foreground">
+                No preview
+              </div>
+            )}
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-3">
+              <div className="flex flex-col items-start gap-1 text-base font-medium text-white">
+                <span className="flex items-center gap-1">
+                  <PlayIcon className="h-5 w-5" />
+                  {formatCount(item.viewCount)}
+                </span>
+                <span className="flex items-center gap-1">
+                  <HeartIcon className="h-5 w-5" />
+                  {formatCount(item.likeCount)}
+                </span>
+              </div>
             </div>
-            <CardContent className="space-y-4 p-4">
-              <div className="flex items-center gap-3">
-                {post.account?.profileImageUrl ? (
-                  <div className="relative h-10 w-10 overflow-hidden rounded-full bg-muted">
-                    <Image
-                      src={post.account.profileImageUrl}
-                      alt={post.accountLabel}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                ) : (
-                  <UserCircle className="h-10 w-10 text-muted-foreground" />
-                )}
-                <div>
-                  <p className="text-sm font-medium leading-tight">
-                    {post.accountLabel}
-                  </p>
-                  {post.account?.username && (
-                    <p className="text-xs text-muted-foreground">
-                      @{post.account.username}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <p className="line-clamp-3 text-sm text-muted-foreground">
-                {post.caption?.trim() || "No caption provided."}
-              </p>
-
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1">
-                  <Eye className="h-4 w-4" />
-                  {formatCount(post.viewCount)}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <Heart className="h-4 w-4" />
-                  {formatCount(post.likeCount)}
-                </span>
-                <span>
-                  Saved{" "}
-                  {new Date(post.createdAt).toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </span>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className={cn(
-                    "w-full sm:w-auto",
-                    !post.account?.username && "pointer-events-none opacity-60",
-                  )}
-                  disabled={!post.account?.username}
-                  onClick={() => {
-                    if (!post.account?.username) return;
-                    const url = `https://www.tiktok.com/@${post.account.username}/video/${post.postId}`;
-                    window.open(url, "_blank", "noopener,noreferrer");
-                  }}
-                >
-                  Open on TikTok
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          </button>
         ))}
-        </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
