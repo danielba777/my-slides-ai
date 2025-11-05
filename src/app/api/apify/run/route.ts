@@ -387,6 +387,7 @@ export async function ingestTikTokPost({
     createdAt: publishedAt.toISOString(),
     duration: durationSeconds,
     slides: slidesPayload,
+    isActive: ownerUserId ? false : true,
     ...(ownerUserId ? { ownerUserId } : {}),
   };
 

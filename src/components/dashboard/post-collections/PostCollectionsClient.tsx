@@ -237,7 +237,6 @@ export function PostCollectionsClient() {
 
               <div className="flex flex-wrap items-center gap-2">
                 <Button
-                  asChild
                   size="sm"
                   variant="secondary"
                   className={cn(
@@ -245,18 +244,13 @@ export function PostCollectionsClient() {
                     !post.account?.username && "pointer-events-none opacity-60",
                   )}
                   disabled={!post.account?.username}
+                  onClick={() => {
+                    if (!post.account?.username) return;
+                    const url = `https://www.tiktok.com/@${post.account.username}/video/${post.postId}`;
+                    window.open(url, "_blank", "noopener,noreferrer");
+                  }}
                 >
-                  <a
-                    href={
-                      post.account?.username
-                        ? `https://www.tiktok.com/@${post.account.username}/video/${post.postId}`
-                      : "#"
-                    }
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Open on TikTok
-                  </a>
+                  Open on TikTok
                 </Button>
               </div>
             </CardContent>
