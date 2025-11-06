@@ -13,7 +13,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 import { cn } from "@/lib/utils";
 import type { DemoVideo, GeneratedVideo, ReactionAvatar } from "@/types/ugc";
-import { RefreshCw, Settings, VideoOff, Plus, AlignCenter, ArrowUpFromLine } from "lucide-react";
+import {
+  AlignCenter,
+  ArrowUpFromLine,
+  Plus,
+  RefreshCw,
+  Settings,
+  VideoOff,
+} from "lucide-react";
 // Sound-Popover (Dialog)
 import {
   Dialog,
@@ -123,7 +130,9 @@ export default function UgcDashboardPage() {
       if (!response.ok) {
         throw new Error(data?.error || "Unable to load reaction avatars");
       }
-      const raw: ReactionAvatar[] = Array.isArray(data?.avatars) ? data.avatars : [];
+      const raw: ReactionAvatar[] = Array.isArray(data?.avatars)
+        ? data.avatars
+        : [];
       // Nur Avatare zeigen, die ein gültiges Hook-Video hinterlegt haben
       const avatarsData = raw.filter((a) => {
         const v = (a.videoUrl ?? "").trim().toLowerCase();
@@ -400,7 +409,7 @@ export default function UgcDashboardPage() {
                     placeholder="Schreibe deinen Hook"
                     className="h-12 flex-1 rounded-full border border-border/40 bg-muted px-5 text-base shadow-inner focus-visible:ring-2 focus-visible:ring-foreground/20"
                   />
-                  </div>
+                </div>
               </section>
 
               {/* Avatars (ohne innere Box, kompakt) */}
@@ -409,19 +418,6 @@ export default function UgcDashboardPage() {
                   <div>
                     <h2 className="text-base font-semibold">2. AI Avatar</h2>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 rounded-full px-3"
-                    onClick={() => {
-                      void loadAvatars();
-                    }}
-                    disabled={avatarsLoading}
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Aktualisieren
-                  </Button>
                 </div>
 
                 <Tabs
@@ -474,8 +470,7 @@ export default function UgcDashboardPage() {
                       </ScrollArea>
                     )}
                   </TabsContent>
-
-                  </Tabs>
+                </Tabs>
               </section>
 
               {/* Demos (ohne Box, als 9:16 Cards + Platzhalter rechts) */}
@@ -538,58 +533,58 @@ export default function UgcDashboardPage() {
             {/* RIGHT: Video Preview + Controls (ohne zusätzliche Box) */}
             <div className="flex flex-col gap-4">
               <div className="relative mx-auto aspect-[9/16] w-full max-w-[420px] overflow-hidden rounded-2xl bg-black">
-                  {previewVideoSrc || previewFallbackImage ? (
-                    <>
-                      {previewVideoSrc ? (
-                        <video
-                          key={previewVideoKey}
-                          src={previewVideoSrc}
+                {previewVideoSrc || previewFallbackImage ? (
+                  <>
+                    {previewVideoSrc ? (
+                      <video
+                        key={previewVideoKey}
+                        src={previewVideoSrc}
+                        className="h-full w-full object-cover"
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                      />
+                    ) : previewFallbackImage ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={previewFallbackImage}
+                          alt={selectedAvatar?.name ?? "Reaction avatar"}
                           className="h-full w-full object-cover"
-                          autoPlay
-                          loop
-                          muted
-                          playsInline
                         />
-                      ) : previewFallbackImage ? (
-                        <>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={previewFallbackImage}
-                            alt={selectedAvatar?.name ?? "Reaction avatar"}
-                            className="h-full w-full object-cover"
-                          />
-                        </>
-                      ) : null}
-                      {/* Hook Overlay */}
-                      {hook.trim().length > 0 && (
-                        <div
-                          className={cn(
-                            "pointer-events-none absolute left-1/2 w-[86%] -translate-x-1/2 text-center text-white",
-                            hookPosition === "middle"
-                              ? "top-1/2 -translate-y-1/2"
-                              : "top-[18%]",
-                          )}
-                          style={{
-                            WebkitTextStroke: "2px rgba(0,0,0,0.85)",
-                            textShadow:
-                              "0 2px 6px rgba(0,0,0,0.6), 0 0 2px rgba(0,0,0,0.5)",
-                          }}
-                        >
-                          <span className="text-2xl font-semibold leading-snug md:text-3xl">
-                            {hook}
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <VideoOff className="h-4 w-4" />
-                        Wähle einen Avatar und optional eine Demo.
+                      </>
+                    ) : null}
+                    {/* Hook Overlay */}
+                    {hook.trim().length > 0 && (
+                      <div
+                        className={cn(
+                          "pointer-events-none absolute left-1/2 w-[86%] -translate-x-1/2 text-center text-white",
+                          hookPosition === "middle"
+                            ? "top-1/2 -translate-y-1/2"
+                            : "top-[18%]",
+                        )}
+                        style={{
+                          WebkitTextStroke: "2px rgba(0,0,0,0.85)",
+                          textShadow:
+                            "0 2px 6px rgba(0,0,0,0.6), 0 0 2px rgba(0,0,0,0.5)",
+                        }}
+                      >
+                        <span className="text-2xl font-semibold leading-snug md:text-3xl">
+                          {hook}
+                        </span>
                       </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex h-full items-center justify-center">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <VideoOff className="h-4 w-4" />
+                      Wähle einen Avatar und optional eine Demo.
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+              </div>
 
               {/* Hook-Position als Icons (unter dem Video) */}
               <div className="flex items-center justify-center gap-2">
@@ -788,12 +783,17 @@ export default function UgcDashboardPage() {
                       </p>
                       {video.scheduleRunAt && (
                         <p className="truncate text-xs text-muted-foreground">
-                          Scheduled: {new Date(video.scheduleRunAt).toLocaleString()}
+                          Scheduled:{" "}
+                          {new Date(video.scheduleRunAt).toLocaleString()}
                         </p>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleDownload(video)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownload(video)}
+                      >
                         Download
                       </Button>
                       <Button size="sm" onClick={() => handleOpenVideo(video)}>
