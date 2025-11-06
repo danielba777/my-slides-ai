@@ -16,6 +16,7 @@ interface PresentationLayoutProps {
   themeData?: ThemeProperties;
   isShared?: boolean;
   hideSidebar?: boolean;
+  fixedBackgroundColor?: string; // Neue Prop für feste Hintergrundfarbe
 }
 
 export function PresentationLayout({
@@ -24,6 +25,7 @@ export function PresentationLayout({
   themeData,
   isShared = false,
   hideSidebar = false,
+  fixedBackgroundColor,
 }: PresentationLayoutProps) {
   const isPresenting = usePresentationState((s) => s.isPresenting);
 
@@ -36,7 +38,20 @@ export function PresentationLayout({
   // Hide sidebar in shared mode and when presenting
   const showSidebar = !hideSidebar && !isShared && !isPresenting;
 
-  return (
+  const backgroundElement = fixedBackgroundColor ? (
+    <div className="h-full w-full" style={{ backgroundColor: fixedBackgroundColor }}>
+      <DndProvider backend={HTML5Backend}>
+        {themeData && <CustomThemeFontLoader themeData={themeData} />}
+        <div className="flex h-full">
+          {showSidebar && <SlidePreview showSidebar={showSidebar} />}
+          {/* Main Presentation Content - Scrollable */}
+          <div className="presentation-slides flex max-h-full flex-1 items-start overflow-x-auto overflow-y-hidden pb-20">
+            {children}
+          </div>
+        </div>
+      </DndProvider>
+    </div>
+  ) : (
     <ThemeBackground className="h-full w-full">
       <DndProvider backend={HTML5Backend}>
         {themeData && <CustomThemeFontLoader themeData={themeData} />}
@@ -50,4 +65,6 @@ export function PresentationLayout({
       </DndProvider>
     </ThemeBackground>
   );
+
+  return backgroundElement;
 }

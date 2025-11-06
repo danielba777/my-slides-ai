@@ -294,6 +294,7 @@ export default function PresentationPage() {
       isLoading={isLoading}
       themeData={currentThemeData ?? undefined}
       hideSidebar
+      fixedBackgroundColor="#F3F4EF"
     >
       <div className="mx-auto w-full max-w-none px-8 pt-16">
         <PresentationSlidesView

@@ -59,7 +59,10 @@ export function ThemeBackground({ className, children }: ThemeBackgroundProps) {
 
   if (!currentTheme || !mounted) {
     return (
-      <div className={cn("h-max min-h-full w-full bg-background", className)}>
+      <div
+        className={cn("h-max min-h-full w-full", className)}
+        style={{ backgroundColor: "#F3F4EF" }}
+      >
         {children}
       </div>
     );
