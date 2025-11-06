@@ -312,7 +312,7 @@ export const ImageCollectionSelector: React.FC = () => {
     }
 
     return (
-      <ScrollArea className="h-full max-h-full pr-4">
+      <ScrollArea className="h-full max-h-full pr-0 scrollbar-hide">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {/* "All Images" Option when drilling down */}
           {drillDownParent && (
@@ -514,7 +514,7 @@ export const ImageCollectionSelector: React.FC = () => {
           </DialogHeader>
 
           {/* Scrollbarer Mittelteil (behält feste Außenmaße bei) */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 overscroll-contain">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 overscroll-contain scrollbar-hide">
             <Tabs
               value={activeTab}
               onValueChange={(value) =>

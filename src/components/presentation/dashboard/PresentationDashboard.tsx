@@ -331,9 +331,9 @@ export function PresentationDashboard({
         viewportRef={
           section === "community" ? communityViewportRef : personalViewportRef
         }
-        className="h-full max-h-full pr-4 overscroll-contain"
+        className="h-full max-h-full pr-0 overscroll-contain scrollbar-hide"
       >
-        <div className="grid grid-cols-1 gap-4 content-start sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7 pb-4">
+        <div className="grid grid-cols-1 gap-4 content-start sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 3xl:grid-cols-10 pb-4">
           {posts.map((post) => {
             const primarySlide =
               post.slides?.find((slide) => slide.imageUrl)?.imageUrl ?? null;
@@ -439,8 +439,8 @@ export function PresentationDashboard({
       </div>
 
       <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
-        <DialogContent className="!max-w-none w-[96vw] md:w-[70vw] h-[85vh] max-h-[85vh] p-0 overflow-hidden flex flex-col rounded-2xl shadow-xl border border-border/30">
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 overscroll-contain">
+        <DialogContent className="!max-w-none w-[98vw] h-[95vh] max-w-[98vw] max-h-[95vh] p-0 overflow-hidden flex flex-col m-auto rounded-xl shadow-xl border border-border/20">
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 overscroll-contain scrollbar-hide">
             <Tabs
               value={templateTab}
               onValueChange={(value) =>
