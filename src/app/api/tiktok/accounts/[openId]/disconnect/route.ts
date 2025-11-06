@@ -4,14 +4,14 @@ import { NextResponse } from "next/server";
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { openId: string } }
+  { params }: { params: Promise<{ openId: string }> }
 ) {
   const session = await auth();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { openId } = params;
+  const { openId } = await params;
 
   try {
     const response = await fetch(
