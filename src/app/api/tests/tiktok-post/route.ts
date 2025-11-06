@@ -36,13 +36,13 @@ export async function POST(request: Request) {
 
   const payload = {
     caption: body.caption ?? "",
-    postMode: "DIRECT_POST" as const,
+    postMode: "MEDIA_UPLOAD" as const,
     media: body.photoImages.map((url) => ({
       type: "photo" as const,
       url,
     })),
     settings: {
-      contentPostingMethod: "DIRECT_POST" as const,
+      contentPostingMethod: "URL" as const,
       autoAddMusic: true,
       title:
         body.title && body.title.trim().length > 0

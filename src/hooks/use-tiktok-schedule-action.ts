@@ -203,10 +203,10 @@ export function useTikTokScheduleAction(
       idempotencyKey: form.idempotencyKey,
       post: {
         caption: form.caption,
-        postMode: "DIRECT_POST" as const,
+        postMode: "MEDIA_UPLOAD" as const,
         media: orderedImages.map((url) => ({ type: "photo" as const, url })),
         settings: {
-          contentPostingMethod: "DIRECT_POST" as const,
+          contentPostingMethod: "URL" as const,
           autoAddMusic: true,
           title: normalizedTitle.length > 0 ? normalizedTitle : undefined,
         },
