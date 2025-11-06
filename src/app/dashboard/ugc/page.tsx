@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -13,15 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 import { cn } from "@/lib/utils";
 import type { DemoVideo, GeneratedVideo, ReactionAvatar } from "@/types/ugc";
-import {
-  AlignCenter,
-  ArrowUpFromLine,
-  Plus,
-  RefreshCw,
-  Settings,
-  VideoOff,
-} from "lucide-react";
-// Sound-Popover (Dialog)
+import { AlignCenter, ArrowUpFromLine, Plus, VideoOff } from "lucide-react";
+// Sound popover (dialog)
 import {
   Dialog,
   DialogContent,
@@ -55,7 +48,8 @@ export default function UgcDashboardPage() {
   const [avatars, setAvatars] = useState<ReactionAvatar[]>([]);
   const [avatarsLoading, setAvatarsLoading] = useState(true);
   const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(null);
-  const [avatarTab, setAvatarTab] = useState("default");
+  // only one visible tab: "community"
+  const [avatarTab, setAvatarTab] = useState("community");
 
   const [demos, setDemos] = useState<DemoVideo[]>([]);
   const [demosLoading, setDemosLoading] = useState(true);
@@ -65,17 +59,17 @@ export default function UgcDashboardPage() {
   const [videosLoading, setVideosLoading] = useState(true);
 
   const [hook, setHook] = useState("");
-  // TikTok-like Hook Overlay Position (nur Preview/UI)
+  // TikTok-like hook overlay position (preview/UI only)
   const [hookPosition, setHookPosition] = useState<"middle" | "upper">(
     "middle",
   );
-  // Sound-Dialog (UI-only). Später ans Render-POST anbindbar.
+  // Sound dialog (UI-only). Can be wired to render POST later.
   const [soundOpen, setSoundOpen] = useState(false);
   const [soundSource, setSoundSource] = useState<"community" | "my">(
     "community",
   );
   const [soundUrl, setSoundUrl] = useState<string>("");
-  // ausgewählter Sound (nur UI-Label)
+  // selected sound (UI label only)
   const [soundLabel, setSoundLabel] = useState<string>("Sound");
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -133,7 +127,7 @@ export default function UgcDashboardPage() {
       const raw: ReactionAvatar[] = Array.isArray(data?.avatars)
         ? data.avatars
         : [];
-      // Nur Avatare zeigen, die ein gültiges Hook-Video hinterlegt haben
+      // Only show avatars that have a valid hook video
       const avatarsData = raw.filter((a) => {
         const v = (a.videoUrl ?? "").trim().toLowerCase();
         return v && v !== "about:blank";
@@ -224,15 +218,13 @@ export default function UgcDashboardPage() {
     return candidate;
   }, [selectedAvatar]);
 
-  const previewVideoSrc = useMemo(() => {
+  /** Preview-Reihenfolge: 1) Avatar-Hook  2) Demo */
+  const previewSources = useMemo(() => {
+    const out: string[] = [];
+    if (selectedAvatarVideoUrl) out.push(selectedAvatarVideoUrl);
     const demoVideo = selectedDemo?.videoUrl?.trim();
-    if (demoVideo) {
-      return demoVideo;
-    }
-    if (selectedAvatarVideoUrl) {
-      return selectedAvatarVideoUrl;
-    }
-    return null;
+    if (demoVideo) out.push(demoVideo);
+    return out;
   }, [selectedAvatarVideoUrl, selectedDemo]);
 
   const previewFallbackImage = useMemo(() => {
@@ -241,6 +233,32 @@ export default function UgcDashboardPage() {
   }, [selectedAvatar]);
 
   const previewVideoKey = `${selectedDemo?.id ?? "none"}:${selectedAvatar?.id ?? "none"}:${selectedAvatarVideoUrl ?? ""}`;
+
+  /** Nahtloser Preview via Doppel-<video>-Overlay */
+  const [activeIdx, setActiveIdx] = useState(0); // welches Video ist sichtbar
+  const [armed, setArmed] = useState(false); // ob der Übergang schon vorbereitet ist
+  const v0Ref = useRef<HTMLVideoElement | null>(null);
+  const v1Ref = useRef<HTMLVideoElement | null>(null);
+  const transitionLeadMs = 80; // ~80ms vor Ende starten wir das zweite Video
+
+  const resetSeamlessPreview = () => {
+    setActiveIdx(0);
+    setArmed(false);
+    if (v0Ref.current) {
+      v0Ref.current.currentTime = 0;
+      // Autoplay wird weiter unten via autoPlay gesetzt
+    }
+    if (v1Ref.current) {
+      v1Ref.current.pause();
+      v1Ref.current.currentTime = 0;
+    }
+  };
+
+  useEffect(() => {
+    // Bei neuer Auswahl komplett zurücksetzen
+    resetSeamlessPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewVideoKey]);
 
   const handleGenerate = async () => {
     if (!selectedAvatar) {
@@ -256,6 +274,8 @@ export default function UgcDashboardPage() {
           reactionAvatarId: selectedAvatar.id,
           demoVideoId: selectedDemo?.id ?? undefined,
           title: hook.trim() || undefined,
+          overlayText: hook.trim() || undefined, // Hook-Text ins Video brennen
+          overlayPosition: hookPosition, // "upper" | "middle"
         }),
       });
       const data = await response.json();
@@ -384,8 +404,7 @@ export default function UgcDashboardPage() {
           Create UGC ads
         </h1>
         <p className="text-sm text-muted-foreground">
-          Stelle Hook, Avatar und Demo kompakt zusammen und prüfe rechts sofort
-          die Vorschau.
+          Combine hook, avatar and demo, and see the preview on the right.
         </p>
       </header>
 
@@ -406,7 +425,7 @@ export default function UgcDashboardPage() {
                   <Input
                     value={hook}
                     onChange={(e) => setHook(e.target.value)}
-                    placeholder="Schreibe deinen Hook"
+                    placeholder="Write your hook"
                     className="h-12 flex-1 rounded-full border border-border/40 bg-muted px-5 text-base shadow-inner focus-visible:ring-2 focus-visible:ring-foreground/20"
                   />
                 </div>
@@ -428,16 +447,16 @@ export default function UgcDashboardPage() {
                   {/* Nur eine sichtbare Tab-Option: Community */}
                   <TabsList className="grid h-10 w-full grid-cols-1 rounded-full bg-muted p-1">
                     <TabsTrigger
-                      value="default"
+                      value="community"
                       className="rounded-full text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
                     >
                       Community
                     </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="default" className="mt-4">
+                  <TabsContent value="community" className="mt-4">
                     {avatarsLoading ? (
-                      <div className="flex h-48 items-center justify-center">
+                      <div className="flex h-64 items-center justify-center">
                         <Spinner className="h-6 w-6" />
                       </div>
                     ) : avatars.length === 0 ? (
@@ -445,29 +464,32 @@ export default function UgcDashboardPage() {
                         Keine passenden Avatare mit Video vorhanden.
                       </div>
                     ) : (
-                      <ScrollArea className="h-40 rounded-2xl border border-border/50 bg-muted/40">
-                        <div className="grid grid-cols-5 gap-2 p-2 sm:grid-cols-7 md:grid-cols-9">
-                          {avatars.slice(0, 48).map((avatar) => (
-                            <button
-                              key={avatar.id}
-                              className={cn(
-                                "relative aspect-square overflow-hidden rounded-lg border border-transparent transition-all duration-150 hover:ring-2 hover:ring-foreground/40",
-                                selectedAvatarId === avatar.id
-                                  ? "ring-2 ring-foreground"
-                                  : "",
-                              )}
-                              onClick={() => setSelectedAvatarId(avatar.id)}
-                            >
-                              <img
-                                src={avatar.thumbnailUrl}
-                                className="h-full w-full object-cover"
-                                alt={avatar.name}
-                              />
-                              {/* Kein Hover-Text, nur dezente Markierung */}
-                            </button>
-                          ))}
-                        </div>
-                      </ScrollArea>
+                      <>
+                        {/* 4 Reihen sichtbar, danach Scroll */}
+                        <ScrollArea className="h-64 sm:h-72 lg:h-80 rounded-2xl border border-border/50 bg-muted/40">
+                          <div className="grid grid-cols-4 gap-2 p-2 sm:grid-cols-6 md:grid-cols-8">
+                            {avatars.slice(0, 48).map((avatar) => (
+                              <button
+                                key={avatar.id}
+                                className={cn(
+                                  "relative aspect-square overflow-hidden rounded-lg border border-transparent transition-all duration-150 hover:ring-2 hover:ring-foreground/40",
+                                  selectedAvatarId === avatar.id
+                                    ? "ring-2 ring-foreground"
+                                    : "",
+                                )}
+                                onClick={() => setSelectedAvatarId(avatar.id)}
+                              >
+                                <img
+                                  src={avatar.thumbnailUrl}
+                                  className="h-full w-full object-cover"
+                                  alt={avatar.name}
+                                />
+                                {/* Kein Hover-Text, nur dezente Markierung */}
+                              </button>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </>
                     )}
                   </TabsContent>
                 </Tabs>
@@ -482,49 +504,52 @@ export default function UgcDashboardPage() {
                       <Spinner className="h-6 w-6" />
                     </div>
                   ) : (
-                    <ScrollArea className="h-[140px] rounded-2xl border border-border/50 bg-muted/40">
-                      <div className="flex items-center gap-3 p-3">
-                        {demos.map((demo) => {
-                          const isActive = selectedDemoId === demo.id;
-                          return (
-                            <button
-                              key={demo.id}
-                              type="button"
-                              onClick={() => setSelectedDemoId(demo.id)}
-                              className={cn(
-                                "relative aspect-[9/16] h-[120px] overflow-hidden rounded-xl border bg-black text-white transition",
-                                isActive
-                                  ? "ring-2 ring-foreground"
-                                  : "hover:ring-2 hover:ring-foreground/40",
-                              )}
-                              title={demo.name || "Demo"}
-                            >
-                              {/* Thumbnail falls vorhanden, sonst dunkle Fläche */}
-                              {demo.thumbnailUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={demo.thumbnailUrl}
-                                  alt={demo.name || "Demo"}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <div className="flex h-full w-full items-center justify-center text-xs text-white/70">
-                                  Demo
-                                </div>
-                              )}
-                            </button>
-                          );
-                        })}
-                        {/* Platzhalter-Kärtchen mit + ganz rechts */}
-                        <Link
-                          href="/dashboard/account/settings#demos"
-                          className="relative aspect-[9/16] h-[120px] rounded-xl border border-dashed border-border/70 bg-background/60 hover:border-foreground/50 hover:bg-background/80 flex items-center justify-center"
-                          title="Demo hochladen"
-                        >
-                          <Plus className="h-6 w-6" />
-                        </Link>
-                      </div>
-                    </ScrollArea>
+                    <>
+                      {/* 2 Reihen sichtbar, danach Scroll */}
+                      <ScrollArea className="h-[260px] sm:h-[300px] rounded-2xl border border-border/50 bg-muted/40">
+                        <div className="flex items-center gap-3 p-3">
+                          {demos.map((demo) => {
+                            const isActive = selectedDemoId === demo.id;
+                            return (
+                              <button
+                                key={demo.id}
+                                type="button"
+                                onClick={() => setSelectedDemoId(demo.id)}
+                                className={cn(
+                                  "relative aspect-[9/16] h-[120px] overflow-hidden rounded-xl border bg-black text-white transition",
+                                  isActive
+                                    ? "ring-2 ring-foreground"
+                                    : "hover:ring-2 hover:ring-foreground/40",
+                                )}
+                                title={demo.name || "Demo"}
+                              >
+                                {/* Thumbnail falls vorhanden, sonst dunkle Fläche */}
+                                {demo.thumbnailUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={demo.thumbnailUrl}
+                                    alt={demo.name || "Demo"}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-xs text-white/70">
+                                    Demo
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                          {/* Platzhalter-Kärtchen mit + ganz rechts */}
+                          <Link
+                            href="/dashboard/account/settings#demos"
+                            className="relative aspect-[9/16] h-[120px] rounded-xl border border-dashed border-border/70 bg-background/60 hover:border-foreground/50 hover:bg-background/80 flex items-center justify-center"
+                            title="Demo hochladen"
+                          >
+                            <Plus className="h-6 w-6" />
+                          </Link>
+                        </div>
+                      </ScrollArea>
+                    </>
                   )}
                 </div>
               </section>
@@ -532,19 +557,76 @@ export default function UgcDashboardPage() {
 
             {/* RIGHT: Video Preview + Controls (ohne zusätzliche Box) */}
             <div className="flex flex-col gap-4">
-              <div className="relative mx-auto aspect-[9/16] w-full max-w-[420px] overflow-hidden rounded-2xl bg-black">
-                {previewVideoSrc || previewFallbackImage ? (
+              {/* etwas kompakter (ca. -20%) */}
+              <div className="relative mx-auto aspect-[9/16] w-full max-w-[360px] overflow-hidden rounded-2xl bg-black">
+                {previewSources.length > 0 || previewFallbackImage ? (
                   <>
-                    {previewVideoSrc ? (
-                      <video
-                        key={previewVideoKey}
-                        src={previewVideoSrc}
-                        className="h-full w-full object-cover"
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                      />
+                    {previewSources.length > 0 ? (
+                      <div className="relative h-full w-full">
+                        {/* Layer 0 (Hook) */}
+                        <video
+                          key={`${previewVideoKey}:layer0`}
+                          ref={v0Ref}
+                          src={previewSources[0]}
+                          className={`absolute inset-0 h-full w-full object-cover ${activeIdx === 0 ? "opacity-100" : "opacity-0"}`}
+                          autoPlay
+                          muted
+                          playsInline
+                          preload="auto"
+                          onTimeUpdate={() => {
+                            const el = v0Ref.current;
+                            // Wenn nur ein Source vorhanden, kein Seamless nötig
+                            if (!el || previewSources.length < 2) return;
+                            if (
+                              !Number.isFinite(el.duration) ||
+                              el.duration === 0
+                            )
+                              return;
+                            const remainingMs =
+                              (el.duration - el.currentTime) * 1000;
+                            if (remainingMs <= transitionLeadMs && !armed) {
+                              // Zweites Video vorbereiten & starten
+                              if (v1Ref.current) {
+                                // iOS braucht einen Play-Aufruf, wenn muted + playsInline gesetzt sind
+                                v1Ref.current.play().catch(() => {});
+                                setArmed(true);
+                                // Sofort sichtbar schalten, um den schwarzen Frame zu vermeiden
+                                setActiveIdx(1);
+                              }
+                            }
+                          }}
+                          onEnded={() => {
+                            // Fallback falls timeupdate knapp verpasst wurde
+                            if (previewSources.length > 1 && v1Ref.current) {
+                              setActiveIdx(1);
+                              v1Ref.current.play().catch(() => {});
+                            }
+                          }}
+                        />
+                        {/* Layer 1 (Demo) */}
+                        {previewSources[1] ? (
+                          <video
+                            key={`${previewVideoKey}:layer1`}
+                            ref={v1Ref}
+                            src={previewSources[1]}
+                            className={`absolute inset-0 h-full w-full object-cover ${activeIdx === 1 ? "opacity-100" : "opacity-0"}`}
+                            muted
+                            playsInline
+                            preload="auto"
+                            // nicht autoPlay: wir starten gezielt kurz vor Ende von Layer 0
+                            onEnded={() => {
+                              // Für Preview zur Schleife zurück an den Start
+                              resetSeamlessPreview();
+                              // Autoplay neu starten
+                              requestAnimationFrame(() => {
+                                if (v0Ref.current) {
+                                  v0Ref.current.play().catch(() => {});
+                                }
+                              });
+                            }}
+                          />
+                        ) : null}
+                      </div>
                     ) : previewFallbackImage ? (
                       <>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -580,7 +662,7 @@ export default function UgcDashboardPage() {
                   <div className="flex h-full items-center justify-center">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <VideoOff className="h-4 w-4" />
-                      Wähle einen Avatar und optional eine Demo.
+                      Choose a avatar or demo to preview
                     </div>
                   </div>
                 )}
@@ -619,9 +701,6 @@ export default function UgcDashboardPage() {
                       className="flex min-w-[160px] items-center justify-between gap-2 rounded-full px-4"
                     >
                       <span className="truncate">{soundLabel}</span>
-                      <span className="text-xs text-muted-foreground">
-                        ändern
-                      </span>
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-xl">
@@ -706,6 +785,7 @@ export default function UgcDashboardPage() {
         </CardContent>
       </Card>
 
+      {/* MY VIDEOS – wie AI Avatars (Kacheln + Aktionen) */}
       <section className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -717,34 +797,6 @@ export default function UgcDashboardPage() {
               Download oder Scheduling.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-2 rounded-full px-4"
-              onClick={() => {
-                void loadVideos();
-              }}
-              disabled={videosLoading}
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-2 rounded-full px-4"
-              onClick={() => {
-                void refreshAccounts();
-              }}
-              disabled={accountsLoading}
-            >
-              <Settings className="h-4 w-4" />
-              Accounts
-            </Button>
-          </div>
         </div>
 
         {videosLoading ? (
@@ -752,31 +804,43 @@ export default function UgcDashboardPage() {
             <Spinner className="h-6 w-6" />
           </div>
         ) : videos.length === 0 ? (
+          // Platzhalter-Kacheln wie bei Avataren/Templates
           <div className="rounded-2xl border border-dashed border-border/70 bg-muted/30 p-4">
-            {/* Imaginäre Kacheln wie bei Avatars */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, i) => (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              {Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
-                  className="aspect-[9/16] w-full rounded-xl border border-dashed border-border/60 bg-background/40"
+                  className="aspect-[9/16] w-full rounded-xl border border-dashed border-border/60 bg-background/50"
                 />
               ))}
             </div>
             <p className="mt-4 text-center text-sm text-muted-foreground">
-              Noch keine Videos vorhanden. Generiere dein erstes Video.
+              Noch keine Videos – Generiere dein erstes UGC-Video oben links.
             </p>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             {videos.map((video) => (
               <Card key={video.id} className="overflow-hidden rounded-2xl">
-                <CardContent className="space-y-3 p-4">
-                  <video
-                    src={video.compositeVideoUrl}
-                    controls
-                    className="h-56 w-full rounded-xl bg-black object-cover"
-                  />
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardContent className="space-y-3 p-3">
+                  <div className="relative">
+                    {/* bevorzugt Thumbnail anzeigen (leichter/performanter) */}
+                    {video.compositeThumbnailUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={video.compositeThumbnailUrl}
+                        alt={video.title ?? "UGC Video"}
+                        className="aspect-[9/16] w-full rounded-xl object-cover"
+                      />
+                    ) : (
+                      <video
+                        src={video.compositeVideoUrl}
+                        muted
+                        className="aspect-[9/16] w-full rounded-xl bg-black object-cover"
+                      />
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">
                         {video.title ?? "UGC Video"}
@@ -788,6 +852,8 @@ export default function UgcDashboardPage() {
                         </p>
                       )}
                     </div>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
@@ -796,10 +862,20 @@ export default function UgcDashboardPage() {
                       >
                         Download
                       </Button>
-                      <Button size="sm" onClick={() => handleOpenVideo(video)}>
-                        Schedule
-                      </Button>
+                      <Link
+                        href={video.compositeVideoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex"
+                      >
+                        <Button variant="outline" size="sm">
+                          Open
+                        </Button>
+                      </Link>
                     </div>
+                    <Button size="sm" onClick={() => handleOpenVideo(video)}>
+                      Post on TikTok
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

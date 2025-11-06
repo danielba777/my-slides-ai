@@ -11,6 +11,9 @@ const createVideoSchema = z.object({
   reactionAvatarId: z.string().trim().min(1, "reactionAvatarId is required"),
   demoVideoId: z.string().trim().min(1).optional().or(z.literal("")).nullable(),
   title: z.string().trim().max(120).optional(),
+  // NEU: Hook-Text wirklich einbrennen wie in der Preview
+  overlayText: z.string().trim().max(180).optional(),
+  overlayPosition: z.enum(["upper", "middle"]).optional(),
 });
 
 export async function GET() {
@@ -64,7 +67,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { reactionAvatarId, demoVideoId, title } = parsed.data;
+  const { reactionAvatarId, demoVideoId, title, overlayText, overlayPosition } = parsed.data;
 
   const avatar = await db.reactionAvatar.findUnique({
     where: { id: reactionAvatarId },
@@ -89,6 +92,8 @@ export async function POST(req: Request) {
       reactionUrl: avatar.videoUrl,
       demoUrl: demo?.videoUrl ?? null,
       userId: session.user.id,
+      overlayText: overlayText ?? title ?? undefined,
+      overlayPosition: overlayPosition ?? "upper",
     });
 
     const video = await db.userUGCVideo.create({
@@ -119,11 +124,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ video }, { status: 201 });
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown error";
     console.error("[UGC][Videos][POST] Failed to compose video", error);
-    return NextResponse.json(
-      { error: "Failed to generate video" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

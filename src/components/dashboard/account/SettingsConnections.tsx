@@ -1,8 +1,7 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Spinner } from "@/components/ui/spinner";
 import {
   ConnectedTikTokAccount,
@@ -10,6 +9,7 @@ import {
 } from "@/hooks/use-tiktok-accounts";
 import IonIcon from "@reacticons/ionicons";
 import { defineCustomElements } from "ionicons/loader";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 type ConnectionState = "idle" | "loading";
 export default function SettingsConnections() {
