@@ -18,6 +18,8 @@ export interface TikTokPostPayload {
   title: string;
   coverIndex: number;
   photoImages: string[];
+  autoAddMusic?: boolean;
+  postMode?: "DIRECT_POST" | "MEDIA_UPLOAD";
 }
 
 export interface TikTokPostResult {
@@ -47,6 +49,8 @@ const DEFAULT_FORM_VALUES: TikTokPostPayload = {
   title: "",
   coverIndex: 0,
   photoImages: [],
+  autoAddMusic: true,
+  postMode: "MEDIA_UPLOAD",
 };
 
 export interface UseTikTokPostActionOptions {
