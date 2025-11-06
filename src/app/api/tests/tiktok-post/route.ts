@@ -8,6 +8,8 @@ interface RequestPayload {
   title?: string;
   coverIndex?: number;
   photoImages?: string[];
+  postMode?: "DIRECT_POST" | "MEDIA_UPLOAD";
+  autoAddMusic?: boolean;
 }
 
 export async function POST(request: Request) {
