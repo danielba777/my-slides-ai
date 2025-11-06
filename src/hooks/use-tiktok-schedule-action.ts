@@ -20,6 +20,8 @@ export interface TikTokSchedulePayload {
   photoImages: string[];
   publishAt: string;
   idempotencyKey: string;
+  autoAddMusic?: boolean;
+  postMode?: "DIRECT_POST" | "MEDIA_UPLOAD";
 }
 
 export interface TikTokScheduleResult {
@@ -65,6 +67,8 @@ const DEFAULT_SCHEDULE_VALUES: TikTokSchedulePayload = {
   photoImages: [],
   publishAt: createDefaultPublishAt(),
   idempotencyKey: `schedule_${Date.now()}`,
+  autoAddMusic: true,
+  postMode: "MEDIA_UPLOAD",
 };
 
 export function useTikTokScheduleAction(

@@ -7,6 +7,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TikTokConfig } from "@/components/tiktok/TikTokConfig";
 import { type UseTikTokPostActionResult } from "@/hooks/use-tiktok-post-action";
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
@@ -152,17 +153,6 @@ export function TikTokPostForm({
           </div>
         )}
         <div className="space-y-2">
-          <Label htmlFor="title">Title</Label>
-          <Input
-            id="title"
-            placeholder="Optional title"
-            value={form.title}
-            onChange={(event) => updateField("title", event.target.value)}
-            className="bg-white"
-          />
-        </div>
-
-        <div className="space-y-2">
           <Label htmlFor="caption">Caption</Label>
           <Textarea
             id="caption"
@@ -173,6 +163,16 @@ export function TikTokPostForm({
             className="bg-white"
           />
         </div>
+
+        {/* TikTok Config Section */}
+        <TikTokConfig
+          title={form.title || ""}
+          autoAddMusic={form.autoAddMusic ?? true}
+          postMode={form.postMode === "DIRECT_POST" ? "direct_post" : "inbox"}
+          onTitleChange={(title) => updateField("title", title)}
+          onAutoAddMusicChange={(autoAddMusic) => updateField("autoAddMusic", autoAddMusic)}
+          onPostModeChange={(postMode) => updateField("postMode", postMode === "direct_post" ? "DIRECT_POST" : "MEDIA_UPLOAD")}
+        />
 
         {error && <p className="text-sm text-destructive">{error}</p>}
       </CardContent>

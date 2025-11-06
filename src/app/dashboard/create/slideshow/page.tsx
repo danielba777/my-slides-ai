@@ -21,15 +21,15 @@ export default function CreateSlideshowPostPage() {
 
   const postAction = useTikTokPostAction({
     defaultValues: {
-      caption: prepared?.defaultCaption ?? "",
-      title: prepared?.presentationTitle ?? "",
+      caption: "",
+      title: "",
       photoImages: prepared?.slideImageUrls ?? [],
     },
   });
   const scheduleAction = useTikTokScheduleAction({
     defaultValues: {
-      caption: prepared?.defaultCaption ?? "",
-      title: prepared?.presentationTitle ?? "",
+      caption: "",
+      title: "",
       photoImages: prepared?.slideImageUrls ?? [],
     },
   });
@@ -57,10 +57,6 @@ export default function CreateSlideshowPostPage() {
     if (!prepared) return;
     updatePostField("photoImages", prepared.slideImageUrls ?? []);
     updateScheduleField("photoImages", prepared.slideImageUrls ?? []);
-    updatePostField("title", prepared.presentationTitle ?? "");
-    updateScheduleField("title", prepared.presentationTitle ?? "");
-    updatePostField("caption", prepared.defaultCaption ?? "");
-    updateScheduleField("caption", prepared.defaultCaption ?? "");
     updatePostField("coverIndex", 0);
     updateScheduleField("coverIndex", 0);
     if (!scheduledAt) {
