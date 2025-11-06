@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 import { cn } from "@/lib/utils";
 import type { DemoVideo, GeneratedVideo, ReactionAvatar } from "@/types/ugc";
-import { RefreshCw, Settings, VideoOff } from "lucide-react";
+import { RefreshCw, Settings, VideoOff, Plus, AlignCenter, ArrowUpFromLine } from "lucide-react";
 // Sound-Popover (Dialog)
 import {
   Dialog,
@@ -123,9 +123,12 @@ export default function UgcDashboardPage() {
       if (!response.ok) {
         throw new Error(data?.error || "Unable to load reaction avatars");
       }
-      const avatarsData: ReactionAvatar[] = Array.isArray(data?.avatars)
-        ? data.avatars
-        : [];
+      const raw: ReactionAvatar[] = Array.isArray(data?.avatars) ? data.avatars : [];
+      // Nur Avatare zeigen, die ein gültiges Hook-Video hinterlegt haben
+      const avatarsData = raw.filter((a) => {
+        const v = (a.videoUrl ?? "").trim().toLowerCase();
+        return v && v !== "about:blank";
+      });
       setAvatars(avatarsData);
       if (!selectedAvatarId) {
         const firstAvatarId = avatarsData[0]?.id;
@@ -379,11 +382,12 @@ export default function UgcDashboardPage() {
 
       <Card className="rounded-3xl border border-border/60 bg-card/95 shadow-xl">
         <CardContent className="p-5 sm:p-7 lg:p-9">
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,360px)] lg:items-start">
+          {/* 60% / 40% Layout */}
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-start">
             {/* LEFT: Hook + Avatars + Demos */}
             <div className="flex flex-col gap-5">
-              {/* Hook */}
-              <section className="rounded-2xl border border-border/60 bg-background/80 p-5 shadow-sm">
+              {/* Hook (ohne innere Box) */}
+              <section className="p-0">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-base font-semibold">1. Hook</h2>
@@ -394,38 +398,14 @@ export default function UgcDashboardPage() {
                     value={hook}
                     onChange={(e) => setHook(e.target.value)}
                     placeholder="Schreibe deinen Hook"
-                    className="h-12 flex-1 rounded-full border-0 bg-muted px-5 text-base shadow-inner focus-visible:ring-2 focus-visible:ring-foreground/20"
+                    className="h-12 flex-1 rounded-full border border-border/40 bg-muted px-5 text-base shadow-inner focus-visible:ring-2 focus-visible:ring-foreground/20"
                   />
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={
-                        hookPosition === "middle" ? "default" : "outline"
-                      }
-                      onClick={() => setHookPosition("middle")}
-                      className="rounded-full px-4"
-                      title="Vertikal zentrieren"
-                    >
-                      Mid
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={hookPosition === "upper" ? "default" : "outline"}
-                      onClick={() => setHookPosition("upper")}
-                      className="rounded-full px-4"
-                      title="Weiter oben positionieren"
-                    >
-                      Up
-                    </Button>
                   </div>
-                </div>
               </section>
 
-              {/* Avatars */}
-              <section className="rounded-2xl border border-border/60 bg-background/80 p-5 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Avatars (ohne innere Box, kompakt) */}
+              <section className="p-0">
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base font-semibold">2. AI Avatar</h2>
                   </div>
@@ -449,24 +429,13 @@ export default function UgcDashboardPage() {
                   onValueChange={setAvatarTab}
                   className="mt-4"
                 >
-                  <TabsList className="grid h-10 w-full grid-cols-3 rounded-full bg-muted p-1">
+                  {/* Nur eine sichtbare Tab-Option: Community */}
+                  <TabsList className="grid h-10 w-full grid-cols-1 rounded-full bg-muted p-1">
                     <TabsTrigger
                       value="default"
                       className="rounded-full text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
                     >
-                      Default
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="ugc"
-                      className="rounded-full text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
-                    >
-                      My UGC
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="uploads"
-                      className="rounded-full text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
-                    >
-                      Uploads
+                      Community
                     </TabsTrigger>
                   </TabsList>
 
@@ -477,31 +446,28 @@ export default function UgcDashboardPage() {
                       </div>
                     ) : avatars.length === 0 ? (
                       <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-border/80 bg-muted/40 text-center text-sm text-muted-foreground">
-                        No reaction avatars yet. Add them via the admin panel.
+                        Keine passenden Avatare mit Video vorhanden.
                       </div>
                     ) : (
-                      <ScrollArea className="h-52 rounded-2xl border border-border/50 bg-muted/40">
-                        <div className="grid grid-cols-3 gap-3 p-3 sm:grid-cols-4 md:grid-cols-5">
-                          {avatars.slice(0, 30).map((avatar) => (
+                      <ScrollArea className="h-40 rounded-2xl border border-border/50 bg-muted/40">
+                        <div className="grid grid-cols-5 gap-2 p-2 sm:grid-cols-7 md:grid-cols-9">
+                          {avatars.slice(0, 48).map((avatar) => (
                             <button
                               key={avatar.id}
                               className={cn(
-                                "group relative aspect-square overflow-hidden rounded-xl border border-transparent transition-all duration-150 hover:border-foreground/60",
+                                "relative aspect-square overflow-hidden rounded-lg border border-transparent transition-all duration-150 hover:ring-2 hover:ring-foreground/40",
                                 selectedAvatarId === avatar.id
-                                  ? "ring-2 ring-offset-2 ring-offset-background ring-foreground"
+                                  ? "ring-2 ring-foreground"
                                   : "",
                               )}
                               onClick={() => setSelectedAvatarId(avatar.id)}
-                              title={avatar.name}
                             >
                               <img
                                 src={avatar.thumbnailUrl}
                                 className="h-full w-full object-cover"
                                 alt={avatar.name}
                               />
-                              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1 text-left text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
-                                {avatar.name}
-                              </div>
+                              {/* Kein Hover-Text, nur dezente Markierung */}
                             </button>
                           ))}
                         </div>
@@ -509,73 +475,59 @@ export default function UgcDashboardPage() {
                     )}
                   </TabsContent>
 
-                  <TabsContent value="ugc" className="mt-4">
-                    <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-border/80 bg-muted/30 text-sm text-muted-foreground">
-                      Verbinde deine persönlichen Avatare – Upload bald
-                      verfügbar.
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="uploads" className="mt-4">
-                    <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-border/80 bg-muted/30 text-sm text-muted-foreground">
-                      Lade eigene Clips hoch, um sie als Avatar zu nutzen.
-                      Coming soon.
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                  </Tabs>
               </section>
 
-              {/* Demos */}
-              <section className="rounded-2xl border border-border/60 bg-background/80 p-5 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-semibold">3. Demos</h2>
-                  </div>
-                  <Link href="/admin/ugc/reaction-avatars">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full px-3"
-                    >
-                      <span className="text-base font-semibold">+</span>
-                    </Button>
-                  </Link>
-                </div>
+              {/* Demos (ohne Box, als 9:16 Cards + Platzhalter rechts) */}
+              <section className="p-0">
+                <h2 className="text-base font-semibold">3. Demos</h2>
                 <div className="mt-4">
                   {demosLoading ? (
                     <div className="flex h-28 items-center justify-center">
                       <Spinner className="h-6 w-6" />
                     </div>
                   ) : (
-                    <ScrollArea className="h-28 rounded-2xl border border-border/50 bg-muted/40">
-                      <div className="flex flex-wrap gap-2 p-3">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDemoId("none")}
-                          className={cn(
-                            "rounded-full px-3 py-1.5 text-sm transition",
-                            selectedDemoId === "none"
-                              ? "bg-foreground text-background shadow-sm"
-                              : "bg-background/80 text-foreground hover:bg-background",
-                          )}
+                    <ScrollArea className="h-[140px] rounded-2xl border border-border/50 bg-muted/40">
+                      <div className="flex items-center gap-3 p-3">
+                        {demos.map((demo) => {
+                          const isActive = selectedDemoId === demo.id;
+                          return (
+                            <button
+                              key={demo.id}
+                              type="button"
+                              onClick={() => setSelectedDemoId(demo.id)}
+                              className={cn(
+                                "relative aspect-[9/16] h-[120px] overflow-hidden rounded-xl border bg-black text-white transition",
+                                isActive
+                                  ? "ring-2 ring-foreground"
+                                  : "hover:ring-2 hover:ring-foreground/40",
+                              )}
+                              title={demo.name || "Demo"}
+                            >
+                              {/* Thumbnail falls vorhanden, sonst dunkle Fläche */}
+                              {demo.thumbnailUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={demo.thumbnailUrl}
+                                  alt={demo.name || "Demo"}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-xs text-white/70">
+                                  Demo
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                        {/* Platzhalter-Kärtchen mit + ganz rechts */}
+                        <Link
+                          href="/dashboard/account/settings#demos"
+                          className="relative aspect-[9/16] h-[120px] rounded-xl border border-dashed border-border/70 bg-background/60 hover:border-foreground/50 hover:bg-background/80 flex items-center justify-center"
+                          title="Demo hochladen"
                         >
-                          None
-                        </button>
-                        {demos.map((demo) => (
-                          <button
-                            type="button"
-                            key={demo.id}
-                            onClick={() => setSelectedDemoId(demo.id)}
-                            className={cn(
-                              "rounded-full px-3 py-1.5 text-sm transition",
-                              selectedDemoId === demo.id
-                                ? "bg-foreground text-background shadow-sm"
-                                : "bg-background/80 text-foreground hover:bg-background",
-                            )}
-                          >
-                            {demo.name || "Demo"}
-                          </button>
-                        ))}
+                          <Plus className="h-6 w-6" />
+                        </Link>
                       </div>
                     </ScrollArea>
                   )}
@@ -583,10 +535,9 @@ export default function UgcDashboardPage() {
               </section>
             </div>
 
-            {/* RIGHT: Preview + Bottom row (Sound + Generate) */}
-            <div className="flex flex-col gap-5">
-              <section className="rounded-2xl border border-border/60 bg-background/90 p-4 shadow-sm">
-                <div className="relative mx-auto aspect-[9/16] w-full max-w-[340px] overflow-hidden rounded-2xl bg-black">
+            {/* RIGHT: Video Preview + Controls (ohne zusätzliche Box) */}
+            <div className="flex flex-col gap-4">
+              <div className="relative mx-auto aspect-[9/16] w-full max-w-[420px] overflow-hidden rounded-2xl bg-black">
                   {previewVideoSrc || previewFallbackImage ? (
                     <>
                       {previewVideoSrc ? (
@@ -639,10 +590,33 @@ export default function UgcDashboardPage() {
                     </div>
                   )}
                 </div>
-              </section>
 
-              {/* Bottom row: Sound (Dialog) + Generate */}
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              {/* Hook-Position als Icons (unter dem Video) */}
+              <div className="flex items-center justify-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={hookPosition === "middle" ? "default" : "outline"}
+                  onClick={() => setHookPosition("middle")}
+                  className="rounded-full px-3"
+                  title="Vertikal zentrieren"
+                >
+                  <AlignCenter className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={hookPosition === "upper" ? "default" : "outline"}
+                  onClick={() => setHookPosition("upper")}
+                  className="rounded-full px-3"
+                  title="Weiter oben positionieren"
+                >
+                  <ArrowUpFromLine className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Sound (Dialog) + Generate – ohne Box, direkt unter Video */}
+              <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <Dialog open={soundOpen} onOpenChange={setSoundOpen}>
                   <DialogTrigger asChild>
                     <Button
@@ -779,101 +753,57 @@ export default function UgcDashboardPage() {
         </div>
 
         {videosLoading ? (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, idx) => (
-              <div
-                key={idx}
-                className="aspect-[9/16] w-full rounded-2xl border border-dashed border-border/60 bg-muted/40 animate-pulse"
-              />
-            ))}
+          <div className="flex h-28 items-center justify-center">
+            <Spinner className="h-6 w-6" />
           </div>
         ) : videos.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border/60 bg-muted/30 p-10 text-center text-sm text-muted-foreground">
-            Noch keine Videos. Generiere deinen ersten Clip oben.
+          <div className="rounded-2xl border border-dashed border-border/70 bg-muted/30 p-4">
+            {/* Imaginäre Kacheln wie bei Avatars */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="aspect-[9/16] w-full rounded-xl border border-dashed border-border/60 bg-background/40"
+                />
+              ))}
+            </div>
+            <p className="mt-4 text-center text-sm text-muted-foreground">
+              Noch keine Videos vorhanden. Generiere dein erstes Video.
+            </p>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {videos.map((video) => {
-              const statusStyle =
-                statusStyleMap[video.status] ??
-                "bg-muted text-muted-foreground";
-              const statusLabel = statusLabelMap[video.status] ?? video.status;
-              const scheduled = formatDateTime(video.scheduleRunAt);
-              const created = formatDateTime(video.createdAt);
-              return (
-                <Card
-                  key={video.id}
-                  className="flex h-full flex-col gap-4 rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm"
-                >
-                  <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-muted">
-                    {video.compositeThumbnailUrl ? (
-                      <img
-                        src={video.compositeThumbnailUrl}
-                        alt={video.title ?? "Generated video"}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                        Preview wird vorbereitet
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <h3 className="text-base font-semibold leading-tight">
-                          {video.title || "Unbenanntes Video"}
-                        </h3>
-                        {created ? (
-                          <p className="text-xs text-muted-foreground">
-                            Erstellt am {created}
-                          </p>
-                        ) : null}
-                      </div>
-                      <span
-                        className={cn(
-                          "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium",
-                          statusStyle,
-                        )}
-                      >
-                        {statusLabel}
-                      </span>
-                    </div>
-                    {video.reactionAvatar?.name ? (
-                      <p className="text-xs text-muted-foreground">
-                        Avatar: {video.reactionAvatar.name}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {videos.map((video) => (
+              <Card key={video.id} className="overflow-hidden rounded-2xl">
+                <CardContent className="space-y-3 p-4">
+                  <video
+                    src={video.compositeVideoUrl}
+                    controls
+                    className="h-56 w-full rounded-xl bg-black object-cover"
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {video.title ?? "UGC Video"}
                       </p>
-                    ) : null}
-                    {scheduled ? (
-                      <div className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-                        Geplant für {scheduled}
-                      </div>
-                    ) : null}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full px-4"
-                        onClick={() => handleOpenVideo(video)}
-                      >
-                        Öffnen
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="rounded-full px-4"
-                        onClick={() => handleDownload(video)}
-                        disabled={!video.compositeVideoUrl}
-                      >
+                      {video.scheduleRunAt && (
+                        <p className="truncate text-xs text-muted-foreground">
+                          Scheduled: {new Date(video.scheduleRunAt).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleDownload(video)}>
                         Download
                       </Button>
+                      <Button size="sm" onClick={() => handleOpenVideo(video)}>
+                        Schedule
+                      </Button>
                     </div>
                   </div>
-                </Card>
-              );
-            })}
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
       </section>

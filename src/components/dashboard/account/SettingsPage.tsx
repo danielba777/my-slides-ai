@@ -11,13 +11,31 @@ import SettingsConnections from "./SettingsConnections";
 import SettingsDemoVideos from "./SettingsDemoVideos";
 export default function SettingsPage() {
   const searchParams = useSearchParams();
-  const initialTab = searchParams?.get("tab") ?? "personal";
+  const initialTab = (searchParams?.get("tab") ?? "").trim() || "personal";
   const [tab, setTab] = useState(initialTab);
 
+  // Hash (#connections / #demos) → Tab synchronisieren
+  useEffect(() => {
+    const applyHash = () => {
+      const hash = (window.location.hash || "").replace("#", "");
+      if (hash === "connections" || hash === "demos" || hash === "personal") {
+        setTab(hash);
+      }
+    };
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, []);
+
+  // ?tab=… weiter unterstützen
   useEffect(() => {
     const param = searchParams?.get("tab");
     if (param && param !== tab) {
       setTab(param);
+      // URL-Hash angleichen (für Deep-Link-Konsistenz)
+      if (typeof window !== "undefined") {
+        window.location.hash = `#${param}`;
+      }
     }
   }, [searchParams, tab]);
 
@@ -34,7 +52,13 @@ export default function SettingsPage() {
        {/* Main */}
        <Tabs
          value={tab}
-         onValueChange={setTab}
+         onValueChange={(v) => {
+           setTab(v);
+           // Beim Tab-Wechsel Hash setzen, damit #links funktionieren
+           if (typeof window !== "undefined") {
+             window.location.hash = `#${v}`;
+           }
+         }}
          orientation="vertical"
          className="w-full"
        >
@@ -109,7 +133,7 @@ export default function SettingsPage() {
           {/* Right: content area */}
           <div className="space-y-6">
             {/* PERSONAL */}
-            <TabsContent value="personal" className="m-0">
+            <TabsContent value="personal" className="m-0" id="personal">
               <Card className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <CardContent className="p-6 md:p-8">
                   <ProfileBilling />
@@ -118,7 +142,7 @@ export default function SettingsPage() {
             </TabsContent>
 
             {/* CONNECTIONS */}
-            <TabsContent value="connections" className="m-0">
+            <TabsContent value="connections" className="m-0" id="connections">
               <Card className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <CardContent className="p-6 md:p-8">
                   <SettingsConnections />
@@ -127,7 +151,7 @@ export default function SettingsPage() {
             </TabsContent>
 
             {/* DEMO VIDEOS */}
-            <TabsContent value="demos" className="m-0">
+            <TabsContent value="demos" className="m-0" id="demos">
               <Card className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <CardContent className="p-0 md:p-0">
                   <SettingsDemoVideos />

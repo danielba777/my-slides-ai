@@ -61,7 +61,7 @@ export default function ReactionAvatarsAdminPage() {
   const [generateCount, setGenerateCount] = useState(1);
   const [generating, setGenerating] = useState(false);
   const [targetAvatar, setTargetAvatar] = useState<ReactionAvatar | null>(null);
-
+  
   const { startUpload } = useUploadThing("editorUploader");
 
   const nextOrder = useMemo(() => {
@@ -138,11 +138,28 @@ export default function ReactionAvatarsAdminPage() {
           avatarIds: [targetAvatar.id],
           prompt: generatePrompt.trim(),
           count: generateCount,
+          mode: "std",
         }),
       });
-      const data = await res.json();
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        // Fallback: Rohtext lesen, falls die Route (z.B. wegen Crash) keinen JSON-Body lieferte
+        const raw = await res.text().catch(() => "");
+        if (!res.ok) {
+          throw new Error(
+            (raw && raw.slice(0, 300)) || "Generierung fehlgeschlagen",
+          );
+        }
+      }
       if (!res.ok) throw new Error(data?.error || "Generierung fehlgeschlagen");
-      toast.success("Generiert mit 302.ai (Avatar-4)");
+      // Sofortige Preview/CTA, falls die API bereits die videoUrl liefert
+      if (data?.videoUrl) {
+        toast.success(`Video fertig (${data?.usedMode ?? "STD"})`);
+      } else {
+        toast.success(`Generiert mit fal.ai Pika ${data?.usedMode?.toUpperCase() ?? "STD"}`);
+      }
       // refresh list
       await fetchAvatars();
       setGenerateOpen(false);
@@ -579,6 +596,3 @@ export default function ReactionAvatarsAdminPage() {
     </>
   );
 }
-
-
-

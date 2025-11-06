@@ -1,18 +1,18 @@
 import { randomUUID } from "crypto";
 import { promises as fs } from "fs";
-import path from "path";
 import { NextResponse } from "next/server";
+import path from "path";
 
-import { auth } from "@/server/auth"; // your existing auth helper
+import { auth } from "@/server/auth";
 import { db } from "@/server/db";
-import { createAvatar4Hook } from "@/server/vendors/three02";
-/**
- * POST /api/admin/ugc/reaction-avatars/generate
- * Body: { avatarIds: string[], prompt: string, count?: number }
- * For each avatar id, generate exactly `count` (default 1) 5s hook video using 302.ai Avatar-4.
- * Stores the last generated URL into reactionAvatar.videoUrl (Hook clip).
- */
-const HOOKS_FOLDER = path.join(process.cwd(), "public", "ugc", "reaction-hooks");
+import { createPikaImageToVideo } from "@/server/vendors/fal";
+
+const HOOKS_FOLDER = path.join(
+  process.cwd(),
+  "public",
+  "ugc",
+  "reaction-hooks",
+);
 const HOOKS_PREFIX = "/ugc/reaction-hooks";
 
 const ensureHooksFolder = async () => {
@@ -24,7 +24,9 @@ const toFileName = (avatarId: string) => `${avatarId}-${randomUUID()}.mp4`;
 const downloadHookVideo = async (videoUrl: string, filePath: string) => {
   const response = await fetch(videoUrl);
   if (!response.ok) {
-    throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Download failed: ${response.status} ${response.statusText}`,
+    );
   }
   const arrayBuffer = await response.arrayBuffer();
   await fs.writeFile(filePath, Buffer.from(arrayBuffer));
@@ -52,59 +54,109 @@ export async function POST(req: Request) {
     if (!session?.user?.id || (!session.user.isAdmin && !isAllowed)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const { avatarIds, prompt, count } = (await req.json()) as {
-      avatarIds: string[];
-      prompt: string;
+
+    const body = (await req.json()) as {
+      avatarIds?: string[];
+      prompt?: string;
       count?: number;
+      durationSeconds?: number;
+      mode?: "std" | "pro";
     };
-    if (!Array.isArray(avatarIds) || avatarIds.length === 0) {
-      return NextResponse.json({ error: "No avatars provided" }, { status: 400 });
+
+    if (!Array.isArray(body.avatarIds) || body.avatarIds.length === 0) {
+      return NextResponse.json(
+        { error: "No avatars provided" },
+        { status: 400 },
+      );
     }
-    if (!prompt || typeof prompt !== "string") {
+
+    const prompt = body.prompt?.trim();
+    if (!prompt) {
       return NextResponse.json({ error: "Prompt required" }, { status: 400 });
     }
-    const runs = Math.min(Math.max(Number(count ?? 1), 1), 21);
+
+    const normalizedRuns = Math.min(Math.max(Number(body.count ?? 1), 1), 5);
+    const effectiveDuration = Number.isFinite(body.durationSeconds)
+      ? Math.max(5, Math.min(10, Number(body.durationSeconds) >= 10 ? 10 : 5))
+      : 5;
+    const targetMode: "std" | "pro" = body.mode === "pro" ? "pro" : "std";
 
     const avatars = await db.reactionAvatar.findMany({
-      where: { id: { in: avatarIds } },
+      where: { id: { in: body.avatarIds } },
       select: { id: true, thumbnailUrl: true, videoUrl: true },
     });
+
     if (avatars.length === 0) {
       return NextResponse.json({ error: "Avatars not found" }, { status: 404 });
     }
 
-    const results: Array<{ id: string; videoUrl: string }> = [];
     await ensureHooksFolder();
 
-    for (const av of avatars) {
-      let lastUrl = "";
-      // Generate `runs` times; we keep the last URL as current hook video
-      for (let i = 0; i < runs; i++) {
-        lastUrl = await createAvatar4Hook(av.thumbnailUrl, prompt, {
-          durationSeconds: 5,
+    const results: Array<{ id: string; videoUrl: string }> = [];
+
+    for (const avatar of avatars) {
+      if (!avatar.thumbnailUrl) {
+        continue;
+      }
+
+      let latestUrl = "";
+
+      for (let run = 0; run < normalizedRuns; run += 1) {
+        latestUrl = await createPikaImageToVideo(avatar.thumbnailUrl, prompt, {
+          durationSeconds: effectiveDuration,
+          aspectRatio: "9:16",
+          mode: targetMode,
         });
       }
 
-      const fileName = toFileName(av.id);
-      const filePath = path.join(HOOKS_FOLDER, fileName);
-      await downloadHookVideo(lastUrl, filePath);
-      const publicUrl = `${HOOKS_PREFIX}/${fileName}`;
+      if (!latestUrl) {
+        throw new Error("Kling returned no video URL");
+      }
 
-      await removePreviousHookVideo(av.videoUrl);
+      await removePreviousHookVideo(avatar.videoUrl);
+
+      const fileName = toFileName(avatar.id);
+      const filePath = path.join(HOOKS_FOLDER, fileName);
+      await downloadHookVideo(latestUrl, filePath);
+      const localUrl = `${HOOKS_PREFIX}/${fileName}`;
 
       await db.reactionAvatar.update({
-        where: { id: av.id },
-        data: { videoUrl: publicUrl },
+        where: { id: avatar.id },
+        data: { videoUrl: localUrl },
       });
-      results.push({ id: av.id, videoUrl: publicUrl });
+
+      results.push({ id: avatar.id, videoUrl: localUrl });
     }
 
-    return NextResponse.json({ ok: true, results });
+    if (results.length === 0) {
+      return NextResponse.json(
+        { error: "No avatars processed" },
+        { status: 500 },
+      );
+    }
+
+    const firstResult = results[0];
+
+    return NextResponse.json({
+      ok: true,
+      results,
+      videoUrl: firstResult?.videoUrl,
+      usedMode: targetMode,
+    });
   } catch (error) {
     console.error("[admin.reaction-avatars.generate] error", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    const isCapacity =
+      /No available models/i.test(message) ||
+      /err_code["']?\s*:\s*-?10008/.test(message) ||
+      /capacity/i.test(message);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 },
+      {
+        error: isCapacity
+          ? "302.ai Kling STD meldet aktuell: No available models."
+          : message,
+      },
+      { status: isCapacity ? 503 : 500 },
     );
   }
 }

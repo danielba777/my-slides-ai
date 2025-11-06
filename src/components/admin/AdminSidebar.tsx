@@ -21,7 +21,6 @@ import {
   Home,
   Image as ImageIcon,
   Play,
-  Sparkles,
   Users,
   type LucideIcon,
 } from "lucide-react";
