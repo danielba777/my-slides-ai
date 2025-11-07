@@ -403,9 +403,6 @@ export default function UgcDashboardPage() {
         <h1 className="text-3xl font-semibold tracking-tight">
           Create UGC ads
         </h1>
-        <p className="text-sm text-muted-foreground">
-          Combine hook, avatar and demo, and see the preview on the right.
-        </p>
       </header>
 
       <Card className="rounded-3xl border border-border/60 bg-card/95 shadow-xl">
@@ -792,10 +789,6 @@ export default function UgcDashboardPage() {
             <h2 className="text-xl font-semibold">
               My Videos ({videos.length})
             </h2>
-            <p className="text-sm text-muted-foreground">
-              Alle generierten Videos auf einen Blick – öffne sie für Preview,
-              Download oder Scheduling.
-            </p>
           </div>
         </div>
 

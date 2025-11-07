@@ -218,52 +218,85 @@ const normalizeVideo = async (
   const { hasAudio, durationMs } = await probeVideo(sourcePath);
   const args: string[] = ["-y"];
 
-  if (!hasAudio) {
-    const durationSeconds = Math.max(durationMs / 1000, 0.1);
-    // Ältere FFmpeg-Builds unterstützen anullsrc:d=<sekunden> nicht.
-    // Stattdessen Dauer mit -t am lavfi-Input setzen (portabler).
+  // Einheitliche 9:16-Normalisierung – sicher mit ganzzahligen Werten
+  const filter = [
+    // Skaliere Video proportional, sodass die Höhe exakt 1920 wird
+    // Danach wird Breite auf 1080 gecroppt (kein Stretch, kein Padding)
+    "scale=-1:1920:flags=lanczos",
+    // Falls das Video schmaler oder breiter ist, auf 1080x1920 beschneiden
+    "crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2",
+    // Sicheres Seitenverhältnis & Farbraum
+    "setsar=1",
+    "fps=30",
+    "format=yuv420p"
+  ].join(",");
+
+  // 🧩 Final fix: filter nach allen Inputs mit -filter_complex anwenden (robust & korrekt)
+  if (hasAudio) {
     args.push(
+      "-i",
+      sourcePath,
+      "-filter_complex",
+      `[0:v]${filter}[v]`,
+      "-map",
+      "[v]",
+      "-map",
+      "0:a?",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "veryfast",
+      "-crf",
+      "22",
+      "-pix_fmt",
+      "yuv420p",
+      "-movflags",
+      "+faststart",
+      "-c:a",
+      "aac",
+      "-ac",
+      "2",
+      "-ar",
+      "44100",
+      destinationPath
+    );
+  } else {
+    const durationSeconds = Math.max(durationMs / 1000, 0.1);
+    args.push(
+      "-i",
+      sourcePath,
       "-f",
       "lavfi",
       "-t",
       durationSeconds.toFixed(3),
       "-i",
       "anullsrc=channel_layout=stereo:sample_rate=44100",
+      "-filter_complex",
+      `[0:v]${filter}[v]`,
+      "-map",
+      "[v]",
+      "-map",
+      "1:a",
+      "-shortest",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "veryfast",
+      "-crf",
+      "22",
+      "-pix_fmt",
+      "yuv420p",
+      "-movflags",
+      "+faststart",
+      "-c:a",
+      "aac",
+      "-ac",
+      "2",
+      "-ar",
+      "44100",
+      destinationPath
     );
   }
-
-  args.push("-i", sourcePath);
-
-  if (!hasAudio) {
-    args.push("-map", "1:v:0", "-map", "0:a:0");
-  } else {
-    args.push("-map", "0:v:0", "-map", "0:a:0");
-  }
-
-  args.push(
-    "-c:v",
-    "libx264",
-    "-preset",
-    "veryfast",
-    "-crf",
-    "22",
-    "-pix_fmt",
-    "yuv420p",
-    "-movflags",
-    "+faststart",
-    "-c:a",
-    "aac",
-    "-ac",
-    "2",
-    "-ar",
-    "44100",
-  );
-
-  if (!hasAudio) {
-    args.push("-shortest");
-  }
-
-  args.push(destinationPath);
 
   await runFfmpeg(args);
   return { path: destinationPath, durationMs };
