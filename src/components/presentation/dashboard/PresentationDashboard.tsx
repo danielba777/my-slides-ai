@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePresentationState } from "@/states/presentation-state";
 import {
   ArrowUpDown,
@@ -20,7 +21,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ImageCollectionSelector } from "./ImageCollectionSelector";
 import { PresentationInput } from "./PresentationInput";
@@ -80,7 +81,16 @@ export function PresentationDashboard({
     };
     void load();
   }, []);
-  const [templatePosts, setTemplatePosts] = useState<TemplatePost[]>([]);
+  const [templateCommunityPosts, setTemplateCommunityPosts] = useState<
+    TemplatePost[]
+  >([]);
+  const [templatePersonalPosts, setTemplatePersonalPosts] = useState<
+    TemplatePost[]
+  >([]);
+  const [templatesLoaded, setTemplatesLoaded] = useState(false);
+  const [templateTab, setTemplateTab] = useState<"community" | "mine">(
+    "community",
+  );
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [generatingPromptForId, setGeneratingPromptForId] = useState<
@@ -107,7 +117,13 @@ export function PresentationDashboard({
   }, []);
 
   useEffect(() => {
-    if (!showTemplates || templatePosts.length > 0 || isLoadingTemplates) {
+    if (showTemplates) {
+      setTemplateTab("community");
+    }
+  }, [showTemplates]);
+
+  useEffect(() => {
+    if (!showTemplates || templatesLoaded || isLoadingTemplates) {
       return;
     }
 
@@ -115,12 +131,35 @@ export function PresentationDashboard({
       try {
         setIsLoadingTemplates(true);
         setTemplateError(null);
-        const response = await fetch("/api/slideshow-library/posts?limit=60");
-        if (!response.ok) {
+        const [communityRes, personalRes] = await Promise.all([
+          fetch("/api/slideshow-library/posts?limit=60"),
+          fetch("/api/slideshow-library/user/posts?limit=120"),
+        ]);
+
+        if (!communityRes.ok) {
           throw new Error("Prompts konnten nicht geladen werden");
         }
-        const data = (await response.json()) as TemplatePost[];
-        setTemplatePosts(Array.isArray(data) ? data : []);
+
+        const communityData = (await communityRes.json()) as TemplatePost[];
+        setTemplateCommunityPosts(
+          Array.isArray(communityData) ? communityData : [],
+        );
+
+        if (personalRes.ok) {
+          const personalData = (await personalRes.json()) as TemplatePost[];
+          setTemplatePersonalPosts(
+            Array.isArray(personalData) ? personalData : [],
+          );
+        } else if (personalRes.status === 401) {
+          setTemplatePersonalPosts([]);
+        } else {
+          const errorText = await personalRes
+            .json()
+            .catch(() => ({}) as { error?: string });
+          console.warn("Failed to load personal posts", errorText);
+          setTemplatePersonalPosts([]);
+        }
+        setTemplatesLoaded(true);
       } catch (error) {
         console.error("Error fetching templates:", error);
         setTemplateError(
@@ -128,13 +167,14 @@ export function PresentationDashboard({
             ? error.message
             : "Prompts konnten nicht geladen werden",
         );
+        setTemplatesLoaded(false);
       } finally {
         setIsLoadingTemplates(false);
       }
     };
 
     void fetchTemplates();
-  }, [showTemplates, templatePosts.length, isLoadingTemplates]);
+  }, [showTemplates, templatesLoaded, isLoadingTemplates]);
   const canGenerate =
     limits?.unlimited ||
     (typeof limits?.slidesLeft === "number" && limits.slidesLeft > 0);
@@ -203,7 +243,10 @@ export function PresentationDashboard({
       const { prompt } = (await response.json()) as { prompt: string };
 
       // Update the post in the state with the new prompt
-      setTemplatePosts((prev) =>
+      setTemplateCommunityPosts((prev) =>
+        prev.map((post) => (post.id === postId ? { ...post, prompt } : post)),
+      );
+      setTemplatePersonalPosts((prev) =>
         prev.map((post) => (post.id === postId ? { ...post, prompt } : post)),
       );
 
@@ -223,21 +266,134 @@ export function PresentationDashboard({
     }
   };
 
-  const sortedPosts = useMemo(() => {
-    const posts = [...templatePosts];
-    switch (sortBy) {
-      case "views-most":
-        return posts.sort((a, b) => b.viewCount - a.viewCount);
-      case "views-least":
-        return posts.sort((a, b) => a.viewCount - b.viewCount);
-      case "likes-most":
-        return posts.sort((a, b) => b.likeCount - a.likeCount);
-      case "likes-least":
-        return posts.sort((a, b) => a.likeCount - b.likeCount);
-      default:
-        return posts;
+  const sortPosts = useCallback(
+    (posts: TemplatePost[]) => {
+      const list = [...posts];
+      switch (sortBy) {
+        case "views-most":
+          return list.sort((a, b) => b.viewCount - a.viewCount);
+        case "views-least":
+          return list.sort((a, b) => a.viewCount - b.viewCount);
+        case "likes-most":
+          return list.sort((a, b) => b.likeCount - a.likeCount);
+        case "likes-least":
+          return list.sort((a, b) => a.likeCount - b.likeCount);
+        default:
+          return list;
+      }
+    },
+    [sortBy],
+  );
+
+  const communityViewportRef = useRef<HTMLDivElement | null>(null);
+  const personalViewportRef = useRef<HTMLDivElement | null>(null);
+
+  const sortedCommunityPosts = useMemo(
+    () => sortPosts(templateCommunityPosts),
+    [sortPosts, templateCommunityPosts],
+  );
+  const sortedPersonalPosts = useMemo(
+    () => sortPosts(templatePersonalPosts),
+    [sortPosts, templatePersonalPosts],
+  );
+
+  useEffect(() => {
+    if (!showTemplates) return;
+
+    const viewport =
+      templateTab === "community"
+        ? communityViewportRef.current
+        : personalViewportRef.current;
+
+    if (!viewport) return;
+
+    requestAnimationFrame(() => {
+      viewport.scrollTop = 0;
+      viewport.scrollLeft = 0;
+    });
+  }, [showTemplates, templateTab, sortedCommunityPosts, sortedPersonalPosts]);
+
+  const renderTemplateSection = (
+    posts: TemplatePost[],
+    emptyMessage: string,
+    section: "community" | "mine",
+  ) => {
+    if (posts.length === 0) {
+      return (
+        <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+          {emptyMessage}
+        </div>
+      );
     }
-  }, [templatePosts, sortBy]);
+
+    return (
+      <ScrollArea
+        viewportRef={
+          section === "community" ? communityViewportRef : personalViewportRef
+        }
+        className="h-full max-h-full pr-0 overscroll-contain scrollbar-hide"
+      >
+        <div className="grid grid-cols-1 gap-4 content-start sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 3xl:grid-cols-10 pb-4">
+          {posts.map((post) => {
+            const primarySlide =
+              post.slides?.find((slide) => slide.imageUrl)?.imageUrl ?? null;
+            const isGenerating = generatingPromptForId === post.id;
+
+            return (
+              <div key={post.id} className="flex flex-col gap-2">
+                <div className="group relative overflow-hidden rounded-xl border bg-muted/30 transition hover:border-primary hover:shadow-lg">
+                  <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
+                    {primarySlide ? (
+                      <img
+                        src={primarySlide}
+                        alt="Slideshow preview"
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+                        Keine Vorschau
+                      </div>
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 p-3">
+                      <div className="rounded-xl backdrop-blur-sm">
+                        <div className="flex flex-col items-start gap-1 text-xs font-medium text-white">
+                          <span className="flex items-center gap-1">
+                            <PlayIcon className="h-3.5 w-3.5" />
+                            {formatCount(post.viewCount)} Views
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <HeartIcon className="h-3.5 w-3.5" />
+                            {formatCount(post.likeCount)} Likes
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2 border-2 border-zinc-900"
+                  onClick={() => handleGeneratePrompt(post.id, post.slides)}
+                  disabled={isGenerating}
+                >
+                  {isGenerating ? (
+                    <Spinner className="h-4 w-4" />
+                  ) : (
+                    <>
+                      <PlusIcon className="h-4 w-4" />
+                      Get Prompt
+                    </>
+                  )}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      </ScrollArea>
+    );
+  };
 
   const getSortLabel = () => {
     switch (sortBy) {
@@ -283,112 +439,86 @@ export function PresentationDashboard({
       </div>
 
       <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
-        <DialogContent className="max-h-[95vh] w-full h-full max-w-[95vw] overflow-hidden pt-4 pb-0 px-0 sm:rounded-xl">
-          <div className="flex h-[93vh] flex-col px-6 pb-6 pt-6 gap-6">
-            <div className="flex items-center justify-between pr-4">
-              <h2 className="text-2xl font-semibold">
-                SlidesCockpit TikTok Library
-              </h2>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <ArrowUpDown className="h-4 w-4" />
-                    {getSortLabel()}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setSortBy("views-most")}>
-                    Views (Most)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSortBy("views-least")}>
-                    Views (Least)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSortBy("likes-most")}>
-                    Likes (Most)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSortBy("likes-least")}>
-                    Likes (Least)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            {isLoadingTemplates ? (
-              <div className="flex flex-1 items-center justify-center">
-                <Spinner className="h-8 w-8" />
-              </div>
-            ) : templateError ? (
-              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                {templateError}
-              </div>
-            ) : sortedPosts.length === 0 ? (
-              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                Keine Posts vorhanden.
-              </div>
-            ) : (
-              <ScrollArea className="flex-1 pr-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7">
-                  {sortedPosts.map((post) => {
-                    const primarySlide =
-                      post.slides?.find((slide) => slide.imageUrl)?.imageUrl ??
-                      null;
-                    const isGenerating = generatingPromptForId === post.id;
-
-                    return (
-                      <div key={post.id} className="flex flex-col gap-2">
-                        <div className="group relative overflow-hidden rounded-xl border bg-muted/30 transition hover:border-primary hover:shadow-lg">
-                          <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
-                            {primarySlide ? (
-                              <img
-                                src={primarySlide}
-                                alt="Slideshow preview"
-                                className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
-                                Keine Vorschau
-                              </div>
-                            )}
-                            <div className="absolute inset-x-0 bottom-0 p-3">
-                              <div className="rounded-xl backdrop-blur-sm">
-                                <div className="flex flex-col items-start gap-1 text-xs font-medium text-white">
-                                  <span className="flex items-center gap-1">
-                                    <PlayIcon className="h-3.5 w-3.5" />
-                                    {formatCount(post.viewCount)} Views
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <HeartIcon className="h-3.5 w-3.5" />
-                                    {formatCount(post.likeCount)} Likes
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full gap-2 border-2 border-zinc-900"
-                          onClick={() =>
-                            handleGeneratePrompt(post.id, post.slides)
-                          }
-                          disabled={isGenerating}
-                        >
-                          {isGenerating ? (
-                            <Spinner className="h-4 w-4" />
-                          ) : (
-                            <>
-                              <PlusIcon className="h-4 w-4" />
-                              Get Prompt
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    );
-                  })}
+        <DialogContent className="!max-w-none w-[98vw] h-[95vh] max-w-[98vw] max-h-[95vh] p-0 overflow-hidden flex flex-col m-auto rounded-xl shadow-xl border border-border/20">
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 overscroll-contain scrollbar-hide">
+            <Tabs
+              value={templateTab}
+              onValueChange={(value) =>
+                setTemplateTab(value as "community" | "mine")
+              }
+              className="flex flex-col min-h-0"
+            >
+              <div className="flex flex-col gap-4 pr-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4">
+                  <h2 className="text-2xl font-semibold">
+                    SlidesCockpit TikTok Library
+                  </h2>
+                  <TabsList className="grid w-full grid-cols-2 rounded-lg bg-muted p-1 sm:w-[320px]">
+                    <TabsTrigger
+                      value="community"
+                      className="w-full rounded-md text-sm text-muted-foreground transition data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                    >
+                      Community
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="mine"
+                      className="w-full rounded-md text-sm text-muted-foreground transition data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                    >
+                      My Post Collections
+                    </TabsTrigger>
+                  </TabsList>
                 </div>
-              </ScrollArea>
-            )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <ArrowUpDown className="h-4 w-4" />
+                      {getSortLabel()}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setSortBy("views-most")}>
+                      Views (Most)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy("views-least")}>
+                      Views (Least)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy("likes-most")}>
+                      Likes (Most)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy("likes-least")}>
+                      Likes (Least)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {isLoadingTemplates ? (
+                <div className="flex flex-1 items-center justify-center">
+                  <Spinner className="h-8 w-8" />
+                </div>
+              ) : templateError ? (
+                <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                  {templateError}
+                </div>
+              ) : (
+                <>
+                  <TabsContent value="community" className="mt-4 min-h-0">
+                    {renderTemplateSection(
+                      sortedCommunityPosts,
+                      "Keine Community-Posts vorhanden.",
+                      "community",
+                    )}
+                  </TabsContent>
+                  <TabsContent value="mine" className="mt-4 min-h-0">
+                    {renderTemplateSection(
+                      sortedPersonalPosts,
+                      "Du hast noch keine Posts gespeichert.",
+                      "mine",
+                    )}
+                  </TabsContent>
+                </>
+              )}
+            </Tabs>
           </div>
         </DialogContent>
       </Dialog>

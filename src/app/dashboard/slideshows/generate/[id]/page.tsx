@@ -8,7 +8,7 @@ import {
 } from "@/app/_actions/presentation/presentationActions";
 import { getCustomThemeById } from "@/app/_actions/presentation/theme-actions";
 import { type CanvasDoc, type CanvasTextNode } from "@/canvas/types";
-import { LoadingState } from "@/components/presentation/presentation-page/Loading";
+import { LoadingStateWithFixedBackground } from "@/components/presentation/presentation-page/Loading";
 import { applyBackgroundImageToCanvas } from "@/components/presentation/utils/canvas";
 import {
   type PlateNode,
@@ -406,6 +406,6 @@ export default function PresentationGenerateWithIdPage() {
   };
 
   // Immer Ladezustand anzeigen, während automatisch generiert wird
-  if (isLoadingPresentation) return <LoadingState />;
-  return <LoadingState />;
+  if (isLoadingPresentation) return <LoadingStateWithFixedBackground />;
+  return <LoadingStateWithFixedBackground />;
 }

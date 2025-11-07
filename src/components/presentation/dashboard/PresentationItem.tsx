@@ -24,7 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
-import { useToast } from "@/components/ui/use-toast";
+import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { usePresentationState } from "@/states/presentation-state";
 import { type BaseDocument } from "@prisma/client";
@@ -66,8 +66,7 @@ export function PresentationItem({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const setCurrentPresentation = usePresentationState(
+    const setCurrentPresentation = usePresentationState(
     (state) => state.setCurrentPresentation,
   );
 
@@ -86,18 +85,11 @@ export function PresentationItem({
         });
         await queryClient.invalidateQueries({ queryKey: ["recent-items"] });
         setIsDeleteDialogOpen(false);
-        toast({
-          title: "Success",
-          description: "Presentation deleted successfully",
-        });
+        toast.success("Presentation deleted successfully");
       },
       onError: (error) => {
         console.error("Failed to delete presentation:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to delete presentation",
-        });
+        toast.error("Failed to delete presentation");
       },
     });
 
@@ -115,18 +107,11 @@ export function PresentationItem({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["presentations-all"] });
       await queryClient.invalidateQueries({ queryKey: ["recent-items"] });
-      toast({
-        title: "Success",
-        description: "Presentation renamed successfully",
-      });
+      toast.success("Presentation renamed successfully");
     },
     onError: (error) => {
       console.error("Failed to rename presentation:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to rename presentation",
-      });
+      toast.error("Failed to rename presentation");
     },
   });
 
@@ -140,18 +125,11 @@ export function PresentationItem({
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["presentations-all"] });
-      toast({
-        title: "Success",
-        description: "Presentation duplicated successfully",
-      });
+      toast.success("Presentation duplicated successfully");
     },
     onError: (error) => {
       console.error("Failed to duplicate presentation:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to duplicate presentation",
-      });
+      toast.error("Failed to duplicate presentation");
     },
   });
 
@@ -184,11 +162,7 @@ export function PresentationItem({
       }
     } catch (error) {
       console.error("Failed to navigate:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to open presentation",
-      });
+      toast.error("Failed to open presentation");
     } finally {
       setIsNavigating(false);
     }

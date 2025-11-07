@@ -88,7 +88,7 @@ export function TikTokPostButton() {
         return;
       }
       const uploadPayload = (await uploadResponse.json().catch(() => null)) as
-        | Array<{ url?: string }>
+        | Array<{ url?: string } | string>
         | { error?: string }
         | null;
 
@@ -102,8 +102,13 @@ export function TikTokPostButton() {
       }
 
       const imageUrls = uploadPayload
-        .map((item) => (item && typeof item.url === "string" ? item.url : null))
-        .filter((url): url is string => typeof url === "string");
+        .map((item) => {
+          if (typeof item === "string") return item;
+          if (item && typeof item.url === "string") return item.url;
+          return null;
+        })
+        .filter((url): url is string => typeof url === "string" && url.length > 0);
+
       if (imageUrls.length !== imageFiles.length) {
         console.error(
           "Unexpected upload response",

@@ -1062,7 +1062,7 @@ model GeneratedImage {
 }
 
 /// Verknüpft User mit ihren persönlichen Image-Collections (eigene Ordner/Sets)
-model UserImageCollection {
+model UserPersonalCollection {
   id         String   @id @default(uuid())
   userId     String
   imageSetId String   @unique
@@ -1072,7 +1072,8 @@ model UserImageCollection {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
 
-  @@index([userId], map: "idx_user_image_collection_user")
+  @@index([userId], map: "idx_user_personal_collection_user")
+  @@map("UserPersonalCollection")
 }
 
 enum UserRole {
@@ -107732,4 +107733,3 @@ export default config;
 }
 
 ```
-

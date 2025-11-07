@@ -7,9 +7,11 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TikTokConfig } from "@/components/tiktok/TikTokConfig";
 import { type UseTikTokPostActionResult } from "@/hooks/use-tiktok-post-action";
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
+import toast from "react-hot-toast";
 
 interface TikTokPostFormProps {
   action: UseTikTokPostActionResult;
@@ -48,6 +50,24 @@ export function TikTokPostForm({
     refreshAccounts,
   } = action;
 
+  // Check if posting is allowed due to post limits and metadata validation
+  const canPost = typeof window !== 'undefined' ?
+    ((window as any).__tiktokCanPost !== false && (window as any).__tiktokMetadataValid !== false) : true;
+  const postLimitReason = typeof window !== 'undefined' ? (window as any).__tiktokPostLimitReason : null;
+
+  // Custom handleSubmit with privacy level validation
+  const handleValidatedSubmit = () => {
+    // Check if privacy level is selected
+    const metadata = typeof window !== 'undefined' ? (window as any).__tiktokMetadata : null;
+    if (!metadata || !metadata.privacyLevel) {
+      toast.error("Please select who can see this post before posting.");
+      return;
+    }
+
+    // If validation passes, call the original handleSubmit
+    void handleSubmit();
+  };
+
   useEffect(() => {
     setForm((prev) => {
       if (prev.photoImages.length === 0 && prev.coverIndex !== 0) {
@@ -62,6 +82,18 @@ export function TikTokPostForm({
       return prev;
     });
   }, [form.photoImages.length, setForm]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (postLimitReason) {
+      toast.error(`Posting restricted: ${postLimitReason}`);
+    }
+  }, [postLimitReason]);
 
   return (
     <Card
@@ -152,17 +184,6 @@ export function TikTokPostForm({
           </div>
         )}
         <div className="space-y-2">
-          <Label htmlFor="title">Title</Label>
-          <Input
-            id="title"
-            placeholder="Optional title"
-            value={form.title}
-            onChange={(event) => updateField("title", event.target.value)}
-            className="bg-white"
-          />
-        </div>
-
-        <div className="space-y-2">
           <Label htmlFor="caption">Caption</Label>
           <Textarea
             id="caption"
@@ -174,17 +195,42 @@ export function TikTokPostForm({
           />
         </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {/* TikTok Config Section */}
+        <TikTokConfig
+          title={form.title || ""}
+          autoAddMusic={form.autoAddMusic ?? true}
+          postMode={form.postMode === "DIRECT_POST" ? "direct_post" : "inbox"}
+          openId={form.openId}
+          onTitleChange={(title) => updateField("title", title)}
+          onAutoAddMusicChange={(autoAddMusic) => updateField("autoAddMusic", autoAddMusic)}
+          onPostModeChange={(postMode) => updateField("postMode", postMode === "direct_post" ? "DIRECT_POST" : "MEDIA_UPLOAD")}
+          onMetadataChange={(metadata) => {
+            // Store metadata in a global state for later use in submission
+            // This will be accessed by the parent component during post submission
+            if (typeof window !== 'undefined') {
+              (window as any).__tiktokMetadata = metadata;
+            }
+          }}
+          onPostLimitChange={(canPost, reason) => {
+            // Store post limit status in global state for the submit button
+            if (typeof window !== 'undefined') {
+              (window as any).__tiktokCanPost = canPost;
+              (window as any).__tiktokPostLimitReason = reason;
+            }
+          }}
+        />
+        {/* Errors and hints are surfaced via toast notifications */}
       </CardContent>
       {/*
       <CardFooter className="flex items-center gap-4">
         <Button
-          onClick={() => void handleSubmit()}
+          onClick={handleValidatedSubmit}
           disabled={
             submitting ||
             accountsLoading ||
             accounts.length === 0 ||
-            form.photoImages.length === 0
+            form.photoImages.length === 0 ||
+            !canPost
           }
         >
           {submitting ? "Posting & polling…" : submitLabel}
@@ -204,12 +250,13 @@ export function TikTokPostForm({
       {showSubmitButton && (
         <CardFooter className="mt-0 flex items-center gap-4">
           <Button
-            onClick={() => void handleSubmit()}
+            onClick={handleValidatedSubmit}
             disabled={
               submitting ||
               accountsLoading ||
               accounts.length === 0 ||
-              form.photoImages.length === 0
+              form.photoImages.length === 0 ||
+              !canPost
             }
           >
             {submitting ? "Posting & polling…" : submitLabel}
