@@ -36,5 +36,6 @@ yarn-error.log*
 next-env.d.ts
 codebase.md
 diff_prompt.md
+diff_prompt.txt
 
 .npmrc

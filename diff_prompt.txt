@@ -1,30 +1,35 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
---- src/server/ugc/video-composer.ts
-+++ src/server/ugc/video-composer.ts
-@@ -340,10 +340,20 @@
-   const args: string[] = ["-y"];
-
--  // Einheitliche 9:16-Normalisierung – kein Padding, sondern Cropping, damit Text & Größe konsistent bleiben
--  const filter = [
--    // Skaliere so, dass Höhe immer 1920 ist, überschüssige Breite wird beschnitten
--    "scale=w=1080*max(iw/ih\\,9/16):h=1920*max(ih/iw\\,16/9):flags=lanczos",
--    // Schneide exakt auf 1080x1920 zu (keine schwarzen Balken)
--    "crop=1080:1920",
--    // Erzwinge korrektes Seitenverhältnis und Format
--    "setsar=1",
--    "fps=30",
--    "format=yuv420p",
--  ].join(",");
-+  // Einheitliche 9:16-Normalisierung – sicher mit ganzzahligen Werten
-+  const filter = [
-+    // Skaliere Video proportional, sodass die Höhe exakt 1920 wird
-+    // Danach wird Breite auf 1080 gecroppt (kein Stretch, kein Padding)
-+    "scale=-1:1920:flags=lanczos",
-+    // Falls das Video schmaler oder breiter ist, auf 1080x1920 beschneiden
-+    "crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2",
-+    // Sicheres Seitenverhältnis & Farbraum
-+    "setsar=1",
-+    "fps=30",
-+    "format=yuv420p"
-+  ].join(",");
+--- src/app/dashboard/ugc/page.tsx
++++ src/app/dashboard/ugc/page.tsx
+@@ -620,10 +620,23 @@
+                     {hook.trim().length > 0 && (
+                       <div
+                         className={cn(
+                           "pointer-events-none absolute left-1/2 w-[86%] -translate-x-1/2 text-center text-white",
+                           hookPosition === "middle"
+                             ? "top-1/2 -translate-y-1/2"
+                             : "top-[18%]",
+                         )}
+-                        style={{
+-                          WebkitTextStroke: "2px rgba(0,0,0,0.85)",
+-                          textShadow:
+-                            "0 2px 6px rgba(0,0,0,0.6), 0 2px 3px rgba(0,0,0,0.5)",
+-                          fontSize: "48px",
+-                          fontWeight: 700,
+-                          lineHeight: 1.15,
+-                        }}
++                        style={{
++                          fontFamily: "TikTokTextBold, sans-serif",
++                          fontSize: "54px",
++                          fontWeight: 700,
++                          lineHeight: 1.1,
++                          WebkitTextStroke: "3px black",
++                          textShadow:
++                            "2px 2px 4px rgba(0,0,0,0.65), 0 0 3px rgba(0,0,0,0.55)",
++                          letterSpacing: "0.2px",
++                        }}
+                       >
+                         {hook}
+                       </div>
+                     )}
