@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { type UseTikTokScheduleActionResult } from "@/hooks/use-tiktok-schedule-action";
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
+import toast from "react-hot-toast";
 
 interface TikTokScheduleFormProps {
   action: UseTikTokScheduleActionResult;
@@ -69,6 +70,12 @@ export function TikTokScheduleForm({
       return prev;
     });
   }, [form.photoImages.length, setForm]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
 
   return (
     <Card className={cn("w-full", className)}>
@@ -215,8 +222,7 @@ export function TikTokScheduleForm({
             rows={4}
           />
         </div>
-
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {/* Errors are displayed via toast notifications */}
       </CardContent>
       {showRefreshButton && (
         <CardFooter className="flex items-center gap-4">

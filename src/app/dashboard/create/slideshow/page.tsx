@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { TikTokPostForm } from "@/components/tiktok/TikTokPostForm";
 import { TikTokScheduleForm } from "@/components/tiktok/TikTokScheduleForm";
@@ -59,13 +59,59 @@ export default function CreateSlideshowPostPage() {
     caption: string;
   } | null>(null);
   const [tiktokMetadata, setTiktokMetadata] = useState<any>(null);
+
+  // Check if metadata is valid (privacy level selected)
+  const [isMetadataValid, setIsMetadataValid] = useState(true);
+
+  const missingPreparationToastShown = useRef(false);
+  const noAccountsToastShown = useRef(false);
+  const noSlidesToastShown = useRef(false);
+
+  // Update metadata validity when global state changes
+  useEffect(() => {
+    const checkMetadataValid = () => {
+      const valid = typeof window !== 'undefined' ?
+        ((window as any).__tiktokMetadataValid !== false) : true;
+      setIsMetadataValid(valid);
+    };
+
+    checkMetadataValid();
+    // Set up interval to check for changes
+    const interval = setInterval(checkMetadataValid, 100);
+    return () => clearInterval(interval);
+  }, []);
+  useEffect(() => {
+    if (!prepared && !missingPreparationToastShown.current) {
+      toast.error("No prepared slides found. Export the slideshow again to continue.");
+      missingPreparationToastShown.current = true;
+      router.replace("/dashboard/slideshows");
+    } else if (prepared) {
+      missingPreparationToastShown.current = false;
+    }
+  }, [prepared, router]);
+
   useEffect(() => {
     if (slides.length === 0) {
       setCurrentSlide(0);
+      if (prepared && !noSlidesToastShown.current) {
+        toast.error("No slides available for this slideshow. Please export from the editor again.");
+        noSlidesToastShown.current = true;
+      }
       return;
     }
+    noSlidesToastShown.current = false;
     setCurrentSlide((prev) => Math.min(prev, slides.length - 1));
-  }, [slides.length]);
+  }, [prepared, slides.length]);
+
+  useEffect(() => {
+    if (!accountsLoading && accounts.length === 0 && !noAccountsToastShown.current) {
+      toast.error("No TikTok accounts connected. Connect one before posting.");
+      noAccountsToastShown.current = true;
+    }
+    if (accounts.length > 0) {
+      noAccountsToastShown.current = false;
+    }
+  }, [accounts, accountsLoading]);
 
   useEffect(() => {
     if (!prepared) return;
@@ -85,6 +131,13 @@ export default function CreateSlideshowPostPage() {
 
   const handlePrimaryAction = async () => {
     if (scheduleEnabled && !scheduledAt) {
+      return;
+    }
+
+    // Check if privacy level is selected before posting
+    const metadata = typeof window !== 'undefined' ? (window as any).__tiktokMetadata : null;
+    if (!metadata || !metadata.privacyLevel) {
+      toast.error("Please select who can see this post before posting.");
       return;
     }
 
@@ -149,6 +202,7 @@ export default function CreateSlideshowPostPage() {
         setScheduledAt(publishAt);
         updateScheduleField("publishAt", publishAt);
       }
+      toast("Scheduled posts use UTC time.");
     }
   };
 
@@ -176,23 +230,12 @@ export default function CreateSlideshowPostPage() {
     setPostingData(null);
   };
 
-  const fallbackContent = (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-12 text-center">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold">Create Slideshow Post</h1>
-        <p className="text-muted-foreground">
-          No prepared slides found. Export the slideshow in the editor and try
-          again.
-        </p>
-      </div>
-      <Button onClick={() => router.push("/dashboard/slideshows")}>
-        Back to slideshows
-      </Button>
-    </div>
-  );
-
   if (!prepared) {
-    return fallbackContent;
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   return (
@@ -209,13 +252,16 @@ export default function CreateSlideshowPostPage() {
             <div className="flex items-start gap-3 p-4">
               <div className="flex gap-4 overflow-x-auto pb-1">
                 {accountsLoading ? (
-                  <p className="text-sm text-muted-foreground">
-                    Loading accounts…
-                  </p>
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-label="Loading accounts" />
                 ) : accounts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No TikTok accounts connected.
-                  </p>
+                  <div className="flex flex-col items-center gap-2">
+                    <Button variant="outline" onClick={() => refreshAccounts()}>
+                      Refresh accounts
+                    </Button>
+                    <Button onClick={() => router.push("/dashboard/settings/social")}>
+                      Manage TikTok accounts
+                    </Button>
+                  </div>
                 ) : (
                   accounts.map((account) => {
                     const label =
@@ -297,10 +343,12 @@ export default function CreateSlideshowPostPage() {
             </div>
             <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4">
               {slides.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center">
-                  No slides available. Return to the editor and export the
-                  slideshow again.
-                </p>
+                <div className="flex flex-col items-center justify-center gap-3">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-label="Waiting for slides" />
+                  <Button onClick={() => router.push("/dashboard/slideshows")}>
+                    Back to slideshows
+                  </Button>
+                </div>
               ) : (
                 <>
                   <div className="flex items-center gap-3">
@@ -381,9 +429,6 @@ export default function CreateSlideshowPostPage() {
                       handleScheduledAtChange(event.target.value)
                     }
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Times are sent in UTC.
-                  </p>
                 </div>
               )}
 
@@ -398,7 +443,8 @@ export default function CreateSlideshowPostPage() {
                   !directPostAction.form.openId ||
                   finalizing ||
                   (scheduleEnabled && !scheduledAt) ||
-                  directPostAction.form.photoImages.length === 0
+                  directPostAction.form.photoImages.length === 0 ||
+                  !isMetadataValid
                 }
               >
                 {scheduleEnabled

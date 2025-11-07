@@ -25,6 +25,7 @@ interface TikTokConfigProps {
   onAutoAddMusicChange?: (autoAddMusic: boolean) => void;
   onPostModeChange?: (postMode: "inbox" | "direct_post") => void;
   onMetadataChange?: (metadata: any) => void;
+  onPostLimitChange?: (canPost: boolean, reason?: string) => void;
   openId?: string;
 }
 
@@ -33,6 +34,10 @@ interface CreatorInfo {
   comment_disabled: boolean;
   duet_disabled: boolean;
   stitch_disabled: boolean;
+  post_limits?: {
+    can_post: boolean;
+    reason?: string;
+  };
 }
 
 export function TikTokConfig({
@@ -43,13 +48,14 @@ export function TikTokConfig({
   onAutoAddMusicChange,
   onPostModeChange,
   onMetadataChange,
+  onPostLimitChange,
   openId,
 }: TikTokConfigProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Metadata state
   const [metadata, setMetadata] = useState({
-    privacyLevel: "PUBLIC_TO_EVERYONE",
+    privacyLevel: "", // No default selection as required by checklist
     disableComment: false,
     disableDuet: false,
     disableStitch: false,
@@ -60,6 +66,7 @@ export function TikTokConfig({
   const [creatorInfo, setCreatorInfo] = useState<CreatorInfo | null>(null);
   const [loadingCreatorInfo, setLoadingCreatorInfo] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [postLimitError, setPostLimitError] = useState<string | null>(null);
 
   // Load creator info when component mounts or openId changes
   useEffect(() => {
@@ -73,7 +80,7 @@ export function TikTokConfig({
         if (!response.ok) {
           // Use fallback if API is not available
           const defaultCreatorInfo: CreatorInfo = {
-            privacy_level_options: ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIEND", "FRIEND", "SELF_ONLY"],
+            privacy_level_options: ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"],
             comment_disabled: false,
             duet_disabled: false,
             stitch_disabled: false,
@@ -82,17 +89,30 @@ export function TikTokConfig({
         } else {
           const data = await response.json();
           setCreatorInfo(data);
+
+          // Check post limits
+          if (data.post_limits && !data.post_limits.can_post) {
+            const reason = data.post_limits.reason || "You cannot make more posts at this time. Please try again later.";
+            setPostLimitError(reason);
+            onPostLimitChange?.(false, reason);
+          } else {
+            setPostLimitError(null);
+            onPostLimitChange?.(true);
+          }
         }
       } catch (error) {
         console.error("Failed to load creator info:", error);
         // Use fallback
         const defaultCreatorInfo: CreatorInfo = {
-          privacy_level_options: ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIEND", "FRIEND", "SELF_ONLY"],
+          privacy_level_options: ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"],
           comment_disabled: false,
           duet_disabled: false,
           stitch_disabled: false,
+          post_limits: { can_post: true },
         };
         setCreatorInfo(defaultCreatorInfo);
+        setPostLimitError(null);
+        onPostLimitChange?.(true);
       } finally {
         setLoadingCreatorInfo(false);
       }
@@ -103,7 +123,17 @@ export function TikTokConfig({
 
   // Update parent component when metadata changes
   useEffect(() => {
+    // Check if metadata is valid for posting
+    const isValid =
+      metadata.privacyLevel !== "" && // Privacy level must be selected
+      (!metadata.isCommercialContent || metadata.brandOption !== null); // If commercial content, brand option must be selected
+
     onMetadataChange?.(metadata);
+
+    // Also inform about validation status
+    if (typeof window !== 'undefined') {
+      (window as any).__tiktokMetadataValid = isValid;
+    }
   }, [metadata, onMetadataChange]);
 
   const updateMetadata = (key: string, value: any) => {
@@ -112,6 +142,11 @@ export function TikTokConfig({
 
       // Validate commercial content rules
       const newErrors: Record<string, string> = {};
+
+      // Check if privacy level is selected
+      if (!newMetadata.privacyLevel) {
+        newErrors.privacyLevel = "Please select who can see this post.";
+      }
 
       // Check if commercial content is enabled but no brand option selected
       if (newMetadata.isCommercialContent && !newMetadata.brandOption) {
@@ -133,8 +168,8 @@ export function TikTokConfig({
   const formatPrivacyLevel = (level: string): string => {
     const labelMap: Record<string, string> = {
       "PUBLIC_TO_EVERYONE": "Public",
-      "MUTUAL_FOLLOW_FRIEND": "Mutual Friends",
-      "FRIEND": "Friends",
+      "MUTUAL_FOLLOW_FRIENDS": "Mutual Friends",
+      "FOLLOWER_OF_CREATOR": "Followers",
       "SELF_ONLY": "Only Me"
     };
     return labelMap[level] || level.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
@@ -173,6 +208,15 @@ export function TikTokConfig({
 
       {isExpanded && (
         <div className="rounded-lg border bg-card p-4 space-y-4">
+          {/* Post Limit Error Alert */}
+          {postLimitError && (
+            <Alert>
+              <InfoIcon className="h-4 w-4" />
+              <AlertDescription className="text-orange-600 font-medium">
+                Posting Restricted: {postLimitError}
+              </AlertDescription>
+            </Alert>
+          )}
           {/* Title Field */}
           <div className="space-y-2">
             <Label htmlFor="tiktok-title">Title (Optional)</Label>
@@ -201,8 +245,8 @@ export function TikTokConfig({
               <SelectContent>
                 {(creatorInfo?.privacy_level_options || [
                   "PUBLIC_TO_EVERYONE",
-                  "MUTUAL_FOLLOW_FRIEND",
-                  "FRIEND",
+                  "MUTUAL_FOLLOW_FRIENDS",
+                  "FOLLOWER_OF_CREATOR",
                   "SELF_ONLY"
                 ]).map((option) => {
                   const isDisabled = metadata.isCommercialContent && metadata.brandOption === "BRANDED_CONTENT" && option === "SELF_ONLY";
@@ -222,6 +266,9 @@ export function TikTokConfig({
             </Select>
             {errors.privacyConstraint && (
               <p className="text-sm text-orange-600">{errors.privacyConstraint}</p>
+            )}
+            {errors.privacyLevel && (
+              <p className="text-sm text-destructive">{errors.privacyLevel}</p>
             )}
           </div>
 
