@@ -11,7 +11,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/components/ui/use-toast";
+import toast from "react-hot-toast";
 import { usePresentationState } from "@/states/presentation-state";
 import { type Prisma } from "@prisma/client";
 import {
@@ -43,8 +43,7 @@ export function PresentationsSidebar({
 }) {
   const { ref: loadMoreRef, inView } = useInView();
   const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const {
+    const {
     isSelecting,
     selectedPresentations,
     toggleSelecting,
@@ -72,18 +71,11 @@ export function PresentationsSidebar({
       await queryClient.invalidateQueries({ queryKey: ["recent-items"] });
       deselectAllPresentations();
       toggleSelecting();
-      toast({
-        title: "Success",
-        description: result.message || "Selected presentations deleted",
-      });
+      toast.success(result.message || "Selected presentations deleted");
     },
     onError: (error) => {
       console.error("Failed to delete presentations:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to delete presentations",
-      });
+      toast.error("Failed to delete presentations");
     },
   });
 

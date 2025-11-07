@@ -2,20 +2,24 @@ import { env } from "@/env";
 import { auth } from "@/server/auth";
 import { NextResponse } from "next/server";
 
+type TikTokPostMode = "MEDIA_UPLOAD" | "DIRECT_POST" | "INBOX" | "PUBLISH";
+type TikTokPrivacyLevel = "PUBLIC" | "FRIENDS" | "SELF_ONLY";
+type TikTokBrandOption = "YOUR_BRAND" | "BRANDED_CONTENT" | null;
+
 interface TikTokPostRequest {
-  caption: string;
-  title: string;
-  coverIndex: number;
+  caption?: string;
+  title?: string;
+  coverIndex?: number;
   autoAddMusic?: boolean;
-  postMode?: "MEDIA_UPLOAD" | "DIRECT_POST";
-  photoImages: string[];
-  openId: string;
-  privacyLevel?: string;
+  postMode?: TikTokPostMode;
+  photoImages?: string[];
+  openId?: string;
+  privacyLevel?: TikTokPrivacyLevel;
   disableComment?: boolean;
   disableDuet?: boolean;
   disableStitch?: boolean;
-  isBrandedContent?: boolean;
-  brandOption?: "MY_BRAND" | "THIRD_PARTY" | null;
+  isCommercialContent?: boolean;
+  brandOption?: TikTokBrandOption;
 }
 
 export async function POST(request: Request) {
@@ -27,76 +31,109 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as TikTokPostRequest;
 
-    // Validate required fields
-    if (!body.openId || !body.caption || !body.photoImages?.length) {
+    if (
+      !body ||
+      typeof body.openId !== "string" ||
+      !body.openId.trim() ||
+      !body.photoImages ||
+      body.photoImages.length === 0 ||
+      typeof body.caption !== "string"
+    ) {
       return NextResponse.json(
         { error: "Missing required fields: openId, caption, photoImages" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Validate that we have at least one image
-    if (body.photoImages.length === 0) {
+    const trimmedCaption = body.caption.trim();
+    const trimmedTitle = body.title?.trim() ?? "";
+    const coverIndex = Number.isFinite(body.coverIndex)
+      ? Math.floor(body.coverIndex as number)
+      : 0;
+    const normalizedCoverIndex = Math.max(
+      0,
+      Math.min(coverIndex, body.photoImages.length - 1),
+    );
+
+    const orderedImages = [...body.photoImages];
+    if (
+      normalizedCoverIndex > 0 &&
+      normalizedCoverIndex < orderedImages.length
+    ) {
+      const [coverImage] = orderedImages.splice(normalizedCoverIndex, 1);
+      if (coverImage) {
+        orderedImages.unshift(coverImage);
+      }
+    }
+
+    const sanitizedImages = orderedImages
+      .map((url) => (typeof url === "string" ? url.trim() : ""))
+      .filter((url) => url.length > 0);
+
+    if (sanitizedImages.length === 0) {
       return NextResponse.json(
-        { error: "At least one image is required" },
-        { status: 400 }
+        { error: "At least one valid photo URL is required" },
+        { status: 400 },
       );
     }
 
-    // Prepare payload for backend API
+    const allowedPostModes: TikTokPostMode[] = [
+      "MEDIA_UPLOAD",
+      "DIRECT_POST",
+      "INBOX",
+      "PUBLISH",
+    ];
+    const resolvedPostMode = allowedPostModes.includes(
+      body.postMode as TikTokPostMode,
+    )
+      ? (body.postMode as TikTokPostMode)
+      : "MEDIA_UPLOAD";
+
+    const allowedPrivacyLevels: TikTokPrivacyLevel[] = [
+      "PUBLIC",
+      "FRIENDS",
+      "SELF_ONLY",
+    ];
+    const resolvedPrivacyLevel = allowedPrivacyLevels.includes(
+      body.privacyLevel as TikTokPrivacyLevel,
+    )
+      ? (body.privacyLevel as TikTokPrivacyLevel)
+      : undefined;
+
+    const settings: Record<string, unknown> = {
+      contentPostingMethod: "URL",
+      autoAddMusic: body.autoAddMusic ?? true,
+    };
+
+    if (trimmedTitle.length > 0) {
+      settings.title = trimmedTitle;
+    }
+    if (resolvedPrivacyLevel) {
+      settings.privacyLevel = resolvedPrivacyLevel;
+    }
+    if (typeof body.disableComment === "boolean") {
+      settings.comment = !body.disableComment;
+    }
+    if (typeof body.disableDuet === "boolean") {
+      settings.duet = !body.disableDuet;
+    }
+    if (typeof body.disableStitch === "boolean") {
+      settings.stitch = !body.disableStitch;
+    }
+    if (body.isCommercialContent) {
+      settings.brandContentToggle = body.brandOption === "BRANDED_CONTENT";
+      settings.brandOrganicToggle = body.brandOption === "YOUR_BRAND";
+    }
+
     const payload = {
-      caption: body.caption ?? "",
-      postMode: body.postMode ?? "MEDIA_UPLOAD",
-      media: body.photoImages.map((url) => ({
+      caption: trimmedCaption,
+      postMode: resolvedPostMode,
+      media: sanitizedImages.map((url) => ({
         type: "photo" as const,
         url,
       })),
-      settings: {
-        contentPostingMethod: "URL" as const,
-        autoAddMusic: body.autoAddMusic ?? true,
-        title:
-          body.title && body.title.trim().length > 0
-            ? body.title.trim()
-            : undefined,
-      },
+      settings,
     };
-
-    // Add post info with metadata if provided
-    const postInfo: any = {};
-
-    if (body.privacyLevel) {
-      postInfo.privacy_level = body.privacyLevel;
-    }
-
-    if (body.disableComment !== undefined) {
-      postInfo.disable_comment = body.disableComment;
-    }
-
-    if (body.disableDuet !== undefined) {
-      postInfo.disable_duet = body.disableDuet;
-    }
-
-    if (body.disableStitch !== undefined) {
-      postInfo.disable_stitch = body.disableStitch;
-    }
-
-    if (body.isBrandedContent !== undefined) {
-      postInfo.brand_content_toggle = body.isBrandedContent;
-    }
-
-    if (body.brandOption === "MY_BRAND") {
-      postInfo.brand_organic_toggle = true;
-    }
-
-    // Only include post_info if we have metadata
-    if (Object.keys(postInfo).length > 0) {
-      (payload as any).post_info = postInfo;
-    }
-
-    // Only include coverIndex if it's provided and not zero (to avoid backend validation error)
-    if (body.coverIndex > 0) {
-      (payload as any).coverIndex = body.coverIndex;
-    }
 
     console.log("[TikTokCreatePostAPI] Outgoing payload", payload);
 
@@ -116,24 +153,30 @@ export async function POST(request: Request) {
       );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({} as {
-          message?: string;
-          error?: string;
-          statusCode?: number;
-        }));
+        const errorData = await response.json().catch(
+          () =>
+            ({}) as {
+              message?: string;
+              error?: string;
+              statusCode?: number;
+            },
+        );
 
         console.error("[TikTokCreatePostAPI] Backend error:", errorData);
 
         // Extract the most descriptive error message
-        const errorMessage = errorData.message || errorData.error || `TikTok API error: ${response.status} ${response.statusText}`;
+        const errorMessage =
+          errorData.message ||
+          errorData.error ||
+          `TikTok API error: ${response.status} ${response.statusText}`;
 
         return NextResponse.json(
           {
             error: errorMessage,
             originalError: errorData.error || `HTTP ${response.status}`,
-            statusCode: errorData.statusCode || response.status
+            statusCode: errorData.statusCode || response.status,
           },
-          { status: response.status }
+          { status: response.status },
         );
       }
 
@@ -143,25 +186,23 @@ export async function POST(request: Request) {
       if (!data) {
         return NextResponse.json(
           { error: "Invalid response from backend" },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
       return NextResponse.json(data, { status: 200 });
-
     } catch (error) {
       console.error("[TikTokCreatePostAPI] Network error:", error);
       return NextResponse.json(
         { error: "Failed to connect to backend API" },
-        { status: 500 }
+        { status: 500 },
       );
     }
-
   } catch (error) {
     console.error("[TikTokCreatePostAPI] Request parsing error:", error);
     return NextResponse.json(
       { error: "Invalid request format" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 }

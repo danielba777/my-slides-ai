@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { useToast } from "@/components/ui/use-toast";
+import toast from "react-hot-toast";
 import { useTikTokAccounts } from "./use-tiktok-accounts";
 
 export interface TikTokDirectPostPayload {
@@ -16,8 +16,8 @@ export interface TikTokDirectPostPayload {
   disableComment?: boolean;
   disableDuet?: boolean;
   disableStitch?: boolean;
-  isBrandedContent?: boolean;
-  brandOption?: "MY_BRAND" | "THIRD_PARTY" | null;
+  isCommercialContent?: boolean;
+  brandOption?: "YOUR_BRAND" | "BRANDED_CONTENT" | null;
 }
 
 export interface TikTokDirectPostResult {
@@ -69,7 +69,6 @@ export function useTikTokDirectPost(
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<TikTokDirectPostResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
 
   // Get accounts from separate hook for compatibility
   const { accounts, loading: accountsLoading, refresh: refreshAccounts } = useTikTokAccounts();
@@ -126,20 +125,14 @@ export function useTikTokDirectPost(
 
       // Show info toast for processing status - UI will handle the rest
       if (data.status === "inbox") {
-        toast({
-          title: "Success",
-          description: "Post sent to TikTok inbox for review",
-        });
+        toast.success("Post sent to TikTok inbox for review");
+        toast("Please note: It may take a few minutes for your post to appear on TikTok");
       } else if (data.status === "success") {
-        toast({
-          title: "Success",
-          description: "Post published successfully to TikTok",
-        });
+        toast.success("Post published successfully to TikTok");
+        toast("Please note: It may take a few minutes for your post to appear on TikTok");
       } else if (data.status === "processing") {
-        toast({
-          title: "Processing",
-          description: "Post is being processed by TikTok...",
-        });
+        toast("Post is being processed by TikTok...");
+        toast("Please note: It may take a few minutes for your post to appear on TikTok");
       }
 
       return data;
@@ -147,11 +140,7 @@ export function useTikTokDirectPost(
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to post to TikTok";
       setError(errorMessage);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: errorMessage,
-      });
+      toast.error(errorMessage);
       return null;
     } finally {
       setSubmitting(false);

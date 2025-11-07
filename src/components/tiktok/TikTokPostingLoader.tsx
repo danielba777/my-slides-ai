@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { CheckCircle, XCircle, Clock, AlertCircle } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import toast from "react-hot-toast";
 
 interface TikTokPostingLoaderProps {
   publishId: string;
@@ -33,7 +33,6 @@ export function TikTokPostingLoader({
   onBack
 }: TikTokPostingLoaderProps) {
   const router = useRouter();
-  const { toast } = useToast();
   const [status, setStatus] = useState<PostStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,11 +76,7 @@ export function TikTokPostingLoader({
         setLoading(false);
 
         // Show error as toast notification
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: errorMessage,
-        });
+        toast.error(errorMessage);
 
         onError?.(errorMessage);
       }
@@ -101,11 +96,7 @@ export function TikTokPostingLoader({
       setError(timeoutMessage);
 
       // Show timeout error as toast notification
-      toast({
-        variant: "destructive",
-        title: "Timeout",
-        description: timeoutMessage,
-      });
+      toast.error(timeoutMessage);
 
       onError?.(timeoutMessage);
     }, 120000);

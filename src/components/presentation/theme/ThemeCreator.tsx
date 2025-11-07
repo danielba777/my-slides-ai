@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
+import toast from "react-hot-toast";
 import { useUploadThing } from "@/hooks/globals/useUploadthing";
 import { themes } from "@/lib/presentation/themes";
 import { Loader2, Plus } from "lucide-react";
@@ -33,8 +33,7 @@ const STEPS = [
 
 export function ThemeCreator({ children }: { children?: ReactNode }) {
   const { isThemeCreatorOpen, setIsThemeCreatorOpen } = usePresentationState();
-  const { toast } = useToast();
-  const [currentStep, setCurrentStep] = useState(0);
+    const [currentStep, setCurrentStep] = useState(0);
   const [activeColorTab, setActiveColorTab] = useState<"light" | "dark">(
     "light",
   );
@@ -158,23 +157,12 @@ export function ThemeCreator({ children }: { children?: ReactNode }) {
 
       const result = await createCustomTheme(themeData);
       if (result.success) {
-        toast({
-          title: "Success",
-          description: "Theme created successfully!",
-        });
+        toast.success("Theme created successfully!");
       } else {
-        toast({
-          title: "Error",
-          description: result.message || "Failed to create theme",
-          variant: "destructive",
-        });
+        toast.error(result.message || "Failed to create theme");
       }
     } catch {
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
-      });
+      toast.error("An unexpected error occurred");
     } finally {
       setIsSubmitting(false);
       setCurrentStep(0);

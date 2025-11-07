@@ -7,6 +7,10 @@ interface CreatorInfoResponse {
   comment_disabled: boolean;
   duet_disabled: boolean;
   stitch_disabled: boolean;
+  post_limits?: {
+    can_post: boolean;
+    reason?: string;
+  };
 }
 
 export async function GET(

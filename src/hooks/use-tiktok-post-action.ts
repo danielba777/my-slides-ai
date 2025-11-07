@@ -261,6 +261,7 @@ export function useTikTokPostAction(
       if ("accepted" in payload && payload.accepted) {
         setResult({ publishId: payload.publishId, status: payload.status });
         toast.success("TikTok post started – polling status");
+        toast("Please note: It may take a few minutes for your post to appear on TikTok");
 
         try {
           const finalStatus = await pollStatus(form.openId, payload.publishId);
@@ -275,8 +276,10 @@ export function useTikTokPostAction(
 
           if (finalStatus.status === "success") {
             toast.success("TikTok post published successfully");
+            toast("Please note: It may take a few minutes for your post to appear on TikTok");
           } else if (finalStatus.status === "inbox") {
             toast.success("TikTok post saved to TikTok Inbox drafts");
+            toast("Please note: It may take a few minutes for your post to appear on TikTok");
           } else if (finalStatus.status === "failed") {
             toast.error(
               finalStatus.error ??
