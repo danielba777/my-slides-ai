@@ -10,22 +10,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useTikTokPostAction } from "@/hooks/use-tiktok-post-action";
+import { useTikTokDirectPost } from "@/hooks/use-tiktok-direct-post";
 import { useTikTokScheduleAction } from "@/hooks/use-tiktok-schedule-action";
 import { useSlideshowPostState } from "@/states/slideshow-post-state";
+import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
+import { TikTokPostingLoader } from "@/components/tiktok/TikTokPostingLoader";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function CreateSlideshowPostPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const prepared = useSlideshowPostState((state) => state.prepared);
 
-  const postAction = useTikTokPostAction({
+  // Use the new direct post hook
+  const directPostAction = useTikTokDirectPost({
     defaultValues: {
       caption: "",
       title: "",
       photoImages: prepared?.slideImageUrls ?? [],
     },
   });
+
+  // Keep schedule action for scheduling functionality
   const scheduleAction = useTikTokScheduleAction({
     defaultValues: {
       caption: "",
@@ -33,9 +40,12 @@ export default function CreateSlideshowPostPage() {
       photoImages: prepared?.slideImageUrls ?? [],
     },
   });
-  const updatePostField = postAction.updateField;
+
+  // Get accounts from separate hook
+  const { accounts, loading: accountsLoading, refresh: refreshAccounts } = useTikTokAccounts();
+
+  const updateDirectPostField = directPostAction.updateField;
   const updateScheduleField = scheduleAction.updateField;
-  const { accounts, accountsLoading } = postAction;
 
   const slides = prepared?.slides ?? [];
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -45,6 +55,10 @@ export default function CreateSlideshowPostPage() {
   );
   const [finalizing, setFinalizing] = useState(false);
   const [finalizingMode, setFinalizingMode] = useState<"post" | "schedule" | null>(null);
+  const [postingData, setPostingData] = useState<{
+    publishId: string;
+    caption: string;
+  } | null>(null);
   useEffect(() => {
     if (slides.length === 0) {
       setCurrentSlide(0);
@@ -55,20 +69,18 @@ export default function CreateSlideshowPostPage() {
 
   useEffect(() => {
     if (!prepared) return;
-    updatePostField("photoImages", prepared.slideImageUrls ?? []);
+    updateDirectPostField("photoImages", prepared.slideImageUrls ?? []);
     updateScheduleField("photoImages", prepared.slideImageUrls ?? []);
-    updatePostField("coverIndex", 0);
-    updateScheduleField("coverIndex", 0);
     if (!scheduledAt) {
       setScheduledAt(scheduleAction.form.publishAt ?? "");
     }
-  }, [prepared, updatePostField, updateScheduleField]);
+  }, [prepared, updateDirectPostField, updateScheduleField]);
 
   useEffect(() => {
     setScheduledAt(scheduleAction.form.publishAt ?? "");
   }, [scheduleAction.form.publishAt]);
 
-  const isPosting = postAction.submitting;
+  const isPosting = directPostAction.submitting;
   const isScheduling = scheduleAction.submitting;
 
   const handlePrimaryAction = async () => {
@@ -89,16 +101,34 @@ export default function CreateSlideshowPostPage() {
           router.push("/dashboard/posts/scheduled");
         }
       } else {
-        const result = await postAction.handleSubmit();
-        if (result && (result.status === "inbox" || result.status === "success")) {
-          redirected = true;
-          router.push("/dashboard/posts/posted");
+        const result = await directPostAction.handleSubmit();
+        if (result && result.publishId) {
+          // Don't redirect immediately - show loading screen for processing
+          setPostingData({
+            publishId: result.publishId,
+            caption: directPostAction.form.caption,
+          });
+          redirected = true; // Prevent error fallback
         }
       }
     } catch (error) {
       console.error("[CreateSlideshowPostPage] Submission failed", error);
+
+      // Show error as toast
+      const errorMessage = error instanceof Error ? error.message : "Failed to post to TikTok";
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: errorMessage,
+      });
+
+      // If we have posting data, show error in the loader instead of hiding everything
+      if (!postingData) {
+        setFinalizing(false);
+        setFinalizingMode(null);
+      }
     } finally {
-      if (!redirected) {
+      if (!redirected && !postingData) {
         setFinalizing(false);
         setFinalizingMode(null);
       }
@@ -122,8 +152,22 @@ export default function CreateSlideshowPostPage() {
   };
 
   const handleSelectAccount = (openId: string) => {
-    updatePostField("openId", openId);
+    updateDirectPostField("openId", openId);
     updateScheduleField("openId", openId);
+  };
+
+  const handlePostingComplete = (status: string, postId?: string, releaseUrl?: string) => {
+    setFinalizing(false);
+    setFinalizingMode(null);
+    setPostingData(null);
+
+    // Auto-redirect handled by TikTokPostingLoader component
+  };
+
+  const handlePostingError = (error: string) => {
+    setFinalizing(false);
+    setFinalizingMode(null);
+    setPostingData(null);
   };
 
   const fallbackContent = (
@@ -171,7 +215,7 @@ export default function CreateSlideshowPostPage() {
                     const label =
                       account.username ?? account.displayName ?? account.openId;
                     const isSelected =
-                      postAction.form.openId === account.openId;
+                      directPostAction.form.openId === account.openId;
                     const initials = label
                       .split(" ")
                       .map((part) => part[0]?.toUpperCase())
@@ -217,9 +261,9 @@ export default function CreateSlideshowPostPage() {
           </section>
 
           <TikTokPostForm
-            action={postAction}
+            action={directPostAction}
             cardTitle="Post configuration"
-            submitLabel="Trigger TikTok post"
+            submitLabel="Post to TikTok"
             refreshLabel="Refresh accounts"
             showSubmitButton={false}
             showRefreshButton={false}
@@ -345,10 +389,10 @@ export default function CreateSlideshowPostPage() {
                   isScheduling ||
                   accountsLoading ||
                   accounts.length === 0 ||
-                  !postAction.form.openId ||
+                  !directPostAction.form.openId ||
                   finalizing ||
                   (scheduleEnabled && !scheduledAt) ||
-                  postAction.form.photoImages.length === 0
+                  directPostAction.form.photoImages.length === 0
                 }
               >
                 {scheduleEnabled
@@ -364,15 +408,32 @@ export default function CreateSlideshowPostPage() {
         </div>
       </div>
 
+      {/* TikTok Posting Loader - Integrated into page */}
       {finalizing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur">
-          <div className="flex flex-col items-center gap-3 rounded-lg border bg-card px-6 py-5 shadow-lg">
-            <Loader2 className="h-6 w-6 animate-spin" aria-hidden />
-            <p className="text-sm text-muted-foreground">
-              {finalizingMode === "schedule"
-                ? "Scheduling TikTok post…"
-                : "Posting to TikTok…"}
-            </p>
+        <div className="fixed inset-0 top-0 left-0 w-full h-full bg-background/95 backdrop-blur-sm z-50">
+          <div className="flex flex-col items-center justify-center min-h-screen p-8">
+            {postingData ? (
+              <div className="w-full max-w-2xl">
+                <TikTokPostingLoader
+                  publishId={postingData.publishId}
+                  caption={postingData.caption}
+                  onComplete={handlePostingComplete}
+                  onError={handlePostingError}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-4 bg-card rounded-xl border p-8 shadow-xl">
+                <Loader2 className="h-12 w-12 animate-spin" />
+                <h3 className="text-xl font-semibold">
+                  {finalizingMode === "schedule"
+                    ? "Scheduling TikTok post…"
+                    : "Posting to TikTok…"}
+                </h3>
+                <p className="text-muted-foreground text-center max-w-md">
+                  Your post is being processed. This usually takes a few seconds.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
