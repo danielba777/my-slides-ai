@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 
 interface TikTokPostingLoaderProps {
   publishId: string;
+  openId: string;
   caption: string;
   onComplete?: (status: string, postId?: string, releaseUrl?: string) => void;
   onError?: (error: string) => void;
@@ -25,6 +26,7 @@ interface PostStatus {
 
 export function TikTokPostingLoader({
   publishId,
+  openId,
   caption,
   onComplete,
   onError,
@@ -43,7 +45,7 @@ export function TikTokPostingLoader({
 
     const pollStatus = async () => {
       try {
-        const response = await fetch(`/api/tiktok/post-status/${encodeURIComponent(publishId)}`);
+        const response = await fetch(`/api/tiktok/post-status/${encodeURIComponent(openId)}/${encodeURIComponent(publishId)}`);
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
