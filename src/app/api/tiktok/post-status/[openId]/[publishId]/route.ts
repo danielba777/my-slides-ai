@@ -12,22 +12,22 @@ interface TikTokStatusResponse {
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ publishId: string }> }
+  { params }: { params: Promise<{ openId: string; publishId: string }> }
 ) {
   const session = await auth();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { publishId } = await params;
+  const { openId, publishId } = await params;
 
-  if (!publishId) {
-    return NextResponse.json({ error: "Missing publishId" }, { status: 400 });
+  if (!openId || !publishId) {
+    return NextResponse.json({ error: "Missing openId or publishId" }, { status: 400 });
   }
 
   try {
     const response = await fetch(
-      `${env.SLIDESCOCKPIT_API}/integrations/social/tiktok/post/${encodeURIComponent(publishId)}`,
+      `${env.SLIDESCOCKPIT_API}/integrations/social/tiktok/${encodeURIComponent(openId)}/post/status/${encodeURIComponent(publishId)}`,
       {
         method: "GET",
         headers: {

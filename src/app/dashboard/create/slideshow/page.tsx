@@ -416,6 +416,7 @@ export default function CreateSlideshowPostPage() {
               <div className="w-full max-w-2xl">
                 <TikTokPostingLoader
                   publishId={postingData.publishId}
+                  openId={directPostAction.form.openId}
                   caption={postingData.caption}
                   onComplete={handlePostingComplete}
                   onError={handlePostingError}
