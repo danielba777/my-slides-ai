@@ -14,8 +14,8 @@ interface TikTokPostRequest {
   disableComment?: boolean;
   disableDuet?: boolean;
   disableStitch?: boolean;
-  isBrandedContent?: boolean;
-  brandOption?: "MY_BRAND" | "THIRD_PARTY" | null;
+  isCommercialContent?: boolean;
+  brandOption?: "YOUR_BRAND" | "BRANDED_CONTENT" | null;
 }
 
 export async function POST(request: Request) {
@@ -80,12 +80,14 @@ export async function POST(request: Request) {
       postInfo.disable_stitch = body.disableStitch;
     }
 
-    if (body.isBrandedContent !== undefined) {
-      postInfo.brand_content_toggle = body.isBrandedContent;
+    if (body.isCommercialContent !== undefined) {
+      postInfo.is_commercial_content = body.isCommercialContent;
     }
 
-    if (body.brandOption === "MY_BRAND") {
-      postInfo.brand_organic_toggle = true;
+    if (body.brandOption === "YOUR_BRAND") {
+      postInfo.brand_content_type = "YOUR_BRAND";
+    } else if (body.brandOption === "BRANDED_CONTENT") {
+      postInfo.brand_content_type = "BRANDED_CONTENT";
     }
 
     // Only include post_info if we have metadata

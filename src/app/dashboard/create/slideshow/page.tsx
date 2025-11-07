@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { TikTokPostForm } from "@/components/tiktok/TikTokPostForm";
-import { TikTokMetadataForm, type TikTokMetadata } from "@/components/tiktok/TikTokMetadataForm";
 import { TikTokScheduleForm } from "@/components/tiktok/TikTokScheduleForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,11 +16,10 @@ import { useSlideshowPostState } from "@/states/slideshow-post-state";
 import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 import { TikTokPostingLoader } from "@/components/tiktok/TikTokPostingLoader";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import toast from "react-hot-toast";
 
 export default function CreateSlideshowPostPage() {
   const router = useRouter();
-  const { toast } = useToast();
   const prepared = useSlideshowPostState((state) => state.prepared);
 
   // Use the new direct post hook
@@ -60,8 +58,7 @@ export default function CreateSlideshowPostPage() {
     publishId: string;
     caption: string;
   } | null>(null);
-  const [tiktokMetadata, setTiktokMetadata] = useState<TikTokMetadata | null>(null);
-  const [showMetadataForm, setShowMetadataForm] = useState(false);
+  const [tiktokMetadata, setTiktokMetadata] = useState<any>(null);
   useEffect(() => {
     if (slides.length === 0) {
       setCurrentSlide(0);
@@ -86,42 +83,53 @@ export default function CreateSlideshowPostPage() {
   const isPosting = directPostAction.submitting;
   const isScheduling = scheduleAction.submitting;
 
-  const handlePrimaryAction = () => {
+  const handlePrimaryAction = async () => {
     if (scheduleEnabled && !scheduledAt) {
       return;
     }
 
     const mode: "post" | "schedule" = scheduleEnabled ? "schedule" : "post";
-
-    if (mode === "schedule") {
-      // Handle scheduling with existing logic
-      handleScheduleSubmission();
-    } else {
-      // Show metadata form for regular posting
-      setShowMetadataForm(true);
-    }
-  };
-
-  const handleScheduleSubmission = async () => {
     setFinalizing(true);
-    setFinalizingMode("schedule");
+    setFinalizingMode(mode);
 
     let redirected = false;
     try {
-      const result = await scheduleAction.handleSubmit();
-      if (result?.scheduled) {
-        redirected = true;
-        router.push("/dashboard/posts/scheduled");
+      if (mode === "schedule") {
+        setFinalizing(true);
+        setFinalizingMode("schedule");
+        const result = await scheduleAction.handleSubmit();
+        if (result?.scheduled) {
+          redirected = true;
+          router.push("/dashboard/posts/scheduled");
+        }
+      } else {
+        // Apply metadata from global state before submitting
+        if (typeof window !== 'undefined' && (window as any).__tiktokMetadata) {
+          const metadata = (window as any).__tiktokMetadata;
+          updateDirectPostField("privacyLevel", metadata.privacyLevel);
+          updateDirectPostField("disableComment", metadata.disableComment);
+          updateDirectPostField("disableDuet", metadata.disableDuet);
+          updateDirectPostField("disableStitch", metadata.disableStitch);
+          updateDirectPostField("isCommercialContent", metadata.isCommercialContent);
+          updateDirectPostField("brandOption", metadata.brandOption);
+        }
+
+        const result = await directPostAction.handleSubmit();
+        if (result && result.publishId) {
+          // Show loading screen for processing immediately
+          setPostingData({
+            publishId: result.publishId,
+            caption: directPostAction.form.caption,
+          });
+          redirected = true; // Prevent error fallback
+        }
       }
     } catch (error) {
-      console.error("[CreateSlideshowPostPage] Schedule submission failed", error);
+      console.error("[CreateSlideshowPostPage] Submission failed", error);
 
-      const errorMessage = error instanceof Error ? error.message : "Failed to schedule post";
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: errorMessage,
-      });
+      // Show error as toast
+      const errorMessage = error instanceof Error ? error.message : "Failed to post to TikTok";
+      toast.error(errorMessage);
 
       setFinalizing(false);
       setFinalizingMode(null);
@@ -130,42 +138,6 @@ export default function CreateSlideshowPostPage() {
         setFinalizing(false);
         setFinalizingMode(null);
       }
-    }
-  };
-
-  const handleMetadataSubmission = async (metadata: TikTokMetadata) => {
-    setTiktokMetadata(metadata);
-    setShowMetadataForm(false);
-    setFinalizing(true);
-    setFinalizingMode("post");
-
-    let redirected = false;
-    try {
-      // Update the direct post form with metadata
-      updateDirectPostField("caption", metadata.title);
-      updateDirectPostField("title", metadata.title);
-
-      const result = await directPostAction.handleSubmit();
-      if (result && result.publishId) {
-        // Don't redirect immediately - show loading screen for processing
-        setPostingData({
-          publishId: result.publishId,
-          caption: metadata.title,
-        });
-        redirected = true; // Prevent error fallback
-      }
-    } catch (error) {
-      console.error("[CreateSlideshowPostPage] Post submission failed", error);
-
-      const errorMessage = error instanceof Error ? error.message : "Failed to post to TikTok";
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: errorMessage,
-      });
-
-      setFinalizing(false);
-      setFinalizingMode(null);
     }
   };
 
@@ -425,7 +397,6 @@ export default function CreateSlideshowPostPage() {
                   accounts.length === 0 ||
                   !directPostAction.form.openId ||
                   finalizing ||
-                  showMetadataForm ||
                   (scheduleEnabled && !scheduledAt) ||
                   directPostAction.form.photoImages.length === 0
                 }
@@ -434,9 +405,7 @@ export default function CreateSlideshowPostPage() {
                   ? isScheduling
                     ? "Scheduling…"
                     : "Schedule Now"
-                  : showMetadataForm
-                    ? "Configure Settings…"
-                    : isPosting
+                  : isPosting
                     ? "Posting…"
                     : "Post Now"}
               </Button>
@@ -445,67 +414,19 @@ export default function CreateSlideshowPostPage() {
         </div>
       </div>
 
-      {/* TikTok Metadata Form - Overlay */}
-      {showMetadataForm && (
+      {/* TikTok Posting Loader - Integrated into page */}
+      {postingData && (
         <div className="fixed inset-0 top-0 left-0 w-full h-full bg-background/95 backdrop-blur-sm z-50">
           <div className="flex flex-col items-center justify-center min-h-screen p-8">
             <div className="w-full max-w-2xl">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-xl font-semibold">Configure TikTok Post Settings</h3>
-                  <p className="text-muted-foreground text-sm">
-                    Review and adjust your post settings before publishing
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowMetadataForm(false)}
-                  disabled={finalizing}
-                >
-                  Cancel
-                </Button>
-              </div>
-
-              <TikTokMetadataForm
-                initialData={{
-                  title: directPostAction.form.caption,
-                }}
-                onSubmit={handleMetadataSubmission}
-                loading={finalizing}
+              <TikTokPostingLoader
+                publishId={postingData.publishId}
                 openId={directPostAction.form.openId}
+                caption={postingData.caption}
+                onComplete={handlePostingComplete}
+                onError={handlePostingError}
               />
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* TikTok Posting Loader - Integrated into page */}
-      {finalizing && (
-        <div className="fixed inset-0 top-0 left-0 w-full h-full bg-background/95 backdrop-blur-sm z-50">
-          <div className="flex flex-col items-center justify-center min-h-screen p-8">
-            {postingData ? (
-              <div className="w-full max-w-2xl">
-                <TikTokPostingLoader
-                  publishId={postingData.publishId}
-                  openId={directPostAction.form.openId}
-                  caption={postingData.caption}
-                  onComplete={handlePostingComplete}
-                  onError={handlePostingError}
-                />
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-4 bg-card rounded-xl border p-8 shadow-xl">
-                <Loader2 className="h-12 w-12 animate-spin" />
-                <h3 className="text-xl font-semibold">
-                  {finalizingMode === "schedule"
-                    ? "Scheduling TikTok post…"
-                    : "Posting to TikTok…"}
-                </h3>
-                <p className="text-muted-foreground text-center max-w-md">
-                  Your post is being processed. This usually takes a few seconds.
-                </p>
-              </div>
-            )}
           </div>
         </div>
       )}

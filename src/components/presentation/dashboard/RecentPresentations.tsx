@@ -24,7 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/components/ui/use-toast";
+import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { usePresentationState } from "@/states/presentation-state";
 import { type BaseDocument } from "@prisma/client";
@@ -47,7 +47,6 @@ import { useState } from "react";
 
 export function RecentPresentations() {
   const router = useRouter();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const setCurrentPresentation = usePresentationState(
     (state) => state.setCurrentPresentation,
@@ -83,18 +82,11 @@ export function RecentPresentations() {
       });
       await queryClient.invalidateQueries({ queryKey: ["recent-items"] });
       setDeleteDialogOpen(false);
-      toast({
-        title: "Success",
-        description: "Presentation deleted successfully",
-      });
+      toast.success("Presentation deleted successfully");
     },
     onError: (error) => {
       console.error("Failed to delete presentation:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to delete presentation",
-      });
+    toast.error("Failed to delete presentation");
     },
   });
 
@@ -112,18 +104,11 @@ export function RecentPresentations() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["presentations-all"] });
       await queryClient.invalidateQueries({ queryKey: ["recent-items"] });
-      toast({
-        title: "Success",
-        description: "Presentation renamed successfully",
-      });
+    toast.success("Presentation renamed successfully");
     },
     onError: (error) => {
       console.error("Failed to rename presentation:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to rename presentation",
-      });
+    toast.error("Failed to rename presentation");
     },
   });
 
@@ -152,11 +137,7 @@ export function RecentPresentations() {
       }
     } catch (error) {
       console.error("Failed to navigate:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to open presentation",
-      });
+  toast.error("Failed to open presentation");
     } finally {
       setIsNavigating(null);
     }

@@ -169,9 +169,17 @@ export function TikTokPostForm({
           title={form.title || ""}
           autoAddMusic={form.autoAddMusic ?? true}
           postMode={form.postMode === "DIRECT_POST" ? "direct_post" : "inbox"}
+          openId={form.openId}
           onTitleChange={(title) => updateField("title", title)}
           onAutoAddMusicChange={(autoAddMusic) => updateField("autoAddMusic", autoAddMusic)}
           onPostModeChange={(postMode) => updateField("postMode", postMode === "direct_post" ? "DIRECT_POST" : "MEDIA_UPLOAD")}
+          onMetadataChange={(metadata) => {
+            // Store metadata in a global state for later use in submission
+            // This will be accessed by the parent component during post submission
+            if (typeof window !== 'undefined') {
+              (window as any).__tiktokMetadata = metadata;
+            }
+          }}
         />
 
         {error && <p className="text-sm text-destructive">{error}</p>}

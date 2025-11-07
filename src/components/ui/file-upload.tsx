@@ -14,7 +14,7 @@ import {
 import { useCallback } from "react";
 import { type FileRejection, useDropzone } from "react-dropzone";
 import { Button } from "./button";
-import { useToast } from "./use-toast";
+import toast from "react-hot-toast";
 
 enum FileTypes {
   Image = "image",
@@ -72,7 +72,6 @@ export default function FileUpload({
   info?: string;
   showUploadButton?: boolean;
 }) {
-  const { toast } = useToast();
   const getFileIconAndColor = (file: File) => {
     if (file.type.includes(FileTypes.Image)) {
       return {
@@ -128,10 +127,7 @@ export default function FileUpload({
         ];
       });
       if (fileRejected.length > 0) {
-        toast({
-          title: "File type not allowed",
-          description: "Please upload a valid file type",
-        });
+        toast.error("Please upload a valid file type");
       }
     },
     [],

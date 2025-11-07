@@ -254,6 +254,7 @@ export function useTikTokScheduleAction(
 
       setResult(data);
       toast.success("TikTok post was scheduled successfully");
+      toast("Please note: It may take a few minutes for your scheduled post to appear on TikTok");
       return data;
     } catch (err) {
       console.error("[TikTokSchedule] Unexpected error", err, { payload });

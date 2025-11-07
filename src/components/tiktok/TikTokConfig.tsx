@@ -1,11 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ChevronDown, ChevronUp, Settings } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ChevronDown, ChevronUp, Settings, InfoIcon } from "lucide-react";
+import toast from "react-hot-toast";
 
 interface TikTokConfigProps {
   title?: string;
@@ -14,6 +24,15 @@ interface TikTokConfigProps {
   onTitleChange?: (title: string) => void;
   onAutoAddMusicChange?: (autoAddMusic: boolean) => void;
   onPostModeChange?: (postMode: "inbox" | "direct_post") => void;
+  onMetadataChange?: (metadata: any) => void;
+  openId?: string;
+}
+
+interface CreatorInfo {
+  privacy_level_options: string[];
+  comment_disabled: boolean;
+  duet_disabled: boolean;
+  stitch_disabled: boolean;
 }
 
 export function TikTokConfig({
@@ -23,8 +42,103 @@ export function TikTokConfig({
   onTitleChange,
   onAutoAddMusicChange,
   onPostModeChange,
+  onMetadataChange,
+  openId,
 }: TikTokConfigProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Metadata state
+  const [metadata, setMetadata] = useState({
+    privacyLevel: "PUBLIC_TO_EVERYONE",
+    disableComment: false,
+    disableDuet: false,
+    disableStitch: false,
+    isCommercialContent: false,
+    brandOption: null as "YOUR_BRAND" | "BRANDED_CONTENT" | null,
+  });
+
+  const [creatorInfo, setCreatorInfo] = useState<CreatorInfo | null>(null);
+  const [loadingCreatorInfo, setLoadingCreatorInfo] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Load creator info when component mounts or openId changes
+  useEffect(() => {
+    if (!openId) return;
+
+    const loadCreatorInfo = async () => {
+      setLoadingCreatorInfo(true);
+      try {
+        const response = await fetch(`/api/tiktok/creator-info/${encodeURIComponent(openId)}`);
+
+        if (!response.ok) {
+          // Use fallback if API is not available
+          const defaultCreatorInfo: CreatorInfo = {
+            privacy_level_options: ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIEND", "FRIEND", "SELF_ONLY"],
+            comment_disabled: false,
+            duet_disabled: false,
+            stitch_disabled: false,
+          };
+          setCreatorInfo(defaultCreatorInfo);
+        } else {
+          const data = await response.json();
+          setCreatorInfo(data);
+        }
+      } catch (error) {
+        console.error("Failed to load creator info:", error);
+        // Use fallback
+        const defaultCreatorInfo: CreatorInfo = {
+          privacy_level_options: ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIEND", "FRIEND", "SELF_ONLY"],
+          comment_disabled: false,
+          duet_disabled: false,
+          stitch_disabled: false,
+        };
+        setCreatorInfo(defaultCreatorInfo);
+      } finally {
+        setLoadingCreatorInfo(false);
+      }
+    };
+
+    loadCreatorInfo();
+  }, [openId]);
+
+  // Update parent component when metadata changes
+  useEffect(() => {
+    onMetadataChange?.(metadata);
+  }, [metadata, onMetadataChange]);
+
+  const updateMetadata = (key: string, value: any) => {
+    setMetadata(prev => {
+      const newMetadata = { ...prev, [key]: value };
+
+      // Validate commercial content rules
+      const newErrors: Record<string, string> = {};
+
+      // Check if commercial content is enabled but no brand option selected
+      if (newMetadata.isCommercialContent && !newMetadata.brandOption) {
+        newErrors.brandOption = "You must select either 'Your Brand' or 'Branded Content' to proceed.";
+      }
+
+      // Check privacy constraints for branded content
+      if (newMetadata.isCommercialContent && newMetadata.brandOption === "BRANDED_CONTENT" && newMetadata.privacyLevel === "SELF_ONLY") {
+        newErrors.privacyConstraint = "Branded content cannot be set to private. Visibility has been switched to Public.";
+        // Auto-correct privacy level
+        newMetadata.privacyLevel = "PUBLIC_TO_EVERYONE";
+      }
+
+      setErrors(newErrors);
+      return newMetadata;
+    });
+  };
+
+  const formatPrivacyLevel = (level: string): string => {
+    const labelMap: Record<string, string> = {
+      "PUBLIC_TO_EVERYONE": "Public",
+      "MUTUAL_FOLLOW_FRIEND": "Mutual Friends",
+      "FRIEND": "Friends",
+      "SELF_ONLY": "Only Me"
+    };
+    return labelMap[level] || level.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+  };
 
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     onTitleChange?.(event.target.value);
@@ -73,6 +187,170 @@ export function TikTokConfig({
             </p>
           </div>
 
+          {/* Privacy Level */}
+          <div className="space-y-2">
+            <Label>Who can see this post</Label>
+            <Select
+              value={metadata.privacyLevel}
+              onValueChange={(value) => updateMetadata("privacyLevel", value)}
+              disabled={loadingCreatorInfo}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select visibility" />
+              </SelectTrigger>
+              <SelectContent>
+                {(creatorInfo?.privacy_level_options || [
+                  "PUBLIC_TO_EVERYONE",
+                  "MUTUAL_FOLLOW_FRIEND",
+                  "FRIEND",
+                  "SELF_ONLY"
+                ]).map((option) => {
+                  const isDisabled = metadata.isCommercialContent && metadata.brandOption === "BRANDED_CONTENT" && option === "SELF_ONLY";
+                  return (
+                    <SelectItem
+                      key={option}
+                      value={option}
+                      disabled={isDisabled}
+                      className={isDisabled ? "opacity-50 cursor-not-allowed" : ""}
+                    >
+                      {formatPrivacyLevel(option)}
+                      {isDisabled && " (Not available for branded content)"}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            {errors.privacyConstraint && (
+              <p className="text-sm text-orange-600">{errors.privacyConstraint}</p>
+            )}
+          </div>
+
+          {/* Interaction Options */}
+          <div className="space-y-4">
+            <Label>Interaction Options</Label>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="allowComments">Allow Comments</Label>
+                <p className="text-xs text-muted-foreground">
+                  Let others comment on your post
+                </p>
+              </div>
+              <Switch
+                id="allowComments"
+                checked={!metadata.disableComment}
+                onCheckedChange={(checked) => updateMetadata("disableComment", !checked)}
+                disabled={creatorInfo?.comment_disabled}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="allowDuet">Allow Duet</Label>
+                <p className="text-xs text-muted-foreground">
+                  Let others create duets with your post
+                </p>
+              </div>
+              <Switch
+                id="allowDuet"
+                checked={!metadata.disableDuet}
+                onCheckedChange={(checked) => updateMetadata("disableDuet", !checked)}
+                disabled={creatorInfo?.duet_disabled}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="allowStitch">Allow Stitch</Label>
+                <p className="text-xs text-muted-foreground">
+                  Let others stitch your content
+                </p>
+              </div>
+              <Switch
+                id="allowStitch"
+                checked={!metadata.disableStitch}
+                onCheckedChange={(checked) => updateMetadata("disableStitch", !checked)}
+                disabled={creatorInfo?.stitch_disabled}
+              />
+            </div>
+
+            {/* Show disabled features info */}
+            {(creatorInfo?.comment_disabled || creatorInfo?.duet_disabled || creatorInfo?.stitch_disabled) && (
+              <Alert>
+                <InfoIcon className="h-4 w-4" />
+                <AlertDescription>
+                  Some interaction features are disabled for this account by TikTok.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          {/* Commercial Content Disclosure */}
+          <div className="space-y-4">
+            <Label>Commercial Content Disclosure</Label>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="commercialContent">This post includes commercial content or brand promotion</Label>
+                <p className="text-xs text-muted-foreground">
+                  Disclose if this promotes a brand, product, or service
+                </p>
+              </div>
+              <Switch
+                id="commercialContent"
+                checked={metadata.isCommercialContent}
+                onCheckedChange={(checked) => updateMetadata("isCommercialContent", checked)}
+              />
+            </div>
+
+            {metadata.isCommercialContent && (
+              <div className="space-y-3 pl-4 border-l-2 border-muted">
+                <p className="text-sm font-medium">Select the type of promotion:</p>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="yourBrand"
+                    checked={metadata.brandOption === "YOUR_BRAND"}
+                    onCheckedChange={(checked) =>
+                      updateMetadata("brandOption", checked ? "YOUR_BRAND" : null)
+                    }
+                  />
+                  <Label htmlFor="yourBrand" className="text-sm">
+                    Your Brand (you promote your own business)
+                  </Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="brandedContent"
+                    checked={metadata.brandOption === "BRANDED_CONTENT"}
+                    onCheckedChange={(checked) =>
+                      updateMetadata("brandOption", checked ? "BRANDED_CONTENT" : null)
+                    }
+                  />
+                  <Label htmlFor="brandedContent" className="text-sm">
+                    Branded Content (you promote someone else's brand)
+                  </Label>
+                </div>
+
+                {errors.brandOption && (
+                  <p className="text-sm text-destructive">{errors.brandOption}</p>
+                )}
+
+                <div className="space-y-2 pt-2 border-t">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {metadata.brandOption === "YOUR_BRAND"
+                      ? "By posting, you agree to TikTok's Music Usage Confirmation."
+                      : metadata.brandOption === "BRANDED_CONTENT"
+                      ? "By posting, you agree to TikTok's Branded Content Policy and Music Usage Confirmation. If both options are selected, your content will be labeled as 'Paid partnership'."
+                      : "Please select one of the options above to proceed."
+                    }
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Auto Music Toggle */}
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
@@ -103,19 +381,19 @@ export function TikTokConfig({
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant={postMode === "direct_post" ? "default" : "outline"}
                 size="sm"
-                disabled
-                className="flex-1 relative"
+                onClick={() => handlePostModeChange("direct_post")}
+                className="flex-1"
               >
                 Auto Publish
-                <span className="absolute -top-2 -right-2 rounded-full bg-yellow-100 text-yellow-800 text-xs px-1.5 py-0.5">
-                  Coming Soon
-                </span>
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Post will be sent to your TikTok inbox for manual review and publishing
+              {postMode === "inbox"
+                ? "Post will be sent to your TikTok inbox for manual review and publishing"
+                : "Post will be published directly to your TikTok account"
+              }
             </p>
           </div>
         </div>
