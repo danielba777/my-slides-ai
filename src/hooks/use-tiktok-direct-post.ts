@@ -12,6 +12,12 @@ export interface TikTokDirectPostPayload {
   postMode?: "MEDIA_UPLOAD" | "DIRECT_POST";
   photoImages: string[];
   openId: string;
+  privacyLevel?: string;
+  disableComment?: boolean;
+  disableDuet?: boolean;
+  disableStitch?: boolean;
+  isBrandedContent?: boolean;
+  brandOption?: "MY_BRAND" | "THIRD_PARTY" | null;
 }
 
 export interface TikTokDirectPostResult {

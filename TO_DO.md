@@ -1,150 +1,96 @@
-1. Zielsetzung
+2. Metadaten-Eingabe durch den Nutzer
 
-Vor dem Posten (Foto- oder Slideshow-Inhalt) deiner App muss sichergestellt werden, dass du die aktuellen Informationen des TikTok-Creators abrufst und in der UI anzeigst. Damit gewährleistest du, dass der Nutzer weiß, über welches Konto gepostet wird und welche Sichtbarkeits-/Interaktions-Optionen zur Verfügung stehen. (Quelle: Content Posting API „Query Creator Info“). ￼
+Ziel
 
-⸻
+Bevor Inhalte aus deiner App zu TikTok gepostet werden, muss der Nutzer in deiner App die relevanten Metadaten eingeben und/oder bestätigen, damit die Anforderungen von TikTok erfüllt sind. Deine App zeigt UI-Elemente, die folgende Informationen und Optionen abdecken: 1. Caption/Title (Beschreibung) des Posts 2. Privacy/Visibility Level (Wer darf den Post sehen) 3. Interaktions-Optionen (Kommentare, Duet, Stitch) 4. Kommerzielle Inhalte Offenlegung („Branded Content“, „Your Brand“)
 
-2. API-Endpunkt & Authentifizierung
-
-Endpoint
-
-POST https://open.tiktokapis.com/v2/post/publish/creator_info/query/
-
-Anforderungen
-• HTTP Methode: POST ￼
-• Header:
-• Authorization: Bearer {access_token} — der Access Token des TikTok-Nutzers, der deine App autorisiert hat. ￼
-• Content-Type: application/json; charset=UTF-8 ￼
-• Body: leer JSON Objekt {} (keine Pflichtfelder) — oft reicht ein leeres Body laut Dokumentation. ￼
-
-Rate Limit
-• Jede Nutzerzugriffstoken-Kombination ist auf 20 Anfragen pro Minute begrenzt. ￼
+Diese Metadaten müssen korrekt sein, bevor du den Post-Request an TikTok sendest. (Quelle: Richtlinien „Required UX Implementation: step 2“) ￼
 
 ⸻
 
-3. Antwortstruktur (Response)
+Umsetzungsschritte
 
-Beispiel aus der Dokumentation: ￼
+1. UI Layout & Eingabefelder
+   • Ein Formular (z. B. React-Komponente) mit folgenden Feldern:
+   • Caption / Title: Textfeld (optional oder Pflicht je nach Inhaltstyp)
+   • Privacy Level: Dropdown oder Radio-Buttons mit Optionen, die dynamisch aus der creator_info.privacy_level_options geladen wurden.
+   • Comment Allowed: Checkbox oder Toggle – falls comment_disabled == true, muss sie deaktiviert und ausgegraut sein.
+   • Duet Allowed: Checkbox oder Toggle – falls duet_disabled == true, deaktivieren.
+   • Stitch Allowed: Checkbox oder Toggle – falls stitch_disabled == true, deaktivieren.
+   • Ein Abschnitt für Commercial / Branded Content Disclosure:
+   • Toggle: „This post includes commercial content / brand promotion“.
+   • Wenn aktiv: Auswahlkästchen „My Brand“ und „Branded Content (third-party)“.
+   • Hinweistext: z. B. „By posting, you agree to TikTok’s Branded Content Policy and Music Usage Confirmation.“ (wenn „Branded Content“ gewählt) ￼
+
+2. Datenbindung & Validierung
+   • Caption/Text darf bearbeitet werden – kein vordefinierter Text, keine fixe Hashtags, unless der Nutzer sie selbst eingibt. (Wasserzeichen/Logos untersagt) ￼
+   • Privacy Level muss einer der zurückgegebenen Optionen von creator_info sein – sonst Fehler beim TikTok API Call. ￼
+   • Wenn „Branded Content“ aktiv ist und Privacy Level = SELF_ONLY (nur ich): Entweder deaktivieren „SELF_ONLY“, oder automatischer Wechsel auf PUBLIC_TO_EVERYONE (mit Hinweis). ￼
+   • Wenn Kommentar/Duet/Stitch deaktiviert in creator_info, dann UI-Element deaktivieren und optional Tooltip: „Feature disabled for this account“.
+
+3. Benutzerfluss
+   1. Nutzer wählt Inhalte (Slideshow/Foto) zur Veröffentlichung.
+   2. App ruft creator_info ab (siehe Schritt 1).
+   3. App zeigt Metadaten-Formular mit voreingestellten Permissi­onen basierend auf creator_info.
+   4. Nutzer bearbeitet Caption, wählt Privacy Level, setzt ggf. Commercial Toggle.
+   5. App validiert Eingaben (z. B. Caption Länge, Privacy Option gültig, wenn „Branded Content“ -> Privacy ≠ SELF_ONLY).
+   6. Nutzer klickt „Submit/Post“ → App sendet Request an TikTok API.
+   7. App zeigt Erfolgs- oder Fehlermeldung.
+
+4. Speicherung & Weiterleitung
+   • Lokale Zwischenspeicherung der Eingaben erlaubt (z. B. wenn Nutzer später zurückkommt).
+   • Keine permanente Speicherung von Metadaten ohne Nutzerzustimmung – Transparenz über Datenverwendung.
+   • Beim Posten: die Metadaten (title, privacy_level, disable_comment, etc.) müssen in der API-Anfrage korrekt übergeben werden. Beispiel aus API-Guide: ￼
 
 {
-"data": {
-"creator_avatar_url": "https://lf16-tt4d.tiktokcdn.com/obj/.../avatar.jpg",
-"creator_username": "tiktok",
-"creator_nickname": "TikTok Official",
-"privacy_level_options": ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "SELF_ONLY"],
-"comment_disabled": false,
-"duet_disabled": false,
-"stitch_disabled": true,
-"max_video_post_duration_sec": 300
-},
-"error": {
-"code": "ok",
-"message": "",
-"log_id": "202210112248442CB9319E1FB30C1073F3"
+"post_info": {
+"title": "Your caption here",
+"privacy_level": "PUBLIC_TO_EVERYONE",
+"disable_duet": false,
+"disable_comment": true
 }
 }
 
-Wichtige Felder
-• creator_avatar_url → URL zum Avatar des Creators.
-• creator_username → eindeutiger Nutzername (z. B. „@user“)
-• creator_nickname → Anzeigename.
-• privacy_level_options → Liste der Sichtbarkeitsoptionen, die dem Nutzer zur Verfügung stehen.
-• comment_disabled → true, wenn Kommentare deaktiviert sind.
-• duet_disabled, stitch_disabled → ob Duet bzw. Stitch deaktiviert sind.
-• max_video_post_duration_sec → maximale erlaubte Videolänge für diesen Creator (nur relevant für Video-Posts)
+5. Fehlermeldungen & User-Feedback
+   • Wenn Nutzer eine ungültige Privacy Option wählt => sofort Feedback („Please select a valid visibility from the options for your account.“)
+   • Wenn „Branded Content“ gewählt wird, aber Sichtbarkeit auf SELF_ONLY steht => Hinweis: „Branded content cannot be private; visibility will be set to Public.“
+   • Während Metadaten geladen werden (nach creator_info), „Loading…” Spinner anzeigen.
+   • Wenn API Call nach Metadaten/Creator Info fehlschlägt => „Unable to load account info. Please try again later.“
+   • Nach erfolgreichem Posten: „Your content was submitted. It may take a few minutes to appear on TikTok.“ (gemäß UX-Richtlinie) ￼
 
 ⸻
 
-4. UI-Implementierungsschritte
+Schnittstelle zu deinem System
+• Komponenten-Props/State:
 
-4.1 Zeitpunkt des Abrufs
-• Beim Rendern der „Post to TikTok“-Seite (also bevor der Nutzer auf „Posten“ klickt) solltest du diesen API-Call ausführen. (Siehe Required UX § 1a) ￼
+interface MetadataInputs {
+title: string;
+privacyLevel: string;
+disableComment: boolean;
+disableDuet: boolean;
+disableStitch: boolean;
+isBrandedContent: boolean;
+brandOption: "MY_BRAND" | "THIRD_PARTY" | null;
+}
 
-4.2 Anzeige des Creators
-• Zeige dem Nutzer deutlich an:
-• Avatar (creator_avatar_url)
-• Nickname (creator_nickname) oder Nutzername (creator_username)
-Damit ist klar, über welches Konto gepostet wird.
+    •	API Aufruf zur Post-Initialisierung nach Metadaten:
 
-4.3 Sichtbarkeits-/Interaktions-Optionen
-• Zeige eine Auswahl (Dropdown, Radio Buttons) basierend auf privacy_level_options.
-• Wenn comment_disabled === true, deaktiviere bzw. verstecke Kommentare-Toggle.
-• Wenn duet_disabled === true oder stitch_disabled === true, deaktiviere die entsprechenden Toggles (für Foto/Slideshow ggf. nicht relevant).
-
-4.4 Einschränkungen beachten
-• Wenn max_video_post_duration_sec vorhanden und dein Inhalt länger ist → blockiere oder warne den Nutzer (z. B. Slider oder Fehlermeldung) und verhindere das Posten. (Für Foto/Slideshow irrelevant, aber implementiere generisch) ￼
-• Wenn die API-Antwort ein Fehlerfeld zeigt mit z. B. spam_risk_too_many_posts oder user_banned_from_posting → unterbinde den Post-Flow und zeige eine Benachrichtigung („You currently cannot post via this account, try later“). ￼
-
-⸻
-
-5. Fehler-Handling & Fallstricke
-   • Wenn HTTP Status ≠ 200 oder error.code ≠ "ok" → handle entsprechend. Z. B.:
-   • access_token_invalid → forciere erneute Authentifizierung.
-   • scope_not_authorized → informiere Nutzer, dass deine App nicht die nötigen Scopes hat.
-   • rate_limit_exceeded → zeige „Please wait and try again later.“
-   • Stelle sicher, dass deine UI nicht vorschnell weitermacht, bevor dieser Call abgeschlossen ist (z. B. disable „Posten“-Button bis Daten geladen sind).
-
-⸻
-
-6. Beispiel-Code (Pseudo-TypeScript)
-
-async function fetchCreatorInfo(accessToken: string): Promise<CreatorInfo> {
-const res = await fetch("https://open.tiktokapis.com/v2/post/publish/creator_info/query/", {
+await fetch("https://open.tiktokapis.com/v2/post/publish/video/init/", {
 method: "POST",
 headers: {
 "Authorization": `Bearer ${accessToken}`,
 "Content-Type": "application/json; charset=UTF-8"
 },
-body: JSON.stringify({}) // empty body
-});
-const json = await res.json();
-if (json.error?.code !== "ok") {
-throw new Error(`TikTok error: ${json.error.code} – ${json.error.message}`);
-}
-return json.data as CreatorInfo;
-}
-
-// In React component:
-const [creatorInfo, setCreatorInfo] = useState<CreatorInfo | null>(null);
-const [loading, setLoading] = useState(true);
-
-useEffect(() => {
-fetchCreatorInfo(userAccessToken)
-.then(info => {
-setCreatorInfo(info);
-setLoading(false);
+body: JSON.stringify({
+post_info: {
+title: metadata.title,
+privacy_level: metadata.privacyLevel,
+disable_comment: metadata.disableComment,
+disable_duet: metadata.disableDuet,
+disable_stitch: metadata.disableStitch,
+brand_content_toggle: metadata.isBrandedContent,
+brand_organic_toggle: metadata.brandOption === "MY_BRAND"
+},
+// weitere Felder je nach Medientyp …
 })
-.catch(err => {
-console.error("Error fetching creator info", err);
-setLoading(false);
-// show UI message
 });
-}, [userAccessToken]);
-
-// In render():
-if (loading) return <Spinner />;
-if (creatorInfo == null) return <div>Error loading account info</div>;
-
-return (
-
-  <div className="creator-info">
-    <img src={creatorInfo.creator_avatar_url} alt="Creator Avatar" />
-    <span>{creatorInfo.creator_nickname}</span>
-    <select name="privacyLevel">
-      {creatorInfo.privacy_level_options.map(opt => (
-        <option key={opt} value={opt}>{opt}</option>
-      ))}
-    </select>
-    {creatorInfo.comment_disabled && <div>Comments are disabled for this account.</div>}
-    {/* Enable/disable duet/stitch toggles based on flags */}
-  </div>
-);
-
-⸻
-
-7. Integration in deinen Workflow
-   • Rufe fetchCreatorInfo auf vor dem Nutzer zulässt Inhalte zu posten.
-   • Speichere creatorInfo in deinem Formular-State (z. B. React State -> presentationState etc.).
-   • Nutze creatorInfo.privacy_level_options als Optionen für den Privacy-Dropdown in deinem UI.
-   • Deaktiviere oder verstecke Interaktions-Optionen (Kommentare, Duet, Stitch) je nach creatorInfo.
-   • Wenn Fehler oder Einschränkungen erkannt werden → zeige Nutzer-Feedback und blockiere den Post-Flow.

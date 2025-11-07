@@ -145,13 +145,10 @@ export function TikTokPostingLoader({
     <div className="flex flex-col items-center justify-center gap-6 p-8">
       {loading && (
         <div className="flex flex-col items-center gap-3">
-          <Spinner className="h-12 w-12" />
-          <h2 className="text-2xl font-semibold">Posting to TikTok</h2>
+          <Spinner className="h-16 w-16" />
+          <h2 className="text-2xl font-semibold">Posting on TikTok</h2>
           <p className="text-muted-foreground text-center max-w-md">
-            Your post is being processed by TikTok. This usually takes 10-30 seconds.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Checking status... (Poll #{pollCount + 1})
+            Please don't refresh or close this page.
           </p>
         </div>
       )}
@@ -198,12 +195,6 @@ export function TikTokPostingLoader({
           )}
         </div>
       )}
-
-      {/* Caption Preview */}
-      <div className="w-full max-w-md p-4 bg-muted/50 rounded-lg border">
-        <p className="text-sm text-muted-foreground mb-1">Post Caption:</p>
-        <p className="text-sm">{caption}</p>
-      </div>
     </div>
   );
 }

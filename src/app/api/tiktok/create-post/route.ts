@@ -10,6 +10,12 @@ interface TikTokPostRequest {
   postMode?: "MEDIA_UPLOAD" | "DIRECT_POST";
   photoImages: string[];
   openId: string;
+  privacyLevel?: string;
+  disableComment?: boolean;
+  disableDuet?: boolean;
+  disableStitch?: boolean;
+  isBrandedContent?: boolean;
+  brandOption?: "MY_BRAND" | "THIRD_PARTY" | null;
 }
 
 export async function POST(request: Request) {
@@ -54,6 +60,38 @@ export async function POST(request: Request) {
             : undefined,
       },
     };
+
+    // Add post info with metadata if provided
+    const postInfo: any = {};
+
+    if (body.privacyLevel) {
+      postInfo.privacy_level = body.privacyLevel;
+    }
+
+    if (body.disableComment !== undefined) {
+      postInfo.disable_comment = body.disableComment;
+    }
+
+    if (body.disableDuet !== undefined) {
+      postInfo.disable_duet = body.disableDuet;
+    }
+
+    if (body.disableStitch !== undefined) {
+      postInfo.disable_stitch = body.disableStitch;
+    }
+
+    if (body.isBrandedContent !== undefined) {
+      postInfo.brand_content_toggle = body.isBrandedContent;
+    }
+
+    if (body.brandOption === "MY_BRAND") {
+      postInfo.brand_organic_toggle = true;
+    }
+
+    // Only include post_info if we have metadata
+    if (Object.keys(postInfo).length > 0) {
+      (payload as any).post_info = postInfo;
+    }
 
     // Only include coverIndex if it's provided and not zero (to avoid backend validation error)
     if (body.coverIndex > 0) {

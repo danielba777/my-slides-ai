@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { TikTokPostForm } from "@/components/tiktok/TikTokPostForm";
+import { TikTokMetadataForm, type TikTokMetadata } from "@/components/tiktok/TikTokMetadataForm";
 import { TikTokScheduleForm } from "@/components/tiktok/TikTokScheduleForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,8 @@ export default function CreateSlideshowPostPage() {
     publishId: string;
     caption: string;
   } | null>(null);
+  const [tiktokMetadata, setTiktokMetadata] = useState<TikTokMetadata | null>(null);
+  const [showMetadataForm, setShowMetadataForm] = useState(false);
   useEffect(() => {
     if (slides.length === 0) {
       setCurrentSlide(0);
@@ -83,38 +86,77 @@ export default function CreateSlideshowPostPage() {
   const isPosting = directPostAction.submitting;
   const isScheduling = scheduleAction.submitting;
 
-  const handlePrimaryAction = async () => {
+  const handlePrimaryAction = () => {
     if (scheduleEnabled && !scheduledAt) {
       return;
     }
 
     const mode: "post" | "schedule" = scheduleEnabled ? "schedule" : "post";
+
+    if (mode === "schedule") {
+      // Handle scheduling with existing logic
+      handleScheduleSubmission();
+    } else {
+      // Show metadata form for regular posting
+      setShowMetadataForm(true);
+    }
+  };
+
+  const handleScheduleSubmission = async () => {
     setFinalizing(true);
-    setFinalizingMode(mode);
+    setFinalizingMode("schedule");
 
     let redirected = false;
     try {
-      if (mode === "schedule") {
-        const result = await scheduleAction.handleSubmit();
-        if (result?.scheduled) {
-          redirected = true;
-          router.push("/dashboard/posts/scheduled");
-        }
-      } else {
-        const result = await directPostAction.handleSubmit();
-        if (result && result.publishId) {
-          // Don't redirect immediately - show loading screen for processing
-          setPostingData({
-            publishId: result.publishId,
-            caption: directPostAction.form.caption,
-          });
-          redirected = true; // Prevent error fallback
-        }
+      const result = await scheduleAction.handleSubmit();
+      if (result?.scheduled) {
+        redirected = true;
+        router.push("/dashboard/posts/scheduled");
       }
     } catch (error) {
-      console.error("[CreateSlideshowPostPage] Submission failed", error);
+      console.error("[CreateSlideshowPostPage] Schedule submission failed", error);
 
-      // Show error as toast
+      const errorMessage = error instanceof Error ? error.message : "Failed to schedule post";
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: errorMessage,
+      });
+
+      setFinalizing(false);
+      setFinalizingMode(null);
+    } finally {
+      if (!redirected) {
+        setFinalizing(false);
+        setFinalizingMode(null);
+      }
+    }
+  };
+
+  const handleMetadataSubmission = async (metadata: TikTokMetadata) => {
+    setTiktokMetadata(metadata);
+    setShowMetadataForm(false);
+    setFinalizing(true);
+    setFinalizingMode("post");
+
+    let redirected = false;
+    try {
+      // Update the direct post form with metadata
+      updateDirectPostField("caption", metadata.title);
+      updateDirectPostField("title", metadata.title);
+
+      const result = await directPostAction.handleSubmit();
+      if (result && result.publishId) {
+        // Don't redirect immediately - show loading screen for processing
+        setPostingData({
+          publishId: result.publishId,
+          caption: metadata.title,
+        });
+        redirected = true; // Prevent error fallback
+      }
+    } catch (error) {
+      console.error("[CreateSlideshowPostPage] Post submission failed", error);
+
       const errorMessage = error instanceof Error ? error.message : "Failed to post to TikTok";
       toast({
         variant: "destructive",
@@ -122,16 +164,8 @@ export default function CreateSlideshowPostPage() {
         description: errorMessage,
       });
 
-      // If we have posting data, show error in the loader instead of hiding everything
-      if (!postingData) {
-        setFinalizing(false);
-        setFinalizingMode(null);
-      }
-    } finally {
-      if (!redirected && !postingData) {
-        setFinalizing(false);
-        setFinalizingMode(null);
-      }
+      setFinalizing(false);
+      setFinalizingMode(null);
     }
   };
 
@@ -391,6 +425,7 @@ export default function CreateSlideshowPostPage() {
                   accounts.length === 0 ||
                   !directPostAction.form.openId ||
                   finalizing ||
+                  showMetadataForm ||
                   (scheduleEnabled && !scheduledAt) ||
                   directPostAction.form.photoImages.length === 0
                 }
@@ -399,7 +434,9 @@ export default function CreateSlideshowPostPage() {
                   ? isScheduling
                     ? "Scheduling…"
                     : "Schedule Now"
-                  : isPosting
+                  : showMetadataForm
+                    ? "Configure Settings…"
+                    : isPosting
                     ? "Posting…"
                     : "Post Now"}
               </Button>
@@ -407,6 +444,40 @@ export default function CreateSlideshowPostPage() {
           </aside>
         </div>
       </div>
+
+      {/* TikTok Metadata Form - Overlay */}
+      {showMetadataForm && (
+        <div className="fixed inset-0 top-0 left-0 w-full h-full bg-background/95 backdrop-blur-sm z-50">
+          <div className="flex flex-col items-center justify-center min-h-screen p-8">
+            <div className="w-full max-w-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-semibold">Configure TikTok Post Settings</h3>
+                  <p className="text-muted-foreground text-sm">
+                    Review and adjust your post settings before publishing
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowMetadataForm(false)}
+                  disabled={finalizing}
+                >
+                  Cancel
+                </Button>
+              </div>
+
+              <TikTokMetadataForm
+                initialData={{
+                  title: directPostAction.form.caption,
+                }}
+                onSubmit={handleMetadataSubmission}
+                loading={finalizing}
+                openId={directPostAction.form.openId}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* TikTok Posting Loader - Integrated into page */}
       {finalizing && (
