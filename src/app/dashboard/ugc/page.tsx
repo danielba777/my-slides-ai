@@ -637,21 +637,35 @@ export default function UgcDashboardPage() {
                     {/* Hook Overlay */}
                     {hook.trim().length > 0 && (
                       <div
-                        className={cn(
-                          "pointer-events-none absolute left-1/2 w-[86%] -translate-x-1/2 text-center text-white",
-                          hookPosition === "middle"
-                            ? "top-1/2 -translate-y-1/2"
-                            : "top-[18%]",
-                        )}
-                        style={{
-                          WebkitTextStroke: "2px rgba(0,0,0,0.85)",
-                          textShadow:
-                            "0 2px 6px rgba(0,0,0,0.6), 0 0 2px rgba(0,0,0,0.5)",
-                        }}
+                        style={(function() {
+                          // Preview-Größe dynamisch skalieren, damit 1:1 wie ffmpeg-Export (1080x1920 → 54px Font)
+                          const preview = document.querySelector("video, canvas");
+                          const baseHeight = 1920;
+                          const currentHeight = preview?.clientHeight || baseHeight;
+                          const scale = currentHeight / baseHeight;
+
+                          return {
+                            // Einheitliche TikTok-Schrift wie in den Slideshows
+                            // nutzt die in app/layout.tsx registrierte Font-Variable
+                            fontFamily: "TikTok Sans, var(--font-sans), sans-serif",
+                            fontSize: `${54 * scale}px`,
+                            fontWeight: 800,
+                            lineHeight: 1.1,
+                            WebkitTextStroke: `${3 * scale}px black`,
+                            textShadow: `${2 * scale}px ${2 * scale}px ${4 * scale}px rgba(0,0,0,0.65), 0 0 ${3 * scale}px rgba(0,0,0,0.55)`,
+                            letterSpacing: `${0.2 * scale}px`,
+                            transform: `translate(-50%, ${hookPosition === "middle" ? "-50%" : "0"})`,
+                            position: "absolute",
+                            width: "86%",
+                            left: "50%",
+                            top: hookPosition === "middle" ? "50%" : "18%",
+                            color: "white",
+                            textAlign: "center",
+                            pointerEvents: "none",
+                          };
+                        })()}
                       >
-                        <span className="text-2xl font-semibold leading-snug md:text-3xl">
-                          {hook}
-                        </span>
+                        {hook}
                       </div>
                     )}
                   </>

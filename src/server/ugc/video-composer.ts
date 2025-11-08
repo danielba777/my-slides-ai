@@ -1,6 +1,7 @@
 import { execFile } from "child_process";
 import { randomUUID } from "crypto";
-import { promises as fs } from "fs";
+import fs from "fs";
+import { promises as fsAsync } from "fs";
 import { tmpdir } from "os";
 import { dirname, join } from "path";
 import { promisify } from "util";
@@ -36,6 +37,37 @@ const getFfprobePath = () => {
   }
   return cachedFfprobePath;
 };
+
+/**
+ * FFmpeg akzeptiert am stabilsten einen absoluten fontfile-Pfad.
+ * Auf Windows müssen Backslashes in Slashes umgewandelt und das Laufwerk "C:" als "C\\:" escaped werden.
+ */
+function normalizeForFfmpegFontfile(p: string) {
+  let out = p.replace(/\\/g, "/");
+  // Windows-Laufwerk wie C: -> C\:
+  out = out.replace(/^([A-Za-z]):\//, "$1\\:/");
+  return out;
+}
+
+function resolveTikTokFontPath(): string | null {
+  // Optional: explizit via ENV setzen
+  const envPath = process.env.TIKTOK_FONT_PATH;
+  if (envPath && fs.existsSync(envPath)) return envPath;
+
+  const candidates = [
+    // Tatsächlicher Pfad im Repo (entspricht app/layout.tsx)
+    join(process.cwd(), "src", "app", "fonts", "tiktok", "TikTokTextBold.otf"),
+    // Fallbacks für ältere Layouts / lokale Tests
+    join(process.cwd(), "src", "fonts", "tiktok", "TikTokTextBold.otf"),
+    join(process.cwd(), "src", "fonts", "TikTokTextBold.otf"),
+    join(process.cwd(), "public", "fonts", "TikTokTextBold.otf"),
+  ];
+
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return null;
+}
 
 const runFfmpeg = async (args: string[]) => {
   try {
@@ -134,13 +166,13 @@ const tryCopyFromPublic = async (inputUrlOrPath: string, destinationPath: string
   const relative = pathname.startsWith("/") ? pathname.slice(1) : pathname;
   const diskPath = join(process.cwd(), "public", relative);
   try {
-    await fs.copyFile(diskPath, destinationPath);
+    await fsAsync.copyFile(diskPath, destinationPath);
     return;
   } catch (err: any) {
     // Zusätzlicher Versuch für gängige Monorepo-Struktur (optional, schadet nicht)
     const altDiskPath = join(process.cwd(), relative);
     try {
-      await fs.copyFile(altDiskPath, destinationPath);
+      await fsAsync.copyFile(altDiskPath, destinationPath);
       return;
     } catch {
       const hint = `[UGC] File not found on disk. Tried: ${diskPath} and ${altDiskPath}`;
@@ -172,7 +204,7 @@ const downloadToFile = async (url: string, filePath: string) => {
     return;
   }
   const arrayBuffer = await response.arrayBuffer();
-  await fs.writeFile(filePath, Buffer.from(arrayBuffer));
+  await fsAsync.writeFile(filePath, Buffer.from(arrayBuffer));
 };
 
 const probeVideo = async (filePath: string) => {
@@ -315,7 +347,7 @@ const concatVideos = async (
     if (!single) {
       throw new Error("Missing normalized video input");
     }
-    await fs.copyFile(single.path, destinationPath);
+    await fsAsync.copyFile(single.path, destinationPath);
     return single.durationMs;
   }
 
@@ -327,7 +359,7 @@ const concatVideos = async (
         `file '${input.path.replace(/\\/g, "/").replace(/'/g, "'\\''")}'`,
     )
     .join("\n");
-  await fs.writeFile(listPath, listContent, "utf8");
+  await fsAsync.writeFile(listPath, listContent, "utf8");
 
   try {
     await runFfmpeg([
@@ -345,7 +377,7 @@ const concatVideos = async (
       destinationPath,
     ]);
   } finally {
-    await fs.unlink(listPath).catch(() => {});
+    await fsAsync.unlink(listPath).catch(() => {});
   }
 
   const totalDuration = inputs.reduce((acc, item) => acc + item.durationMs, 0);
@@ -365,13 +397,53 @@ const captureThumbnail = async (videoPath: string, destinationPath: string) => {
   ]);
 };
 
-const uploadBuffer = async (buffer: Buffer, fileName: string) => {
-  const utFile = new UTFile([new Uint8Array(buffer)], fileName);
-  const [upload] = await utapi.uploadFiles([utFile]);
-  if (!upload?.data?.ufsUrl) {
-    throw new Error("UploadThing upload failed");
+const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+const uploadBuffer = async (buf: Buffer, key: string, mimeType: string = "video/mp4"): Promise<string> => {
+  // Sprechender Dateiname + korrekter MIME-Type
+  const extension = mimeType === "video/mp4" ? ".mp4" : ".jpg";
+  const filename = `${key}${extension}`;
+  const utFile = new File([buf], filename, {
+    type: mimeType,
+    lastModified: Date.now(),
+  });
+
+  // Retry mit Exponential Backoff bei Pool/Rate/Server-Fehlern
+  const maxAttempts = 5;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const [upload] = await utapi.uploadFiles([utFile]);
+      if (upload?.data?.ufsUrl) {
+        return upload.data.ufsUrl;
+      }
+      const msg = upload?.error ?? "UploadThing upload failed";
+      throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+    } catch (err: any) {
+      const message = String(err?.message ?? err);
+      const shouldRetry =
+        message.includes("ResourceExhausted") ||
+        message.includes("connection limit exceeded") ||
+        message.includes("rate limit") ||
+        message.includes("ECONNRESET") ||
+        message.includes("ETIMEDOUT") ||
+        message.includes("5") || // 5xx
+        message.includes("429");
+
+      if (attempt < maxAttempts && shouldRetry) {
+        const jitter = Math.floor(Math.random() * 400);
+        const backoff = Math.min(2000 * 2 ** (attempt - 1) + jitter, 15000);
+        console.warn(
+          `[UGC][upload] Attempt ${attempt}/${maxAttempts} failed: ${message}. Retrying in ${backoff}ms…`
+        );
+        await sleep(backoff);
+        continue;
+      }
+      console.error("[UGC][upload] Permanent failure:", message);
+      throw new Error("UploadThing upload failed");
+    }
   }
-  return upload.data.ufsUrl;
+  // sollte nie erreicht werden
+  throw new Error("UploadThing upload failed");
 };
 
 export interface ComposeOptions {
@@ -395,7 +467,7 @@ export async function composeReactionDemoVideo({
   overlayText,
   overlayPosition = "upper",
 }: ComposeOptions): Promise<ComposeResult> {
-  const tempDir = await fs.mkdtemp(join(tmpdir(), "ugc-compose-"));
+  const tempDir = await fsAsync.mkdtemp(join(tmpdir(), "ugc-compose-"));
 
   try {
     const reactionSource = join(tempDir, `reaction-${randomUUID()}.mp4`);
@@ -428,18 +500,11 @@ export async function composeReactionDemoVideo({
     let finalVideoPath = concatenatedPath;
     if (overlayText && overlayText.trim().length > 0) {
       const outPath = join(tempDir, `ugc-final-overlay-${randomUUID()}.mp4`);
-      const fontCandidates = [
-        join(process.cwd(), "src", "fonts", "tiktok", "TikTokTextBold.otf"),
-        join(process.cwd(), "src", "fonts", "TikTokTextBold.otf"),
-        join(process.cwd(), "public", "fonts", "TikTokTextBold.otf"),
-      ];
-      let fontArg: string[] = [];
-      for (const p of fontCandidates) {
-        try {
-          await fs.stat(p);
-          fontArg = [":fontfile=" + p.replace(/\\/g, "\\\\")];
-          break;
-        } catch {}
+      const resolvedFontPath = resolveTikTokFontPath();
+      if (!resolvedFontPath) {
+        console.warn("[UGC][compose] TikTok font NOT FOUND – FFmpeg will fallback. Check font path packaging.");
+      } else {
+        console.log("[UGC][compose] Using TikTok font:", resolvedFontPath);
       }
       // Positionierung: upper ≈ 18% von oben, middle = Vertikalmitte
       const yExprRaw =
@@ -449,32 +514,42 @@ export async function composeReactionDemoVideo({
       // In älteren FFmpeg-Builds müssen Kommas in Ausdrücken geescaped werden
       const yExprEsc = yExprRaw.replace(/,/g, "\\,");
 
-      // drawtext benötigt Escapes für \ : ' %
+  /**
+       * 1:1 wie im Preview:
+       * Preview nutzt ~ 54px (Bold), Stroke ~ 3px, Shadow-Offset ~ 2px @ 1080x1920.
+       * Da wir immer 9:16 mit 1920 Höhe rendern, setzen wir die Werte numerisch
+       * (ohne Expressions), damit ältere FFmpeg-Builds nicht aussteigen.
+       */
+      const OUTPUT_WIDTH = 1080;
+      const OUTPUT_HEIGHT = 1920;
+      const scaleFactor = OUTPUT_HEIGHT / 1920; // = 1 bei 1080x1920
+      const fontSizePx = Math.round(54 * scaleFactor);
+      const borderW = Math.max(1, Math.round(3 * scaleFactor));
+      const shadowOff = Math.max(1, Math.round(2 * scaleFactor));
+
+      const ffFontfile = resolvedFontPath
+        ? `:fontfile='${normalizeForFfmpegFontfile(resolvedFontPath)}'`
+        : "";
+      const ffFontsize = `:fontsize=${fontSizePx}`;
+      const ffBorder = `:bordercolor=black:borderw=${borderW}`;
+      const ffShadow = `:shadowcolor=black@0.65:shadowx=${shadowOff}:shadowy=${shadowOff}`;
+
+      // Achtung: text muss vorher ffmpeg-sicher escaped sein (Quotes/Colon/Newlines)
       const escapeDrawtext = (s: string) =>
         s
           .replace(/\\/g, "\\\\")
           .replace(/:/g, "\\:")
           .replace(/'/g, "\\'")
           .replace(/%/g, "\\%");
-      const text = escapeDrawtext(overlayText);
-      // Korrekt: fontArg anhängen (nicht ".fontArg")
-      const draw = [
-        `drawtext=text='${text}'`,
-        fontArg.join(""),
-        ":fontsize=54",
-        ":fontcolor=white",
-        ":x=(w-text_w)/2",
-        `:y=${yExprEsc}`,
-        ":borderw=3:bordercolor=black",
-        ":shadowx=2:shadowy=2:shadowcolor=black@0.65",
-      ].join("");
-      console.debug("[UGC][ffmpeg] using -vf:", draw);
+      const escapedText = escapeDrawtext(overlayText);
+      const drawText = `drawtext=text='${escapedText}'${ffFontfile}:fontcolor=white${ffFontsize}${ffBorder}${ffShadow}:x=(w-text_w)/2:y=${yExprEsc}:line_spacing=0:fix_bounds=1`;
+      console.debug("[UGC][ffmpeg] using -vf:", drawText);
       await runFfmpeg([
         "-y",
         "-i",
         concatenatedPath,
         "-vf",
-        draw,
+        drawText,
         "-c:v",
         "libx264",
         "-crf",
@@ -494,8 +569,8 @@ export async function composeReactionDemoVideo({
     await captureThumbnail(finalVideoPath, thumbnailPath);
 
     const [videoBuffer, thumbnailBuffer] = await Promise.all([
-      fs.readFile(finalVideoPath),
-      fs.readFile(thumbnailPath),
+      fsAsync.readFile(finalVideoPath),
+      fsAsync.readFile(thumbnailPath),
     ]);
 
     // Speichere geordnet unter: ugc/hooks/default/<userId>/<timestamp>
@@ -503,8 +578,8 @@ export async function composeReactionDemoVideo({
     const prefix = `ugc/hooks/default/${userId}/${timestamp}`;
 
     const [videoUrlUploaded, thumbnailUrlUploaded] = await Promise.all([
-      uploadBuffer(videoBuffer, `${prefix}.mp4`),
-      uploadBuffer(thumbnailBuffer, `${prefix}.jpg`),
+      uploadBuffer(videoBuffer, `${prefix}`, "video/mp4"),
+      uploadBuffer(thumbnailBuffer, `${prefix}`, "image/jpeg"),
     ]);
 
     return {
@@ -513,6 +588,6 @@ export async function composeReactionDemoVideo({
       durationMs: totalDurationMs,
     };
   } finally {
-    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    await fsAsync.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
 }

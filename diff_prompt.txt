@@ -1,35 +1,61 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
---- src/app/dashboard/ugc/page.tsx
-+++ src/app/dashboard/ugc/page.tsx
-@@ -620,10 +620,23 @@
-                     {hook.trim().length > 0 && (
-                       <div
-                         className={cn(
-                           "pointer-events-none absolute left-1/2 w-[86%] -translate-x-1/2 text-center text-white",
-                           hookPosition === "middle"
-                             ? "top-1/2 -translate-y-1/2"
-                             : "top-[18%]",
-                         )}
--                        style={{
--                          WebkitTextStroke: "2px rgba(0,0,0,0.85)",
--                          textShadow:
--                            "0 2px 6px rgba(0,0,0,0.6), 0 2px 3px rgba(0,0,0,0.5)",
--                          fontSize: "48px",
--                          fontWeight: 700,
--                          lineHeight: 1.15,
--                        }}
-+                        style={{
-+                          fontFamily: "TikTokTextBold, sans-serif",
-+                          fontSize: "54px",
-+                          fontWeight: 700,
-+                          lineHeight: 1.1,
-+                          WebkitTextStroke: "3px black",
-+                          textShadow:
-+                            "2px 2px 4px rgba(0,0,0,0.65), 0 0 3px rgba(0,0,0,0.55)",
-+                          letterSpacing: "0.2px",
-+                        }}
-                       >
-                         {hook}
-                       </div>
-                     )}
+*** Begin Patch
+*** Update File: src/server/ugc/video-composer.ts
+@@
+-const uploadBuffer = async (buf: Buffer, key: string): Promise<string> => {
+-  const utFile = new File([buf], "blob", { type: "video/mp4", lastModified: Date.now() });
+-  const [upload] = await utapi.uploadFiles([utFile]);
+-  if (!upload?.data?.ufsUrl) {
+-    throw new Error("UploadThing upload failed");
+-  }
+-  return upload.data.ufsUrl;
+-};
++const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
++
++const uploadBuffer = async (buf: Buffer, key: string): Promise<string> => {
++  // Sprechender Dateiname + korrekter MIME-Type
++  const filename = `${key}.mp4`;
++  const utFile = new File([buf], filename, {
++    type: "video/mp4",
++    lastModified: Date.now(),
++  });
++
++  // Retry mit Exponential Backoff bei Pool/Rate/Server-Fehlern
++  const maxAttempts = 5;
++  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
++    try {
++      const [upload] = await utapi.uploadFiles([utFile]);
++      if (upload?.data?.ufsUrl) {
++        return upload.data.ufsUrl;
++      }
++      const msg = upload?.error ?? "UploadThing upload failed";
++      throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
++    } catch (err: any) {
++      const message = String(err?.message ?? err);
++      const shouldRetry =
++        message.includes("ResourceExhausted") ||
++        message.includes("connection limit exceeded") ||
++        message.includes("rate limit") ||
++        message.includes("ECONNRESET") ||
++        message.includes("ETIMEDOUT") ||
++        message.includes("5") || // 5xx
++        message.includes("429");
++
++      if (attempt < maxAttempts && shouldRetry) {
++        const jitter = Math.floor(Math.random() * 400);
++        const backoff = Math.min(2000 * 2 ** (attempt - 1) + jitter, 15000);
++        console.warn(
++          `[UGC][upload] Attempt ${attempt}/${maxAttempts} failed: ${message}. Retrying in ${backoff}ms…`
++        );
++        await sleep(backoff);
++        continue;
++      }
++      console.error("[UGC][upload] Permanent failure:", message);
++      throw new Error("UploadThing upload failed");
++    }
++  }
++  // sollte nie erreicht werden
++  throw new Error("UploadThing upload failed");
++};
+*** End Patch
