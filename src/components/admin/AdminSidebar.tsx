@@ -102,7 +102,7 @@ export function AdminSidebar() {
                   <SidebarMenuButton
                     asChild
                     className="font-semibold"
-                    isActive={pathname === item.url}
+                    isActive={pathname.startsWith(item.url)}
                   >
                     <a href={item.url}>
                       <item.icon className="h-5 w-5" />
@@ -124,7 +124,7 @@ export function AdminSidebar() {
                   <SidebarMenuButton
                     asChild
                     className="font-semibold"
-                    isActive={pathname === item.url}
+                    isActive={pathname.startsWith(item.url)}
                   >
                     <a href={item.url}>
                       <item.icon className="h-5 w-5" />
@@ -146,7 +146,7 @@ export function AdminSidebar() {
                   <SidebarMenuButton
                     asChild
                     className="font-semibold"
-                    isActive={pathname === item.url}
+                    isActive={pathname.startsWith(item.url)}
                   >
                     <a href={item.url}>
                       <item.icon className="h-5 w-5" />
@@ -168,7 +168,7 @@ export function AdminSidebar() {
                   <SidebarMenuButton
                     asChild
                     className="font-semibold"
-                    isActive={pathname === item.url}
+                    isActive={pathname.startsWith(item.url)}
                   >
                     <a href={item.url}>
                       <item.icon className="h-5 w-5" />

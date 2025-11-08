@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { db } from "@/server/db";
 
 if (!process.env.APIFY_API_KEY) {
   throw new Error("APIFY_API_KEY is not set");
@@ -448,6 +449,75 @@ export async function ingestTikTokPost({
       console.warn("[apify/run] Failed to link post to user", {
         userId: ownerUserId,
         postId: postData?.id,
+        error,
+      });
+    }
+  }
+
+  // If the user is an admin, also add the post to the public library
+  if (ownerUserId) {
+    try {
+      const user = await db.user.findUnique({
+        where: { id: ownerUserId },
+        select: { role: true },
+      });
+
+      if (user?.role === "ADMIN") {
+        console.log("[apify/run] Admin user detected, adding post to public library", {
+          userId: ownerUserId,
+          postId: postData.id,
+        });
+
+        // Admin posts should also be added to make them publicly visible
+        // We'll create the post in the public library
+
+        const publicPostData = {
+          accountId: accountData.id || "",
+          postId: postData.postId,
+          caption: postData.caption,
+          categories: postData.categories || [],
+          likeCount: postData.likeCount,
+          viewCount: postData.viewCount,
+          publishedAt: postData.publishedAt,
+          createdAt: postData.createdAt,
+          duration: postData.duration,
+          slides: postData.slides || [],
+        };
+
+        console.log("[apify/run] Sending admin post to public library:", {
+          url: `${API_BASE_URL}/slideshow-library/posts`,
+          postId: postData.postId,
+          accountId: accountData.id,
+          slidesCount: postData.slides?.length || 0,
+        });
+
+        const publicPostResponse = await fetch(`${API_BASE_URL}/slideshow-library/posts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(publicPostData),
+        });
+
+        console.log("[apify/run] Public library response status:", publicPostResponse.status);
+
+        const responseText = await publicPostResponse.text();
+        console.log("[apify/run] Public library response body:", responseText);
+
+        if (publicPostResponse.ok) {
+          console.log("[apify/run] Successfully added admin post to public library", {
+            postId: postData.id,
+            response: responseText,
+          });
+        } else {
+          console.error("[apify/run] Failed to add admin post to public library", {
+            status: publicPostResponse.status,
+            postId: postData.id,
+            error: responseText,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("[apify/run] Failed to check user role or add to public library", {
+        userId: ownerUserId,
         error,
       });
     }
