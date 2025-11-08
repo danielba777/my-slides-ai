@@ -1,61 +1,309 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
+1) Export: Original-Audio muten & gewählten Sound mischen
+
+src/server/ugc/video-composer.ts
+
 *** Begin Patch
 *** Update File: src/server/ugc/video-composer.ts
 @@
--const uploadBuffer = async (buf: Buffer, key: string): Promise<string> => {
--  const utFile = new File([buf], "blob", { type: "video/mp4", lastModified: Date.now() });
--  const [upload] = await utapi.uploadFiles([utFile]);
--  if (!upload?.data?.ufsUrl) {
--    throw new Error("UploadThing upload failed");
--  }
--  return upload.data.ufsUrl;
--};
-+const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+-import { join } from "path";
++import { join } from "path";
+ import fs from "fs";
++import { tmpdir } from "os";
++import { createWriteStream } from "fs";
++import { NextResponse } from "next/server";
+@@
+ export async function composeReactionDemoVideo(params: {
+   hookPath: string;
+   demoPath: string;
+-  text: string;
++  text: string;
++  soundUrl?: string; // optionaler, vom Frontend gewählter Sound
+ }): Promise<{ outputPath: string; thumbPath: string }> {
+@@
+-  // ... bestehende Filter-/Command-Erstellung ...
++  // ... bestehende Filter-/Command-Erstellung ...
++  // Wir erzeugen am Ende 1080x1920, 30fps, libx264, AAC – moov-Atom vorne:
+ 
+   const ffArgs: string[] = [
+-    // (bisherige Inputs, Filter & Mappings)
++    // (bisherige Inputs, Filter & Mappings)
+   ];
+ 
++  /**
++   * AUDIO HANDLING
++   * - Originalsound NICHT übernehmen (kein Mapping der Original-Audiostreams)
++   * - Wenn soundUrl gesetzt (oder Default verfügbar), dann als 2. Input einhängen und mappen.
++   */
++  let bgmTempPath: string | null = null;
++  let bgmInputArgs: string[] = [];
++  let bgmMapArgs: string[] = [];
 +
-+const uploadBuffer = async (buf: Buffer, key: string): Promise<string> => {
-+  // Sprechender Dateiname + korrekter MIME-Type
-+  const filename = `${key}.mp4`;
-+  const utFile = new File([buf], filename, {
-+    type: "video/mp4",
-+    lastModified: Date.now(),
++  // Default-Sound aus ENV, falls keiner im Body:
++  const effectiveSoundUrl =
++    params.soundUrl?.trim() ||
++    process.env.DEFAULT_SOUND_URL?.trim() ||
++    "";
++
++  if (effectiveSoundUrl) {
++    // Audio-Datei lokal puffern (stabil für ffmpeg -i)
++    const res = await fetch(effectiveSoundUrl);
++    if (res.ok) {
++      const arrayBuf = await res.arrayBuffer();
++      bgmTempPath = join(tmpdir(), `ugc-bgm-${Date.now()}.mp3`);
++      await fs.promises.writeFile(bgmTempPath, Buffer.from(arrayBuf));
++      bgmInputArgs = ["-i", bgmTempPath];
++      // Nur Video von Input #0, nur Audio von Input #1:
++      bgmMapArgs = ["-map", "0:v:0", "-map", "1:a:0", "-shortest"];
++    } else {
++      console.warn("[UGC][compose] Failed to fetch soundUrl:", effectiveSoundUrl, res.status);
++    }
++  } else {
++    // Kein BGM: Nur Video mappen, Audio weglassen -> reine Stummspur
++    bgmMapArgs = ["-map", "0:v:0"];
++  }
++
++  // Stelle sicher, dass wir NICHT automatisch Original-Audio übernehmen:
++  // (kein -map 0:a; keine ungewollten 'copy'-Anweisungen vorher)
++
+   const outputPath = join(workDir, `ugc-final-${uuidv4()}.mp4`);
+@@
+-  const finalArgs = [
+-    ...ffArgs,
+-    "-c:v",
+-    "libx264",
+-    "-preset",
+-    "medium",
+-    "-crf",
+-    "20",
+-    "-c:a",
+-    "aac",
+-    "-b:a",
+-    "192k",
+-    "-movflags",
+-    "+faststart",
+-    outputPath,
+-  ];
++  const finalArgs = [
++    // bisherige Inputs
++    ...ffArgs,
++    // optionaler BGM-Input:
++    ...bgmInputArgs,
++    // Codec-Settings
++    "-c:v", "libx264",
++    "-preset", "medium",
++    "-crf", "20",
++    "-c:a", "aac",
++    "-b:a", "192k",
++    // Mapping sicher setzen (nur Video von 0, Audio von 1 – oder stumm)
++    ...bgmMapArgs,
++    "-movflags", "+faststart",
++    outputPath,
++  ];
+@@
+   await runFfmpeg(finalArgs, { label: "compose-final" });
+@@
+   // Aufräumen
++  if (bgmTempPath) {
++    try { await fs.promises.unlink(bgmTempPath); } catch {}
++  }
+   return { outputPath, thumbPath };
+ }
+*** End Patch
+
+
+Wirkung: Kein Originalton mehr, stattdessen ausgewählter Admin-Sound (oder stumm, wenn keiner gewählt/konfiguriert).
+
+2) API: soundUrl aus dem Body an den Composer weiterreichen
+
+src/app/api/ugc/videos/route.ts
+
+*** Begin Patch
+*** Update File: src/app/api/ugc/videos/route.ts
+@@
+ export async function POST(req: Request) {
+-  const body = await req.json();
+-  const { hookPath, demoPath, text } = body ?? {};
++  const body = await req.json();
++  const { hookPath, demoPath, text, soundUrl } = body ?? {};
+@@
+-  const { outputPath, thumbPath } = await composeReactionDemoVideo({
+-    hookPath,
+-    demoPath,
+-    text,
+-  });
++  const { outputPath, thumbPath } = await composeReactionDemoVideo({
++    hookPath,
++    demoPath,
++    text,
++    soundUrl, // optional
 +  });
+*** End Patch
+
+3) Public List-API (für UGC-Popup Auswahl)
+
+src/app/api/ugc/sounds/route.ts (NEU)
+
+*** Begin Patch
+*** Add File: src/app/api/ugc/sounds/route.ts
++import { NextResponse } from "next/server";
++import { utapi } from "@/server/uploadthing"; // gleiche Quelle wie im Projekt genutzt
 +
-+  // Retry mit Exponential Backoff bei Pool/Rate/Server-Fehlern
-+  const maxAttempts = 5;
-+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
++// Listet alle Sounds unter dem Prefix "ugc/sounds/"
++export async function GET() {
++  try {
++    // UploadThing UTApi: listFiles kann per prefix filtern (v7+)
++    const list = await utapi.listFiles({ limit: 100, prefix: "ugc/sounds/" });
++    // Normalisiere Rückgabe auf { name, url, ufsUrl, size }
++    const items = list.files?.map((f: any) => ({
++      key: f.key,
++      name: f.name,
++      size: f.size,
++      url: f.url,      // deprecated
++      ufsUrl: f.ufsUrl // bevorzugen
++    })) ?? [];
++    return NextResponse.json({ items });
++  } catch (e: any) {
++    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
++  }
++}
+*** End Patch
+
+4) Admin-Upload-API (Sound hochladen in festen Ordner)
+
+src/app/api/admin/ugc/sounds/route.ts (NEU)
+
+*** Begin Patch
+*** Add File: src/app/api/admin/ugc/sounds/route.ts
++import { NextResponse } from "next/server";
++import { utapi } from "@/server/uploadthing";
++
++// POST multipart/form-data: field "file" (audio/mpeg, audio/mp3, audio/aac, audio/m4a, audio/wav)
++export async function POST(req: Request) {
++  try {
++    const form = await req.formData();
++    const file = form.get("file");
++    if (!(file instanceof File)) {
++      return NextResponse.json({ error: "No file" }, { status: 400 });
++    }
++    // Prefix + Dateiname
++    const ext = (file.name.split(".").pop() || "mp3").toLowerCase();
++    const key = `ugc/sounds/${Date.now()}-${file.name.replace(/\s+/g, "_")}`;
++    const [upload] = await utapi.uploadFiles([new File([await file.arrayBuffer()], key, { type: file.type })]);
++    if (!upload?.data?.ufsUrl) {
++      return NextResponse.json({ error: upload?.error ?? "Upload failed" }, { status: 400 });
++    }
++    return NextResponse.json({
++      key: upload.data.key,
++      ufsUrl: upload.data.ufsUrl,
++      url: upload.data.url, // deprecated
++    });
++  } catch (e: any) {
++    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
++  }
++}
+*** End Patch
+
+5) Admin UI: Simple Upload + Liste
+
+src/components/dashboard/account/SettingsSounds.tsx (NEU)
+
+*** Begin Patch
+*** Add File: src/components/dashboard/account/SettingsSounds.tsx
++"use client";
++import { useEffect, useState } from "react";
++
++type SoundItem = { key: string; name: string; size: number; ufsUrl?: string; url?: string };
++
++export default function SettingsSounds() {
++  const [items, setItems] = useState<SoundItem[]>([]);
++  const [file, setFile] = useState<File | null>(null);
++  const [busy, setBusy] = useState(false);
++
++  async function load() {
++    const res = await fetch("/api/ugc/sounds", { cache: "no-store" });
++    const json = await res.json();
++    setItems(json.items ?? []);
++  }
++  useEffect(() => { load(); }, []);
++
++  async function handleUpload(e: React.FormEvent) {
++    e.preventDefault();
++    if (!file) return;
++    setBusy(true);
 +    try {
-+      const [upload] = await utapi.uploadFiles([utFile]);
-+      if (upload?.data?.ufsUrl) {
-+        return upload.data.ufsUrl;
-+      }
-+      const msg = upload?.error ?? "UploadThing upload failed";
-+      throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
-+    } catch (err: any) {
-+      const message = String(err?.message ?? err);
-+      const shouldRetry =
-+        message.includes("ResourceExhausted") ||
-+        message.includes("connection limit exceeded") ||
-+        message.includes("rate limit") ||
-+        message.includes("ECONNRESET") ||
-+        message.includes("ETIMEDOUT") ||
-+        message.includes("5") || // 5xx
-+        message.includes("429");
-+
-+      if (attempt < maxAttempts && shouldRetry) {
-+        const jitter = Math.floor(Math.random() * 400);
-+        const backoff = Math.min(2000 * 2 ** (attempt - 1) + jitter, 15000);
-+        console.warn(
-+          `[UGC][upload] Attempt ${attempt}/${maxAttempts} failed: ${message}. Retrying in ${backoff}ms…`
-+        );
-+        await sleep(backoff);
-+        continue;
-+      }
-+      console.error("[UGC][upload] Permanent failure:", message);
-+      throw new Error("UploadThing upload failed");
++      const fd = new FormData();
++      fd.append("file", file);
++      const res = await fetch("/api/admin/ugc/sounds", { method: "POST", body: fd });
++      if (!res.ok) throw new Error("Upload failed");
++      await load();
++      setFile(null);
++      alert("Sound hochgeladen.");
++    } catch (err) {
++      alert(String((err as any).message ?? err));
++    } finally {
++      setBusy(false);
 +    }
 +  }
-+  // sollte nie erreicht werden
-+  throw new Error("UploadThing upload failed");
-+};
++
++  return (
++    <div className="space-y-4">
++      <form onSubmit={handleUpload} className="flex items-center gap-3">
++        <input
++          type="file"
++          accept="audio/*"
++          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
++        />
++        <button className="px-3 py-2 rounded-xl bg-primary text-primary-foreground disabled:opacity-60" disabled={busy || !file}>
++          {busy ? "Lädt…" : "Sound hochladen"}
++        </button>
++      </form>
++      <div className="text-sm text-muted-foreground">Ablage: <code>ugc/sounds/…</code></div>
++      <div className="grid gap-2">
++        {items.map((it) => (
++          <div key={it.key} className="rounded-xl border p-3 flex items-center justify-between">
++            <div className="truncate">
++              <div className="font-medium truncate">{it.name}</div>
++              <div className="text-xs opacity-70">{(it.size/1024).toFixed(1)} KB</div>
++            </div>
++            <a href={it.ufsUrl || it.url} target="_blank" rel="noreferrer" className="text-primary text-sm underline">
++              Öffnen
++            </a>
++          </div>
++        ))}
++        {items.length === 0 && <div className="text-sm opacity-70">Noch keine Sounds hochgeladen.</div>}
++      </div>
++    </div>
++  );
++}
+*** End Patch
+
+6) Admin Tab einhängen
+
+src/components/dashboard/account/SettingsPage.tsx
+(Nur Tab + Import ergänzen; bestehende Tabs bleiben unberührt.)
+
+*** Begin Patch
+*** Update File: src/components/dashboard/account/SettingsPage.tsx
+@@
+-import SettingsDemoVideos from "./SettingsDemoVideos";
++import SettingsDemoVideos from "./SettingsDemoVideos";
++import SettingsSounds from "./SettingsSounds";
+@@
+-      <TabsList className="grid grid-cols-3">
++      <TabsList className="grid grid-cols-4">
+         <TabsTrigger value="connections">Integrationen</TabsTrigger>
+-        <TabsTrigger value="demovideos">Demo-Videos</TabsTrigger>
++        <TabsTrigger value="demovideos">Demo-Videos</TabsTrigger>
+         <TabsTrigger value="billing">Abrechnung</TabsTrigger>
++        <TabsTrigger value="sounds">Sounds</TabsTrigger>
+       </TabsList>
+@@
+       <TabsContent value="demovideos">
+         <SettingsDemoVideos />
+       </TabsContent>
++      <TabsContent value="sounds">
++        <SettingsSounds />
++      </TabsContent>
 *** End Patch
