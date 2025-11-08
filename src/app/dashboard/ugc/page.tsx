@@ -13,7 +13,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 import { cn } from "@/lib/utils";
 import type { DemoVideo, GeneratedVideo, ReactionAvatar } from "@/types/ugc";
-import { AlignCenter, ArrowUpFromLine, Plus, VideoOff } from "lucide-react";
+
+type SoundItem = { key: string; name: string; size: number; ufsUrl?: string; url?: string; coverUrl?: string | null };
+import { AlignCenter, ArrowUpFromLine, Music, Plus, VideoOff } from "lucide-react";
 // Sound popover (dialog)
 import {
   Dialog,
@@ -63,14 +65,11 @@ export default function UgcDashboardPage() {
   const [hookPosition, setHookPosition] = useState<"middle" | "upper">(
     "middle",
   );
-  // Sound dialog (UI-only). Can be wired to render POST later.
+  // Sound selection state
   const [soundOpen, setSoundOpen] = useState(false);
-  const [soundSource, setSoundSource] = useState<"community" | "my">(
-    "community",
-  );
-  const [soundUrl, setSoundUrl] = useState<string>("");
-  // selected sound (UI label only)
-  const [soundLabel, setSoundLabel] = useState<string>("Sound");
+  const [sounds, setSounds] = useState<SoundItem[]>([]);
+  const [soundsLoading, setSoundsLoading] = useState(false);
+  const [selectedSound, setSelectedSound] = useState<SoundItem | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [dialogState, setDialogState] = useState<VideoDialogState>({
@@ -98,6 +97,7 @@ export default function UgcDashboardPage() {
     void loadAvatars();
     void loadDemos();
     void loadVideos();
+    void loadSounds();
   }, []);
 
   useEffect(() => {
@@ -194,6 +194,26 @@ export default function UgcDashboardPage() {
     }
   };
 
+  const loadSounds = async () => {
+    try {
+      setSoundsLoading(true);
+      const response = await fetch("/api/ugc/sounds");
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "Unable to load sounds");
+      }
+      const soundsData: SoundItem[] = Array.isArray(data?.items)
+        ? data.items
+        : [];
+      setSounds(soundsData);
+    } catch (error) {
+      console.error("[UGC] loadSounds failed", error);
+      toast.error("Unable to load sounds");
+    } finally {
+      setSoundsLoading(false);
+    }
+  };
+
   const selectedAvatar = useMemo(
     () => avatars.find((avatar) => avatar.id === selectedAvatarId) ?? null,
     [avatars, selectedAvatarId],
@@ -276,6 +296,7 @@ export default function UgcDashboardPage() {
           title: hook.trim() || undefined,
           overlayText: hook.trim() || undefined, // Hook-Text ins Video brennen
           overlayPosition: hookPosition, // "upper" | "middle"
+          soundUrl: selectedSound?.ufsUrl || selectedSound?.url, // Sound-URL
         }),
       });
       const data = await response.json();
@@ -703,94 +724,104 @@ export default function UgcDashboardPage() {
                 </Button>
               </div>
 
-              {/* Sound (Dialog) + Generate – ohne Box, direkt unter Video */}
-              <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <Dialog open={soundOpen} onOpenChange={setSoundOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="flex min-w-[160px] items-center justify-between gap-2 rounded-full px-4"
-                    >
-                      <span className="truncate">{soundLabel}</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-xl">
-                    <DialogHeader>
-                      <DialogTitle>Sound auswählen</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant={
-                            soundSource === "community" ? "default" : "outline"
-                          }
-                          onClick={() => setSoundSource("community")}
-                          className="rounded-full px-4"
-                        >
-                          Community
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={soundSource === "my" ? "default" : "outline"}
-                          onClick={() => setSoundSource("my")}
-                          className="rounded-full px-4"
-                        >
-                          My Uploads
-                        </Button>
-                      </div>
-                      {soundSource === "my" ? (
-                        <div className="space-y-2">
-                          <Input
-                            value={soundUrl}
-                            onChange={(e) => setSoundUrl(e.target.value)}
-                            placeholder="Eigene Sound-URL (UI-only)"
-                          />
-                          <div className="flex justify-end">
-                            <Button
-                              onClick={() => {
-                                setSoundLabel(soundUrl ? "My upload" : "Sound");
-                                setSoundOpen(false);
-                              }}
-                              disabled={!soundUrl}
-                            >
-                              Übernehmen
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-3">
-                          {[
-                            "Trending 01",
-                            "Trending 02",
-                            "Trending 03",
-                            "Trending 04",
-                          ].map((label) => (
-                            <button
-                              key={label}
-                              onClick={() => {
-                                setSoundLabel(label);
-                                setSoundOpen(false);
-                              }}
-                              className="rounded-md border p-3 text-left text-sm hover:bg-muted"
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </DialogContent>
-                </Dialog>
-
-                <Button
-                  onClick={handleGenerate}
-                  disabled={isGenerating || !selectedAvatarId}
-                  className="h-12 rounded-full px-8 text-base"
+              {/* Sound-Auswahl mit Cover links + Abschlußlinie + Text rechts */}
+              <div className="mt-2 rounded-2xl border overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setSoundOpen(true)}
+                  className="w-full flex items-center text-left"
                 >
-                  {isGenerating ? "Generating..." : "Generate"}
-                </Button>
+                  {/* Linker Bildbereich: folgt der Box-Form, abgerundet links, vertikale Linie rechts */}
+                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-l-2xl border-r">
+                    {selectedSound?.coverUrl ? (
+                      <img
+                        src={selectedSound.coverUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="h-full w-full bg-muted" />
+                    )}
+                  </div>
+                  {/* Rechter Textbereich */}
+                  <div className="flex-1 px-3 py-3">
+                    <div className="text-sm font-medium leading-none">Sound</div>
+                    <div className="text-xs text-muted-foreground mt-1 truncate">
+                      {selectedSound ? selectedSound.name : "Kein Sound gewählt"}
+                    </div>
+                  </div>
+                </button>
               </div>
+
+              {/* Sound Dialog */}
+              <Dialog open={soundOpen} onOpenChange={setSoundOpen}>
+                <DialogContent className="max-w-xl">
+                  <DialogHeader>
+                    <DialogTitle>Sound auswählen</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    {soundsLoading ? (
+                      <div className="flex h-32 items-center justify-center">
+                        <Spinner className="h-6 w-6" />
+                      </div>
+                    ) : sounds.length === 0 ? (
+                      <div className="text-center text-sm text-muted-foreground">
+                        Keine Sounds verfügbar.
+                      </div>
+                    ) : (
+                      <div className="grid gap-2 max-h-64 overflow-y-auto">
+                        {sounds.map((sound) => (
+                          <button
+                            key={sound.key}
+                            onClick={() => {
+                              setSelectedSound(sound);
+                              setSoundOpen(false);
+                            }}
+                            className={cn(
+                              "flex items-center gap-3 p-3 rounded-xl border text-left transition-colors hover:bg-muted/50",
+                              selectedSound?.key === sound.key
+                                ? "border-primary bg-primary/5"
+                                : "border-border"
+                            )}
+                          >
+                            <div className="h-10 w-10 rounded-lg overflow-hidden flex-shrink-0">
+                              {sound.coverUrl ? (
+                                <img
+                                  src={sound.coverUrl}
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="h-full w-full bg-muted flex items-center justify-center">
+                                  <Music className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium truncate">{sound.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {(sound.size / 1024).toFixed(1)} KB
+                              </div>
+                            </div>
+                            {selectedSound?.key === sound.key && (
+                              <div className="w-2 h-2 rounded-full bg-primary" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              {/* Generate Button */}
+              <Button
+                onClick={handleGenerate}
+                disabled={isGenerating || !selectedAvatarId}
+                className="h-12 rounded-full px-8 text-base"
+              >
+                {isGenerating ? "Generating..." : "Generate"}
+              </Button>
             </div>
           </div>
         </CardContent>

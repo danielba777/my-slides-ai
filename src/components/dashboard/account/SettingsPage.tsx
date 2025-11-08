@@ -6,10 +6,11 @@ import { useEffect, useState } from "react";
 import ProfileBilling from "@/components/dashboard/billing/ProfileBilling";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clapperboard, Link2, Puzzle, UserRound } from "lucide-react";
+import { Clapperboard, Link2, Music, Puzzle, UserRound } from "lucide-react";
 import SettingsChromeExtension from "./SettingsChromeExtension";
 import SettingsConnections from "./SettingsConnections";
 import SettingsDemoVideos from "./SettingsDemoVideos";
+import SettingsSounds from "./SettingsSounds";
 
 export default function SettingsPage() {
   const searchParams = useSearchParams();
@@ -24,7 +25,8 @@ export default function SettingsPage() {
         hash === "connections" ||
         hash === "demos" ||
         hash === "chrome-extension" ||
-        hash === "personal"
+        hash === "personal" ||
+        hash === "sounds"
       ) {
         setTab(hash);
       }
@@ -153,6 +155,25 @@ export default function SettingsPage() {
                 <span>Chrome Extension</span>
               </span>
             </TabsTrigger>
+
+            {/* SOUNDS */}
+            <TabsTrigger
+              value="sounds"
+              className="
+                group relative mt-1 w-full justify-start rounded-xl px-3 py-2 text-left
+                transition-all duration-200
+                hover:bg-muted/50
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#304674]/40
+                data-[state=active]:bg-[#304674]/12 data-[state=active]:ring-1 data-[state=active]:ring-[#304674]/20
+                aria-selected:font-medium
+                after:content-[''] after:absolute after:left-1.5 after:top-1/2 after:-translate-y-1/2 after:h-5 after:w-1 after:rounded-full after:bg-[#304674] after:opacity-0 group-data-[state=active]:after:opacity-100
+              "
+            >
+              <span className="inline-flex items-center gap-2">
+                <Music className="h-4 w-4 opacity-70 transition-transform group-hover:scale-105 group-data-[state=active]:opacity-100" />
+                <span>Sounds</span>
+              </span>
+            </TabsTrigger>
           </TabsList>
 
           {/* Right: content area */}
@@ -193,6 +214,19 @@ export default function SettingsPage() {
               <Card className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <CardContent className="p-6 md:p-8">
                   <SettingsChromeExtension />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* SOUNDS */}
+            <TabsContent
+              value="sounds"
+              className="m-0"
+              id="sounds"
+            >
+              <Card className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                <CardContent className="p-6 md:p-8">
+                  <SettingsSounds />
                 </CardContent>
               </Card>
             </TabsContent>

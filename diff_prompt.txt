@@ -1,224 +1,170 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-1) Export: Original-Audio muten & gewählten Sound mischen
-
-src/server/ugc/video-composer.ts
-
 *** Begin Patch
-*** Update File: src/server/ugc/video-composer.ts
+*** Update File: src/app/api/admin/ugc/sounds/route.ts
 @@
--import { join } from "path";
-+import { join } from "path";
- import fs from "fs";
-+import { tmpdir } from "os";
-+import { createWriteStream } from "fs";
-+import { NextResponse } from "next/server";
-@@
- export async function composeReactionDemoVideo(params: {
-   hookPath: string;
-   demoPath: string;
--  text: string;
-+  text: string;
-+  soundUrl?: string; // optionaler, vom Frontend gewählter Sound
- }): Promise<{ outputPath: string; thumbPath: string }> {
-@@
--  // ... bestehende Filter-/Command-Erstellung ...
-+  // ... bestehende Filter-/Command-Erstellung ...
-+  // Wir erzeugen am Ende 1080x1920, 30fps, libx264, AAC – moov-Atom vorne:
- 
-   const ffArgs: string[] = [
--    // (bisherige Inputs, Filter & Mappings)
-+    // (bisherige Inputs, Filter & Mappings)
-   ];
- 
-+  /**
-+   * AUDIO HANDLING
-+   * - Originalsound NICHT übernehmen (kein Mapping der Original-Audiostreams)
-+   * - Wenn soundUrl gesetzt (oder Default verfügbar), dann als 2. Input einhängen und mappen.
-+   */
-+  let bgmTempPath: string | null = null;
-+  let bgmInputArgs: string[] = [];
-+  let bgmMapArgs: string[] = [];
-+
-+  // Default-Sound aus ENV, falls keiner im Body:
-+  const effectiveSoundUrl =
-+    params.soundUrl?.trim() ||
-+    process.env.DEFAULT_SOUND_URL?.trim() ||
-+    "";
-+
-+  if (effectiveSoundUrl) {
-+    // Audio-Datei lokal puffern (stabil für ffmpeg -i)
-+    const res = await fetch(effectiveSoundUrl);
-+    if (res.ok) {
-+      const arrayBuf = await res.arrayBuffer();
-+      bgmTempPath = join(tmpdir(), `ugc-bgm-${Date.now()}.mp3`);
-+      await fs.promises.writeFile(bgmTempPath, Buffer.from(arrayBuf));
-+      bgmInputArgs = ["-i", bgmTempPath];
-+      // Nur Video von Input #0, nur Audio von Input #1:
-+      bgmMapArgs = ["-map", "0:v:0", "-map", "1:a:0", "-shortest"];
-+    } else {
-+      console.warn("[UGC][compose] Failed to fetch soundUrl:", effectiveSoundUrl, res.status);
-+    }
-+  } else {
-+    // Kein BGM: Nur Video mappen, Audio weglassen -> reine Stummspur
-+    bgmMapArgs = ["-map", "0:v:0"];
-+  }
-+
-+  // Stelle sicher, dass wir NICHT automatisch Original-Audio übernehmen:
-+  // (kein -map 0:a; keine ungewollten 'copy'-Anweisungen vorher)
-+
-   const outputPath = join(workDir, `ugc-final-${uuidv4()}.mp4`);
-@@
--  const finalArgs = [
--    ...ffArgs,
--    "-c:v",
--    "libx264",
--    "-preset",
--    "medium",
--    "-crf",
--    "20",
--    "-c:a",
--    "aac",
--    "-b:a",
--    "192k",
--    "-movflags",
--    "+faststart",
--    outputPath,
--  ];
-+  const finalArgs = [
-+    // bisherige Inputs
-+    ...ffArgs,
-+    // optionaler BGM-Input:
-+    ...bgmInputArgs,
-+    // Codec-Settings
-+    "-c:v", "libx264",
-+    "-preset", "medium",
-+    "-crf", "20",
-+    "-c:a", "aac",
-+    "-b:a", "192k",
-+    // Mapping sicher setzen (nur Video von 0, Audio von 1 – oder stumm)
-+    ...bgmMapArgs,
-+    "-movflags", "+faststart",
-+    outputPath,
-+  ];
-@@
-   await runFfmpeg(finalArgs, { label: "compose-final" });
-@@
-   // Aufräumen
-+  if (bgmTempPath) {
-+    try { await fs.promises.unlink(bgmTempPath); } catch {}
-+  }
-   return { outputPath, thumbPath };
- }
-*** End Patch
-
-
-Wirkung: Kein Originalton mehr, stattdessen ausgewählter Admin-Sound (oder stumm, wenn keiner gewählt/konfiguriert).
-
-2) API: soundUrl aus dem Body an den Composer weiterreichen
-
-src/app/api/ugc/videos/route.ts
-
-*** Begin Patch
-*** Update File: src/app/api/ugc/videos/route.ts
-@@
- export async function POST(req: Request) {
--  const body = await req.json();
--  const { hookPath, demoPath, text } = body ?? {};
-+  const body = await req.json();
-+  const { hookPath, demoPath, text, soundUrl } = body ?? {};
-@@
--  const { outputPath, thumbPath } = await composeReactionDemoVideo({
--    hookPath,
--    demoPath,
--    text,
--  });
-+  const { outputPath, thumbPath } = await composeReactionDemoVideo({
-+    hookPath,
-+    demoPath,
-+    text,
-+    soundUrl, // optional
-+  });
-*** End Patch
-
-3) Public List-API (für UGC-Popup Auswahl)
-
-src/app/api/ugc/sounds/route.ts (NEU)
-
-*** Begin Patch
-*** Add File: src/app/api/ugc/sounds/route.ts
-+import { NextResponse } from "next/server";
-+import { utapi } from "@/server/uploadthing"; // gleiche Quelle wie im Projekt genutzt
-+
-+// Listet alle Sounds unter dem Prefix "ugc/sounds/"
-+export async function GET() {
-+  try {
-+    // UploadThing UTApi: listFiles kann per prefix filtern (v7+)
-+    const list = await utapi.listFiles({ limit: 100, prefix: "ugc/sounds/" });
-+    // Normalisiere Rückgabe auf { name, url, ufsUrl, size }
-+    const items = list.files?.map((f: any) => ({
-+      key: f.key,
-+      name: f.name,
-+      size: f.size,
-+      url: f.url,      // deprecated
-+      ufsUrl: f.ufsUrl // bevorzugen
-+    })) ?? [];
-+    return NextResponse.json({ items });
-+  } catch (e: any) {
-+    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
-+  }
-+}
-*** End Patch
-
-4) Admin-Upload-API (Sound hochladen in festen Ordner)
-
-src/app/api/admin/ugc/sounds/route.ts (NEU)
-
-*** Begin Patch
-*** Add File: src/app/api/admin/ugc/sounds/route.ts
+-import { NextResponse } from "next/server";
+-import { utapi } from "@/server/uploadthing";
+-
+-// POST multipart/form-data: field "file" (audio/mpeg, audio/mp3, audio/aac, audio/m4a, audio/wav)
+-export async function POST(req: Request) {
+-  try {
+-    const form = await req.formData();
+-    const file = form.get("file");
+-    if (!(file instanceof File)) {
+-      return NextResponse.json({ error: "No file" }, { status: 400 });
+-    }
+-    // Prefix + Dateiname
+-    const ext = (file.name.split(".").pop() || "mp3").toLowerCase();
+-    const key = `ugc/sounds/${Date.now()}-${file.name.replace(/\s+/g, "_")}`;
+-    const [upload] = await utapi.uploadFiles([new File([await file.arrayBuffer()], key, { type: file.type })]);
+-    if (!upload?.data?.ufsUrl) {
+-      return NextResponse.json({ error: upload?.error ?? "Upload failed" }, { status: 400 });
+-    }
+-    return NextResponse.json({
+-      key: upload.data.key,
+-      ufsUrl: upload.data.ufsUrl,
+-      url: upload.data.url, // deprecated
+-    });
+-  } catch (e: any) {
+-    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
+-  }
+-}
 +import { NextResponse } from "next/server";
 +import { utapi } from "@/server/uploadthing";
 +
-+// POST multipart/form-data: field "file" (audio/mpeg, audio/mp3, audio/aac, audio/m4a, audio/wav)
++// POST multipart/form-data
++// fields:
++//  - sound (audio/*)  REQUIRED
++//  - cover (image/*)  OPTIONAL
 +export async function POST(req: Request) {
 +  try {
 +    const form = await req.formData();
-+    const file = form.get("file");
-+    if (!(file instanceof File)) {
-+      return NextResponse.json({ error: "No file" }, { status: 400 });
++    const sound = form.get("sound");
++    const cover = form.get("cover");
++    if (!(sound instanceof File)) {
++      return NextResponse.json({ error: "No sound file" }, { status: 400 });
 +    }
-+    // Prefix + Dateiname
-+    const ext = (file.name.split(".").pop() || "mp3").toLowerCase();
-+    const key = `ugc/sounds/${Date.now()}-${file.name.replace(/\s+/g, "_")}`;
-+    const [upload] = await utapi.uploadFiles([new File([await file.arrayBuffer()], key, { type: file.type })]);
-+    if (!upload?.data?.ufsUrl) {
-+      return NextResponse.json({ error: upload?.error ?? "Upload failed" }, { status: 400 });
++
++    const baseName = `${Date.now()}-${sound.name.replace(/\s+/g, "_")}`;
++    const soundKey = `ugc/sounds/${baseName}`;
++
++    const soundUploadInput = new File([await sound.arrayBuffer()], soundKey, {
++      type: sound.type || "audio/mpeg",
++    });
++
++    const wantsCover = cover instanceof File;
++    const coverExt = wantsCover ? (cover.name.split(".").pop() || "jpg").toLowerCase() : "jpg";
++    const coverKey = `ugc/sounds/${baseName}.cover.${coverExt}`;
++    const coverUploadInput = wantsCover
++      ? new File([await (cover as File).arrayBuffer()], coverKey, {
++          type: (cover as File).type || "image/jpeg",
++        })
++      : null;
++
++    const uploads = await utapi.uploadFiles(coverUploadInput ? [soundUploadInput, coverUploadInput] : [soundUploadInput]);
++    const s = uploads[0];
++    const c = coverUploadInput ? uploads[1] : null;
++
++    if (!s?.data?.ufsUrl) {
++      return NextResponse.json({ error: s?.error ?? "Upload failed" }, { status: 400 });
 +    }
 +    return NextResponse.json({
-+      key: upload.data.key,
-+      ufsUrl: upload.data.ufsUrl,
-+      url: upload.data.url, // deprecated
++      sound: { key: s.data.key, ufsUrl: s.data.ufsUrl, url: s.data.url },
++      cover: c?.data ? { key: c.data.key, ufsUrl: c.data.ufsUrl, url: c.data.url } : null,
 +    });
 +  } catch (e: any) {
 +    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
 +  }
 +}
 *** End Patch
+2) Sounds-Liste: coverUrl mit ausgeben
+src/app/api/ugc/sounds/route.ts
 
-5) Admin UI: Simple Upload + Liste
-
-src/components/dashboard/account/SettingsSounds.tsx (NEU)
-
+diff
+Code kopieren
 *** Begin Patch
-*** Add File: src/components/dashboard/account/SettingsSounds.tsx
+*** Update File: src/app/api/ugc/sounds/route.ts
+@@
+-import { NextResponse } from "next/server";
+-import { utapi } from "@/server/uploadthing"; // gleiche Quelle wie im Projekt genutzt
+-
+-// Listet alle Sounds unter dem Prefix "ugc/sounds/"
+-export async function GET() {
+-  try {
+-    // UploadThing UTApi: listFiles kann per prefix filtern (v7+)
+-    const list = await utapi.listFiles({ limit: 100, prefix: "ugc/sounds/" });
+-    // Normalisiere Rückgabe auf { name, url, ufsUrl, size }
+-    const items = list.files?.map((f: any) => ({
+-      key: f.key,
+-      name: f.name,
+-      size: f.size,
+-      url: f.url,      // deprecated
+-      ufsUrl: f.ufsUrl // bevorzugen
+-    })) ?? [];
+-    return NextResponse.json({ items });
+-  } catch (e: any) {
+-    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
+-  }
+-}
++import { NextResponse } from "next/server";
++import { utapi } from "@/server/uploadthing";
++
++// Listet Sounds + optionales Cover (Naming: "<basename>.<ext>" & "<basename>.<ext>.cover.<imgext>")
++export async function GET() {
++  try {
++    const list = await utapi.listFiles({ limit: 500, prefix: "ugc/sounds/" });
++    const files = list.files ?? [];
++
++    // Trenne Audio/Image – und mappe Cover anhand des gemeinsamen Basenamens vor ".cover."
++    const isImage = (k: string) => /\.(png|jpe?g|webp|gif|avif)$/i.test(k);
++    const isCover = (k: string) => /\.cover\.(png|jpe?g|webp|gif|avif)$/i.test(k);
++    const isAudio = (k: string) => /\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(k) && !isCover(k);
++
++    const images = new Map<string, any>(); // coverKeyByBase
++    for (const f of files) {
++      if (isImage(f.key) && isCover(f.key)) {
++        const base = f.key.replace(/\.cover\.(png|jpe?g|webp|gif|avif)$/i, "");
++        images.set(base, f);
++      }
++    }
++
++    const items = files
++      .filter((f: any) => isAudio(f.key))
++      .map((f: any) => {
++        const cover = images.get(f.key);
++        return {
++          key: f.key,
++          name: f.name,
++          size: f.size,
++          url: f.url,
++          ufsUrl: f.ufsUrl,
++          coverUrl: cover?.ufsUrl || cover?.url || null,
++        };
++      });
++
++    return NextResponse.json({ items });
++  } catch (e: any) {
++    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
++  }
++}
+*** End Patch
+3) Admin UI: aus Settings entfernen → eigener Admin-Menüpunkt „Sounds“
+Neu: src/components/dashboard/admin/AdminSounds.tsx
+
+diff
+Code kopieren
+*** Begin Patch
+*** Add File: src/components/dashboard/admin/AdminSounds.tsx
 +"use client";
 +import { useEffect, useState } from "react";
 +
-+type SoundItem = { key: string; name: string; size: number; ufsUrl?: string; url?: string };
++type SoundItem = { key: string; name: string; size: number; ufsUrl?: string; url?: string; coverUrl?: string | null };
 +
-+export default function SettingsSounds() {
++export default function AdminSounds() {
 +  const [items, setItems] = useState<SoundItem[]>([]);
-+  const [file, setFile] = useState<File | null>(null);
++  const [sound, setSound] = useState<File | null>(null);
++  const [cover, setCover] = useState<File | null>(null);
 +  const [busy, setBusy] = useState(false);
 +
 +  async function load() {
@@ -230,16 +176,20 @@ src/components/dashboard/account/SettingsSounds.tsx (NEU)
 +
 +  async function handleUpload(e: React.FormEvent) {
 +    e.preventDefault();
-+    if (!file) return;
++    if (!sound) return;
 +    setBusy(true);
 +    try {
 +      const fd = new FormData();
-+      fd.append("file", file);
++      fd.append("sound", sound);
++      if (cover) fd.append("cover", cover);
 +      const res = await fetch("/api/admin/ugc/sounds", { method: "POST", body: fd });
 +      if (!res.ok) throw new Error("Upload failed");
 +      await load();
-+      setFile(null);
-+      alert("Sound hochgeladen.");
++      setSound(null);
++      setCover(null);
++      (document.getElementById("sound-input") as HTMLInputElement | null)?.value && ((document.getElementById("sound-input") as HTMLInputElement).value = "");
++      (document.getElementById("cover-input") as HTMLInputElement | null)?.value && ((document.getElementById("cover-input") as HTMLInputElement).value = "");
++      alert("Sound (und ggf. Cover) hochgeladen.");
 +    } catch (err) {
 +      alert(String((err as any).message ?? err));
 +    } finally {
@@ -248,28 +198,39 @@ src/components/dashboard/account/SettingsSounds.tsx (NEU)
 +  }
 +
 +  return (
-+    <div className="space-y-4">
-+      <form onSubmit={handleUpload} className="flex items-center gap-3">
-+        <input
-+          type="file"
-+          accept="audio/*"
-+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-+        />
-+        <button className="px-3 py-2 rounded-xl bg-primary text-primary-foreground disabled:opacity-60" disabled={busy || !file}>
-+          {busy ? "Lädt…" : "Sound hochladen"}
++    <div className="space-y-6">
++      <div>
++        <h2 className="text-xl font-semibold">Sounds</h2>
++        <p className="text-sm text-muted-foreground">Audio + optionales Cover-Bild hochladen. Ablage unter <code>ugc/sounds/</code>.</p>
++      </div>
++
++      <form onSubmit={handleUpload} className="grid gap-3 md:grid-cols-[1fr_auto] items-end">
++        <div className="grid gap-2">
++          <label className="text-sm font-medium">Audio-Datei</label>
++          <input id="sound-input" type="file" accept="audio/*" onChange={(e) => setSound(e.target.files?.[0] ?? null)} />
++          <label className="text-sm font-medium mt-3">Cover-Bild (optional)</label>
++          <input id="cover-input" type="file" accept="image/*" onChange={(e) => setCover(e.target.files?.[0] ?? null)} />
++        </div>
++        <button className="h-10 px-4 rounded-xl bg-primary text-primary-foreground disabled:opacity-60" disabled={busy || !sound}>
++          {busy ? "Lädt…" : "Hochladen"}
 +        </button>
 +      </form>
-+      <div className="text-sm text-muted-foreground">Ablage: <code>ugc/sounds/…</code></div>
-+      <div className="grid gap-2">
++
++      <div className="grid gap-3">
 +        {items.map((it) => (
-+          <div key={it.key} className="rounded-xl border p-3 flex items-center justify-between">
-+            <div className="truncate">
-+              <div className="font-medium truncate">{it.name}</div>
-+              <div className="text-xs opacity-70">{(it.size/1024).toFixed(1)} KB</div>
++          <div key={it.key} className="flex items-center justify-between rounded-2xl border p-3">
++            <div className="flex items-center gap-3 min-w-0">
++              {it.coverUrl ? (
++                <img src={it.coverUrl} alt="" className="h-10 w-10 rounded-xl object-cover" />
++              ) : (
++                <div className="h-10 w-10 rounded-xl bg-muted" />
++              )}
++              <div className="min-w-0">
++                <div className="font-medium truncate">{it.name}</div>
++                <div className="text-xs text-muted-foreground">{(it.size / 1024).toFixed(1)} KB</div>
++              </div>
 +            </div>
-+            <a href={it.ufsUrl || it.url} target="_blank" rel="noreferrer" className="text-primary text-sm underline">
-+              Öffnen
-+            </a>
++            <a href={it.ufsUrl || it.url} target="_blank" rel="noreferrer" className="text-sm text-primary underline">Öffnen</a>
 +          </div>
 +        ))}
 +        {items.length === 0 && <div className="text-sm opacity-70">Noch keine Sounds hochgeladen.</div>}
@@ -278,32 +239,82 @@ src/components/dashboard/account/SettingsSounds.tsx (NEU)
 +  );
 +}
 *** End Patch
+Neuer Admin-Route-Screen direkt unter „Reaction Avatars“:
 
-6) Admin Tab einhängen
+src/app/dashboard/admin/sounds/page.tsx
 
-src/components/dashboard/account/SettingsPage.tsx
-(Nur Tab + Import ergänzen; bestehende Tabs bleiben unberührt.)
-
+diff
+Code kopieren
 *** Begin Patch
-*** Update File: src/components/dashboard/account/SettingsPage.tsx
+*** Add File: src/app/dashboard/admin/sounds/page.tsx
++import AdminSounds from "@/components/dashboard/admin/AdminSounds";
++
++export default function AdminSoundsPage() {
++  return (
++    <div className="p-4 sm:p-6">
++      <AdminSounds />
++    </div>
++  );
++}
+*** End Patch
+Hinweis: Du wolltest es nicht in „Settings“, sondern im Admin-Menü – deshalb eine eigene Route /dashboard/admin/sounds.
+Wenn du ein zentrales Admin-Menü/Sidebar hast, das Links rendert, füge dort einen Link unter „Reaction Avatars“ ein (siehe nächster Diff, falls vorhanden).
+
+Falls du eine Admin-Sidebar-Konfiguration nutzt (z. B. src/components/dashboard/admin/AdminNav.tsx), ergänze den Link:
+
+diff
+Code kopieren
+*** Begin Patch
+*** Update File: src/components/dashboard/admin/AdminNav.tsx
 @@
--import SettingsDemoVideos from "./SettingsDemoVideos";
-+import SettingsDemoVideos from "./SettingsDemoVideos";
-+import SettingsSounds from "./SettingsSounds";
+   const items = [
+     { href: "/dashboard/admin/avatars", label: "Reaction Avatars" },
++    { href: "/dashboard/admin/sounds", label: "Sounds" },
+     // …
+   ];
+*** End Patch
+(Falls deine Datei anders heißt, füge den Link an entsprechender Stelle ein.)
+
+4) UGC-Frontend: Sound-Feld mit Cover links & Linie rechts
+src/app/dashboard/ugc/page.tsx – Anzeige-Box des gewählten Sounds (oder Placeholder), ohne restliche Logik zu verändern.
+
+diff
+Code kopieren
+*** Begin Patch
+*** Update File: src/app/dashboard/ugc/page.tsx
 @@
--      <TabsList className="grid grid-cols-3">
-+      <TabsList className="grid grid-cols-4">
-         <TabsTrigger value="connections">Integrationen</TabsTrigger>
--        <TabsTrigger value="demovideos">Demo-Videos</TabsTrigger>
-+        <TabsTrigger value="demovideos">Demo-Videos</TabsTrigger>
-         <TabsTrigger value="billing">Abrechnung</TabsTrigger>
-+        <TabsTrigger value="sounds">Sounds</TabsTrigger>
-       </TabsList>
-@@
-       <TabsContent value="demovideos">
-         <SettingsDemoVideos />
-       </TabsContent>
-+      <TabsContent value="sounds">
-+        <SettingsSounds />
-+      </TabsContent>
+-              {/* Sound-Auswahl (bisher) */}
+-              <div className="rounded-2xl border p-3 flex items-center justify-between">
+-                <div className="text-sm font-medium">Sound</div>
+-                {/* dein Trigger/Popup/Select */}
+-                {renderSoundSelector()}
+-              </div>
++              {/* Sound-Auswahl mit Cover links + Abschlußlinie + Text rechts */}
++              <div className="rounded-2xl border overflow-hidden">
++                <button
++                  type="button"
++                  onClick={openSoundPopup} // bestehende Funktion, die dein Popup öffnet
++                  className="w-full flex items-center text-left"
++                >
++                  {/* Linker Bildbereich: folgt der Box-Form, abgerundet links, vertikale Linie rechts */}
++                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-l-2xl border-r">
++                    {selectedSound?.coverUrl ? (
++                      <img
++                        src={selectedSound.coverUrl}
++                        alt=""
++                        className="h-full w-full object-cover"
++                      />
++                    ) : (
++                      <div className="h-full w-full bg-muted" />
++                    )}
++                  </div>
++                  {/* Rechter Textbereich */}
++                  <div className="flex-1 px-3 py-3">
++                    <div className="text-sm font-medium leading-none">Sound</div>
++                    <div className="text-xs text-muted-foreground mt-1 truncate">
++                      {selectedSound ? selectedSound.name : "Kein Sound gewählt"}
++                    </div>
++                  </div>
++                </button>
++              </div>
 *** End Patch

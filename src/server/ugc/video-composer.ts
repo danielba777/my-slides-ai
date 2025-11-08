@@ -452,6 +452,7 @@ export interface ComposeOptions {
   userId: string;
   overlayText?: string;
   overlayPosition?: "upper" | "middle";
+  soundUrl?: string; // optionaler, vom Frontend gewählter Sound
 }
 
 export interface ComposeResult {
@@ -466,8 +467,10 @@ export async function composeReactionDemoVideo({
   userId,
   overlayText,
   overlayPosition = "upper",
+  soundUrl,
 }: ComposeOptions): Promise<ComposeResult> {
   const tempDir = await fsAsync.mkdtemp(join(tmpdir(), "ugc-compose-"));
+  let bgmTempPath: string | null = null;
 
   try {
     const reactionSource = join(tempDir, `reaction-${randomUUID()}.mp4`);
@@ -568,8 +571,53 @@ export async function composeReactionDemoVideo({
     const thumbnailPath = join(tempDir, `ugc-thumb-${randomUUID()}.jpg`);
     await captureThumbnail(finalVideoPath, thumbnailPath);
 
+    // AUDIO HANDLING: Original-Audio durch gewählten Sound ersetzen
+    let finalVideoWithSoundPath = finalVideoPath;
+
+    // Default-Sound aus ENV, falls keiner im Body:
+    const effectiveSoundUrl =
+      soundUrl?.trim() ||
+      process.env.DEFAULT_SOUND_URL?.trim() ||
+      "";
+
+    if (effectiveSoundUrl) {
+      try {
+        // Audio-Datei lokal puffern (stabil für ffmpeg -i)
+        const res = await fetch(effectiveSoundUrl);
+        if (res.ok) {
+          const arrayBuf = await res.arrayBuffer();
+          bgmTempPath = join(tempDir, `ugc-bgm-${randomUUID()}.mp3`);
+          await fsAsync.writeFile(bgmTempPath, Buffer.from(arrayBuf));
+
+          // Neues Video mit Sound erstellen
+          const videoWithSoundPath = join(tempDir, `ugc-final-with-sound-${randomUUID()}.mp4`);
+          await runFfmpeg([
+            "-y",
+            "-i", finalVideoPath,     // Video ohne Audio
+            "-i", bgmTempPath,       // BGM Audio
+            "-map", "0:v:0",         // Nur Video von Input #0
+            "-map", "1:a:0",         // Nur Audio von Input #1
+            "-shortest",             // Kürzeste Länge verwenden
+            "-c:v", "copy",          // Video-Stream kopieren
+            "-c:a", "aac",           // Audio neu kodieren
+            "-b:a", "192k",
+            "-movflags", "+faststart",
+            videoWithSoundPath,
+          ]);
+          finalVideoWithSoundPath = videoWithSoundPath;
+          console.log("[UGC][compose] Using background sound:", effectiveSoundUrl);
+        } else {
+          console.warn("[UGC][compose] Failed to fetch soundUrl:", effectiveSoundUrl, res.status);
+        }
+      } catch (err) {
+        console.error("[UGC][compose] Error processing sound:", err);
+      }
+    } else {
+      console.log("[UGC][compose] No sound provided, creating silent video");
+    }
+
     const [videoBuffer, thumbnailBuffer] = await Promise.all([
-      fsAsync.readFile(finalVideoPath),
+      fsAsync.readFile(finalVideoWithSoundPath),
       fsAsync.readFile(thumbnailPath),
     ]);
 
@@ -588,6 +636,10 @@ export async function composeReactionDemoVideo({
       durationMs: totalDurationMs,
     };
   } finally {
+    // Aufräumen: temporäre BGM-Datei entfernen
+    if (bgmTempPath) {
+      try { await fsAsync.unlink(bgmTempPath); } catch {}
+    }
     await fsAsync.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
 }

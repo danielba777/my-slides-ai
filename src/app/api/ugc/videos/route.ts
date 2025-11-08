@@ -14,6 +14,7 @@ const createVideoSchema = z.object({
   // NEU: Hook-Text wirklich einbrennen wie in der Preview
   overlayText: z.string().trim().max(180).optional(),
   overlayPosition: z.enum(["upper", "middle"]).optional(),
+  soundUrl: z.string().trim().url().optional(), // optionaler Sound-URL
 });
 
 export async function GET() {
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { reactionAvatarId, demoVideoId, title, overlayText, overlayPosition } = parsed.data;
+  const { reactionAvatarId, demoVideoId, title, overlayText, overlayPosition, soundUrl } = parsed.data;
 
   const avatar = await db.reactionAvatar.findUnique({
     where: { id: reactionAvatarId },
@@ -94,6 +95,7 @@ export async function POST(req: Request) {
       userId: session.user.id,
       overlayText: overlayText ?? title ?? undefined,
       overlayPosition: overlayPosition ?? "upper",
+      soundUrl, // optional
     });
 
     const video = await db.userUGCVideo.create({
