@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pnpm list:*)"
+      "Bash(pnpm list:*)",
+      "Bash(find:*)",
+      "Bash(echo:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

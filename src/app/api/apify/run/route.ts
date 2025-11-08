@@ -53,57 +53,88 @@ function findAwemeDetail(source: unknown): any | null {
   return null;
 }
 
-function pickFirstString(values: unknown): string | undefined {
-  if (!values) return undefined;
-  if (typeof values === "string") {
-    return values.trim().length > 0 ? values : undefined;
+function pickFirstString(sources: Array<unknown>) {
+  if (!Array.isArray(sources)) {
+    return null;
   }
-  if (Array.isArray(values)) {
-    for (const item of values) {
-      if (typeof item === "string" && item.trim().length > 0) {
-        return item;
-      }
-    }
-  }
-  return undefined;
-}
-
-const PREFERRED_IMAGE_EXTENSIONS = [".jpeg", ".jpg", ".png", ".webp"];
-
-function pickPreferredImageUrl(...sources: Array<unknown>): string | undefined {
-  const urls: string[] = [];
-
-  const pushUrl = (value: unknown) => {
-    if (typeof value === "string" && value.trim().length > 0) {
-      urls.push(value.trim());
-    }
-  };
 
   for (const source of sources) {
-    if (!source) continue;
-    if (Array.isArray(source)) {
-      for (const item of source) {
-        pushUrl(item);
-      }
-    } else {
-      pushUrl(source);
+    if (typeof source === "string") {
+      return source;
     }
   }
 
-  if (urls.length === 0) {
-    return undefined;
+  return null;
+}
+
+function extractSlidesFromAwemeDetail(awemeDetail: any): Array<{
+  id: string;
+  imageUrl: string;
+  slideIndex?: number;
+  textContent?: string;
+  backgroundColor?: string;
+  textPosition?: string;
+  textColor?: string;
+  fontSize?: number;
+}> {
+  const slides: Array<{
+    id: string;
+    imageUrl: string;
+    slideIndex?: number;
+    textContent?: string;
+    backgroundColor?: string;
+    textPosition?: string;
+    textColor?: string;
+    fontSize?: number;
+  }> = [];
+
+  // Try to extract slides from various possible structures in awemeDetail
+  const images = awemeDetail?.imagePost?.images || [];
+
+  images.forEach((image: any, index: number) => {
+    if (
+      image?.url_list &&
+      Array.isArray(image.url_list) &&
+      image.url_list.length > 0
+    ) {
+      slides.push({
+        id: `slide-${index}`,
+        imageUrl: image.url_list[0],
+        slideIndex: index,
+        textContent: awemeDetail?.desc || null,
+        backgroundColor: image?.background_color || null,
+        textPosition: image?.text_position || null,
+        textColor: image?.text_color || null,
+        fontSize: image?.font_size || null,
+      });
+    }
+  });
+
+  // If no slides found from imagePost, try other structures
+  if (slides.length === 0) {
+    const videoCover = awemeDetail?.video?.cover;
+    if (
+      videoCover?.url_list &&
+      Array.isArray(videoCover.url_list) &&
+      videoCover.url_list.length > 0
+    ) {
+      slides.push({
+        id: `slide-0`,
+        imageUrl: videoCover.url_list[0],
+        slideIndex: 0,
+        textContent: awemeDetail?.desc || null,
+      });
+    }
   }
 
-  const hasPreferredExtension = (url: string) => {
-    const base = url.split("?")[0]?.toLowerCase() ?? "";
-    return PREFERRED_IMAGE_EXTENSIONS.some((ext) => base.endsWith(ext));
-  };
-
-  const preferred = urls.find(hasPreferredExtension);
-  return preferred ?? urls[0];
+  return slides;
 }
 
 async function callApify(payload: Record<string, unknown>) {
+  console.log("[apify/run] Calling Apify with payload:", {
+    payload,
+  });
+
   const response = await fetch(
     `https://api.apify.com/v2/acts/scraptik~tiktok-api/run-sync-get-dataset-items?token=${process.env.APIFY_API_KEY}`,
     {
@@ -113,15 +144,33 @@ async function callApify(payload: Record<string, unknown>) {
     },
   );
 
-  const json = await response.json();
+  const responseText = await response.text();
+
+  console.log("[apify/run] Apify response:", {
+    status: response.status,
+    statusText: response.statusText,
+    headers: Object.fromEntries(response.headers.entries()),
+    responseLength: responseText.length,
+    responseText: responseText,
+  });
 
   if (!response.ok) {
     throw new ApifyIngestError(
-      json?.error ??
-        json?.message ??
-        "Apify request failed. Check the provided payload.",
+      `Apify API request failed with status ${response.status}: ${responseText}`,
       response.status,
-      json,
+      responseText,
+    );
+  }
+
+  let json;
+  try {
+    json = JSON.parse(responseText);
+  } catch (parseError) {
+    console.error("[apify/run] Failed to parse JSON response:", parseError);
+    throw new ApifyIngestError(
+      `Failed to parse Apify response: ${parseError}`,
+      500,
+      responseText,
     );
   }
 
@@ -175,279 +224,212 @@ export async function ingestTikTokPost({
     trimmedProfileUsername
   )
     ?.toString()
-    .trim();
-  const accountDisplayName = (accountUser?.nickname ?? accountUsername)
-    ?.toString()
-    .trim();
+    ?.trim()
+    .toLowerCase();
 
-  if (!accountUsername || !accountDisplayName) {
-    throw new ApifyIngestError(
-      "Missing username or display name in account response",
-      422,
-      accountFetch.raw,
-    );
-  }
+  const accountFollowerCount = toPositiveInt(accountUser?.follower_count);
+  const accountFollowingCount = toPositiveInt(accountUser?.following_count);
 
-  const accountPayload = {
+  const accountData = {
+    id: accountDetail.id?.toString(),
     username: accountUsername,
-    displayName: accountDisplayName,
-    bio:
-      typeof accountUser?.signature === "string" &&
-      accountUser.signature.trim().length
-        ? accountUser.signature.trim()
-        : undefined,
-    profileImageUrl: accountProfileImageUrl ?? undefined,
-    followerCount: toPositiveInt(accountUser?.follower_count),
-    followingCount: toPositiveInt(accountUser?.following_count),
-    isVerified: Boolean(
-      accountUser?.verified ??
-        accountUser?.custom_verify ??
-        accountUser?.enterprise_verify_reason ??
-        accountUser?.is_star,
-    ),
-  };
-
-  let accountResponse = await fetch(
-    `${API_BASE_URL}/slideshow-library/accounts`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(accountPayload),
+    displayName: accountUser?.nickname?.toString() ?? accountUsername,
+    bio: accountUser?.signature?.toString() ?? null,
+    profileImageUrl: accountProfileImageUrl ?? null,
+    followerCount: accountFollowerCount,
+    followingCount: accountFollowingCount,
+    isVerified: accountUser?.verified ?? false,
+    stats: {
+      fans: accountFollowerCount,
+      following: accountFollowingCount,
+      heart: accountUser?.heart ?? 0,
+      heartCount: accountUser?.heart ?? 0,
+      digg: accountUser?.digg ?? 0,
+      video: accountUser?.video ?? 0,
+      videoCount: accountUser?.video ?? 0,
     },
-  );
-
-  let accountData: any = null;
-  if (accountResponse.ok) {
-    accountData = await accountResponse.json();
-  } else {
-    const accountError = await accountResponse.json().catch(() => ({}));
-    const duplicate =
-      accountResponse.status === 409 ||
-      (typeof accountError?.error === "string" &&
-        accountError.error.toLowerCase().includes("unique constraint"));
-
-    if (duplicate) {
-      const existingAccountsResponse = await fetch(
-        `${API_BASE_URL}/slideshow-library/accounts`,
-        { cache: "no-store" },
-      );
-      if (existingAccountsResponse.ok) {
-        const existingAccounts = await existingAccountsResponse.json();
-        const accountsArray = Array.isArray(existingAccounts)
-          ? existingAccounts
-          : Array.isArray(existingAccounts?.data)
-            ? existingAccounts.data
-            : [];
-        accountData = accountsArray.find(
-          (account: any) => account.username === accountPayload.username,
-        );
-      }
-    }
-
-    if (!accountData) {
-      throw new ApifyIngestError(
-        accountError?.error ?? "Failed to create or resolve slideshow account",
-        500,
-        {
-          details: accountError,
-          accountPayload,
-        },
-      );
-    }
-  }
-
-  if (!accountData?.id || typeof accountData.id !== "string") {
-    throw new ApifyIngestError(
-      "Could not resolve slideshow account identifier",
-      500,
-      accountData,
-    );
-  }
+  };
 
   const postFetch = await callApify({
     post_awemeId: awemeId,
-    profile_username: trimmedProfileUsername,
   });
 
-  const datasetItems = postFetch.items;
-  const awemeDetail =
-    findAwemeDetail(datasetItems) ?? datasetItems?.[0]?.aweme_detail;
-
-  if (!awemeDetail || typeof awemeDetail !== "object") {
+  const awemeDetail = findAwemeDetail(postFetch);
+  if (!awemeDetail) {
     throw new ApifyIngestError(
-      "Could not locate aweme_detail in Apify response",
+      "Unable to extract aweme detail from Apify response",
       422,
       postFetch.raw,
     );
   }
 
-  const author = (awemeDetail as any)?.author ?? accountDetail ?? {};
-  const statistics = (awemeDetail as any)?.statistics ?? {};
+  const videoUrl = Array.isArray(awemeDetail.video?.play_addr?.url_list)
+    ? awemeDetail.video?.play_addr?.url_list?.[0]
+    : awemeDetail.video?.play_addr_h264?.url_list?.[0];
 
-  const awemeIdFromDetail =
-    (awemeDetail as any)?.aweme_id?.toString() ?? awemeId;
-  const publishedAtSeconds = Number((awemeDetail as any)?.create_time ?? 0);
-  const publishedAt = new Date(
-    Number.isFinite(publishedAtSeconds) && publishedAtSeconds > 0
-      ? publishedAtSeconds * 1000
-      : Date.now(),
-  );
+  const videoUrlLow = Array.isArray(awemeDetail.video?.download_addr?.url_list)
+    ? awemeDetail.video?.download_addr?.url_list?.[0]
+    : awemeDetail.video?.play_addr_lowbr?.url_list?.[0];
 
-  const video = (awemeDetail as any)?.video ?? {};
-  const imagePostInfo = (awemeDetail as any)?.image_post_info ?? {};
-  const coverImage =
-    pickPreferredImageUrl(video?.cover?.url_list) ??
-    pickPreferredImageUrl(video?.dynamic_cover?.url_list) ??
-    pickPreferredImageUrl(video?.origin_cover?.url_list) ??
-    pickPreferredImageUrl(
-      imagePostInfo?.image_post_cover?.display_image?.url_list,
-      imagePostInfo?.image_post_cover?.thumbnail?.url_list,
-      imagePostInfo?.image_post_cover?.owner_watermark_image?.url_list,
-    );
+  const videoDownloadUrl =
+    (videoUrlLow ??
+    videoUrl ??
+    Array.isArray(awemeDetail.video?.bit_rate?.[0]?.play_addr?.url_list))
+      ? awemeDetail.video?.bit_rate?.[0]?.play_addr?.url_list?.[0]
+      : null;
 
-  const durationMs = Number(video?.duration ?? 0);
-  const durationSeconds =
-    Number.isFinite(durationMs) && durationMs > 0
-      ? Math.round(durationMs / 1000)
-      : undefined;
+  const caption = awemeDetail.desc?.toString() ?? null;
 
-  const defaultSlideDuration =
-    (durationSeconds && durationSeconds > 0 ? durationSeconds : undefined) ?? 3;
+  const slides = extractSlidesFromAwemeDetail(awemeDetail);
+  const slideCount = slides.length;
 
-  const imageSlides = Array.isArray(imagePostInfo?.images)
-    ? (imagePostInfo.images as Array<Record<string, any>>).reduce(
-        (
-          slides: Array<{
-            slideIndex: number;
-            imageUrl: string;
-            duration?: number;
-          }>,
-          image,
-          index,
-        ) => {
-          const imageUrl = pickPreferredImageUrl(
-            image?.display_image?.url_list ?? [],
-            image?.owner_watermark_image?.url_list ?? [],
-            image?.user_watermark_image?.url_list ?? [],
-            image?.thumbnail?.url_list ?? [],
-          );
-
-          if (!imageUrl) {
-            return slides;
-          }
-
-          const perImageDuration = toPositiveInt(
-            image?.duration ??
-              image?.image_duration ??
-              image?.display_image?.duration ??
-              0,
-          );
-
-          slides.push({
-            slideIndex: index,
-            imageUrl,
-            ...(perImageDuration > 0
-              ? { duration: perImageDuration }
-              : defaultSlideDuration > 0
-                ? { duration: defaultSlideDuration }
-                : {}),
-          });
-
-          return slides;
-        },
-        [],
-      )
-    : [];
-
-  const slidesPayload =
-    imageSlides.length > 0
-      ? imageSlides
-      : coverImage
-        ? [
-            {
-              slideIndex: 0,
-              imageUrl: coverImage,
-              duration: defaultSlideDuration,
-            },
-          ]
-        : [];
-
-  const postPayload = {
+  const postData = {
+    id: awemeDetail.id?.toString(),
     accountId: accountData.id,
-    postId: awemeIdFromDetail,
-    caption: (awemeDetail as any)?.desc ?? null,
+    postId: awemeDetail.aweme_id?.toString(),
+    caption,
     categories: [],
-    likeCount: toPositiveInt(statistics?.digg_count),
-    viewCount: toPositiveInt(statistics?.play_count),
-    commentCount: toPositiveInt(statistics?.comment_count),
-    shareCount: toPositiveInt(statistics?.share_count),
-    publishedAt: publishedAt.toISOString(),
-    createdAt: publishedAt.toISOString(),
-    duration: durationSeconds,
-    slides: slidesPayload,
-    isActive: ownerUserId ? false : true,
-    ...(ownerUserId ? { ownerUserId } : {}),
+    likeCount: toPositiveInt(awemeDetail.statistics?.digg_count),
+    viewCount: toPositiveInt(awemeDetail.statistics?.play_count),
+    commentCount: toPositiveInt(awemeDetail.statistics?.comment_count),
+    shareCount: toPositiveInt(awemeDetail.statistics?.share_count),
+    publishedAt: new Date((awemeDetail.create_time ?? 0) * 1000),
+    createdAt: new Date((awemeDetail.create_time ?? 0) * 1000),
+    duration: awemeDetail.duration,
+    videoUrl: videoUrl ?? null,
+    videoDownloadUrl: videoDownloadUrl ?? null,
+    videoH265Url: videoUrl ?? null,
+    slideCount,
+    slides,
+    prompt: null,
   };
 
-  let postData: any = null;
-  const postResponse = await fetch(`${API_BASE_URL}/slideshow-library/posts`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(postPayload),
-  });
+  // If it's an admin user, add directly to public library instead of user collection
+  if (ownerUserId === "admin-library") {
+    console.log(
+      "[apify/run] Admin library user detected, adding directly to public library",
+      {
+        postId: postData.postId,
+      },
+    );
 
-  if (postResponse.ok) {
-    postData = await postResponse.json();
-  } else {
-    const postError = await postResponse.json().catch(() => ({}));
-    const duplicatePost =
-      postResponse.status === 409 ||
-      (typeof postError?.error === "string" &&
-        postError.error.toLowerCase().includes("unique constraint"));
+    try {
+      // First, find or create the account to get a valid database ID
+      console.log("[apify/run] Finding or creating account:", {
+        username: accountData.username,
+        displayName: accountData.displayName,
+      });
 
-    if (duplicatePost) {
-      const existingPostsResponse = await fetch(
-        `${API_BASE_URL}/slideshow-library/accounts/${accountData.id}/posts?limit=200`,
-        { cache: "no-store" },
+      const accountResponse = await fetch(
+        `${API_BASE_URL}/slideshow-library/accounts/find-or-create`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: accountData.username,
+            displayName: accountData.displayName,
+            bio: accountData.bio,
+            profileImageUrl: accountData.profileImageUrl,
+            followerCount: accountData.followerCount,
+            followingCount: accountData.followingCount,
+            isVerified: accountData.isVerified,
+          }),
+        },
       );
-      if (existingPostsResponse.ok) {
-        const existingPosts = await existingPostsResponse.json();
-        const postsArray = Array.isArray(existingPosts)
-          ? existingPosts
-          : Array.isArray(existingPosts?.data)
-            ? existingPosts.data
-            : [];
-        postData = postsArray.find(
-          (post: any) => post.postId === postPayload.postId,
+
+      if (!accountResponse.ok) {
+        const errorText = await accountResponse.text();
+        throw new Error(`Failed to find or create account: ${errorText}`);
+      }
+
+      const createdAccount = await accountResponse.json();
+      console.log("[apify/run] Account found/created:", {
+        accountId: createdAccount.id,
+        username: createdAccount.username,
+      });
+
+      const publicPostData = {
+        accountId: createdAccount.id, // Use the database account ID
+        postId: postData.postId,
+        caption: postData.caption,
+        categories: postData.categories,
+        likeCount: postData.likeCount,
+        viewCount: postData.viewCount,
+        publishedAt: postData.publishedAt.toISOString(),
+        createdAt: postData.createdAt.toISOString(),
+        duration: postData.duration,
+        slides: postData.slides,
+      };
+
+      console.log("[apify/run] Sending admin post to backend:", {
+        apiBase: API_BASE_URL,
+        endpoint: `${API_BASE_URL}/slideshow-library/posts`,
+        postId: postData.postId,
+        accountId: createdAccount.id,
+        slidesCount: postData.slides?.length || 0,
+        payload: publicPostData,
+      });
+
+      const publicPostResponse = await fetch(
+        `${API_BASE_URL}/slideshow-library/posts`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(publicPostData),
+        },
+      );
+
+      if (publicPostResponse.ok) {
+        console.log(
+          "[apify/run] Successfully added admin post to public library",
+          {
+            postId: postData.postId,
+          },
+        );
+      } else {
+        const responseText = await publicPostResponse.text();
+        console.error(
+          "[apify/run] Failed to add admin post to public library",
+          {
+            status: publicPostResponse.status,
+            postId: postData.postId,
+            error: responseText,
+          },
+        );
+        throw new ApifyIngestError(
+          `Failed to add admin post to public library: ${responseText}`,
+          500,
         );
       }
-    }
-
-    if (!postData) {
-      throw new ApifyIngestError(
-        postError?.error ?? "Failed to create slideshow post",
-        500,
-        postError,
-      );
-    }
-  }
-
-  if (ownerUserId && postData?.id) {
-    try {
-      await fetch(`${API_BASE_URL}/slideshow-library/user-posts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: ownerUserId,
-          postId: postData.id,
-        }),
-      });
     } catch (error) {
-      console.warn("[apify/run] Failed to link post to user", {
-        userId: ownerUserId,
-        postId: postData?.id,
+      console.error("[apify/run] Error adding admin post to public library", {
+        postId: postData.postId,
         error,
       });
+      throw new ApifyIngestError(
+        `Error adding admin post to public library: ${error}`,
+        500,
+      );
+    }
+  } else {
+    // Normal user: add to user collection
+    if (ownerUserId) {
+      try {
+        await fetch(`${API_BASE_URL}/slideshow-library/user-posts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: ownerUserId,
+            postId: postData.id,
+          }),
+        });
+      } catch (error) {
+        console.warn("[apify/run] Failed to link post to user", {
+          userId: ownerUserId,
+          postId: postData?.id,
+          error,
+        });
+      }
     }
   }
 
@@ -499,16 +481,25 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof ApifyIngestError) {
+      console.warn("[apify/run] Known ingestion error", {
+        message: error.message,
+        status: error.status,
+        payload: error.payload,
+      });
       return NextResponse.json(
         { error: error.message, data: error.payload },
-        { status: error.status },
+        {
+          status: error.status,
+        },
       );
     }
 
-    console.error("Apify run failed", error);
+    console.error("[apify/run] Unexpected failure", error);
     return NextResponse.json(
-      { error: "Failed to trigger Apify run" },
-      { status: 500 },
+      { error: "Failed to ingest TikTok URL" },
+      {
+        status: 500,
+      },
     );
   }
 }

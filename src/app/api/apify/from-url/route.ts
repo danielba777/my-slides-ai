@@ -3,6 +3,13 @@ import { NextResponse } from "next/server";
 import { ApifyIngestError, ingestTikTokPost } from "../run/route";
 import { db } from "@/server/db";
 
+// CORS Headers für Extension-Zugriff
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
 function extractFromTikTokUrl(rawUrl: string) {
   let url: URL;
   try {
@@ -26,6 +33,32 @@ function extractFromTikTokUrl(rawUrl: string) {
   const numericMatch = possibleId.match(/\d+/);
   const awemeId = numericMatch ? numericMatch[0] : null;
 
+  console.log("[apify/from-url] URL extraction debug:", {
+    url: rawUrl,
+    segments,
+    possibleId,
+    numericMatch,
+    awemeId,
+    profileUsername,
+    hasPhotoSegment: segments.includes("photo"),
+    hasVideoSegment: segments.includes("video"),
+  });
+
+  // Check if this is a photo post and log it
+  if (segments.includes("photo")) {
+    console.log("[apify/from-url] Detected photo post", {
+      awemeId,
+      profileUsername,
+      urlType: "photo",
+    });
+  } else if (segments.includes("video")) {
+    console.log("[apify/from-url] Detected video post", {
+      awemeId,
+      profileUsername,
+      urlType: "video",
+    });
+  }
+
   if (!awemeId || !profileUsername) {
     throw new ApifyIngestError(
       "Could not extract aweme id or username from TikTok URL",
@@ -34,6 +67,14 @@ function extractFromTikTokUrl(rawUrl: string) {
   }
 
   return { awemeId, profileUsername };
+}
+
+// OPTIONS Handler für CORS Preflight
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders
+  });
 }
 
 export async function POST(request: Request) {
@@ -69,7 +110,9 @@ export async function POST(request: Request) {
       postId: result.post?.id,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json(result, {
+  headers: corsHeaders
+});
   } catch (error) {
     if (error instanceof ApifyIngestError) {
       console.warn("[apify/from-url] Known ingestion error", {
@@ -79,14 +122,20 @@ export async function POST(request: Request) {
       });
       return NextResponse.json(
         { error: error.message, data: error.payload },
-        { status: error.status },
+        {
+          status: error.status,
+          headers: corsHeaders
+        },
       );
     }
 
     console.error("[apify/from-url] Unexpected failure", error);
     return NextResponse.json(
       { error: "Failed to ingest TikTok URL" },
-      { status: 500 },
+      {
+        status: 500,
+        headers: corsHeaders
+      },
     );
   }
 }
@@ -100,6 +149,32 @@ async function authenticateExtensionUser(request: Request) {
     throw new ApifyIngestError("Missing extension token", 401);
   }
 
+  // First check if it's an admin library token
+  try {
+    const adminResponse = await fetch(`${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/admin/library-token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+
+    if (adminResponse.ok) {
+      const adminResult = await adminResponse.json();
+      if (adminResult.isValid) {
+        console.log("[apify/from-url] Admin library token detected");
+        // Return a special admin user object
+        return {
+          id: "admin-library",
+          email: "admin@slidescockpit.com",
+          isAdmin: true
+        };
+      }
+    }
+  } catch (error) {
+    // Continue with normal user authentication if admin check fails
+    console.debug("[apify/from-url] Admin token check failed, trying normal user:", error);
+  }
+
+  // Normal user authentication
   const user = await db.user.findUnique({
     where: { extensionToken: token },
     select: { id: true, email: true },
@@ -109,5 +184,5 @@ async function authenticateExtensionUser(request: Request) {
     throw new ApifyIngestError("Invalid extension token", 401);
   }
 
-  return user;
+  return { ...user, isAdmin: false };
 }
