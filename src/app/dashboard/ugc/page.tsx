@@ -15,7 +15,13 @@ import { cn } from "@/lib/utils";
 import type { DemoVideo, GeneratedVideo, ReactionAvatar } from "@/types/ugc";
 
 type SoundItem = { key: string; name: string; size: number; ufsUrl?: string; url?: string; coverUrl?: string | null };
-import { AlignCenter, ArrowUpFromLine, Music, Plus, VideoOff } from "lucide-react";
+import {
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyStart,
+  Music,
+  Plus,
+  VideoOff,
+} from "lucide-react";
 // Sound popover (dialog)
 import {
   Dialog,
@@ -50,8 +56,8 @@ export default function UgcDashboardPage() {
   const [avatars, setAvatars] = useState<ReactionAvatar[]>([]);
   const [avatarsLoading, setAvatarsLoading] = useState(true);
   const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(null);
-  // only one visible tab: "community"
-  const [avatarTab, setAvatarTab] = useState("community");
+  // Avatar-Tabs entfallen – direkte Grid-Ansicht
+  const [avatarTab] = useState("community");
 
   const [demos, setDemos] = useState<DemoVideo[]>([]);
   const [demosLoading, setDemosLoading] = useState(true);
@@ -451,68 +457,47 @@ export default function UgcDashboardPage() {
                 </div>
               </section>
 
-              {/* Avatars (ohne innere Box, kompakt) */}
+              {/* Avatars (ohne Tabs) */}
               <section className="p-0">
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base font-semibold">2. AI Avatar</h2>
                   </div>
                 </div>
-
-                <Tabs
-                  value={avatarTab}
-                  onValueChange={setAvatarTab}
-                  className="mt-4"
-                >
-                  {/* Nur eine sichtbare Tab-Option: Community */}
-                  <TabsList className="grid h-10 w-full grid-cols-1 rounded-full bg-muted p-1">
-                    <TabsTrigger
-                      value="community"
-                      className="rounded-full text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
-                    >
-                      Community
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="community" className="mt-4">
-                    {avatarsLoading ? (
-                      <div className="flex h-64 items-center justify-center">
-                        <Spinner className="h-6 w-6" />
+                <div className="mt-4">
+                  {avatarsLoading ? (
+                    <div className="flex h-64 items-center justify-center">
+                      <Spinner className="h-6 w-6" />
+                    </div>
+                  ) : avatars.length === 0 ? (
+                    <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-border/80 bg-muted/40 text-center text-sm text-muted-foreground">
+                      Keine passenden Avatare mit Video vorhanden.
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-64 sm:h-72 lg:h-80 rounded-2xl border border-border/50 bg-muted/40">
+                      <div className="grid grid-cols-4 gap-2 p-2 sm:grid-cols-6 md:grid-cols-8">
+                        {avatars.slice(0, 48).map((avatar) => (
+                          <button
+                            key={avatar.id}
+                            className={cn(
+                              "relative aspect-square overflow-hidden rounded-lg border border-transparent transition-all duration-150 hover:ring-2 hover:ring-foreground/40",
+                              selectedAvatarId === avatar.id
+                                ? "ring-2 ring-foreground"
+                                : "",
+                            )}
+                            onClick={() => setSelectedAvatarId(avatar.id)}
+                          >
+                            <img
+                              src={avatar.thumbnailUrl}
+                              className="h-full w-full object-cover"
+                              alt={avatar.name}
+                            />
+                          </button>
+                        ))}
                       </div>
-                    ) : avatars.length === 0 ? (
-                      <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-border/80 bg-muted/40 text-center text-sm text-muted-foreground">
-                        Keine passenden Avatare mit Video vorhanden.
-                      </div>
-                    ) : (
-                      <>
-                        {/* 4 Reihen sichtbar, danach Scroll */}
-                        <ScrollArea className="h-64 sm:h-72 lg:h-80 rounded-2xl border border-border/50 bg-muted/40">
-                          <div className="grid grid-cols-4 gap-2 p-2 sm:grid-cols-6 md:grid-cols-8">
-                            {avatars.slice(0, 48).map((avatar) => (
-                              <button
-                                key={avatar.id}
-                                className={cn(
-                                  "relative aspect-square overflow-hidden rounded-lg border border-transparent transition-all duration-150 hover:ring-2 hover:ring-foreground/40",
-                                  selectedAvatarId === avatar.id
-                                    ? "ring-2 ring-foreground"
-                                    : "",
-                                )}
-                                onClick={() => setSelectedAvatarId(avatar.id)}
-                              >
-                                <img
-                                  src={avatar.thumbnailUrl}
-                                  className="h-full w-full object-cover"
-                                  alt={avatar.name}
-                                />
-                                {/* Kein Hover-Text, nur dezente Markierung */}
-                              </button>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                      </>
-                    )}
-                  </TabsContent>
-                </Tabs>
+                    </ScrollArea>
+                  )}
+                </div>
               </section>
 
               {/* Demos (ohne Box, als 9:16 Cards + Platzhalter rechts) */}
@@ -525,9 +510,9 @@ export default function UgcDashboardPage() {
                     </div>
                   ) : (
                     <>
-                      {/* 2 Reihen sichtbar, danach Scroll */}
-                      <ScrollArea className="h-[260px] sm:h-[300px] rounded-2xl border border-border/50 bg-muted/40">
-                        <div className="flex items-center gap-3 p-3">
+                      {/* exakt 1 Zeile sichtbar – horizontal scrollen bei Overflow */}
+                      <div className="rounded-2xl border border-border/50 bg-muted/40 overflow-x-auto">
+                        <div className="flex flex-nowrap items-center gap-3 p-3">
                           {demos.map((demo) => {
                             const isActive = selectedDemoId === demo.id;
                             return (
@@ -568,7 +553,7 @@ export default function UgcDashboardPage() {
                             <Plus className="h-6 w-6" />
                           </Link>
                         </div>
-                      </ScrollArea>
+                      </div>
                     </>
                   )}
                 </div>
@@ -712,7 +697,7 @@ export default function UgcDashboardPage() {
                   className="rounded-full px-3"
                   title="Vertikal zentrieren"
                 >
-                  <AlignCenter className="h-4 w-4" />
+                  <AlignVerticalJustifyCenter className="h-4 w-4" />
                 </Button>
                 <Button
                   type="button"
@@ -722,42 +707,44 @@ export default function UgcDashboardPage() {
                   className="rounded-full px-3"
                   title="Weiter oben positionieren"
                 >
-                  <ArrowUpFromLine className="h-4 w-4" />
+                  <AlignVerticalJustifyStart className="h-4 w-4" />
                 </Button>
               </div>
 
-              {/* Sound-Auswahl – kompakt, damit links neben Generate passt */}
-              <div className="mt-2 rounded-2xl border overflow-hidden h-10 max-w-[260px]">
-                 <button
-                   type="button"
-                   onClick={() => setSoundOpen(true)}
-                  className="w-full h-full flex items-center text-left"
-                 >
-                  {/* Bild links, abgerundet; rechte Abschlusslinie */}
-                  <div className="relative h-full w-10 shrink-0 overflow-hidden rounded-l-2xl border-r">
-                     {selectedSound?.coverUrl ? (
-                       <img
-                         src={selectedSound.coverUrl}
-                         alt=""
-                        className="h-full w-full object-cover"
-                       />
-                     ) : (
-                      <div className="h-full w-full bg-muted" />
-                     )}
-                   </div>
-                  {/* Text rechts, sehr kompakt */}
-                  <div className="flex-1 px-2">
-                    <div className="text-xs font-medium leading-none">Sound</div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
-                      {selectedSound ? selectedSound.name : "Keiner gewählt"}
-                    </div>
-                   </div>
-                 </button>
-               </div>
-
-              {/* Sound Dialog */}
-              <Dialog open={soundOpen} onOpenChange={(o)=>{setSoundOpen(o); if(!o) setTempSound(null);}}>
-                <DialogContent className="max-w-xl">
+              {/* Sound-Auswahl links, Generate rechts in einer Zeile */}
+              <div className="mt-2 flex w-full items-center justify-between gap-3">
+                {/* LINKS: Sound-Menübutton */}
+                <div className="flex items-center gap-2">
+                  <Dialog open={soundOpen} onOpenChange={setSoundOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 rounded-2xl border overflow-hidden max-w-[260px] px-0"
+                      >
+                        {/* Bild links, abgerundet; rechte Abschlusslinie */}
+                        <div className="relative h-full w-10 shrink-0 overflow-hidden rounded-l-2xl border-r">
+                          {selectedSound?.coverUrl ? (
+                            <img
+                              src={selectedSound.coverUrl}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="h-full w-full bg-muted" />
+                          )}
+                        </div>
+                        {/* Text rechts, sehr kompakt */}
+                        <div className="flex-1 px-2">
+                          <div className="text-xs font-medium leading-none">Sound</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                            {selectedSound ? selectedSound.name : "Keiner gewählt"}
+                          </div>
+                        </div>
+                      </Button>
+                    </DialogTrigger>
+                    {/* Sound Dialog */}
+                    <DialogContent className="max-w-xl">
                   <DialogHeader>
                     <DialogTitle>Sound auswählen</DialogTitle>
                   </DialogHeader>
@@ -766,7 +753,7 @@ export default function UgcDashboardPage() {
                       <div className="flex h-32 items-center justify-center">
                         <Spinner className="h-6 w-6" />
                       </div>
-                    ) : sounds.length === 0 ? (
+                        ) : sounds.length === 0 ? (
                       <div className="text-center text-sm text-muted-foreground">
                         Keine Sounds verfügbar.
                       </div>
@@ -820,38 +807,42 @@ export default function UgcDashboardPage() {
                      )}
                    </div>
                   {/* versteckter Audio-Player für Loop-Preview */}
-                  <audio ref={audioRef} src={(tempSound ?? selectedSound)?.ufsUrl || (tempSound ?? selectedSound)?.url || undefined} loop />
-                  <DialogFooter className="justify-end">
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        setTempSound(null);
-                        setSoundOpen(false);
-                      }}
-                    >
-                      Abbrechen
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        if (tempSound) setSelectedSound(tempSound);
-                        setSoundOpen(false);
-                      }}
-                    >
-                      Bestätigen
-                    </Button>
-                  </DialogFooter>
+                       <DialogFooter className="flex items-center justify-between gap-3">
+                         <audio ref={audioRef} src={(tempSound ?? selectedSound)?.ufsUrl ?? (tempSound ?? selectedSound)?.url ?? undefined} />
+                         <div className="text-xs text-muted-foreground truncate">
+                           {tempSound ? tempSound.name : selectedSound ? selectedSound.name : "Kein Sound ausgewählt"}
+                         </div>
+                         <div className="flex gap-2">
+                           <Button
+                             type="button"
+                             variant="outline"
+                             onClick={() => { setTempSound(null); setSoundOpen(false); }}
+                           >
+                             Abbrechen
+                           </Button>
+                           <Button
+                             type="button"
+                             onClick={() => {
+                               setSelectedSound(tempSound ?? selectedSound ?? null);
+                               setSoundOpen(false);
+                             }}
+                           >
+                             Übernehmen
+                           </Button>
+                         </div>
+                       </DialogFooter>
                 </DialogContent>
               </Dialog>
-
-              {/* Generate Button */}
-              <Button
-                onClick={handleGenerate}
-                disabled={isGenerating || !selectedAvatarId}
-                className="h-12 rounded-full px-8 text-base"
-              >
-                {isGenerating ? "Generating..." : "Generate"}
-              </Button>
-            </div>
+                   </div>
+                   <Button
+                     onClick={handleGenerate}
+                     disabled={isGenerating || !selectedAvatarId}
+                     className="h-12 rounded-full px-8 text-base"
+                   >
+                     {isGenerating ? "Generating…" : "Generate"}
+                   </Button>
+                 </div>
+              </div>
           </div>
         </CardContent>
       </Card>
@@ -873,7 +864,7 @@ export default function UgcDashboardPage() {
         ) : videos.length === 0 ? (
           // Platzhalter-Kacheln wie bei Avataren/Templates
           <div className="rounded-2xl border border-dashed border-border/70 bg-muted/30 p-4">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
@@ -886,63 +877,44 @@ export default function UgcDashboardPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             {videos.map((video) => (
               <Card key={video.id} className="overflow-hidden rounded-2xl">
-                <CardContent className="space-y-3 p-3">
+                <CardContent className="p-0">
                   <div className="relative">
-                    {/* bevorzugt Thumbnail anzeigen (leichter/performanter) */}
                     {video.compositeThumbnailUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={video.compositeThumbnailUrl}
                         alt={video.title ?? "UGC Video"}
-                        className="aspect-[9/16] w-full rounded-xl object-cover"
+                        className="aspect-[9/16] w-full object-cover"
                       />
                     ) : (
                       <video
                         src={video.compositeVideoUrl}
                         muted
-                        className="aspect-[9/16] w-full rounded-xl bg-black object-cover"
+                        className="aspect-[9/16] w-full bg-black object-cover"
                       />
                     )}
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {video.title ?? "UGC Video"}
-                      </p>
-                      {video.scheduleRunAt && (
-                        <p className="truncate text-xs text-muted-foreground">
-                          Scheduled:{" "}
-                          {new Date(video.scheduleRunAt).toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDownload(video)}
-                      >
-                        Download
-                      </Button>
+                    {/* Overlay-Buttons im Bild – wie Recently Created */}
+                    <div className="absolute inset-x-2 bottom-2 flex flex-col gap-2">
                       <Link
                         href={video.compositeVideoUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex"
                       >
-                        <Button variant="outline" size="sm">
-                          Open
+                        <Button variant="secondary" size="sm" className="w-full rounded-full">
+                          Open in new tab
                         </Button>
                       </Link>
+                      <Button
+                        size="sm"
+                        className="w-full rounded-full"
+                        onClick={() => handleOpenVideo(video)}
+                      >
+                        Post on TikTok
+                      </Button>
                     </div>
-                    <Button size="sm" onClick={() => handleOpenVideo(video)}>
-                      Post on TikTok
-                    </Button>
                   </div>
                 </CardContent>
               </Card>

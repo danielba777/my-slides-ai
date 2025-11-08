@@ -52,7 +52,7 @@ export default function SettingsSounds() {
           <div key={it.key} className="rounded-xl border p-3 flex items-center justify-between">
             <div className="truncate">
               <div className="font-medium truncate">{it.name}</div>
-              <div className="text-xs opacity-70">{(it.size/1024).toFixed(1)} KB</div>
+              {/* Größe ausgeblendet (KB-Anzeige entfernt) */}
             </div>
             <a href={it.ufsUrl || it.url} target="_blank" rel="noreferrer" className="text-primary text-sm underline">
               Öffnen
