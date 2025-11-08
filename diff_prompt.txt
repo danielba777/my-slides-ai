@@ -1,137 +1,35 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
 *** Begin Patch
-*** Update File: src/app/dashboard/ugc/page.tsx
+*** Update File: src/components/dashboard/admin/AdminSounds.tsx
 @@
--              {/* Sound-Auswahl links, Generate rechts in einer Zeile */}
--              <div className="mt-2 flex w-full items-center justify-between gap-3">
--                 <div className="flex items-center gap-2">
--                   <Dialog open={soundOpen} onOpenChange={setSoundOpen}>
--                     <DialogTrigger asChild>
--                       <Button
--                         type="button"
--                         variant="outline"
--                         className="h-10 rounded-2xl border overflow-hidden max-w-[260px] px-0"
--                       >
--                        {/* Bild links, abgerundet; rechte Abschlusslinie */}
--                        <div className="relative h-full w-10 shrink-0 overflow-hidden rounded-l-2xl border-r">
--                           {selectedSound?.coverUrl ? (
--                             <img
--                               src={selectedSound.coverUrl}
--                               alt=""
--                              className="h-full w-full object-cover"
--                             />
--                           ) : (
--                            <div className="h-full w-full bg-muted" />
--                           )}
--                         </div>
--                        {/* Text rechts, sehr kompakt */}
--                        <div className="flex-1 px-2">
--                          <div className="text-xs font-medium leading-none">Sound</div>
--                          <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
--                            {selectedSound ? selectedSound.name : "Keiner gewählt"}
--                          </div>
--                         </div>
--                       </Button>
--                     </DialogTrigger>
--
--              {/* Sound Dialog */}
--              <Dialog open={soundOpen} onOpenChange={(o)=>{setSoundOpen(o); if(!o) setTempSound(null);}}>
--                <DialogContent className="max-w-xl">
-+              {/* Sound-Auswahl links, Generate rechts in einer Zeile */}
-+              <div className="mt-2 flex w-full items-center justify-between gap-3">
-+                {/* LINKS: Sound-Menübutton */}
-+                <div className="flex items-center gap-2">
-+                  <Dialog open={soundOpen} onOpenChange={setSoundOpen}>
-+                    <DialogTrigger asChild>
-+                      <Button
-+                        type="button"
-+                        variant="outline"
-+                        className="h-10 rounded-2xl border overflow-hidden max-w-[260px] px-0"
-+                      >
-+                        {/* Bild links, abgerundet; rechte Abschlusslinie */}
-+                        <div className="relative h-full w-10 shrink-0 overflow-hidden rounded-l-2xl border-r">
-+                          {selectedSound?.coverUrl ? (
-+                            <img
-+                              src={selectedSound.coverUrl}
-+                              alt=""
-+                              className="h-full w-full object-cover"
-+                            />
-+                          ) : (
-+                            <div className="h-full w-full bg-muted" />
-+                          )}
-+                        </div>
-+                        {/* Text rechts, sehr kompakt */}
-+                        <div className="flex-1 px-2">
-+                          <div className="text-xs font-medium leading-none">Sound</div>
-+                          <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
-+                            {selectedSound ? selectedSound.name : "Keiner gewählt"}
-+                          </div>
-+                        </div>
-+                      </Button>
-+                    </DialogTrigger>
-+                    {/* Sound Dialog */}
-+                    <DialogContent className="max-w-xl">
-                       <DialogHeader>
-                         <DialogTitle>Sound auswählen</DialogTitle>
-                       </DialogHeader>
-                       <div className="space-y-4">
-                         {soundsLoading ? (
-                           <div className="flex h-32 items-center justify-center">
-                             <Spinner className="h-6 w-6" />
-                           </div>
--                    ) : sounds.length === 0 ?
-+                        ) : sounds.length === 0 ? (
-                           <div className="text-center text-sm text-muted-foreground">
-                             Keine Sounds verfügbar.
-                           </div>
-                         ) : (
-                           <div className="grid gap-2 max-h-64 overflow-y-auto">
+     } catch (err) {
+       console.error("[AdminSounds] Upload error:", err);
+-      alert(err?.message || "Upload failed");
++      alert(err instanceof Error ? err.message : "Upload failed");
+     } finally {
+       setBusy(false);
+     }
+   }
+*** End Patch
+diff
+Code kopieren
+*** Begin Patch
+*** Update File: src/server/ugc/video-composer.ts
 @@
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                         )}
-                       </div>
-                       <DialogFooter className="flex items-center justify-between gap-3">
-                         <audio ref={audioRef} src={(tempSound ?? selectedSound)?.ufsUrl ?? (tempSound ?? selectedSound)?.url ?? undefined} />
-                         <div className="text-xs text-muted-foreground truncate">
-                           {tempSound ? tempSound.name : selectedSound ? selectedSound.name : "Kein Sound ausgewählt"}
-                         </div>
-                         <div className="flex gap-2">
-                           <Button
-                             type="button"
-                             variant="outline"
-                             onClick={() => { setTempSound(null); setSoundOpen(false); }}
-                           >
-                             Abbrechen
-                           </Button>
-                           <Button
-                             type="button"
-                             onClick={() => {
-                               setSelectedSound(tempSound ?? selectedSound ?? null);
-                               setSoundOpen(false);
-                             }}
-                           >
-                             Übernehmen
-                           </Button>
-                         </div>
-                       </DialogFooter>
--                </DialogContent>
--              </Dialog>
--            </div>
--          </div>
-+                    </DialogContent>
-+                  </Dialog>
-+                </div>
-+                {/* RECHTS: Generate */}
-+                <Button
-+                  onClick={handleGenerate}
-+                  disabled={isGenerating || !selectedAvatarId}
-+                  className="h-12 rounded-full px-8 text-base"
-+                >
-+                  {isGenerating ? "Generating…" : "Generate"}
-+                </Button>
-+              </div>
+-const uploadBuffer = async (buf: Buffer, key: string, mimeType: string = "video/mp4"): Promise<string> => {
++const uploadBuffer = async (buf: Buffer, key: string, mimeType: string = "video/mp4"): Promise<string> => {
+   // Sprechender Dateiname + korrekter MIME-Type
+   const extension = mimeType === "video/mp4" ? ".mp4" : ".jpg";
+   const filename = `${key}${extension}`;
+-  const utFile = new File([buf], filename, {
+-    type: mimeType,
+-    lastModified: Date.now(),
+-  });
++  // In Node keine Web-File-API nutzen: UploadThing erwartet UTFile (server)
++  // Buffer -> Uint8Array, damit der Konstruktor sauber typisiert ist
++  const utFile = new UTFile([new Uint8Array(buf)], filename, { type: mimeType });
+@@
+-      const [upload] = await utapi.uploadFiles([utFile]);
++      const [upload] = await utapi.uploadFiles([utFile]);
 *** End Patch

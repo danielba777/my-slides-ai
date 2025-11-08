@@ -18451,6 +18451,79 @@ export default function AllweoneText(
 }
 </file>
 
+<file path="src/components/logo/AppLogo.tsx">
+"use client";
+
+import { cn } from "@/lib/utils";
+import Image from "next/image";
+import { useTheme } from "next-themes";
+
+import logoDark from "@/assets/logo_dark.png";
+import logoLight from "@/assets/logo_light.png";
+
+interface AppLogoProps {
+  /**
+   * Optional manual override. When provided, `true` forces the dark variant,
+   * `false` forces the light variant. When omitted, the component inverts the
+   * current resolved theme (light theme → dark logo, dark theme → light logo).
+   */
+  dark?: boolean;
+  size?: number | string;
+  className?: string;
+  borderRadius?: number | string;
+}
+
+export function AppLogo({
+  dark,
+  size = 48,
+  className,
+  borderRadius,
+}: AppLogoProps) {
+  const { resolvedTheme } = useTheme();
+  const isThemeDark = resolvedTheme === "dark";
+
+  const dimension = typeof size === "number" ? `${size}px` : size ?? "48px";
+  const borderRadiusStyle =
+    borderRadius !== undefined
+      ? {
+          borderRadius:
+            typeof borderRadius === "number"
+              ? `${borderRadius}px`
+              : borderRadius,
+        }
+      : {};
+
+  // When `dark` prop is provided, honour it. Otherwise invert the theme:
+  // light mode → dark logo, dark mode → light logo.
+  const shouldUseDarkLogo =
+    typeof dark === "boolean" ? dark : !isThemeDark || resolvedTheme === undefined;
+
+  const logoSrc = shouldUseDarkLogo ? logoDark : logoLight;
+
+  return (
+    <div
+      className={cn(
+        "relative flex items-center justify-center overflow-hidden rounded-lg",
+        className,
+      )}
+      style={{ width: dimension, height: dimension, ...borderRadiusStyle }}
+      aria-label="SlidesCockpit logo"
+    >
+      <Image
+        src={logoSrc}
+        alt="SlidesCockpit logo"
+        width={750}
+        height={750}
+        /* Qualität auf erlaubten Wert; oder prop ganz weglassen */
+        quality={75}
+        priority={typeof size === "number" && size <= 64}
+        className="h-full w-full object-contain"
+      />
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/marketing/BackgroundWrap.tsx">
 import type { ReactNode } from "react";
 
@@ -68910,6 +68983,18 @@ TooltipContent.displayName = TooltipPrimitive.Content.displayName;
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger };
 </file>
 
+<file path="src/config.ts">
+const config = {
+  resend: {
+    fromNoReply: "SlidesCockpit <noreply@resend.slidescockpit.com>",
+    fromAdmin: "SlidesCockpit Support <support@resend.slidescockpit.com>",
+    supportEmail: "ab.business.germany@gmail.com",
+  },
+};
+
+export default config;
+</file>
+
 <file path="src/hooks/globals/useMediaQuery.tsx">
 import * as React from "react";
 
@@ -72507,6 +72592,89 @@ export default config;
 }
 </file>
 
+<file path="next.config.js">
+// --- Security headers (CSP funktionsfähig & Scanner-kompatibel) ---
+const ONE_YEAR = 31536000;
+const isProd = process.env.NODE_ENV === "production";
+
+// Hinweis:
+// - Wir erlauben bewusst 'unsafe-inline' und 'unsafe-eval' in script-src,
+// damit Next.js + deine Libs (z.B. Framer Motion) zuverlässig rendern.
+// - Scanner erwarten _vorhandene_ CSP-Header; eine zu strikte CSP hat dir die App gebrochen.
+// - Falls du später weiter abhärten willst, können wir Nonces/Hashes einführen.
+const CSP = [
+  "default-src 'self'",
+  // Skripte: Next/Framer/Hydration brauchen inline/eval in deinem aktuellen Setup
+  "script-src 'self' https: blob: 'unsafe-inline' 'unsafe-eval'",
+  // Styles: Tailwind/inline kritisch, daher 'unsafe-inline'
+  "style-src 'self' https: 'unsafe-inline'",
+  // Medien & Bilder (Next/Image, UploadThing-CDNs, eigene Files)
+  "img-src 'self' https: data: blob:",
+  "media-src 'self' https: blob:",
+  // Schriften
+  "font-src 'self' https: data:",
+  // API/SSR/HMR/Realtime
+  "connect-src 'self' https: wss: ws:",
+  // Frames nur von sicheren Quellen (z.B. eigene Seiten, evtl. externe UIs)
+  "frame-src 'self' https:",
+  // Worker (Next/Image, Offscreen etc.)
+  "worker-src 'self' blob:",
+  // Sichere Defaults
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+  // Mixed-Content nur in Production automatisch upgraden (vermeidet localhost-Timeouts)
+  ...(isProd ? ["upgrade-insecure-requests"] : []),
+].join("; ");
+
+const securityHeaders = [
+  { key: "Strict-Transport-Security", value: `max-age=${ONE_YEAR}; includeSubDomains` },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-site" },
+  { key: "Origin-Agent-Cluster", value: "?1" },
+  { key: "Content-Security-Policy", value: CSP },
+];
+
+const config = {
+  images: {
+    formats: ["image/avif", "image/webp"],
+    remotePatterns: [
+      { protocol: "https", hostname: "files.slidescockpit.com" },
+      { protocol: "https", hostname: "utfs.io" },
+      { protocol: "https", hostname: "*.ufs.sh" },
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
+      { protocol: "https", hostname: "placehold.co" },
+      // TikTok CDN (diverse pXX-Subdomains; nötig für Hero-Slides)
+      {
+        protocol: "https",
+        hostname: "*.tiktokcdn-eu.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.tiktokcdn.com",
+      },
+    ],
+  },
+
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: securityHeaders,
+      },
+    ];
+  },
+};
+
+export default config;
+</file>
+
 <file path="src/app/admin/slideshow-library/accounts/[id]/page.tsx">
 "use client";
 
@@ -73414,6 +73582,65 @@ export async function GET(request: Request) {
 }
 </file>
 
+<file path="src/app/api/support/route.ts">
+import { NextResponse } from "next/server";
+import { Resend } from "resend";
+
+import config from "@/config";
+
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
+
+export async function POST(request: Request) {
+  if (!resend) {
+    return NextResponse.json(
+      { error: "RESEND_API_KEY is not set" },
+      { status: 500 },
+    );
+  }
+  try {
+    const { name, email, subject, message } = await request.json();
+
+    await resend.emails.send({
+      from: config.resend.fromAdmin,
+      to: config.resend.supportEmail,
+      subject: `Support Request: ${subject}`,
+      html: `
+        <h2>New Support Request</h2>
+        <p><strong>Name:</strong> ${name}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Subject:</strong> ${subject}</p>
+        <p><strong>Message:</strong></p>
+        <p>${message}</p>
+      `,
+    });
+
+    await resend.emails.send({
+      from: config.resend.fromAdmin,
+      to: email,
+      subject: "Your Support Request",
+      html: `
+        <h2>Thank you for contacting us!</h2>
+        <p>We received your message and will respond as soon as possible.</p>
+        <p><strong>Subject:</strong> ${subject}</p>
+        <p><strong>Message:</strong></p>
+        <p>${message}</p>
+        <hr />
+        <p>Best regards,<br />Your Support Team</p>
+      `,
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Support request error:", error);
+    return NextResponse.json(
+      { error: "Failed to send support request" },
+      { status: 500 },
+    );
+  }
+}
+</file>
+
 <file path="src/app/api/tiktok/post-status/[openId]/[publishId]/route.ts">
 import { env } from "@/env";
 import { auth } from "@/server/auth";
@@ -74006,6 +74233,7 @@ import { z } from "zod";
 
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
+import { utapi } from "@/app/api/uploadthing/core";
 
 const updateSchema = z
   .object({
@@ -74116,28 +74344,42 @@ export async function DELETE(_: Request, { params }: RouteParams) {
   }
 
   const { id: videoId } = await params;
-  if (!videoId) {
-    return NextResponse.json({ error: "Missing video id" }, { status: 400 });
-  }
 
+  // Zuerst Video holen, um die URL zu haben
   const existing = await db.userUGCVideo.findFirst({
     where: { id: videoId, userId: session.user.id },
-    select: { id: true },
+    select: { id: true, compositeVideoUrl: true },
   });
   if (!existing) {
-    return NextResponse.json({ error: "Video not found" }, { status: 404 });
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  try {
-    await db.userUGCVideo.delete({ where: { id: videoId } });
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("[UGC][Videos][DELETE] Failed to delete video", error);
-    return NextResponse.json(
-      { error: "Failed to delete video" },
-      { status: 500 },
-    );
+  // File-Key aus UploadThing-URL extrahieren (letzter Pfadteil)
+  const fileKey = (() => {
+    const url = existing.compositeVideoUrl || "";
+    try {
+      const u = new URL(url);
+      const parts = u.pathname.split("/").filter(Boolean);
+      return parts[parts.length - 1] || null;
+    } catch {
+      return null;
+    }
+  })();
+
+  // Datei bei UploadThing löschen (best-effort)
+  if (fileKey) {
+    try {
+      await utapi.deleteFiles(fileKey);
+    } catch {
+      // kein Hard-Fail – wir löschen trotzdem den DB-Eintrag
+    }
   }
+
+  const video = await db.userUGCVideo.delete({
+    where: { id: existing.id },
+  });
+
+  return NextResponse.json({ ok: true, video });
 }
 </file>
 
@@ -75336,148 +75578,6 @@ export default function SettingsChromeExtension() {
 }
 </file>
 
-<file path="src/components/dashboard/account/SettingsSounds.tsx">
-"use client";
-import { useEffect, useState } from "react";
-
-type SoundItem = { key: string; name: string; size: number; ufsUrl?: string; url?: string };
-
-export default function SettingsSounds() {
-  const [items, setItems] = useState<SoundItem[]>([]);
-  const [file, setFile] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function load() {
-    const res = await fetch("/api/ugc/sounds", { cache: "no-store" });
-    const json = await res.json();
-    setItems(json.items ?? []);
-  }
-  useEffect(() => { load(); }, []);
-
-  async function handleUpload(e: React.FormEvent) {
-    e.preventDefault();
-    if (!file) return;
-    setBusy(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/admin/ugc/sounds", { method: "POST", body: fd });
-      if (!res.ok) throw new Error("Upload failed");
-      await load();
-      setFile(null);
-      alert("Sound hochgeladen.");
-    } catch (err) {
-      alert(String((err as any).message ?? err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <form onSubmit={handleUpload} className="flex items-center gap-3">
-        <input
-          type="file"
-          accept="audio/*"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        />
-        <button className="px-3 py-2 rounded-xl bg-primary text-primary-foreground disabled:opacity-60" disabled={busy || !file}>
-          {busy ? "Lädt…" : "Sound hochladen"}
-        </button>
-      </form>
-      <div className="text-sm text-muted-foreground">Ablage: <code>ugc/sounds/…</code></div>
-      <div className="grid gap-2">
-        {items.map((it) => (
-          <div key={it.key} className="rounded-xl border p-3 flex items-center justify-between">
-            <div className="truncate">
-              <div className="font-medium truncate">{it.name}</div>
-              {/* Größe ausgeblendet (KB-Anzeige entfernt) */}
-            </div>
-            <a href={it.ufsUrl || it.url} target="_blank" rel="noreferrer" className="text-primary text-sm underline">
-              Öffnen
-            </a>
-          </div>
-        ))}
-        {items.length === 0 && <div className="text-sm opacity-70">Noch keine Sounds hochgeladen.</div>}
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/logo/AppLogo.tsx">
-"use client";
-
-import { cn } from "@/lib/utils";
-import Image from "next/image";
-import { useTheme } from "next-themes";
-
-import logoDark from "@/assets/logo_dark.png";
-import logoLight from "@/assets/logo_light.png";
-
-interface AppLogoProps {
-  /**
-   * Optional manual override. When provided, `true` forces the dark variant,
-   * `false` forces the light variant. When omitted, the component inverts the
-   * current resolved theme (light theme → dark logo, dark theme → light logo).
-   */
-  dark?: boolean;
-  size?: number | string;
-  className?: string;
-  borderRadius?: number | string;
-}
-
-export function AppLogo({
-  dark,
-  size = 48,
-  className,
-  borderRadius,
-}: AppLogoProps) {
-  const { resolvedTheme } = useTheme();
-  const isThemeDark = resolvedTheme === "dark";
-
-  const dimension = typeof size === "number" ? `${size}px` : size ?? "48px";
-  const borderRadiusStyle =
-    borderRadius !== undefined
-      ? {
-          borderRadius:
-            typeof borderRadius === "number"
-              ? `${borderRadius}px`
-              : borderRadius,
-        }
-      : {};
-
-  // When `dark` prop is provided, honour it. Otherwise invert the theme:
-  // light mode → dark logo, dark mode → light logo.
-  const shouldUseDarkLogo =
-    typeof dark === "boolean" ? dark : !isThemeDark || resolvedTheme === undefined;
-
-  const logoSrc = shouldUseDarkLogo ? logoDark : logoLight;
-
-  return (
-    <div
-      className={cn(
-        "relative flex items-center justify-center overflow-hidden rounded-lg",
-        className,
-      )}
-      style={{ width: dimension, height: dimension, ...borderRadiusStyle }}
-      aria-label="SlidesCockpit logo"
-    >
-      <Image
-        src={logoSrc}
-        alt="SlidesCockpit logo"
-        width={750}
-        height={750}
-        /* Qualität auf erlaubten Wert; oder prop ganz weglassen */
-        quality={75}
-        priority={typeof size === "number" && size <= 64}
-        className="h-full w-full object-contain"
-      />
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/marketing/MarketingLibraryPreview.tsx">
 "use client";
 
@@ -75827,6 +75927,583 @@ export function SeoJsonLd() {
     </>
   );
 }
+</file>
+
+<file path="src/components/presentation/dashboard/ImageCollectionSelector.tsx">
+"use client";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+import {
+  annotateImageSetOwnership,
+  hasPersonalCategoryTag,
+  isImageSetOwnedByUser as checkOwnership,
+} from "@/lib/image-set-ownership";
+import { usePresentationState } from "@/states/presentation-state";
+import { useSession } from "next-auth/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+
+interface ImageSetImage {
+  id?: string;
+  url: string;
+}
+
+interface ImageSet {
+  id: string;
+  name: string;
+  category?: string;
+  slug?: string | null;
+  images?: ImageSetImage[];
+  _count?: { images: number; children?: number };
+  isOwnedByUser?: boolean;
+  parentId?: string | null;
+  children?: ImageSet[];
+}
+
+export const ImageCollectionSelector: React.FC = () => {
+  const { imageSetId, setImageSetId, setImageSource } = usePresentationState();
+  const { data: session } = useSession();
+  const userId = session?.user?.id ?? null;
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [pendingSetId, setPendingSetId] = useState<string | null>(null);
+  const [imageSets, setImageSets] = useState<ImageSet[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"community" | "mine">("community");
+  const [allOwned, setAllOwned] = useState<Set<string>>(new Set());
+
+  // Drill-down navigation state
+  const [drillDownParent, setDrillDownParent] = useState<ImageSet | null>(null);
+
+  const loadImageSets = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const [setsRes, ownedRes, allRes] = await Promise.all([
+        fetch("/api/imagesets", { cache: "no-store" }),
+        fetch("/api/user-image-collections", { cache: "no-store" }),
+        fetch("/api/user-image-collections/all", { cache: "no-store" }),
+      ]);
+
+      if (!setsRes.ok) {
+        throw new Error("Failed to fetch image sets");
+      }
+
+      const data = (await setsRes.json()) as unknown;
+      const ownedPayload = ownedRes.ok ? await ownedRes.json() : null;
+      const ownedIds = new Set<string>(ownedPayload?.ownedIds ?? []);
+      const allPayload = allRes.ok ? await allRes.json() : null;
+      const allOwnedIds = new Set<string>(allPayload?.allOwnedIds ?? []);
+      setAllOwned(allOwnedIds);
+
+      if (Array.isArray(data)) {
+        const normalized = data.map((set: ImageSet) =>
+          annotateImageSetOwnership(
+            set,
+            userId,
+            ownedIds.has(set.id),
+          ),
+        );
+        setImageSets(normalized);
+      } else {
+        setImageSets([]);
+      }
+    } catch (error) {
+      console.error("Error loading image sets:", error);
+      setImageSets([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    void loadImageSets();
+  }, [loadImageSets]);
+
+  useEffect(() => {
+    if (isDialogOpen) {
+      setPendingSetId(imageSetId ?? null);
+      setDrillDownParent(null); // Reset drill-down when opening dialog
+    }
+  }, [isDialogOpen, imageSetId]);
+
+  const selectedImageSet = useMemo(
+    () => imageSets.find((set) => set.id === imageSetId) ?? null,
+    [imageSets, imageSetId],
+  );
+
+  const isAiAvatarCollection = useCallback((set: ImageSet) => {
+    const slug = (set.slug ?? "").toLowerCase();
+    const name = (set.name ?? "").toLowerCase();
+    const category = (set.category ?? "").toLowerCase();
+    return (
+      slug.includes("avatar") ||
+      name.includes("avatar") ||
+      category.includes("avatar")
+    );
+  }, []);
+
+  // Korrigierte Signatur: nimmt ein ImageSet entgegen und liefert boolean
+  const looksPersonal = useCallback(
+    (set: ImageSet) =>
+      hasPersonalCategoryTag(set.category) ||
+      hasPersonalCategoryTag(set.slug) ||
+      hasPersonalCategoryTag(set.name),
+    [],
+  );
+
+  // "looksPersonal" darf NICHT dazu führen, dass fremde Sets angezeigt werden!
+  const belongsToUser = useCallback(
+    (set: ImageSet) =>
+      checkOwnership(set, userId ?? null) || isAiAvatarCollection(set),
+    [isAiAvatarCollection, userId],
+  );
+
+  const availableCollections = useMemo(() => {
+    // Kein direkter Zugriff mehr auf drillDownParent.id -> verhindert TS "never"
+    if (!drillDownParent) {
+      // Top-Level Ansicht
+      return imageSets
+        .filter((set) => !set.parentId)
+        .filter(belongsToUser)
+        .filter((s) => !looksPersonal(s) || checkOwnership(s, userId ?? null));
+    }
+
+    const parentId = (drillDownParent as { id?: string | number })?.id;
+    const inlineChildren = Array.isArray((drillDownParent as any).children)
+      ? ((drillDownParent as any).children as ImageSet[])
+      : undefined;
+
+    const children: ImageSet[] =
+      (inlineChildren && inlineChildren.length > 0
+        ? inlineChildren
+        : typeof parentId !== "undefined"
+          ? imageSets.filter((set) => set.parentId === parentId)
+          : []) ?? [];
+
+    return children
+      .filter(belongsToUser)
+      .filter((s) => !looksPersonal(s) || checkOwnership(s, userId ?? null));
+  }, [belongsToUser, imageSets, drillDownParent, looksPersonal, userId, checkOwnership]);
+
+  const { communitySets, mySets } = useMemo(() => {
+  // DRILLDOWN: nur Kinder des gewählten Parents
+  if (drillDownParent) {
+      const parentId = drillDownParent?.id ?? null;
+      const children: ImageSet[] =
+        (Array.isArray(drillDownParent.children) && drillDownParent.children.length > 0)
+          ? drillDownParent.children
+          : parentId
+            ? imageSets.filter((set) => set.parentId === parentId)
+            : [];
+
+      const mine = children.filter(belongsToUser);
+      const community = children.filter(
+        (s) =>
+          // absolut keine User-Collections (von irgendwem)
+          !allOwned.has(s.id) &&
+          // keine Personal/Private Tags
+          !looksPersonal(s) &&
+          // AI Avatars niemals in Community
+          !isAiAvatarCollection(s),
+      );
+      return { communitySets: community, mySets: mine };
+  }
+
+  // TOP-LEVEL: nur Wurzeln
+  const topLevel = imageSets.filter((s) => !s.parentId);
+  const mine = topLevel.filter(belongsToUser);
+  const community = topLevel.filter(
+      (s) =>
+        !allOwned.has(s.id) &&
+        !looksPersonal(s) &&
+        !isAiAvatarCollection(s),
+  );
+  return { communitySets: community, mySets: mine };
+}, [belongsToUser, drillDownParent, imageSets, allOwned, looksPersonal, isAiAvatarCollection]);
+
+  const handleSelectSet = (set: ImageSet) => {
+    // Check if this set has children
+    const hasChildren =
+      (set.children && set.children.length > 0) ||
+      (set._count?.children && set._count.children > 0);
+
+    if (hasChildren) {
+      // Drill down to show only children
+      setDrillDownParent(set);
+    } else {
+      // Directly select this set
+      setPendingSetId(set.id);
+    }
+  };
+
+  const handleBackToTopLevel = () => {
+    setDrillDownParent(null);
+  };
+
+  const handleSave = () => {
+    if (pendingSetId) {
+      setImageSetId(pendingSetId);
+      setImageSource("imageset");
+      setIsDialogOpen(false);
+    }
+  };
+
+  const getPreviewImages = (set: ImageSet): ImageSetImage[] => {
+    // If this set has its own images, use them
+    if (Array.isArray(set.images) && set.images.length > 0) {
+      return set.images.slice(0, 5);
+    }
+
+    // If this set has children but no own images, use mixed preview
+    if (set.children && set.children.length > 0) {
+      return getMixedPreviewImages(set);
+    }
+
+    return [];
+  };
+
+  const getMixedPreviewImages = (parent: ImageSet): ImageSetImage[] => {
+    // Create a mixed preview from all children
+    if (!parent.children || parent.children.length === 0) {
+      // Fallback: use parent's own images if available
+      if (Array.isArray(parent.images) && parent.images.length > 0) {
+        return parent.images.slice(0, 5);
+      }
+      return [];
+    }
+
+    const mixedImages: ImageSetImage[] = [];
+    const childrenWithImages = parent.children.filter(
+      (child) => Array.isArray(child.images) && child.images.length > 0,
+    );
+
+    if (childrenWithImages.length === 0) {
+      // If no children have images, use parent's own images if available
+      if (Array.isArray(parent.images) && parent.images.length > 0) {
+        return parent.images.slice(0, 5);
+      }
+      return [];
+    }
+
+    // Distribute images evenly across children (round-robin)
+    let childIndex = 0;
+    while (
+      mixedImages.length < 5 &&
+      childIndex < childrenWithImages.length * 10
+    ) {
+      const childIdx = childIndex % childrenWithImages.length;
+      const child = childrenWithImages[childIdx];
+
+      if (!child) {
+        childIndex++;
+        continue;
+      }
+
+      const imageIndex = Math.floor(childIndex / childrenWithImages.length);
+
+      if (child.images && imageIndex < child.images.length) {
+        const image = child.images[imageIndex];
+        if (image) {
+          mixedImages.push(image);
+        }
+      }
+
+      childIndex++;
+
+      // Break if we've exhausted all images
+      if (childIndex >= childrenWithImages.length * 10) break;
+    }
+
+    return mixedImages.slice(0, 5);
+  };
+
+  const renderImageSetGrid = (sets: ImageSet[], emptyLabel: string) => {
+    if (isLoading) {
+      return (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <Skeleton key={index} className="h-40 w-full" />
+          ))}
+        </div>
+      );
+    }
+
+    if (!sets.length && !drillDownParent) {
+      return null; // Wenn keine Sets vorhanden sind, nichts anzeigen
+    }
+
+    return (
+      <ScrollArea className="h-full max-h-full pr-0 scrollbar-hide">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {/* "All Images" Option when drilling down */}
+          {drillDownParent && (
+            <div
+              key="all-images"
+              onClick={() => setPendingSetId(drillDownParent.id)}
+              className={cn(
+                "group cursor-pointer rounded-lg p-2 transition bg-card relative overflow-visible",
+                pendingSetId === drillDownParent.id
+                  ? "border-2 border-blue-500"
+                  : "border border-transparent hover:border-muted-foreground/30",
+              )}
+            >
+              <div className="mb-2 text-base font-bold text-foreground">
+                ✨ All Images
+              </div>
+              {(() => {
+                const allImagesPreview = getMixedPreviewImages(drillDownParent);
+                return allImagesPreview.length ? (
+                  <div className="overflow-hidden">
+                    <div className="grid grid-cols-5 gap-0">
+                      {allImagesPreview.map((image, index) => (
+                        <div
+                          key={image.id ?? `all-${index}`}
+                          className={cn(
+                            "relative h-24 md:h-32 lg:h-40 overflow-hidden",
+                            index === 0 && "rounded-l-lg",
+                            index === allImagesPreview.length - 1 &&
+                              "rounded-r-lg",
+                          )}
+                        >
+                          <Image
+                            src={image.url}
+                            alt={`All images preview ${index + 1}`}
+                            width={160}
+                            height={160}
+                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                            quality={30}
+                            loading="lazy"
+                            sizes="160px"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground">
+                    Use all images from all subfolders
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Regular image sets */}
+          {sets.map((set) => {
+            const previewImages = getPreviewImages(set);
+
+            return (
+              <div
+                key={set.id}
+                onClick={() => handleSelectSet(set)}
+                className={cn(
+                  "group cursor-pointer rounded-lg p-2 transition bg-card relative overflow-visible",
+                  pendingSetId === set.id
+                    ? "border-2 border-blue-500"
+                    : "border border-transparent hover:border-muted-foreground/30",
+                )}
+              >
+                <div className="mb-2 text-base font-medium text-foreground truncate">
+                  {set.name}
+                </div>
+                {previewImages.length ? (
+                  <div className="overflow-hidden">
+                    <div className="grid grid-cols-5 gap-0">
+                      {previewImages.map((image, index) => (
+                        <div
+                          key={image.id ?? `${set.id}-${index}`}
+                          className={cn(
+                            "relative h-24 md:h-32 lg:h-40 overflow-hidden",
+                            index === 0 && "rounded-l-lg",
+                            index === previewImages.length - 1 &&
+                              "rounded-r-lg",
+                          )}
+                        >
+                          <Image
+                            src={image.url}
+                            alt={`${set.name} preview ${index + 1}`}
+                            width={160}
+                            height={160}
+                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                            quality={30}
+                            loading="lazy"
+                            sizes="160px"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground">
+                    No preview images available
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </ScrollArea>
+    );
+  };
+
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-bold text-foreground">2. Images</label>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setIsDialogOpen(true)}
+            className="w-full rounded-lg border border-border bg-card p-4 text-left text-sm text-muted-foreground transition focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          >
+            {selectedImageSet ? (
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-foreground">
+                  {selectedImageSet.name}
+                </span>
+                <div className="overflow-hidden">
+                  <div className="grid grid-cols-5 gap-0">
+                    {getPreviewImages(selectedImageSet).map(
+                      (image, index, arr) => (
+                        <div
+                          key={image.id ?? `${selectedImageSet.id}-${index}`}
+                          className={cn(
+                            "relative h-24 md:h-32 lg:h-40 overflow-hidden",
+                            index === 0 && "rounded-l-lg",
+                            index === arr.length - 1 && "rounded-r-lg",
+                          )}
+                        >
+                          <Image
+                            src={image.url}
+                            alt={`${selectedImageSet.name} preview ${index + 1}`}
+                            width={160}
+                            height={160}
+                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                            quality={30}
+                            loading="lazy"
+                            sizes="160px"
+                          />
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-foreground">
+                  No image set selected
+                </span>
+                <div className="h-24 md:h-32 lg:h-40 w-full rounded-lg bg-muted" />
+              </div>
+            )}
+          </button>
+        </DialogTrigger>
+        <DialogContent
+          className="
+     !max-w-none                 /* überschreibt jedes max-w aus dem Component-Default */
+     w-[96vw] md:w-[70vw]
+     h-[85vh] max-h-[85vh]
+     p-0 overflow-hidden flex flex-col
+     rounded-2xl shadow-xl border border-border/30
+          "
+        >
+          <DialogHeader
+            className="
+              sticky top-0 z-10
+              px-6 pt-6 pb-4 border-b
+              bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60
+            "
+          >
+            <div className="flex items-center gap-4">
+              {drillDownParent && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleBackToTopLevel}
+                  className="gap-2"
+                >
+                  ← Back
+                </Button>
+              )}
+              <DialogTitle className="text-2xl">
+                {drillDownParent
+                  ? `Select from: ${drillDownParent.name}`
+                  : "Select Image Collection"}
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+
+          {/* Scrollbarer Mittelteil (behält feste Außenmaße bei) */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 overscroll-contain scrollbar-hide">
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) =>
+                setActiveTab(value as "community" | "mine")
+              }
+              className="flex flex-col min-h-0"
+            >
+              <TabsList className="grid w-full grid-cols-2 rounded-lg bg-muted p-1">
+                <TabsTrigger
+                  value="community"
+                  className="w-full rounded-md text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                >
+                  Community
+                </TabsTrigger>
+                <TabsTrigger
+                  value="mine"
+                  className="w-full rounded-md text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                >
+                  My Collections
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="community" className="mt-4 min-h-0">
+                {renderImageSetGrid(
+                  communitySets,
+                  "No community collections available yet.",
+                )}
+              </TabsContent>
+              <TabsContent value="mine" className="mt-4 min-h-0">
+                {renderImageSetGrid(
+                  mySets,
+                  "You haven't created any collections yet.",
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Fixer Footer */}
+          <div
+            className="
+              shrink-0 border-t
+              px-6 py-4
+              bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60
+              flex items-center justify-end gap-2
+            "
+          >
+            <Button variant="secondary" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={!pendingSetId}>
+              Save
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
 </file>
 
 <file path="src/components/presentation/dashboard/PresentationItem.tsx">
@@ -79503,18 +80180,6 @@ export {
 }
 </file>
 
-<file path="src/config.ts">
-const config = {
-  resend: {
-    fromNoReply: "SlidesCockpit <noreply@resend.slidescockpit.com>",
-    fromAdmin: "SlidesCockpit Support <support@resend.slidescockpit.com>",
-    supportEmail: "ab.business.germany@gmail.com",
-  },
-};
-
-export default config;
-</file>
-
 <file path="src/hooks/use-tiktok-accounts.ts">
 "use client";
 
@@ -80279,65 +80944,6 @@ export async function POST(req: Request) {
 }
 </file>
 
-<file path="src/app/api/support/route.ts">
-import { NextResponse } from "next/server";
-import { Resend } from "resend";
-
-import config from "@/config";
-
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
-
-export async function POST(request: Request) {
-  if (!resend) {
-    return NextResponse.json(
-      { error: "RESEND_API_KEY is not set" },
-      { status: 500 },
-    );
-  }
-  try {
-    const { name, email, subject, message } = await request.json();
-
-    await resend.emails.send({
-      from: config.resend.fromAdmin,
-      to: config.resend.supportEmail,
-      subject: `Support Request: ${subject}`,
-      html: `
-        <h2>New Support Request</h2>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Subject:</strong> ${subject}</p>
-        <p><strong>Message:</strong></p>
-        <p>${message}</p>
-      `,
-    });
-
-    await resend.emails.send({
-      from: config.resend.fromAdmin,
-      to: email,
-      subject: "Your Support Request",
-      html: `
-        <h2>Thank you for contacting us!</h2>
-        <p>We received your message and will respond as soon as possible.</p>
-        <p><strong>Subject:</strong> ${subject}</p>
-        <p><strong>Message:</strong></p>
-        <p>${message}</p>
-        <hr />
-        <p>Best regards,<br />Your Support Team</p>
-      `,
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Support request error:", error);
-    return NextResponse.json(
-      { error: "Failed to send support request" },
-      { status: 500 },
-    );
-  }
-}
-</file>
-
 <file path="src/app/api/tiktok/accounts/[openId]/disconnect/route.ts">
 import { env } from "@/env";
 import { auth } from "@/server/auth";
@@ -80989,6 +81595,265 @@ export default async function PostCollectionsPage() {
 }
 </file>
 
+<file path="src/components/app-sidebar-support.tsx">
+"use client";
+
+import { Ellipsis, LifeBuoy, X } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useState, type ReactNode } from "react";
+import toast from "react-hot-toast";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
+import { Textarea } from "@/components/ui/textarea";
+
+type SupportOption = "issue" | "idea" | "other";
+
+type SupportOptionConfig = {
+  value: SupportOption;
+  label: string;
+  title: string;
+  subject: string;
+  icon: ReactNode;
+};
+
+const SUPPORT_OPTIONS: SupportOptionConfig[] = [
+  {
+    value: "issue",
+    label: "Issue",
+    title: "Report an issue",
+    subject: "Report an issue",
+    icon: <span className="text-4xl leading-none">⚠️</span>,
+  },
+  {
+    value: "idea",
+    label: "Idea",
+    title: "Share an idea",
+    subject: "Share an idea",
+    icon: <span className="text-4xl leading-none">💡</span>,
+  },
+  {
+    value: "other",
+    label: "Other",
+    title: "Tell us anything!",
+    subject: "Tell us anything!",
+    icon: (
+      <span className="flex items-center justify-center rounded-full text-foreground">
+        <Ellipsis className="h-9 w-9" strokeWidth={2.8} />
+      </span>
+    ),
+  },
+];
+
+type FormStatus = {
+  loading: boolean;
+  success: boolean;
+  error: string | null;
+};
+
+const createInitialStatus = (): FormStatus => ({
+  loading: false,
+  success: false,
+  error: null,
+});
+
+export function SidebarSupportButton() {
+  const [selectedOption, setSelectedOption] = useState<SupportOption | null>(
+    null,
+  );
+  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState<FormStatus>(createInitialStatus);
+  const [isOpen, setIsOpen] = useState(false);
+  const { data: session } = useSession();
+
+  const selectedOptionConfig = selectedOption
+    ? SUPPORT_OPTIONS.find((option) => option.value === selectedOption)
+    : null;
+
+  const handleOptionSelect = (option: SupportOptionConfig) => {
+    setSelectedOption(option.value);
+    setMessage("");
+    setStatus(createInitialStatus());
+  };
+
+  const resetDialog = () => {
+    setSelectedOption(null);
+    setMessage("");
+    setStatus(createInitialStatus());
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!selectedOptionConfig) {
+      setStatus({
+        loading: false,
+        success: false,
+        error: "Please choose a support topic before sending.",
+      });
+      toast.error("Please choose a support topic before sending.");
+      return;
+    }
+
+    const userEmail = session?.user?.email;
+    const userName = session?.user?.name?.trim() || "SlidesCockpit User";
+
+    if (!userEmail) {
+      setStatus({
+        loading: false,
+        success: false,
+        error:
+          "We could not find your email address. Please contact support directly.",
+      });
+      toast.error(
+        "We could not find your email address. Please contact support directly.",
+      );
+      return;
+    }
+
+    const trimmedMessage = message.trim();
+    if (trimmedMessage.length === 0) {
+      setStatus({
+        loading: false,
+        success: false,
+        error: "Please enter a short description before sending.",
+      });
+      toast.error("Please enter a short description before sending.");
+      return;
+    }
+
+    setStatus({ loading: true, success: false, error: null });
+
+    try {
+      const response = await fetch("/api/support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: userName,
+          email: userEmail,
+          subject: selectedOptionConfig.subject,
+          message: trimmedMessage,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send support request");
+      }
+
+      setStatus(createInitialStatus());
+      setMessage("");
+      setIsOpen(false);
+      setTimeout(() => {
+        toast.success("Thanks for your message! We'll respond shortly.");
+      }, 150);
+    } catch (error) {
+      const messageText =
+        error instanceof Error
+          ? error.message
+          : "Failed to send support request";
+      setStatus({ loading: false, success: false, error: messageText });
+      toast.error(messageText);
+    }
+  };
+
+  const isSendDisabled = status.loading || message.trim().length === 0;
+
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        setIsOpen(open);
+        if (!open) {
+          resetDialog();
+        }
+      }}
+    >
+      <SidebarMenu className="text-muted-foreground/80">
+        <SidebarMenuItem>
+          <DialogTrigger asChild>
+            <SidebarMenuButton
+              type="button"
+              className="font-semibold text-muted-foreground/80 bg-transparent hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              tooltip="Support"
+              onClick={() => setIsOpen(true)}
+            >
+              <LifeBuoy className="h-5 w-5" />
+              <span className="font-semibold">Support</span>
+            </SidebarMenuButton>
+          </DialogTrigger>
+        </SidebarMenuItem>
+      </SidebarMenu>
+
+      <DialogContent
+        shouldHaveClose={false}
+        className="max-w-md space-y-5 bg-white"
+      >
+        <div className="flex items-start justify-between">
+          <DialogTitle>
+            {selectedOptionConfig?.title ?? "What's on your mind?"}
+          </DialogTitle>
+          <DialogClose
+            className="-mr-2 -mt-2 rounded-md p-1 text-muted-foreground transition hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </DialogClose>
+        </div>
+
+        {selectedOptionConfig === null ? (
+          <div className="grid gap-2 sm:grid-cols-3">
+            {SUPPORT_OPTIONS.map((option) => (
+              <Button
+                key={option.value}
+                variant="outline"
+                className="flex flex-col items-center gap-3 border-muted/40 bg-muted/30 py-12 text-foreground hover:bg-muted"
+                onClick={() => handleOptionSelect(option)}
+              >
+                {option.icon}
+                <span className="text-sm font-semibold">{option.label}</span>
+              </Button>
+            ))}
+          </div>
+        ) : (
+          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+            {status.error ? (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {status.error}
+              </div>
+            ) : null}
+
+            <Textarea
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              placeholder="Type your message here..."
+              className="min-h-[160px]"
+              required
+              disabled={status.loading}
+            />
+            <Button type="submit" className="w-full" disabled={isSendDisabled}>
+              {status.loading ? "Sending…" : "Send"}
+            </Button>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+</file>
+
 <file path="src/components/dashboard/account/SettingsConnections.tsx">
 "use client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -81372,24 +82237,15 @@ export default function SettingsDemoVideos() {
 }
 </file>
 
-<file path="src/components/dashboard/admin/AdminSounds.tsx">
+<file path="src/components/dashboard/account/SettingsSounds.tsx">
 "use client";
 import { useEffect, useState } from "react";
 
-type SoundItem = {
-  key: string;
-  name: string;
-  size: number;
-  ufsUrl?: string;
-  url?: string;
-  coverUrl?: string | null;
-};
+type SoundItem = { key: string; name: string; size: number; ufsUrl?: string; url?: string };
 
-export default function AdminSounds() {
+export default function SettingsSounds() {
   const [items, setItems] = useState<SoundItem[]>([]);
-  const [sound, setSound] = useState<File | null>(null);
-  const [cover, setCover] = useState<File | null>(null);
-  const [displayName, setDisplayName] = useState<string>("");
+  const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -81397,711 +82253,607 @@ export default function AdminSounds() {
     const json = await res.json();
     setItems(json.items ?? []);
   }
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
-    if (!sound) return;
+    if (!file) return;
     setBusy(true);
     try {
       const fd = new FormData();
-      fd.append("sound", sound);
-      if (cover) fd.append("cover", cover);
-      if (displayName.trim()) fd.append("name", displayName.trim());
-      const res = await fetch("/api/admin/ugc/sounds", {
-        method: "POST",
-        body: fd,
-      });
-      if (!res.ok) {
-        let detail = "";
-        try { const j = await res.json(); detail = j?.upstreamBodySnippet || j?.detail || j?.error || ""; } catch {}
-        throw new Error(`Upload failed (${res.status}) ${detail}`.trim());
-      }
-      const data = await res.json().catch(() => ({}));
+      fd.append("file", file);
+      const res = await fetch("/api/admin/ugc/sounds", { method: "POST", body: fd });
+      if (!res.ok) throw new Error("Upload failed");
       await load();
-      setSound(null);
-      setCover(null);
-      setDisplayName("");
-      (document.getElementById("sound-input") as HTMLInputElement | null)
-        ?.value &&
-        ((document.getElementById("sound-input") as HTMLInputElement).value =
-          "");
-      (document.getElementById("cover-input") as HTMLInputElement | null)
-        ?.value &&
-        ((document.getElementById("cover-input") as HTMLInputElement).value =
-          "");
-      alert("Sound (und ggf. Cover) hochgeladen.");
+      setFile(null);
+      alert("Sound hochgeladen.");
     } catch (err) {
-      console.error("[AdminSounds] Upload error:", err);
-      alert(err?.message || "Upload failed");
+      alert(String((err as any).message ?? err));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold">Sounds</h2>
-      </div>
-
-      <form
-        onSubmit={handleUpload}
-        className="grid gap-3 md:grid-cols-[1fr_auto] items-end"
-      >
-        <div className="grid gap-2">
-          <label className="text-sm font-medium">Name (Anzeige im Auswahl-Pop-up)</label>
-          <input
-            type="text"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="z. B. Chill Vibes 120bpm"
-            className="h-10 rounded-lg border px-3"
-          />
-          <label className="text-sm font-medium">Audio-Datei</label>
-          <input
-            id="sound-input"
-            type="file"
-            accept="audio/*"
-            onChange={(e) => setSound(e.target.files?.[0] ?? null)}
-          />
-          <label className="text-sm font-medium mt-3">
-            Cover-Bild (optional)
-          </label>
-          <input
-            id="cover-input"
-            type="file"
-            accept="image/*"
-            onChange={(e) => setCover(e.target.files?.[0] ?? null)}
-          />
-        </div>
-        <button
-          className="h-10 px-4 rounded-xl bg-primary text-primary-foreground disabled:opacity-60"
-          disabled={busy || !sound}
-        >
-          {busy ? "Lädt…" : "Hochladen"}
+    <div className="space-y-4">
+      <form onSubmit={handleUpload} className="flex items-center gap-3">
+        <input
+          type="file"
+          accept="audio/*"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        />
+        <button className="px-3 py-2 rounded-xl bg-primary text-primary-foreground disabled:opacity-60" disabled={busy || !file}>
+          {busy ? "Lädt…" : "Sound hochladen"}
         </button>
       </form>
-
-      <div className="grid gap-3">
+      <div className="text-sm text-muted-foreground">Ablage: <code>ugc/sounds/…</code></div>
+      <div className="grid gap-2">
         {items.map((it) => (
-          <div
-            key={it.key}
-            className="flex items-center justify-between rounded-2xl border p-3"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              {it.coverUrl ? (
-                <img
-                  src={it.coverUrl}
-                  alt=""
-                  className="h-10 w-10 rounded-lg object-cover"
-                />
-              ) : (
-                <div className="h-10 w-10 rounded-lg bg-muted" />
-              )}
-              <div className="min-w-0">
-                <div className="font-medium truncate">{it.name}</div>
-                {/* Größe ausgeblendet (KB-Anzeige entfernt) */}
-              </div>
+          <div key={it.key} className="rounded-xl border p-3 flex items-center justify-between">
+            <div className="truncate">
+              <div className="font-medium truncate">{it.name}</div>
+              {/* Größe ausgeblendet (KB-Anzeige entfernt) */}
             </div>
-            <a
-              href={it.ufsUrl || it.url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary text-sm underline"
-            >
+            <a href={it.ufsUrl || it.url} target="_blank" rel="noreferrer" className="text-primary text-sm underline">
               Öffnen
             </a>
           </div>
         ))}
-        {items.length === 0 && (
-          <div className="text-sm opacity-70">
-            Noch keine Sounds hochgeladen.
-          </div>
-        )}
+        {items.length === 0 && <div className="text-sm opacity-70">Noch keine Sounds hochgeladen.</div>}
       </div>
     </div>
   );
 }
 </file>
 
-<file path="src/components/presentation/dashboard/ImageCollectionSelector.tsx">
+<file path="src/components/marketing/Hero.tsx">
 "use client";
-
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
-import {
-  annotateImageSetOwnership,
-  hasPersonalCategoryTag,
-  isImageSetOwnedByUser as checkOwnership,
-} from "@/lib/image-set-ownership";
-import { usePresentationState } from "@/states/presentation-state";
-import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+  ArrowRightIcon,
+  BarChart3Icon,
+  CheckCircle2Icon,
+  StarIcon,
+  TrendingUpIcon,
+  ZapIcon,
+} from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { Section } from "./Section";
 
-interface ImageSetImage {
-  id?: string;
-  url: string;
-}
+const HERO_POSTER_ROWS = 8;
+const HERO_POSTERS_PER_ROW = 28;
+const HERO_FETCH_LIMIT = 300;
 
-interface ImageSet {
-  id: string;
-  name: string;
+type HeroSlide = {
+  imageUrl?: string | null;
+};
+
+type HeroPost = {
+  slides?: HeroSlide[];
+};
+
+export function MarketingHero({
+  session,
+  category,
+  heroTitle,
+  heroSubtitle,
+}: {
+  session: boolean;
   category?: string;
-  slug?: string | null;
-  images?: ImageSetImage[];
-  _count?: { images: number; children?: number };
-  isOwnedByUser?: boolean;
-  parentId?: string | null;
-  children?: ImageSet[];
-}
-
-export const ImageCollectionSelector: React.FC = () => {
-  const { imageSetId, setImageSetId, setImageSource } = usePresentationState();
-  const { data: session } = useSession();
-  const userId = session?.user?.id ?? null;
-
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [pendingSetId, setPendingSetId] = useState<string | null>(null);
-  const [imageSets, setImageSets] = useState<ImageSet[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"community" | "mine">("community");
-  const [allOwned, setAllOwned] = useState<Set<string>>(new Set());
-
-  // Drill-down navigation state
-  const [drillDownParent, setDrillDownParent] = useState<ImageSet | null>(null);
-
-  const loadImageSets = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const [setsRes, ownedRes, allRes] = await Promise.all([
-        fetch("/api/imagesets", { cache: "no-store" }),
-        fetch("/api/user-image-collections", { cache: "no-store" }),
-        fetch("/api/user-image-collections/all", { cache: "no-store" }),
-      ]);
-
-      if (!setsRes.ok) {
-        throw new Error("Failed to fetch image sets");
-      }
-
-      const data = (await setsRes.json()) as unknown;
-      const ownedPayload = ownedRes.ok ? await ownedRes.json() : null;
-      const ownedIds = new Set<string>(ownedPayload?.ownedIds ?? []);
-      const allPayload = allRes.ok ? await allRes.json() : null;
-      const allOwnedIds = new Set<string>(allPayload?.allOwnedIds ?? []);
-      setAllOwned(allOwnedIds);
-
-      if (Array.isArray(data)) {
-        const normalized = data.map((set: ImageSet) =>
-          annotateImageSetOwnership(
-            set,
-            userId,
-            ownedIds.has(set.id),
-          ),
-        );
-        setImageSets(normalized);
-      } else {
-        setImageSets([]);
-      }
-    } catch (error) {
-      console.error("Error loading image sets:", error);
-      setImageSets([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [userId]);
+  heroTitle?: string;
+  heroSubtitle?: string;
+}) {
+  const [posterImages, setPosterImages] = useState<string[]>([]);
 
   useEffect(() => {
-    void loadImageSets();
-  }, [loadImageSets]);
+    const controller = new AbortController();
 
-  useEffect(() => {
-    if (isDialogOpen) {
-      setPendingSetId(imageSetId ?? null);
-      setDrillDownParent(null); // Reset drill-down when opening dialog
-    }
-  }, [isDialogOpen, imageSetId]);
-
-  const selectedImageSet = useMemo(
-    () => imageSets.find((set) => set.id === imageSetId) ?? null,
-    [imageSets, imageSetId],
-  );
-
-  const isAiAvatarCollection = useCallback((set: ImageSet) => {
-    const slug = (set.slug ?? "").toLowerCase();
-    const name = (set.name ?? "").toLowerCase();
-    const category = (set.category ?? "").toLowerCase();
-    return (
-      slug.includes("avatar") ||
-      name.includes("avatar") ||
-      category.includes("avatar")
-    );
-  }, []);
-
-  // Korrigierte Signatur: nimmt ein ImageSet entgegen und liefert boolean
-  const looksPersonal = useCallback(
-    (set: ImageSet) =>
-      hasPersonalCategoryTag(set.category) ||
-      hasPersonalCategoryTag(set.slug) ||
-      hasPersonalCategoryTag(set.name),
-    [],
-  );
-
-  // "looksPersonal" darf NICHT dazu führen, dass fremde Sets angezeigt werden!
-  const belongsToUser = useCallback(
-    (set: ImageSet) =>
-      checkOwnership(set, userId ?? null) || isAiAvatarCollection(set),
-    [isAiAvatarCollection, userId],
-  );
-
-  const availableCollections = useMemo(() => {
-    // Kein direkter Zugriff mehr auf drillDownParent.id -> verhindert TS "never"
-    if (!drillDownParent) {
-      // Top-Level Ansicht
-      return imageSets
-        .filter((set) => !set.parentId)
-        .filter(belongsToUser)
-        .filter((s) => !looksPersonal(s) || checkOwnership(s, userId ?? null));
-    }
-
-    const parentId = (drillDownParent as { id?: string | number })?.id;
-    const inlineChildren = Array.isArray((drillDownParent as any).children)
-      ? ((drillDownParent as any).children as ImageSet[])
-      : undefined;
-
-    const children: ImageSet[] =
-      (inlineChildren && inlineChildren.length > 0
-        ? inlineChildren
-        : typeof parentId !== "undefined"
-          ? imageSets.filter((set) => set.parentId === parentId)
-          : []) ?? [];
-
-    return children
-      .filter(belongsToUser)
-      .filter((s) => !looksPersonal(s) || checkOwnership(s, userId ?? null));
-  }, [belongsToUser, imageSets, drillDownParent, looksPersonal, userId, checkOwnership]);
-
-  const { communitySets, mySets } = useMemo(() => {
-  // DRILLDOWN: nur Kinder des gewählten Parents
-  if (drillDownParent) {
-      const parentId = drillDownParent?.id ?? null;
-      const children: ImageSet[] =
-        (Array.isArray(drillDownParent.children) && drillDownParent.children.length > 0)
-          ? drillDownParent.children
-          : parentId
-            ? imageSets.filter((set) => set.parentId === parentId)
-            : [];
-
-      const mine = children.filter(belongsToUser);
-      const community = children.filter(
-        (s) =>
-          // absolut keine User-Collections (von irgendwem)
-          !allOwned.has(s.id) &&
-          // keine Personal/Private Tags
-          !looksPersonal(s) &&
-          // AI Avatars niemals in Community
-          !isAiAvatarCollection(s),
-      );
-      return { communitySets: community, mySets: mine };
-  }
-
-  // TOP-LEVEL: nur Wurzeln
-  const topLevel = imageSets.filter((s) => !s.parentId);
-  const mine = topLevel.filter(belongsToUser);
-  const community = topLevel.filter(
-      (s) =>
-        !allOwned.has(s.id) &&
-        !looksPersonal(s) &&
-        !isAiAvatarCollection(s),
-  );
-  return { communitySets: community, mySets: mine };
-}, [belongsToUser, drillDownParent, imageSets, allOwned, looksPersonal, isAiAvatarCollection]);
-
-  const handleSelectSet = (set: ImageSet) => {
-    // Check if this set has children
-    const hasChildren =
-      (set.children && set.children.length > 0) ||
-      (set._count?.children && set._count.children > 0);
-
-    if (hasChildren) {
-      // Drill down to show only children
-      setDrillDownParent(set);
-    } else {
-      // Directly select this set
-      setPendingSetId(set.id);
-    }
-  };
-
-  const handleBackToTopLevel = () => {
-    setDrillDownParent(null);
-  };
-
-  const handleSave = () => {
-    if (pendingSetId) {
-      setImageSetId(pendingSetId);
-      setImageSource("imageset");
-      setIsDialogOpen(false);
-    }
-  };
-
-  const getPreviewImages = (set: ImageSet): ImageSetImage[] => {
-    // If this set has its own images, use them
-    if (Array.isArray(set.images) && set.images.length > 0) {
-      return set.images.slice(0, 5);
-    }
-
-    // If this set has children but no own images, use mixed preview
-    if (set.children && set.children.length > 0) {
-      return getMixedPreviewImages(set);
-    }
-
-    return [];
-  };
-
-  const getMixedPreviewImages = (parent: ImageSet): ImageSetImage[] => {
-    // Create a mixed preview from all children
-    if (!parent.children || parent.children.length === 0) {
-      // Fallback: use parent's own images if available
-      if (Array.isArray(parent.images) && parent.images.length > 0) {
-        return parent.images.slice(0, 5);
-      }
-      return [];
-    }
-
-    const mixedImages: ImageSetImage[] = [];
-    const childrenWithImages = parent.children.filter(
-      (child) => Array.isArray(child.images) && child.images.length > 0,
-    );
-
-    if (childrenWithImages.length === 0) {
-      // If no children have images, use parent's own images if available
-      if (Array.isArray(parent.images) && parent.images.length > 0) {
-        return parent.images.slice(0, 5);
-      }
-      return [];
-    }
-
-    // Distribute images evenly across children (round-robin)
-    let childIndex = 0;
-    while (
-      mixedImages.length < 5 &&
-      childIndex < childrenWithImages.length * 10
-    ) {
-      const childIdx = childIndex % childrenWithImages.length;
-      const child = childrenWithImages[childIdx];
-
-      if (!child) {
-        childIndex++;
-        continue;
-      }
-
-      const imageIndex = Math.floor(childIndex / childrenWithImages.length);
-
-      if (child.images && imageIndex < child.images.length) {
-        const image = child.images[imageIndex];
-        if (image) {
-          mixedImages.push(image);
+    const fetchSlides = async () => {
+      try {
+        const params = new URLSearchParams({
+          limit: HERO_FETCH_LIMIT.toString(),
+        });
+        if (category) {
+          params.set("category", category);
         }
+
+        const response = await fetch(
+          `/api/slideshow-library/posts?${params.toString()}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to load hero slides: ${response.status}`);
+        }
+
+        const data = (await response.json()) as unknown;
+        if (!Array.isArray(data)) return;
+
+        const collected = new Set<string>();
+
+        for (const post of data as HeroPost[]) {
+          if (!post?.slides?.length) continue;
+
+          for (const slide of post.slides) {
+            if (!slide?.imageUrl) continue;
+            collected.add(slide.imageUrl);
+          }
+        }
+
+        if (!collected.size) return;
+
+        const deduped = Array.from(collected);
+        for (let index = deduped.length - 1; index > 0; index--) {
+          const swapIndex = Math.floor(Math.random() * (index + 1));
+          const current = deduped[index];
+          const swap = deduped[swapIndex];
+          if (current === undefined || swap === undefined) {
+            continue;
+          }
+          deduped[index] = swap;
+          deduped[swapIndex] = current;
+        }
+
+        setPosterImages(deduped);
+      } catch (error) {
+        if ((error as Error).name === "AbortError") {
+          return;
+        }
+        console.error("Error loading hero slide images", error);
       }
+    };
 
-      childIndex++;
+    void fetchSlides();
 
-      // Break if we've exhausted all images
-      if (childIndex >= childrenWithImages.length * 10) break;
+    return () => {
+      controller.abort();
+    };
+  }, [category]);
+
+  const posterMatrix = useMemo(() => {
+    const perRow = HERO_POSTERS_PER_ROW;
+    const totalRows = HERO_POSTER_ROWS;
+
+     // Until we have real images, render nothing (no placeholders).
+     if (!posterImages.length) return [];
+
+     const rows: string[][] = [];
+     for (let r = 0; r < totalRows; r++) {
+       const start = r * perRow;
+       const end = start + perRow;
+       rows.push(posterImages.slice(start, end));
+     }
+     return rows;
+
+}, [posterImages]);
+
+  // TikTok-Bilder NICHT über next/image rendern (Host-Whitelist von Next schlägt oft zu).
+  // Alles andere weiter mit next/image (Optimierung bleibt erhalten).
+  const isTikTokCdn = (urlStr: string) => {
+    try {
+      const u = new URL(urlStr);
+      // Beispiele: p16-pu-sign-no.tiktokcdn-eu.com, p19-common-sign-useastred.tiktokcdn-eu.com, ...
+      return /(^|\.)tiktokcdn(?:-eu)?\.com$/i.test(u.hostname);
+    } catch {
+      return false;
     }
-
-    return mixedImages.slice(0, 5);
-  };
-
-  const renderImageSetGrid = (sets: ImageSet[], emptyLabel: string) => {
-    if (isLoading) {
-      return (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <Skeleton key={index} className="h-40 w-full" />
-          ))}
-        </div>
-      );
-    }
-
-    if (!sets.length && !drillDownParent) {
-      return null; // Wenn keine Sets vorhanden sind, nichts anzeigen
-    }
-
-    return (
-      <ScrollArea className="h-full max-h-full pr-0 scrollbar-hide">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {/* "All Images" Option when drilling down */}
-          {drillDownParent && (
-            <div
-              key="all-images"
-              onClick={() => setPendingSetId(drillDownParent.id)}
-              className={cn(
-                "group cursor-pointer rounded-lg p-2 transition bg-card relative overflow-visible",
-                pendingSetId === drillDownParent.id
-                  ? "border-2 border-blue-500"
-                  : "border border-transparent hover:border-muted-foreground/30",
-              )}
-            >
-              <div className="mb-2 text-base font-bold text-foreground">
-                ✨ All Images
-              </div>
-              {(() => {
-                const allImagesPreview = getMixedPreviewImages(drillDownParent);
-                return allImagesPreview.length ? (
-                  <div className="overflow-hidden">
-                    <div className="grid grid-cols-5 gap-0">
-                      {allImagesPreview.map((image, index) => (
-                        <div
-                          key={image.id ?? `all-${index}`}
-                          className={cn(
-                            "relative h-24 md:h-32 lg:h-40 overflow-hidden",
-                            index === 0 && "rounded-l-lg",
-                            index === allImagesPreview.length - 1 &&
-                              "rounded-r-lg",
-                          )}
-                        >
-                          <Image
-                            src={image.url}
-                            alt={`All images preview ${index + 1}`}
-                            width={160}
-                            height={160}
-                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
-                            quality={30}
-                            loading="lazy"
-                            sizes="160px"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-xs text-muted-foreground">
-                    Use all images from all subfolders
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-
-          {/* Regular image sets */}
-          {sets.map((set) => {
-            const previewImages = getPreviewImages(set);
-
-            return (
-              <div
-                key={set.id}
-                onClick={() => handleSelectSet(set)}
-                className={cn(
-                  "group cursor-pointer rounded-lg p-2 transition bg-card relative overflow-visible",
-                  pendingSetId === set.id
-                    ? "border-2 border-blue-500"
-                    : "border border-transparent hover:border-muted-foreground/30",
-                )}
-              >
-                <div className="mb-2 text-base font-medium text-foreground truncate">
-                  {set.name}
-                </div>
-                {previewImages.length ? (
-                  <div className="overflow-hidden">
-                    <div className="grid grid-cols-5 gap-0">
-                      {previewImages.map((image, index) => (
-                        <div
-                          key={image.id ?? `${set.id}-${index}`}
-                          className={cn(
-                            "relative h-24 md:h-32 lg:h-40 overflow-hidden",
-                            index === 0 && "rounded-l-lg",
-                            index === previewImages.length - 1 &&
-                              "rounded-r-lg",
-                          )}
-                        >
-                          <Image
-                            src={image.url}
-                            alt={`${set.name} preview ${index + 1}`}
-                            width={160}
-                            height={160}
-                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
-                            quality={30}
-                            loading="lazy"
-                            sizes="160px"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-xs text-muted-foreground">
-                    No preview images available
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </ScrollArea>
-    );
   };
 
   return (
-    <div className="space-y-2">
-      <label className="text-sm font-bold text-foreground">2. Images</label>
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogTrigger asChild>
-          <button
-            type="button"
-            onClick={() => setIsDialogOpen(true)}
-            className="w-full rounded-lg border border-border bg-card p-4 text-left text-sm text-muted-foreground transition focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-          >
-            {selectedImageSet ? (
-              <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">
-                  {selectedImageSet.name}
-                </span>
-                <div className="overflow-hidden">
-                  <div className="grid grid-cols-5 gap-0">
-                    {getPreviewImages(selectedImageSet).map(
-                      (image, index, arr) => (
-                        <div
-                          key={image.id ?? `${selectedImageSet.id}-${index}`}
-                          className={cn(
-                            "relative h-24 md:h-32 lg:h-40 overflow-hidden",
-                            index === 0 && "rounded-l-lg",
-                            index === arr.length - 1 && "rounded-r-lg",
-                          )}
-                        >
-                          <Image
-                            src={image.url}
-                            alt={`${selectedImageSet.name} preview ${index + 1}`}
-                            width={160}
-                            height={160}
-                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
-                            quality={30}
-                            loading="lazy"
-                            sizes="160px"
-                          />
-                        </div>
-                      ),
-                    )}
-                  </div>
+    <Section className="relative min-h-[85vh] overflow-hidden bg-[#111] py-0">
+      {/* Netflix Background - Fixed z-index hierarchy */}
+      {posterMatrix.length > 0 && (
+        <div className="hero-background-container">
+          {/* Gradient Overlay */}
+          <div className="hero-gradient-overlay" />
+
+          {/* Animated Background */}
+          <div className="hero-perspective-wrapper">
+            <div className="hero-animated-grid">
+              {posterMatrix.map((row, rowIndex) => (
+                <div key={`hero-row-${rowIndex}`} className="hero-image-row">
+                  {row.map((imageUrl, itemIndex) => (
+                    <div
+                      key={`hero-row-${rowIndex}-item-${itemIndex}`}
+                      className="hero-image-card"
+                    >
+                      {isTikTokCdn(imageUrl) ? (
+                        // Fallback auf <img> für TikTok-CDNs → keine Next-Whitelist nötig
+                        <img
+                          src={imageUrl}
+                          alt=""
+                          loading={rowIndex < 2 ? "eager" : "lazy"}
+                          className="h-full w-full object-cover"
+                          decoding="async"
+                        />
+                      ) : (
+                        <Image
+                          src={imageUrl}
+                          alt=""
+                          fill
+                          /* Nur für die kleinen Kacheln: extrem klein halten */
+                          sizes="125px"
+                          /* Next darf optimieren -> erzeugt AVIF/WebP automatisch */
+                          quality={60}
+                          // Avoid Next.js runtime error: can't set both priority and loading
+                          // Use priority for first 2 rows, lazy for the rest
+                          priority={rowIndex < 2}
+                          loading={rowIndex < 2 ? undefined : "lazy"}
+                          style={{ objectFit: "cover", objectPosition: "center" }}
+                        />
+                      )}
+                    </div>
+                  ))}
                 </div>
-              </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Foreground Content - Isolated stacking context */}
+      <div className="hero-content-wrapper">
+        <div className="mx-auto max-w-5xl text-center">
+          {/* Status badge */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="inline-flex items-center gap-3 rounded-full border border-indigo-300/20 bg-indigo-500/40 backdrop-blur-sm px-4 py-2 text-xs sm:text-sm font-medium text-indigo-100 shadow-lg mb-2 sm:mb-4 lg:mb-6 mt-[-0.5rem] sm:mt-[-1rem]"
+          >
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
+              <span>10M+ views generated with SlidesCockpit</span>
+            </div>
+            <div className="hidden sm:block h-4 w-px bg-indigo-300/30"></div>
+            <div className="flex items-center gap-1">
+              <TrendingUpIcon className="w-4 h-4" />
+              <span>2025</span>
+            </div>
+          </motion.div>
+
+          {/* Main headline */}
+          <motion.h1
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08, duration: 0.7 }}
+            className="py-2 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight text-white"
+          >
+            {heroTitle ? (
+              (() => {
+                // Teile den Title in Wörter auf
+                const words = heroTitle.split(" ");
+
+                // Wenn weniger als 3 Wörter, zeige alles normal
+                if (words.length < 3) {
+                  return <span className="block">{heroTitle}</span>;
+                }
+
+                // Nimm die letzten 2 Wörter für den Gradient
+                const lastTwoWords = words.slice(-2).join(" ");
+                const restOfTitle = words.slice(0, -2).join(" ");
+
+                return (
+                  <>
+                    <span className="block sm:inline">{restOfTitle}&nbsp;</span>
+                    <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
+                      {lastTwoWords}
+                    </span>
+                  </>
+                );
+              })()
             ) : (
-              <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">
-                  No image set selected
+              <>
+                <span className="block">Automate TikTok slides</span>
+                {/* Mobile ≈3 Zeilen, ab sm → 2 Zeilen */}
+                <span className="block sm:inline sm:whitespace-nowrap">
+                  that actually&nbsp;
                 </span>
-                <div className="h-24 md:h-32 lg:h-40 w-full rounded-lg bg-muted" />
+                <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
+                  drive traffic
+                </span>
+              </>
+            )}
+          </motion.h1>
+
+          {/* Subheadline */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15, duration: 0.6 }}
+            className="mt-2 pb-4 text-lg sm:text-xl lg:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed font-light"
+          >
+            {heroSubtitle ||
+              "Create viral TikTok slides in seconds. Visually stunning, authentic, and built to perform."}
+          </motion.p>
+
+          {/* CTA buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-5"
+          >
+            {session ? (
+              <Link href="/dashboard/home" className="w-full sm:w-auto">
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
+                >
+                  Go to the app
+                  <ArrowRightIcon className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
+                </Button>
+              </Link>
+            ) : (
+              <div className="w-full sm:w-auto">
+                <GoogleSignInButton />
               </div>
             )}
-          </button>
-        </DialogTrigger>
-        <DialogContent
-          className="
-     !max-w-none                 /* überschreibt jedes max-w aus dem Component-Default */
-     w-[96vw] md:w-[70vw]
-     h-[85vh] max-h-[85vh]
-     p-0 overflow-hidden flex flex-col
-     rounded-2xl shadow-xl border border-border/30
-          "
-        >
-          <DialogHeader
-            className="
-              sticky top-0 z-10
-              px-6 pt-6 pb-4 border-b
-              bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60
-            "
-          >
-            <div className="flex items-center gap-4">
-              {drillDownParent && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleBackToTopLevel}
-                  className="gap-2"
-                >
-                  ← Back
-                </Button>
-              )}
-              <DialogTitle className="text-2xl">
-                {drillDownParent
-                  ? `Select from: ${drillDownParent.name}`
-                  : "Select Image Collection"}
-              </DialogTitle>
-            </div>
-          </DialogHeader>
 
-          {/* Scrollbarer Mittelteil (behält feste Außenmaße bei) */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 overscroll-contain scrollbar-hide">
-            <Tabs
-              value={activeTab}
-              onValueChange={(value) =>
-                setActiveTab(value as "community" | "mine")
-              }
-              className="flex flex-col min-h-0"
+            <a
+              href="#library"
+              className="inline-flex items-center gap-2 text-white/80 hover:text-white text-sm sm:text-base font-medium underline-offset-4 hover:underline transition-all duration-200 px-2 py-1"
             >
-              <TabsList className="grid w-full grid-cols-2 rounded-lg bg-muted p-1">
-                <TabsTrigger
-                  value="community"
-                  className="w-full rounded-md text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-                >
-                  Community
-                </TabsTrigger>
-                <TabsTrigger
-                  value="mine"
-                  className="w-full rounded-md text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-                >
-                  My Collections
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="community" className="mt-4 min-h-0">
-                {renderImageSetGrid(
-                  communitySets,
-                  "No community collections available yet.",
-                )}
-              </TabsContent>
-              <TabsContent value="mine" className="mt-4 min-h-0">
-                {renderImageSetGrid(
-                  mySets,
-                  "You haven't created any collections yet.",
-                )}
-              </TabsContent>
-            </Tabs>
-          </div>
+              <StarIcon className="w-4 h-4 text-yellow-400" />
+              Browse examples
+            </a>
+          </motion.div>
 
-          {/* Fixer Footer */}
-          <div
-            className="
-              shrink-0 border-t
-              px-6 py-4
-              bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60
-              flex items-center justify-end gap-2
-            "
+          {/* Feature highlights */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 text-left"
           >
-            <Button variant="secondary" onClick={() => setIsDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={!pendingSetId}>
-              Save
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
+                  <ZapIcon className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-white font-semibold">Live in seconds</h2>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                From idea to finished slides instantly. No setup, no hassle.
+              </p>
+            </div>
+
+            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
+                  <BarChart3Icon className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-white font-semibold">
+                  Templates that convert
+                </h2>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                Battle-tested winners. More reach, more followers.
+              </p>
+            </div>
+
+            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
+                  <CheckCircle2Icon className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-white font-semibold">Looks handcrafted</h2>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                Creator aesthetic instead of AI vibe. Natural and trustworthy.
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Social proof stats */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+            className="mt-14 px-4"
+          >
+            <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-indigo-500/40 hover:bg-indigo-500/50 duration-300 backdrop-blur-sm p-5 sm:p-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 mb-1">
+                    10M+
+                  </div>
+                  <div className="text-sm text-gray-300/90">TikTok Views</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
+                    100+
+                  </div>
+                  <div className="text-sm text-gray-300/90">Happy creators</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
+                    20K+
+                  </div>
+                  <div className="text-sm text-gray-300/90">
+                    Slides produced
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
+                    100%
+                  </div>
+                  <div className="text-sm text-gray-300/90">Success rate</div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Optimized Styles - Fixed z-index hierarchy and GPU acceleration */}
+      <style jsx global>{`
+        /* Background Container - Lowest layer */
+        .hero-background-container {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          background-color: #111;
+          z-index: 1;
+          pointer-events: none;
+          /* Create isolated stacking context */
+          isolation: isolate;
+          /* Promote to own layer */
+          will-change: transform;
+          transform: translateZ(0);
+        }
+
+        /* Gradient Overlay - Above background */
+        .hero-gradient-overlay {
+          position: absolute;
+          inset: 0;
+          z-index: 2;
+          background: linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.8) 15%,
+            rgba(0, 0, 0, 0.8) 50%,
+            rgba(0, 0, 0, 0.95) 70%,
+            rgba(0, 0, 0, 0.6) 95%,
+            rgba(0, 0, 0, 1) 100%
+          );
+          opacity: 0.65;
+          pointer-events: none;
+          /* Fixed property for better performance */
+          will-change: opacity;
+        }
+
+        /* Perspective Wrapper */
+        .hero-perspective-wrapper {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          perspective: 500px;
+          perspective-origin: center center;
+          z-index: 1;
+          /* Contain layout and paint for performance */
+          contain: layout style paint;
+        }
+
+        /* Animated Grid */
+        .hero-animated-grid {
+          width: 100%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-start;
+          transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
+            translateX(1300px) translateZ(0);
+          transform-style: preserve-3d;
+          animation: heroBackgroundMove 180s linear infinite alternate;
+          /* Force GPU acceleration */
+          will-change: transform;
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
+          -webkit-transform-style: preserve-3d;
+        }
+
+        /* Image Rows */
+        .hero-image-row {
+          margin: 0;
+          display: flex;
+          justify-content: flex-end;
+          width: 100%;
+          flex-wrap: nowrap;
+          flex-grow: 1;
+          transform: translateX(100px) translateY(-120px) translateZ(0);
+          /* Prevent layout thrashing */
+          contain: layout style;
+        }
+
+        /* Individual Image Cards */
+        .hero-image-card {
+          position: relative;
+          transform-style: preserve-3d;
+          transform: rotateX(20deg) rotateY(0deg) skewX(335deg) translateZ(0);
+          min-width: 125px;
+          min-height: 187px;
+          display: inline-block;
+          margin: 7px;
+          border-radius: 12px;
+          box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
+          opacity: 0.9;
+          overflow: hidden;
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
+          /* Performance optimization */
+          will-change: transform;
+        }
+
+        /* Content Wrapper - keep it BELOW the fixed navbar (navbar is z-50) */
+        .hero-content-wrapper {
+          position: relative;
+          /* Navbar has z-50 — set hero below it to avoid overlapping while scrolling */
+          z-index: 20;
+          /* Create new stacking context isolated from background */
+          isolation: isolate;
+          /* Promote to own layer */
+          will-change: transform;
+          transform: translateZ(0);
+          min-height: 89vh;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          padding: 5rem 1.25rem 2.5rem;
+        }
+
+        @media (min-width: 640px) {
+          .hero-content-wrapper {
+            padding: 5rem 1.5rem 2.5rem;
+          }
+        }
+
+        @media (min-width: 1024px) {
+          .hero-content-wrapper {
+            padding-top: 5rem;
+          }
+        }
+
+        /* Optimized Animation */
+        @keyframes heroBackgroundMove {
+          from {
+            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
+              translateX(1300px) translateZ(0);
+          }
+          to {
+            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
+              translateX(-190px) translateZ(0);
+          }
+        }
+
+        /* Force hardware acceleration for smooth animation */
+        @media (prefers-reduced-motion: no-preference) {
+          .hero-animated-grid {
+            animation-play-state: running;
+          }
+        }
+
+        /* Pause animation if user prefers reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+          .hero-animated-grid {
+            animation-play-state: paused;
+          }
+        }
+      `}</style>
+    </Section>
   );
-};
+}
 </file>
 
 <file path="src/components/ui/tabs.tsx">
@@ -82510,89 +83262,6 @@ export function useTikTokPostAction(
     refreshAccounts,
   };
 }
-</file>
-
-<file path="next.config.js">
-// --- Security headers (CSP funktionsfähig & Scanner-kompatibel) ---
-const ONE_YEAR = 31536000;
-const isProd = process.env.NODE_ENV === "production";
-
-// Hinweis:
-// - Wir erlauben bewusst 'unsafe-inline' und 'unsafe-eval' in script-src,
-// damit Next.js + deine Libs (z.B. Framer Motion) zuverlässig rendern.
-// - Scanner erwarten _vorhandene_ CSP-Header; eine zu strikte CSP hat dir die App gebrochen.
-// - Falls du später weiter abhärten willst, können wir Nonces/Hashes einführen.
-const CSP = [
-  "default-src 'self'",
-  // Skripte: Next/Framer/Hydration brauchen inline/eval in deinem aktuellen Setup
-  "script-src 'self' https: blob: 'unsafe-inline' 'unsafe-eval'",
-  // Styles: Tailwind/inline kritisch, daher 'unsafe-inline'
-  "style-src 'self' https: 'unsafe-inline'",
-  // Medien & Bilder (Next/Image, UploadThing-CDNs, eigene Files)
-  "img-src 'self' https: data: blob:",
-  "media-src 'self' https: blob:",
-  // Schriften
-  "font-src 'self' https: data:",
-  // API/SSR/HMR/Realtime
-  "connect-src 'self' https: wss: ws:",
-  // Frames nur von sicheren Quellen (z.B. eigene Seiten, evtl. externe UIs)
-  "frame-src 'self' https:",
-  // Worker (Next/Image, Offscreen etc.)
-  "worker-src 'self' blob:",
-  // Sichere Defaults
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'self'",
-  // Mixed-Content nur in Production automatisch upgraden (vermeidet localhost-Timeouts)
-  ...(isProd ? ["upgrade-insecure-requests"] : []),
-].join("; ");
-
-const securityHeaders = [
-  { key: "Strict-Transport-Security", value: `max-age=${ONE_YEAR}; includeSubDomains` },
-  { key: "X-Frame-Options", value: "SAMEORIGIN" },
-  { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
-  { key: "Cross-Origin-Resource-Policy", value: "same-site" },
-  { key: "Origin-Agent-Cluster", value: "?1" },
-  { key: "Content-Security-Policy", value: CSP },
-];
-
-const config = {
-  images: {
-    formats: ["image/avif", "image/webp"],
-    remotePatterns: [
-      { protocol: "https", hostname: "files.slidescockpit.com" },
-      { protocol: "https", hostname: "utfs.io" },
-      { protocol: "https", hostname: "*.ufs.sh" },
-      { protocol: "https", hostname: "images.unsplash.com" },
-      { protocol: "https", hostname: "lh3.googleusercontent.com" },
-      { protocol: "https", hostname: "placehold.co" },
-      // TikTok CDN (diverse pXX-Subdomains; nötig für Hero-Slides)
-      {
-        protocol: "https",
-        hostname: "*.tiktokcdn-eu.com",
-      },
-      {
-        protocol: "https",
-        hostname: "*.tiktokcdn.com",
-      },
-    ],
-  },
-
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: securityHeaders,
-      },
-    ];
-  },
-};
-
-export default config;
 </file>
 
 <file path="src/app/admin/ugc/reaction-avatars/page.tsx">
@@ -83457,6 +84126,161 @@ export default function RootLayout({
 }
 </file>
 
+<file path="src/components/dashboard/admin/AdminSounds.tsx">
+"use client";
+import { useEffect, useState } from "react";
+
+type SoundItem = {
+  key: string;
+  name: string;
+  size: number;
+  ufsUrl?: string;
+  url?: string;
+  coverUrl?: string | null;
+};
+
+export default function AdminSounds() {
+  const [items, setItems] = useState<SoundItem[]>([]);
+  const [sound, setSound] = useState<File | null>(null);
+  const [cover, setCover] = useState<File | null>(null);
+  const [displayName, setDisplayName] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    const res = await fetch("/api/ugc/sounds", { cache: "no-store" });
+    const json = await res.json();
+    setItems(json.items ?? []);
+  }
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function handleUpload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!sound) return;
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("sound", sound);
+      if (cover) fd.append("cover", cover);
+      if (displayName.trim()) fd.append("name", displayName.trim());
+      const res = await fetch("/api/admin/ugc/sounds", {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) {
+        let detail = "";
+        try { const j = await res.json(); detail = j?.upstreamBodySnippet || j?.detail || j?.error || ""; } catch {}
+        throw new Error(`Upload failed (${res.status}) ${detail}`.trim());
+      }
+      const data = await res.json().catch(() => ({}));
+      await load();
+      setSound(null);
+      setCover(null);
+      setDisplayName("");
+      (document.getElementById("sound-input") as HTMLInputElement | null)
+        ?.value &&
+        ((document.getElementById("sound-input") as HTMLInputElement).value =
+          "");
+      (document.getElementById("cover-input") as HTMLInputElement | null)
+        ?.value &&
+        ((document.getElementById("cover-input") as HTMLInputElement).value =
+          "");
+      alert("Sound (und ggf. Cover) hochgeladen.");
+    } catch (err) {
+      console.error("[AdminSounds] Upload error:", err);
+      alert(err?.message || "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold">Sounds</h2>
+      </div>
+
+      <form
+        onSubmit={handleUpload}
+        className="grid gap-3 md:grid-cols-[1fr_auto] items-end"
+      >
+        <div className="grid gap-2">
+          <label className="text-sm font-medium">Name (Anzeige im Auswahl-Pop-up)</label>
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="z. B. Chill Vibes 120bpm"
+            className="h-10 rounded-lg border px-3"
+          />
+          <label className="text-sm font-medium">Audio-Datei</label>
+          <input
+            id="sound-input"
+            type="file"
+            accept="audio/*"
+            onChange={(e) => setSound(e.target.files?.[0] ?? null)}
+          />
+          <label className="text-sm font-medium mt-3">
+            Cover-Bild (optional)
+          </label>
+          <input
+            id="cover-input"
+            type="file"
+            accept="image/*"
+            onChange={(e) => setCover(e.target.files?.[0] ?? null)}
+          />
+        </div>
+        <button
+          className="h-10 px-4 rounded-xl bg-primary text-primary-foreground disabled:opacity-60"
+          disabled={busy || !sound}
+        >
+          {busy ? "Lädt…" : "Hochladen"}
+        </button>
+      </form>
+
+      <div className="grid gap-3">
+        {items.map((it) => (
+          <div
+            key={it.key}
+            className="flex items-center justify-between rounded-2xl border p-3"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              {it.coverUrl ? (
+                <img
+                  src={it.coverUrl}
+                  alt=""
+                  className="h-10 w-10 rounded-lg object-cover"
+                />
+              ) : (
+                <div className="h-10 w-10 rounded-lg bg-muted" />
+              )}
+              <div className="min-w-0">
+                <div className="font-medium truncate">{it.name}</div>
+                {/* Größe ausgeblendet (KB-Anzeige entfernt) */}
+              </div>
+            </div>
+            <a
+              href={it.ufsUrl || it.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary text-sm underline"
+            >
+              Öffnen
+            </a>
+          </div>
+        ))}
+        {items.length === 0 && (
+          <div className="text-sm opacity-70">
+            Noch keine Sounds hochgeladen.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/dashboard/post-collections/PostCollectionsClient.tsx">
 "use client";
 
@@ -83741,556 +84565,6 @@ export function PostCollectionsClient() {
         ))}
       </div>
     </div>
-  );
-}
-</file>
-
-<file path="src/components/marketing/Hero.tsx">
-"use client";
-import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
-import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
-import {
-  ArrowRightIcon,
-  BarChart3Icon,
-  CheckCircle2Icon,
-  StarIcon,
-  TrendingUpIcon,
-  ZapIcon,
-} from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { Section } from "./Section";
-
-const HERO_POSTER_ROWS = 8;
-const HERO_POSTERS_PER_ROW = 28;
-const HERO_FETCH_LIMIT = 300;
-
-type HeroSlide = {
-  imageUrl?: string | null;
-};
-
-type HeroPost = {
-  slides?: HeroSlide[];
-};
-
-export function MarketingHero({
-  session,
-  category,
-  heroTitle,
-  heroSubtitle,
-}: {
-  session: boolean;
-  category?: string;
-  heroTitle?: string;
-  heroSubtitle?: string;
-}) {
-  const [posterImages, setPosterImages] = useState<string[]>([]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchSlides = async () => {
-      try {
-        const params = new URLSearchParams({
-          limit: HERO_FETCH_LIMIT.toString(),
-        });
-        if (category) {
-          params.set("category", category);
-        }
-
-        const response = await fetch(
-          `/api/slideshow-library/posts?${params.toString()}`,
-          {
-            cache: "no-store",
-            signal: controller.signal,
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to load hero slides: ${response.status}`);
-        }
-
-        const data = (await response.json()) as unknown;
-        if (!Array.isArray(data)) return;
-
-        const collected = new Set<string>();
-
-        for (const post of data as HeroPost[]) {
-          if (!post?.slides?.length) continue;
-
-          for (const slide of post.slides) {
-            if (!slide?.imageUrl) continue;
-            collected.add(slide.imageUrl);
-          }
-        }
-
-        if (!collected.size) return;
-
-        const deduped = Array.from(collected);
-        for (let index = deduped.length - 1; index > 0; index--) {
-          const swapIndex = Math.floor(Math.random() * (index + 1));
-          const current = deduped[index];
-          const swap = deduped[swapIndex];
-          if (current === undefined || swap === undefined) {
-            continue;
-          }
-          deduped[index] = swap;
-          deduped[swapIndex] = current;
-        }
-
-        setPosterImages(deduped);
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          return;
-        }
-        console.error("Error loading hero slide images", error);
-      }
-    };
-
-    void fetchSlides();
-
-    return () => {
-      controller.abort();
-    };
-  }, [category]);
-
-  const posterMatrix = useMemo(() => {
-    const perRow = HERO_POSTERS_PER_ROW;
-    const totalRows = HERO_POSTER_ROWS;
-
-     // Until we have real images, render nothing (no placeholders).
-     if (!posterImages.length) return [];
-
-     const rows: string[][] = [];
-     for (let r = 0; r < totalRows; r++) {
-       const start = r * perRow;
-       const end = start + perRow;
-       rows.push(posterImages.slice(start, end));
-     }
-     return rows;
-
-}, [posterImages]);
-
-  // TikTok-Bilder NICHT über next/image rendern (Host-Whitelist von Next schlägt oft zu).
-  // Alles andere weiter mit next/image (Optimierung bleibt erhalten).
-  const isTikTokCdn = (urlStr: string) => {
-    try {
-      const u = new URL(urlStr);
-      // Beispiele: p16-pu-sign-no.tiktokcdn-eu.com, p19-common-sign-useastred.tiktokcdn-eu.com, ...
-      return /(^|\.)tiktokcdn(?:-eu)?\.com$/i.test(u.hostname);
-    } catch {
-      return false;
-    }
-  };
-
-  return (
-    <Section className="relative min-h-[85vh] overflow-hidden bg-[#111] py-0">
-      {/* Netflix Background - Fixed z-index hierarchy */}
-      {posterMatrix.length > 0 && (
-        <div className="hero-background-container">
-          {/* Gradient Overlay */}
-          <div className="hero-gradient-overlay" />
-
-          {/* Animated Background */}
-          <div className="hero-perspective-wrapper">
-            <div className="hero-animated-grid">
-              {posterMatrix.map((row, rowIndex) => (
-                <div key={`hero-row-${rowIndex}`} className="hero-image-row">
-                  {row.map((imageUrl, itemIndex) => (
-                    <div
-                      key={`hero-row-${rowIndex}-item-${itemIndex}`}
-                      className="hero-image-card"
-                    >
-                      {isTikTokCdn(imageUrl) ? (
-                        // Fallback auf <img> für TikTok-CDNs → keine Next-Whitelist nötig
-                        <img
-                          src={imageUrl}
-                          alt=""
-                          loading={rowIndex < 2 ? "eager" : "lazy"}
-                          className="h-full w-full object-cover"
-                          decoding="async"
-                        />
-                      ) : (
-                        <Image
-                          src={imageUrl}
-                          alt=""
-                          fill
-                          /* Nur für die kleinen Kacheln: extrem klein halten */
-                          sizes="125px"
-                          /* Next darf optimieren -> erzeugt AVIF/WebP automatisch */
-                          quality={60}
-                          // Avoid Next.js runtime error: can't set both priority and loading
-                          // Use priority for first 2 rows, lazy for the rest
-                          priority={rowIndex < 2}
-                          loading={rowIndex < 2 ? undefined : "lazy"}
-                          style={{ objectFit: "cover", objectPosition: "center" }}
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Foreground Content - Isolated stacking context */}
-      <div className="hero-content-wrapper">
-        <div className="mx-auto max-w-5xl text-center">
-          {/* Status badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-3 rounded-full border border-indigo-300/20 bg-indigo-500/40 backdrop-blur-sm px-4 py-2 text-xs sm:text-sm font-medium text-indigo-100 shadow-lg mb-2 sm:mb-4 lg:mb-6 mt-[-0.5rem] sm:mt-[-1rem]"
-          >
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
-              <span>10M+ views generated with SlidesCockpit</span>
-            </div>
-            <div className="hidden sm:block h-4 w-px bg-indigo-300/30"></div>
-            <div className="flex items-center gap-1">
-              <TrendingUpIcon className="w-4 h-4" />
-              <span>2025</span>
-            </div>
-          </motion.div>
-
-          {/* Main headline */}
-          <motion.h1
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08, duration: 0.7 }}
-            className="py-2 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight text-white"
-          >
-            {heroTitle ? (
-              (() => {
-                // Teile den Title in Wörter auf
-                const words = heroTitle.split(" ");
-
-                // Wenn weniger als 3 Wörter, zeige alles normal
-                if (words.length < 3) {
-                  return <span className="block">{heroTitle}</span>;
-                }
-
-                // Nimm die letzten 2 Wörter für den Gradient
-                const lastTwoWords = words.slice(-2).join(" ");
-                const restOfTitle = words.slice(0, -2).join(" ");
-
-                return (
-                  <>
-                    <span className="block sm:inline">{restOfTitle}&nbsp;</span>
-                    <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
-                      {lastTwoWords}
-                    </span>
-                  </>
-                );
-              })()
-            ) : (
-              <>
-                <span className="block">Automate TikTok slides</span>
-                {/* Mobile ≈3 Zeilen, ab sm → 2 Zeilen */}
-                <span className="block sm:inline sm:whitespace-nowrap">
-                  that actually&nbsp;
-                </span>
-                <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
-                  drive traffic
-                </span>
-              </>
-            )}
-          </motion.h1>
-
-          {/* Subheadline */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.15, duration: 0.6 }}
-            className="mt-2 pb-4 text-lg sm:text-xl lg:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed font-light"
-          >
-            {heroSubtitle ||
-              "Create viral TikTok slides in seconds. Visually stunning, authentic, and built to perform."}
-          </motion.p>
-
-          {/* CTA buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-5"
-          >
-            {session ? (
-              <Link href="/dashboard/home" className="w-full sm:w-auto">
-                <Button
-                  size="lg"
-                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
-                >
-                  Go to the app
-                  <ArrowRightIcon className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
-                </Button>
-              </Link>
-            ) : (
-              <div className="w-full sm:w-auto">
-                <GoogleSignInButton />
-              </div>
-            )}
-
-            <a
-              href="#library"
-              className="inline-flex items-center gap-2 text-white/80 hover:text-white text-sm sm:text-base font-medium underline-offset-4 hover:underline transition-all duration-200 px-2 py-1"
-            >
-              <StarIcon className="w-4 h-4 text-yellow-400" />
-              Browse examples
-            </a>
-          </motion.div>
-
-          {/* Feature highlights */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 text-left"
-          >
-            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
-                  <ZapIcon className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-white font-semibold">Live in seconds</h2>
-              </div>
-              <p className="text-gray-300 text-sm leading-relaxed">
-                From idea to finished slides instantly. No setup, no hassle.
-              </p>
-            </div>
-
-            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
-                  <BarChart3Icon className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-white font-semibold">
-                  Templates that convert
-                </h2>
-              </div>
-              <p className="text-gray-300 text-sm leading-relaxed">
-                Battle-tested winners. More reach, more followers.
-              </p>
-            </div>
-
-            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
-                  <CheckCircle2Icon className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-white font-semibold">Looks handcrafted</h2>
-              </div>
-              <p className="text-gray-300 text-sm leading-relaxed">
-                Creator aesthetic instead of AI vibe. Natural and trustworthy.
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Social proof stats */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4, duration: 0.6 }}
-            className="mt-14 px-4"
-          >
-            <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-indigo-500/40 hover:bg-indigo-500/50 duration-300 backdrop-blur-sm p-5 sm:p-6">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 mb-1">
-                    10M+
-                  </div>
-                  <div className="text-sm text-gray-300/90">TikTok Views</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-                    100+
-                  </div>
-                  <div className="text-sm text-gray-300/90">Happy creators</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-                    20K+
-                  </div>
-                  <div className="text-sm text-gray-300/90">
-                    Slides produced
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-                    100%
-                  </div>
-                  <div className="text-sm text-gray-300/90">Success rate</div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-
-      {/* Optimized Styles - Fixed z-index hierarchy and GPU acceleration */}
-      <style jsx global>{`
-        /* Background Container - Lowest layer */
-        .hero-background-container {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-          background-color: #111;
-          z-index: 1;
-          pointer-events: none;
-          /* Create isolated stacking context */
-          isolation: isolate;
-          /* Promote to own layer */
-          will-change: transform;
-          transform: translateZ(0);
-        }
-
-        /* Gradient Overlay - Above background */
-        .hero-gradient-overlay {
-          position: absolute;
-          inset: 0;
-          z-index: 2;
-          background: linear-gradient(
-            to bottom,
-            rgba(0, 0, 0, 0.8) 15%,
-            rgba(0, 0, 0, 0.8) 50%,
-            rgba(0, 0, 0, 0.95) 70%,
-            rgba(0, 0, 0, 0.6) 95%,
-            rgba(0, 0, 0, 1) 100%
-          );
-          opacity: 0.65;
-          pointer-events: none;
-          /* Fixed property for better performance */
-          will-change: opacity;
-        }
-
-        /* Perspective Wrapper */
-        .hero-perspective-wrapper {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          perspective: 500px;
-          perspective-origin: center center;
-          z-index: 1;
-          /* Contain layout and paint for performance */
-          contain: layout style paint;
-        }
-
-        /* Animated Grid */
-        .hero-animated-grid {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: flex-start;
-          transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
-            translateX(1300px) translateZ(0);
-          transform-style: preserve-3d;
-          animation: heroBackgroundMove 180s linear infinite alternate;
-          /* Force GPU acceleration */
-          will-change: transform;
-          backface-visibility: hidden;
-          -webkit-backface-visibility: hidden;
-          -webkit-transform-style: preserve-3d;
-        }
-
-        /* Image Rows */
-        .hero-image-row {
-          margin: 0;
-          display: flex;
-          justify-content: flex-end;
-          width: 100%;
-          flex-wrap: nowrap;
-          flex-grow: 1;
-          transform: translateX(100px) translateY(-120px) translateZ(0);
-          /* Prevent layout thrashing */
-          contain: layout style;
-        }
-
-        /* Individual Image Cards */
-        .hero-image-card {
-          position: relative;
-          transform-style: preserve-3d;
-          transform: rotateX(20deg) rotateY(0deg) skewX(335deg) translateZ(0);
-          min-width: 125px;
-          min-height: 187px;
-          display: inline-block;
-          margin: 7px;
-          border-radius: 12px;
-          box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
-          opacity: 0.9;
-          overflow: hidden;
-          backface-visibility: hidden;
-          -webkit-backface-visibility: hidden;
-          /* Performance optimization */
-          will-change: transform;
-        }
-
-        /* Content Wrapper - keep it BELOW the fixed navbar (navbar is z-50) */
-        .hero-content-wrapper {
-          position: relative;
-          /* Navbar has z-50 — set hero below it to avoid overlapping while scrolling */
-          z-index: 20;
-          /* Create new stacking context isolated from background */
-          isolation: isolate;
-          /* Promote to own layer */
-          will-change: transform;
-          transform: translateZ(0);
-          min-height: 89vh;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          padding: 5rem 1.25rem 2.5rem;
-        }
-
-        @media (min-width: 640px) {
-          .hero-content-wrapper {
-            padding: 5rem 1.5rem 2.5rem;
-          }
-        }
-
-        @media (min-width: 1024px) {
-          .hero-content-wrapper {
-            padding-top: 5rem;
-          }
-        }
-
-        /* Optimized Animation */
-        @keyframes heroBackgroundMove {
-          from {
-            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
-              translateX(1300px) translateZ(0);
-          }
-          to {
-            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
-              translateX(-190px) translateZ(0);
-          }
-        }
-
-        /* Force hardware acceleration for smooth animation */
-        @media (prefers-reduced-motion: no-preference) {
-          .hero-animated-grid {
-            animation-play-state: running;
-          }
-        }
-
-        /* Pause animation if user prefers reduced motion */
-        @media (prefers-reduced-motion: reduce) {
-          .hero-animated-grid {
-            animation-play-state: paused;
-          }
-        }
-      `}</style>
-    </Section>
   );
 }
 </file>
@@ -85195,6 +85469,239 @@ export function useTikTokDirectPost(
 }
 </file>
 
+<file path="package.json">
+{
+  "name": "presentation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build --turbo",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "dev": "next dev --turbo",
+    "dev:noturbo": "cross-env NEXT_DISABLE_TURBOPACK=1 next dev",
+    "postinstall": "prisma generate",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "start": "next start",
+    "type": "tsc --noEmit",
+    "postbuild": "next-sitemap"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^1.3.23",
+    "@ai-sdk/openai-compatible": "^1.0.19",
+    "@ai-sdk/provider": "1.1.3",
+    "@ai-sdk/provider-utils": "2.2.8",
+    "@ai-sdk/react": "^1.2.12",
+    "@ariakit/react": "^0.4.17",
+    "@auth/prisma-adapter": "^1.6.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@emoji-mart/data": "^1.2.1",
+    "@fal-ai/client": "^1.7.2",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2",
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-brands-svg-icons": "^6.7.2",
+    "@fortawesome/free-regular-svg-icons": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
+    "@fortawesome/react-fontawesome": "^0.2.2",
+    "@hookform/resolvers": "^3.10.0",
+    "@platejs/ai": "^49.2.15",
+    "@platejs/autoformat": "^49.0.0",
+    "@platejs/basic-nodes": "^49.0.0",
+    "@platejs/basic-styles": "^49.0.0",
+    "@platejs/callout": "^49.0.0",
+    "@platejs/caption": "^49.0.0",
+    "@platejs/code-block": "^49.0.0",
+    "@platejs/combobox": "^49.0.0",
+    "@platejs/comment": "^49.0.0",
+    "@platejs/date": "^49.0.2",
+    "@platejs/dnd": "^49.2.10",
+    "@platejs/emoji": "^49.0.0",
+    "@platejs/excalidraw": "^49.0.0",
+    "@platejs/floating": "^49.0.0",
+    "@platejs/indent": "^49.0.0",
+    "@platejs/juice": "^49.0.0",
+    "@platejs/layout": "^49.2.1",
+    "@platejs/link": "^49.1.1",
+    "@platejs/list": "^49.2.0",
+    "@platejs/markdown": "^49.2.15",
+    "@platejs/math": "^49.0.0",
+    "@platejs/media": "^49.0.0",
+    "@platejs/mention": "^49.0.0",
+    "@platejs/resizable": "^49.0.0",
+    "@platejs/selection": "^50.2.0",
+    "@platejs/slash-command": "^49.0.0",
+    "@platejs/slate": "^49.2.4",
+    "@platejs/suggestion": "^50.3.3",
+    "@platejs/table": "^49.1.13",
+    "@platejs/toc": "^49.0.0",
+    "@platejs/toggle": "^49.0.0",
+    "@prisma/client": "^6.13.0",
+    "@radix-ui/react-accordion": "^1.2.12",
+    "@radix-ui/react-alert-dialog": "^1.1.14",
+    "@radix-ui/react-aspect-ratio": "^1.1.7",
+    "@radix-ui/react-avatar": "^1.1.10",
+    "@radix-ui/react-checkbox": "^1.3.2",
+    "@radix-ui/react-collapsible": "^1.1.12",
+    "@radix-ui/react-collection": "^1.1.7",
+    "@radix-ui/react-context-menu": "^2.2.15",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-hover-card": "^1.1.15",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-menubar": "^1.1.16",
+    "@radix-ui/react-navigation-menu": "^1.2.14",
+    "@radix-ui/react-popover": "^1.1.15",
+    "@radix-ui/react-primitive": "^2.1.3",
+    "@radix-ui/react-progress": "^1.1.7",
+    "@radix-ui/react-radio-group": "^1.3.7",
+    "@radix-ui/react-scroll-area": "^1.2.10",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-separator": "^1.1.7",
+    "@radix-ui/react-slider": "^1.3.6",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-switch": "^1.2.6",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@radix-ui/react-toast": "^1.2.15",
+    "@radix-ui/react-toggle": "^1.1.9",
+    "@radix-ui/react-toggle-group": "^1.1.10",
+    "@radix-ui/react-toolbar": "^1.1.10",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "@reacticons/ionicons": "^7.1.0",
+    "@t3-oss/env-nextjs": "^0.10.1",
+    "@tanstack/react-query": "^5.84.2",
+    "@tavily/core": "^0.5.12",
+    "@uploadthing/react": "^7.3.1",
+    "ai": "^4.3.19",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "date-fns": "^3.6.0",
+    "embla-carousel-react": "^8.6.0",
+    "execa": "^9.6.0",
+    "ffmpeg-static": "^5.2.0",
+    "fontfaceobserver": "^2.3.0",
+    "framer-motion": "^11.18.2",
+    "html2canvas-pro": "^1.5.11",
+    "input-otp": "^1.4.2",
+    "ionicons": "^8.0.13",
+    "jszip": "^3.10.1",
+    "konva": "^9.3.22",
+    "langchain": "^0.3.30",
+    "lodash.debounce": "^4.0.8",
+    "lowlight": "^3.3.0",
+    "lucide-react": "^0.525.0",
+    "nanoid": "^5.1.5",
+    "next": "15.5.4",
+    "next-auth": "5.0.0-beta.29",
+    "next-sitemap": "^4.2.3",
+    "next-themes": "^0.4.6",
+    "ollama-ai-provider": "^1.2.0",
+    "pdf-lib": "^1.17.1",
+    "platejs": "^49.2.21",
+    "pptxgenjs": "^4.0.1",
+    "prismjs": "^1.30.0",
+    "prosemirror-commands": "^1.7.1",
+    "prosemirror-history": "^1.4.1",
+    "prosemirror-keymap": "^1.2.3",
+    "prosemirror-markdown": "^1.13.2",
+    "prosemirror-model": "^1.25.1",
+    "prosemirror-schema-basic": "^1.2.4",
+    "prosemirror-schema-list": "^1.5.1",
+    "prosemirror-state": "^1.4.3",
+    "prosemirror-view": "^1.39.3",
+    "re-resizable": "^6.11.2",
+    "react": "18.3.1",
+    "react-calendar": "^6.0.0",
+    "react-colorful": "^5.6.1",
+    "react-day-picker": "^9.9.0",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-dom": "18.3.1",
+    "react-dropzone": "^14.3.8",
+    "react-fontpicker-ts": "^1.2.0",
+    "react-hook-form": "^7.56.4",
+    "react-hot-toast": "^2.6.0",
+    "react-icons": "^4.12.0",
+    "react-icons-picker": "^1.0.9",
+    "react-intersection-observer": "^9.16.0",
+    "react-konva": "^19.0.10",
+    "react-lite-youtube-embed": "^2.5.6",
+    "react-player": "^3.3.3",
+    "react-resizable-panels": "^2.1.9",
+    "react-textarea-autosize": "^8.5.9",
+    "react-tweet": "^3.2.2",
+    "recharts": "^2.15.4",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "resend": "^6.4.0",
+    "sonner": "^1.7.4",
+    "stripe": "^19.1.0",
+    "tailwind-merge": "^2.6.0",
+    "together-ai": "^0.7.0",
+    "uploadthing": "^7.7.2",
+    "use-file-picker": "^2.1.2",
+    "vaul": "^1.1.2",
+    "zod": "^3.25.76",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.5",
+    "@tailwindcss/container-queries": "^0.1.1",
+    "@tailwindcss/typography": "^0.5.16",
+    "@types/lodash.debounce": "^4.0.9",
+    "@types/node": "^20.17.47",
+    "@types/prismjs": "^1.26.5",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@types/webpack": "^5.28.5",
+    "cross-env": "^10.1.0",
+    "postcss": "^8.5.3",
+    "prettier": "^3.5.3",
+    "prettier-plugin-organize-imports": "^4.3.0",
+    "prettier-plugin-tailwindcss": "^0.5.14",
+    "prisma": "^6.13.0",
+    "tailwind-scrollbar": "^4.0.2",
+    "tailwind-scrollbar-hide": "^2.0.0",
+    "tailwindcss": "^3.4.17",
+    "tailwindcss-animate": "^1.0.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
+    "webpack": "^5.97.1"
+  },
+  "pnpm": {
+    "peerDependencyRules": {
+      "allowAny": [
+        "react",
+        "react-dom",
+        "@types/react"
+      ]
+    },
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "@swc/core",
+      "canvas",
+      "core-js",
+      "es5-ext",
+      "esbuild",
+      "msgpackr-extract",
+      "prisma",
+      "protobufjs",
+      "sharp",
+      "unrs-resolver"
+    ]
+  },
+  "packageManager": "pnpm@10.17.0"
+}
+</file>
+
 <file path="src/app/api/tests/tiktok-post/route.ts">
 import { env } from "@/env";
 import { auth } from "@/server/auth";
@@ -85513,265 +86020,6 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-}
-</file>
-
-<file path="src/components/app-sidebar-support.tsx">
-"use client";
-
-import { Ellipsis, LifeBuoy, X } from "lucide-react";
-import { useSession } from "next-auth/react";
-import { useState, type ReactNode } from "react";
-import toast from "react-hot-toast";
-
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
-import { Textarea } from "@/components/ui/textarea";
-
-type SupportOption = "issue" | "idea" | "other";
-
-type SupportOptionConfig = {
-  value: SupportOption;
-  label: string;
-  title: string;
-  subject: string;
-  icon: ReactNode;
-};
-
-const SUPPORT_OPTIONS: SupportOptionConfig[] = [
-  {
-    value: "issue",
-    label: "Issue",
-    title: "Report an issue",
-    subject: "Report an issue",
-    icon: <span className="text-4xl leading-none">⚠️</span>,
-  },
-  {
-    value: "idea",
-    label: "Idea",
-    title: "Share an idea",
-    subject: "Share an idea",
-    icon: <span className="text-4xl leading-none">💡</span>,
-  },
-  {
-    value: "other",
-    label: "Other",
-    title: "Tell us anything!",
-    subject: "Tell us anything!",
-    icon: (
-      <span className="flex items-center justify-center rounded-full text-foreground">
-        <Ellipsis className="h-9 w-9" strokeWidth={2.8} />
-      </span>
-    ),
-  },
-];
-
-type FormStatus = {
-  loading: boolean;
-  success: boolean;
-  error: string | null;
-};
-
-const createInitialStatus = (): FormStatus => ({
-  loading: false,
-  success: false,
-  error: null,
-});
-
-export function SidebarSupportButton() {
-  const [selectedOption, setSelectedOption] = useState<SupportOption | null>(
-    null,
-  );
-  const [message, setMessage] = useState("");
-  const [status, setStatus] = useState<FormStatus>(createInitialStatus);
-  const [isOpen, setIsOpen] = useState(false);
-  const { data: session } = useSession();
-
-  const selectedOptionConfig = selectedOption
-    ? SUPPORT_OPTIONS.find((option) => option.value === selectedOption)
-    : null;
-
-  const handleOptionSelect = (option: SupportOptionConfig) => {
-    setSelectedOption(option.value);
-    setMessage("");
-    setStatus(createInitialStatus());
-  };
-
-  const resetDialog = () => {
-    setSelectedOption(null);
-    setMessage("");
-    setStatus(createInitialStatus());
-  };
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!selectedOptionConfig) {
-      setStatus({
-        loading: false,
-        success: false,
-        error: "Please choose a support topic before sending.",
-      });
-      toast.error("Please choose a support topic before sending.");
-      return;
-    }
-
-    const userEmail = session?.user?.email;
-    const userName = session?.user?.name?.trim() || "SlidesCockpit User";
-
-    if (!userEmail) {
-      setStatus({
-        loading: false,
-        success: false,
-        error:
-          "We could not find your email address. Please contact support directly.",
-      });
-      toast.error(
-        "We could not find your email address. Please contact support directly.",
-      );
-      return;
-    }
-
-    const trimmedMessage = message.trim();
-    if (trimmedMessage.length === 0) {
-      setStatus({
-        loading: false,
-        success: false,
-        error: "Please enter a short description before sending.",
-      });
-      toast.error("Please enter a short description before sending.");
-      return;
-    }
-
-    setStatus({ loading: true, success: false, error: null });
-
-    try {
-      const response = await fetch("/api/support", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: userName,
-          email: userEmail,
-          subject: selectedOptionConfig.subject,
-          message: trimmedMessage,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send support request");
-      }
-
-      setStatus(createInitialStatus());
-      setMessage("");
-      setIsOpen(false);
-      setTimeout(() => {
-        toast.success("Thanks for your message! We'll respond shortly.");
-      }, 150);
-    } catch (error) {
-      const messageText =
-        error instanceof Error
-          ? error.message
-          : "Failed to send support request";
-      setStatus({ loading: false, success: false, error: messageText });
-      toast.error(messageText);
-    }
-  };
-
-  const isSendDisabled = status.loading || message.trim().length === 0;
-
-  return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={(open) => {
-        setIsOpen(open);
-        if (!open) {
-          resetDialog();
-        }
-      }}
-    >
-      <SidebarMenu className="text-muted-foreground/80">
-        <SidebarMenuItem>
-          <DialogTrigger asChild>
-            <SidebarMenuButton
-              type="button"
-              className="font-semibold text-muted-foreground/80 bg-transparent hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              tooltip="Support"
-              onClick={() => setIsOpen(true)}
-            >
-              <LifeBuoy className="h-5 w-5" />
-              <span className="font-semibold">Support</span>
-            </SidebarMenuButton>
-          </DialogTrigger>
-        </SidebarMenuItem>
-      </SidebarMenu>
-
-      <DialogContent
-        shouldHaveClose={false}
-        className="max-w-md space-y-5 bg-white"
-      >
-        <div className="flex items-start justify-between">
-          <DialogTitle>
-            {selectedOptionConfig?.title ?? "What's on your mind?"}
-          </DialogTitle>
-          <DialogClose
-            className="-mr-2 -mt-2 rounded-md p-1 text-muted-foreground transition hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </DialogClose>
-        </div>
-
-        {selectedOptionConfig === null ? (
-          <div className="grid gap-2 sm:grid-cols-3">
-            {SUPPORT_OPTIONS.map((option) => (
-              <Button
-                key={option.value}
-                variant="outline"
-                className="flex flex-col items-center gap-3 border-muted/40 bg-muted/30 py-12 text-foreground hover:bg-muted"
-                onClick={() => handleOptionSelect(option)}
-              >
-                {option.icon}
-                <span className="text-sm font-semibold">{option.label}</span>
-              </Button>
-            ))}
-          </div>
-        ) : (
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-            {status.error ? (
-              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {status.error}
-              </div>
-            ) : null}
-
-            <Textarea
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              placeholder="Type your message here..."
-              className="min-h-[160px]"
-              required
-              disabled={status.loading}
-            />
-            <Button type="submit" className="w-full" disabled={isSendDisabled}>
-              {status.loading ? "Sending…" : "Send"}
-            </Button>
-          </form>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
 }
 </file>
 
@@ -86264,239 +86512,6 @@ export function useTikTokScheduleAction(
     refreshAccounts,
     resetIdempotencyKey,
   };
-}
-</file>
-
-<file path="package.json">
-{
-  "name": "presentation",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "build": "next build --turbo",
-    "db:push": "prisma db push",
-    "db:studio": "prisma studio",
-    "dev": "next dev --turbo",
-    "dev:noturbo": "cross-env NEXT_DISABLE_TURBOPACK=1 next dev",
-    "postinstall": "prisma generate",
-    "lint": "biome lint .",
-    "lint:fix": "biome lint --write .",
-    "check": "biome check .",
-    "check:fix": "biome check --write .",
-    "start": "next start",
-    "type": "tsc --noEmit",
-    "postbuild": "next-sitemap"
-  },
-  "dependencies": {
-    "@ai-sdk/openai": "^1.3.23",
-    "@ai-sdk/openai-compatible": "^1.0.19",
-    "@ai-sdk/provider": "1.1.3",
-    "@ai-sdk/provider-utils": "2.2.8",
-    "@ai-sdk/react": "^1.2.12",
-    "@ariakit/react": "^0.4.17",
-    "@auth/prisma-adapter": "^1.6.0",
-    "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/sortable": "^10.0.0",
-    "@dnd-kit/utilities": "^3.2.2",
-    "@emoji-mart/data": "^1.2.1",
-    "@fal-ai/client": "^1.7.2",
-    "@ffmpeg-installer/ffmpeg": "^1.1.0",
-    "@ffprobe-installer/ffprobe": "^2.1.2",
-    "@fortawesome/fontawesome-svg-core": "^6.7.2",
-    "@fortawesome/free-brands-svg-icons": "^6.7.2",
-    "@fortawesome/free-regular-svg-icons": "^6.7.2",
-    "@fortawesome/free-solid-svg-icons": "^6.7.2",
-    "@fortawesome/react-fontawesome": "^0.2.2",
-    "@hookform/resolvers": "^3.10.0",
-    "@platejs/ai": "^49.2.15",
-    "@platejs/autoformat": "^49.0.0",
-    "@platejs/basic-nodes": "^49.0.0",
-    "@platejs/basic-styles": "^49.0.0",
-    "@platejs/callout": "^49.0.0",
-    "@platejs/caption": "^49.0.0",
-    "@platejs/code-block": "^49.0.0",
-    "@platejs/combobox": "^49.0.0",
-    "@platejs/comment": "^49.0.0",
-    "@platejs/date": "^49.0.2",
-    "@platejs/dnd": "^49.2.10",
-    "@platejs/emoji": "^49.0.0",
-    "@platejs/excalidraw": "^49.0.0",
-    "@platejs/floating": "^49.0.0",
-    "@platejs/indent": "^49.0.0",
-    "@platejs/juice": "^49.0.0",
-    "@platejs/layout": "^49.2.1",
-    "@platejs/link": "^49.1.1",
-    "@platejs/list": "^49.2.0",
-    "@platejs/markdown": "^49.2.15",
-    "@platejs/math": "^49.0.0",
-    "@platejs/media": "^49.0.0",
-    "@platejs/mention": "^49.0.0",
-    "@platejs/resizable": "^49.0.0",
-    "@platejs/selection": "^50.2.0",
-    "@platejs/slash-command": "^49.0.0",
-    "@platejs/slate": "^49.2.4",
-    "@platejs/suggestion": "^50.3.3",
-    "@platejs/table": "^49.1.13",
-    "@platejs/toc": "^49.0.0",
-    "@platejs/toggle": "^49.0.0",
-    "@prisma/client": "^6.13.0",
-    "@radix-ui/react-accordion": "^1.2.12",
-    "@radix-ui/react-alert-dialog": "^1.1.14",
-    "@radix-ui/react-aspect-ratio": "^1.1.7",
-    "@radix-ui/react-avatar": "^1.1.10",
-    "@radix-ui/react-checkbox": "^1.3.2",
-    "@radix-ui/react-collapsible": "^1.1.12",
-    "@radix-ui/react-collection": "^1.1.7",
-    "@radix-ui/react-context-menu": "^2.2.15",
-    "@radix-ui/react-dialog": "^1.1.15",
-    "@radix-ui/react-dropdown-menu": "^2.1.16",
-    "@radix-ui/react-hover-card": "^1.1.15",
-    "@radix-ui/react-label": "^2.1.7",
-    "@radix-ui/react-menubar": "^1.1.16",
-    "@radix-ui/react-navigation-menu": "^1.2.14",
-    "@radix-ui/react-popover": "^1.1.15",
-    "@radix-ui/react-primitive": "^2.1.3",
-    "@radix-ui/react-progress": "^1.1.7",
-    "@radix-ui/react-radio-group": "^1.3.7",
-    "@radix-ui/react-scroll-area": "^1.2.10",
-    "@radix-ui/react-select": "^2.2.6",
-    "@radix-ui/react-separator": "^1.1.7",
-    "@radix-ui/react-slider": "^1.3.6",
-    "@radix-ui/react-slot": "^1.2.3",
-    "@radix-ui/react-switch": "^1.2.6",
-    "@radix-ui/react-tabs": "^1.1.13",
-    "@radix-ui/react-toast": "^1.2.15",
-    "@radix-ui/react-toggle": "^1.1.9",
-    "@radix-ui/react-toggle-group": "^1.1.10",
-    "@radix-ui/react-toolbar": "^1.1.10",
-    "@radix-ui/react-tooltip": "^1.2.8",
-    "@reacticons/ionicons": "^7.1.0",
-    "@t3-oss/env-nextjs": "^0.10.1",
-    "@tanstack/react-query": "^5.84.2",
-    "@tavily/core": "^0.5.12",
-    "@uploadthing/react": "^7.3.1",
-    "ai": "^4.3.19",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "cmdk": "^1.1.1",
-    "date-fns": "^3.6.0",
-    "embla-carousel-react": "^8.6.0",
-    "execa": "^9.6.0",
-    "ffmpeg-static": "^5.2.0",
-    "fontfaceobserver": "^2.3.0",
-    "framer-motion": "^11.18.2",
-    "html2canvas-pro": "^1.5.11",
-    "input-otp": "^1.4.2",
-    "ionicons": "^8.0.13",
-    "jszip": "^3.10.1",
-    "konva": "^9.3.22",
-    "langchain": "^0.3.30",
-    "lodash.debounce": "^4.0.8",
-    "lowlight": "^3.3.0",
-    "lucide-react": "^0.525.0",
-    "nanoid": "^5.1.5",
-    "next": "15.5.4",
-    "next-auth": "5.0.0-beta.29",
-    "next-sitemap": "^4.2.3",
-    "next-themes": "^0.4.6",
-    "ollama-ai-provider": "^1.2.0",
-    "pdf-lib": "^1.17.1",
-    "platejs": "^49.2.21",
-    "pptxgenjs": "^4.0.1",
-    "prismjs": "^1.30.0",
-    "prosemirror-commands": "^1.7.1",
-    "prosemirror-history": "^1.4.1",
-    "prosemirror-keymap": "^1.2.3",
-    "prosemirror-markdown": "^1.13.2",
-    "prosemirror-model": "^1.25.1",
-    "prosemirror-schema-basic": "^1.2.4",
-    "prosemirror-schema-list": "^1.5.1",
-    "prosemirror-state": "^1.4.3",
-    "prosemirror-view": "^1.39.3",
-    "re-resizable": "^6.11.2",
-    "react": "18.3.1",
-    "react-calendar": "^6.0.0",
-    "react-colorful": "^5.6.1",
-    "react-day-picker": "^9.9.0",
-    "react-dnd": "^16.0.1",
-    "react-dnd-html5-backend": "^16.0.1",
-    "react-dom": "18.3.1",
-    "react-dropzone": "^14.3.8",
-    "react-fontpicker-ts": "^1.2.0",
-    "react-hook-form": "^7.56.4",
-    "react-hot-toast": "^2.6.0",
-    "react-icons": "^4.12.0",
-    "react-icons-picker": "^1.0.9",
-    "react-intersection-observer": "^9.16.0",
-    "react-konva": "^19.0.10",
-    "react-lite-youtube-embed": "^2.5.6",
-    "react-player": "^3.3.3",
-    "react-resizable-panels": "^2.1.9",
-    "react-textarea-autosize": "^8.5.9",
-    "react-tweet": "^3.2.2",
-    "recharts": "^2.15.4",
-    "remark-gfm": "^4.0.1",
-    "remark-math": "^6.0.0",
-    "resend": "^6.4.0",
-    "sonner": "^1.7.4",
-    "stripe": "^19.1.0",
-    "tailwind-merge": "^2.6.0",
-    "together-ai": "^0.7.0",
-    "uploadthing": "^7.7.2",
-    "use-file-picker": "^2.1.2",
-    "vaul": "^1.1.2",
-    "zod": "^3.25.76",
-    "zustand": "^4.5.7"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.2.5",
-    "@tailwindcss/container-queries": "^0.1.1",
-    "@tailwindcss/typography": "^0.5.16",
-    "@types/lodash.debounce": "^4.0.9",
-    "@types/node": "^20.17.47",
-    "@types/prismjs": "^1.26.5",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@types/webpack": "^5.28.5",
-    "cross-env": "^10.1.0",
-    "postcss": "^8.5.3",
-    "prettier": "^3.5.3",
-    "prettier-plugin-organize-imports": "^4.3.0",
-    "prettier-plugin-tailwindcss": "^0.5.14",
-    "prisma": "^6.13.0",
-    "tailwind-scrollbar": "^4.0.2",
-    "tailwind-scrollbar-hide": "^2.0.0",
-    "tailwindcss": "^3.4.17",
-    "tailwindcss-animate": "^1.0.7",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.2",
-    "webpack": "^5.97.1"
-  },
-  "pnpm": {
-    "peerDependencyRules": {
-      "allowAny": [
-        "react",
-        "react-dom",
-        "@types/react"
-      ]
-    },
-    "onlyBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
-      "@swc/core",
-      "canvas",
-      "core-js",
-      "es5-ext",
-      "esbuild",
-      "msgpackr-extract",
-      "prisma",
-      "protobufjs",
-      "sharp",
-      "unrs-resolver"
-    ]
-  },
-  "packageManager": "pnpm@10.17.0"
 }
 </file>
 
@@ -87171,6 +87186,258 @@ export default function CreateSlideshowPostPage() {
         </div>
       )}
     </div>
+  );
+}
+</file>
+
+<file path="src/components/app-sidebar.tsx">
+"use client";
+import {
+  Calendar,
+  CalendarClock,
+  Clapperboard,
+  FileCheck,
+  Folder,
+  Home,
+  Images,
+  TestTube2,
+  User,
+  Bookmark,
+  type LucideIcon,
+} from "lucide-react";
+import { usePathname } from "next/navigation";
+
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
+import { SidebarAccountSection } from "./app-sidebar-account";
+import { SidebarSettingsButton } from "./app-sidebar-settings";
+import { SidebarSupportButton } from "./app-sidebar-support";
+import { SidebarUsageSummary } from "./app-sidebar-usage";
+import { AppLogo } from "./logo/AppLogo";
+
+interface SidebarItem {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+}
+
+const startItems: SidebarItem[] = [
+  {
+    title: "Home",
+    url: "/dashboard/home",
+    icon: Home,
+  },
+];
+
+const playgroundItems: SidebarItem[] = [
+  {
+    title: "Slideshows",
+    url: "/dashboard/slideshows",
+    icon: Images,
+  },
+  {
+    title: "AI Avatars",
+    url: "/dashboard/ai-avatars",
+    icon: User,
+  },
+  {
+    title: "Hook + Demo",
+    url: "/dashboard/ugc",
+    icon: Clapperboard,
+  },
+];
+
+const resourceItems: SidebarItem[] = [
+  {
+    title: "Image Collections",
+    url: "/dashboard/image-collections",
+    icon: Folder,
+  },
+  {
+    title: "Post Collections",
+    url: "/dashboard/post-collections",
+    icon: Bookmark,
+  },
+];
+
+const postItems: SidebarItem[] = [
+  {
+    title: "Calendar",
+    url: "/dashboard/posts/calendar",
+    icon: Calendar,
+  },
+  {
+    title: "Scheduled",
+    url: "/dashboard/posts/scheduled",
+    icon: CalendarClock,
+  },
+  {
+    title: "Posted",
+    url: "/dashboard/posts/posted",
+    icon: FileCheck,
+  },
+];
+
+
+const debugItems: SidebarItem[] = [
+  {
+    title: "TikTok Posting",
+    url: "/dashboard/tests/tiktok-post",
+    icon: TestTube2,
+  },
+  {
+    title: "TikTok Scheduling",
+    url: "/dashboard/tests/tiktok-schedule",
+    icon: CalendarClock,
+  },
+];
+
+export function AppSidebar() {
+  const pathname = usePathname();
+
+  return (
+    <Sidebar>
+      <SidebarContent className="px-2">
+        <div className="flex justify-center items-center gap-2 py-4">
+          <AppLogo size={32} borderRadius={6} />
+          <p className="text-lg font-bold">SlidesCockpit</p>
+        </div>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {startItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname === item.url}
+                  >
+                    <a href={item.url}>
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sm">Playground</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {playgroundItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname === item.url}
+                  >
+                    <a href={item.url}>
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sm">Ressources</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {resourceItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname.startsWith(item.url)}
+                  >
+                    <a href={item.url}>
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sm">Posts</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {postItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname.startsWith(item.url)}
+                  >
+                    <a
+                      href={item.url}
+                      data-active={pathname.startsWith(item.url)}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+  
+        {/*
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-red-500">DEBUG</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {debugItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname.startsWith(item.url)}
+                  >
+                    <a
+                      href={item.url}
+                      data-active={pathname.startsWith(item.url)}
+                    >
+                      <item.icon className="w-5 h-5 text-red-500" />
+                      <span className="font-semibold text-red-500">
+                        {item.title}
+                      </span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        */}
+      </SidebarContent>
+      <SidebarFooter className="space-y-2">
+        <div className="flex flex-col gap-1 px-2">
+          <SidebarSettingsButton />
+          <SidebarSupportButton />
+        </div>
+        <SidebarUsageSummary />
+        <SidebarAccountSection />
+      </SidebarFooter>
+    </Sidebar>
   );
 }
 </file>
@@ -88295,258 +88562,6 @@ export function AdminSidebar() {
 }
 </file>
 
-<file path="src/components/app-sidebar.tsx">
-"use client";
-import {
-  Calendar,
-  CalendarClock,
-  Clapperboard,
-  FileCheck,
-  Folder,
-  Home,
-  Images,
-  TestTube2,
-  User,
-  Bookmark,
-  type LucideIcon,
-} from "lucide-react";
-import { usePathname } from "next/navigation";
-
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
-import { SidebarAccountSection } from "./app-sidebar-account";
-import { SidebarSettingsButton } from "./app-sidebar-settings";
-import { SidebarSupportButton } from "./app-sidebar-support";
-import { SidebarUsageSummary } from "./app-sidebar-usage";
-import { AppLogo } from "./logo/AppLogo";
-
-interface SidebarItem {
-  title: string;
-  url: string;
-  icon: LucideIcon;
-}
-
-const startItems: SidebarItem[] = [
-  {
-    title: "Home",
-    url: "/dashboard/home",
-    icon: Home,
-  },
-];
-
-const playgroundItems: SidebarItem[] = [
-  {
-    title: "Slideshows",
-    url: "/dashboard/slideshows",
-    icon: Images,
-  },
-  {
-    title: "AI Avatars",
-    url: "/dashboard/ai-avatars",
-    icon: User,
-  },
-  {
-    title: "Hook + Demo",
-    url: "/dashboard/ugc",
-    icon: Clapperboard,
-  },
-];
-
-const resourceItems: SidebarItem[] = [
-  {
-    title: "Image Collections",
-    url: "/dashboard/image-collections",
-    icon: Folder,
-  },
-  {
-    title: "Post Collections",
-    url: "/dashboard/post-collections",
-    icon: Bookmark,
-  },
-];
-
-const postItems: SidebarItem[] = [
-  {
-    title: "Calendar",
-    url: "/dashboard/posts/calendar",
-    icon: Calendar,
-  },
-  {
-    title: "Scheduled",
-    url: "/dashboard/posts/scheduled",
-    icon: CalendarClock,
-  },
-  {
-    title: "Posted",
-    url: "/dashboard/posts/posted",
-    icon: FileCheck,
-  },
-];
-
-
-const debugItems: SidebarItem[] = [
-  {
-    title: "TikTok Posting",
-    url: "/dashboard/tests/tiktok-post",
-    icon: TestTube2,
-  },
-  {
-    title: "TikTok Scheduling",
-    url: "/dashboard/tests/tiktok-schedule",
-    icon: CalendarClock,
-  },
-];
-
-export function AppSidebar() {
-  const pathname = usePathname();
-
-  return (
-    <Sidebar>
-      <SidebarContent className="px-2">
-        <div className="flex justify-center items-center gap-2 py-4">
-          <AppLogo size={32} borderRadius={6} />
-          <p className="text-lg font-bold">SlidesCockpit</p>
-        </div>
-
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {startItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname === item.url}
-                  >
-                    <a href={item.url}>
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-semibold">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sm">Playground</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {playgroundItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname === item.url}
-                  >
-                    <a href={item.url}>
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-semibold">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sm">Ressources</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {resourceItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname.startsWith(item.url)}
-                  >
-                    <a href={item.url}>
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-semibold">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sm">Posts</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {postItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname.startsWith(item.url)}
-                  >
-                    <a
-                      href={item.url}
-                      data-active={pathname.startsWith(item.url)}
-                    >
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-semibold">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-  
-        {/*
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-red-500">DEBUG</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {debugItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname.startsWith(item.url)}
-                  >
-                    <a
-                      href={item.url}
-                      data-active={pathname.startsWith(item.url)}
-                    >
-                      <item.icon className="w-5 h-5 text-red-500" />
-                      <span className="font-semibold text-red-500">
-                        {item.title}
-                      </span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        */}
-      </SidebarContent>
-      <SidebarFooter className="space-y-2">
-        <div className="flex flex-col gap-1 px-2">
-          <SidebarSettingsButton />
-          <SidebarSupportButton />
-        </div>
-        <SidebarUsageSummary />
-        <SidebarAccountSection />
-      </SidebarFooter>
-    </Sidebar>
-  );
-}
-</file>
-
 <file path="src/components/presentation/dashboard/PresentationDashboard.tsx">
 "use client";
 
@@ -89116,18 +89131,27 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 import { cn } from "@/lib/utils";
 import type { DemoVideo, GeneratedVideo, ReactionAvatar } from "@/types/ugc";
 
-type SoundItem = { key: string; name: string; size: number; ufsUrl?: string; url?: string; coverUrl?: string | null };
+type SoundItem = {
+  key: string;
+  name: string;
+  size: number;
+  ufsUrl?: string;
+  url?: string;
+  coverUrl?: string | null;
+};
+// bessere Icons für vertikale Ausrichtung
 import {
   AlignVerticalJustifyCenter,
-  AlignVerticalJustifyStart,
+  AlignVerticalJustifyStart, // top-alignment icon
   Music,
   Plus,
+  Trash2,
   VideoOff,
+  X,
 } from "lucide-react";
 // Sound popover (dialog)
 import {
@@ -89163,8 +89187,8 @@ export default function UgcDashboardPage() {
   const [avatars, setAvatars] = useState<ReactionAvatar[]>([]);
   const [avatarsLoading, setAvatarsLoading] = useState(true);
   const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(null);
-  // Avatar-Tabs entfallen – direkte Grid-Ansicht
-  const [avatarTab] = useState("community");
+  // Community-Tab wird nicht mehr angezeigt
+  const [avatarTab, setAvatarTab] = useState("community"); // bleibt intern, UI blendet "Community" aus
 
   const [demos, setDemos] = useState<DemoVideo[]>([]);
   const [demosLoading, setDemosLoading] = useState(true);
@@ -89172,6 +89196,7 @@ export default function UgcDashboardPage() {
 
   const [videos, setVideos] = useState<GeneratedVideo[]>([]);
   const [videosLoading, setVideosLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [hook, setHook] = useState("");
   // TikTok-like hook overlay position (preview/UI only)
@@ -89749,38 +89774,31 @@ export default function UgcDashboardPage() {
                         />
                       </>
                     ) : null}
-                    {/* Hook Overlay */}
+                    {/* Hook Overlay (ohne IIFE im style → Parser-sicher) */}
                     {hook.trim().length > 0 && (
                       <div
-                        style={(function() {
-                          // Preview-Größe dynamisch skalieren, damit 1:1 wie ffmpeg-Export (1080x1920 → 54px Font)
-                          const preview = document.querySelector("video, canvas");
-                          const baseHeight = 1920;
-                          const currentHeight = preview?.clientHeight || baseHeight;
-                          const scale = currentHeight / baseHeight;
-
-                          return {
-                            // Einheitliche TikTok-Schrift wie in den Slideshows
-                            // nutzt die in app/layout.tsx registrierte Font-Variable
-                            fontFamily: "TikTok Sans, var(--font-sans), sans-serif",
-                            fontSize: `${54 * scale}px`,
-                            fontWeight: 800,
-                            lineHeight: 1.1,
-                            WebkitTextStroke: `${3 * scale}px black`,
-                            textShadow: `${2 * scale}px ${2 * scale}px ${4 * scale}px rgba(0,0,0,0.65), 0 0 ${3 * scale}px rgba(0,0,0,0.55)`,
-                            letterSpacing: `${0.2 * scale}px`,
-                            transform: `translate(-50%, ${hookPosition === "middle" ? "-50%" : "0"})`,
-                            position: "absolute",
-                            width: "86%",
-                            left: "50%",
-                            top: hookPosition === "middle" ? "50%" : "18%",
-                            color: "white",
-                            textAlign: "center",
-                            pointerEvents: "none",
-                          };
-                        })()}
+                        className={cn(
+                          "pointer-events-none absolute left-1/2 w-[86%] -translate-x-1/2 text-white",
+                          hookPosition === "middle"
+                            ? "top-1/2 -translate-y-1/2"
+                            : "top-[18%]",
+                        )}
                       >
-                        {hook}
+                        <span
+                          className="block text-center font-extrabold"
+                          style={{
+                            fontFamily:
+                              "TikTok Sans, var(--font-sans), sans-serif",
+                            fontSize: "54px",
+                            lineHeight: 1.1,
+                            WebkitTextStroke: "3px black",
+                            textShadow:
+                              "2px 2px 4px rgba(0,0,0,0.65), 0 0 3px rgba(0,0,0,0.55)",
+                            letterSpacing: "0.2px",
+                          }}
+                        >
+                          {hook}
+                        </span>
                       </div>
                     )}
                   </>
@@ -89802,8 +89820,9 @@ export default function UgcDashboardPage() {
                   variant={hookPosition === "middle" ? "default" : "outline"}
                   onClick={() => setHookPosition("middle")}
                   className="rounded-full px-3"
-                  title="Vertikal zentrieren"
+                  title="Center vertically"
                 >
+                  {/* Linkes Icon: vertikal zentriert */}
                   <AlignVerticalJustifyCenter className="h-4 w-4" />
                 </Button>
                 <Button
@@ -89812,25 +89831,26 @@ export default function UgcDashboardPage() {
                   variant={hookPosition === "upper" ? "default" : "outline"}
                   onClick={() => setHookPosition("upper")}
                   className="rounded-full px-3"
-                  title="Weiter oben positionieren"
+                  title="Top vertically"
                 >
+                  {/* Rechtes Icon: Top Alignment */}
                   <AlignVerticalJustifyStart className="h-4 w-4" />
                 </Button>
               </div>
 
-              {/* Sound-Auswahl links, Generate rechts in einer Zeile */}
-              <div className="mt-2 flex w-full items-center justify-between gap-3">
-                {/* LINKS: Sound-Menübutton */}
-                <div className="flex items-center gap-2">
+              {/* Sound (70%) links, Generate (30%) rechts – gemeinsames Flex-Layout */}
+              <div className="mt-2 w-full flex items-stretch gap-3">
+                {/* LINKS: Sound – 70% Breite */}
+                <div className="min-w-0 basis-[70%]">
                   <Dialog open={soundOpen} onOpenChange={setSoundOpen}>
                     <DialogTrigger asChild>
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-10 rounded-2xl border overflow-hidden max-w-[260px] px-0"
+                        className="h-12 w-full rounded-full border overflow-hidden px-0 py-0 items-stretch gap-0"
                       >
                         {/* Bild links, abgerundet; rechte Abschlusslinie */}
-                        <div className="relative h-full w-10 shrink-0 overflow-hidden rounded-l-2xl border-r">
+                        <div className="relative h-full w-12 self-stretch shrink-0 overflow-hidden rounded-l-full border-r">
                           {selectedSound?.coverUrl ? (
                             <img
                               src={selectedSound.coverUrl}
@@ -89841,116 +89861,179 @@ export default function UgcDashboardPage() {
                             <div className="h-full w-full bg-muted" />
                           )}
                         </div>
-                        {/* Text rechts, sehr kompakt */}
-                        <div className="flex-1 px-2">
-                          <div className="text-xs font-medium leading-none">Sound</div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
-                            {selectedSound ? selectedSound.name : "Keiner gewählt"}
-                          </div>
+                        {/* Text rechts: zentriert & nur Name */}
+                        <div className="flex-1 px-3 flex items-center justify-center">
+                          <span className="truncate text-base sm:text-lg font-semibold leading-none text-center">
+                            {selectedSound ? selectedSound.name : "No sound"}
+                          </span>
                         </div>
                       </Button>
                     </DialogTrigger>
                     {/* Sound Dialog */}
                     <DialogContent className="max-w-xl">
-                  <DialogHeader>
-                    <DialogTitle>Sound auswählen</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    {soundsLoading ? (
-                      <div className="flex h-32 items-center justify-center">
-                        <Spinner className="h-6 w-6" />
-                      </div>
+                      <DialogHeader>
+                        <DialogTitle>Choose sound</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        {soundsLoading ? (
+                          <div className="flex h-32 items-center justify-center">
+                            <Spinner className="h-6 w-6" />
+                          </div>
                         ) : sounds.length === 0 ? (
-                      <div className="text-center text-sm text-muted-foreground">
-                        Keine Sounds verfügbar.
-                      </div>
-                    ) : (
-                      <div className="grid gap-2 max-h-64 overflow-y-auto">
-                        {sounds.map((sound) => (
-                           <button
-                             key={sound.key}
-                            onClick={() => {
-                              setTempSound(sound);
-                              // Preview direkt loopen
-                              setTimeout(() => {
+                          <div className="text-center text-sm text-muted-foreground">
+                            No sounds available.
+                          </div>
+                        ) : (
+                          <div className="grid gap-2 max-h-64 overflow-y-auto">
+                            {/* Special 'No sound' option */}
+                            <button
+                              onClick={() => {
+                                setTempSound(null);
                                 if (audioRef.current) {
+                                  audioRef.current.pause();
                                   audioRef.current.currentTime = 0;
-                                  audioRef.current.play().catch(()=>{});
                                 }
-                              }, 0);
+                              }}
+                              className={cn(
+                                "flex items-center gap-3 p-3 rounded-xl border text-left transition-colors hover:bg-muted/50",
+                                tempSound === null ||
+                                  (tempSound === undefined &&
+                                    selectedSound === null)
+                                  ? "border-primary bg-primary/5"
+                                  : "border-border",
+                              )}
+                            >
+                              <div className="h-10 w-10 rounded-lg overflow-hidden flex-shrink-0">
+                                <div className="h-full w-full bg-muted/70 flex items-center justify-center">
+                                  <X className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div
+                                  className={cn(
+                                    "truncate",
+                                    tempSound === null ||
+                                      (tempSound === undefined &&
+                                        selectedSound === null)
+                                      ? "font-semibold text-foreground"
+                                      : "font-medium",
+                                  )}
+                                >
+                                  No sound
+                                </div>
+                              </div>
+                            </button>
+                            {sounds.map((sound) => (
+                              <button
+                                key={sound.key}
+                                onClick={() => {
+                                  setTempSound(sound);
+                                  // Preview direkt loopen
+                                  setTimeout(() => {
+                                    if (audioRef.current) {
+                                      audioRef.current.currentTime = 0;
+                                      audioRef.current.play().catch(() => {});
+                                    }
+                                  }, 0);
+                                }}
+                                className={cn(
+                                  "flex items-center gap-3 p-3 rounded-xl border text-left transition-colors hover:bg-muted/50",
+                                  (tempSound?.key ?? selectedSound?.key) ===
+                                    sound.key
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border",
+                                )}
+                              >
+                                <div className="h-10 w-10 rounded-lg overflow-hidden flex-shrink-0">
+                                  {sound.coverUrl ? (
+                                    <img
+                                      src={sound.coverUrl}
+                                      alt=""
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="h-full w-full bg-muted flex items-center justify-center">
+                                      <Music className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div
+                                    className={cn(
+                                      "truncate",
+                                      (tempSound?.key ?? selectedSound?.key) ===
+                                        sound.key
+                                        ? "font-semibold text-foreground"
+                                        : "font-medium",
+                                    )}
+                                  >
+                                    {sound.name}
+                                  </div>
+                                  {/* KB-Anzeige entfernt */}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {/* versteckter Audio-Player für Loop-Preview */}
+                      <DialogFooter className="flex items-center justify-between gap-3">
+                        <audio
+                          ref={audioRef}
+                          src={
+                            (tempSound ?? selectedSound)?.ufsUrl ??
+                            (tempSound ?? selectedSound)?.url ??
+                            undefined
+                          }
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setTempSound(null);
+                              setSoundOpen(false);
                             }}
-                             className={cn(
-                               "flex items-center gap-3 p-3 rounded-xl border text-left transition-colors hover:bg-muted/50",
-                              (tempSound?.key ?? selectedSound?.key) === sound.key
-                                 ? "border-primary bg-primary/5"
-                                 : "border-border"
-                             )}
-                           >
-                             <div className="h-10 w-10 rounded-lg overflow-hidden flex-shrink-0">
-                               {sound.coverUrl ? (
-                                 <img
-                                   src={sound.coverUrl}
-                                   alt=""
-                                   className="h-full w-full object-cover"
-                                 />
-                               ) : (
-                                 <div className="h-full w-full bg-muted flex items-center justify-center">
-                                   <Music className="h-4 w-4 text-muted-foreground" />
-                                 </div>
-                               )}
-                             </div>
-                             <div className="min-w-0 flex-1">
-                               <div className="font-medium truncate">{sound.name}</div>
-                               <div className="text-xs text-muted-foreground">
-                                 {(sound.size / 1024).toFixed(1)} KB
-                               </div>
-                             </div>
-                            {(tempSound?.key ?? selectedSound?.key) === sound.key && (
-                               <div className="w-2 h-2 rounded-full bg-primary" />
-                             )}
-                           </button>
-                         ))}
-                       </div>
-                     )}
-                   </div>
-                  {/* versteckter Audio-Player für Loop-Preview */}
-                       <DialogFooter className="flex items-center justify-between gap-3">
-                         <audio ref={audioRef} src={(tempSound ?? selectedSound)?.ufsUrl ?? (tempSound ?? selectedSound)?.url ?? undefined} />
-                         <div className="text-xs text-muted-foreground truncate">
-                           {tempSound ? tempSound.name : selectedSound ? selectedSound.name : "Kein Sound ausgewählt"}
-                         </div>
-                         <div className="flex gap-2">
-                           <Button
-                             type="button"
-                             variant="outline"
-                             onClick={() => { setTempSound(null); setSoundOpen(false); }}
-                           >
-                             Abbrechen
-                           </Button>
-                           <Button
-                             type="button"
-                             onClick={() => {
-                               setSelectedSound(tempSound ?? selectedSound ?? null);
-                               setSoundOpen(false);
-                             }}
-                           >
-                             Übernehmen
-                           </Button>
-                         </div>
-                       </DialogFooter>
-                </DialogContent>
-              </Dialog>
-                   </div>
-                   <Button
-                     onClick={handleGenerate}
-                     disabled={isGenerating || !selectedAvatarId}
-                     className="h-12 rounded-full px-8 text-base"
-                   >
-                     {isGenerating ? "Generating…" : "Generate"}
-                   </Button>
-                 </div>
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              // Exklusives Verhalten für "No sound":
+                              // - Wenn tempSound === null → immer stumm schalten.
+                              // - Wenn tempSound ein Sound-Objekt ist → diesen übernehmen.
+                              // - Wenn tempSound === undefined → Auswahl unverändert lassen.
+                              if (tempSound === null) {
+                                setSelectedSound(null);
+                              } else if (typeof tempSound !== "undefined") {
+                                setSelectedSound(tempSound);
+                              }
+                              setSoundOpen(false);
+                            }}
+                          >
+                            Apply
+                          </Button>
+                        </div>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                {/* RECHTS: Generate – 30% Breite */}
+                <div className="basis-[30%]">
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={isGenerating || !selectedAvatarId}
+                    className="h-12 w-full rounded-full px-6 text-base"
+                  >
+                    {isGenerating ? "Generating…" : "Generate"}
+                  </Button>
+                </div>
               </div>
+              {/* schließt RIGHT column */}
+            </div>
           </div>
+          {/* schließt den grid-Container (lg:grid-cols-[...]) */}
         </CardContent>
       </Card>
 
@@ -89980,13 +90063,16 @@ export default function UgcDashboardPage() {
               ))}
             </div>
             <p className="mt-4 text-center text-sm text-muted-foreground">
-              Noch keine Videos – Generiere dein erstes UGC-Video oben links.
+              No videos yet — generate your first UGC video above.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             {videos.map((video) => (
-              <Card key={video.id} className="overflow-hidden rounded-2xl">
+              <Card
+                key={video.id}
+                className="group overflow-hidden rounded-2xl"
+              >
                 <CardContent className="p-0">
                   <div className="relative">
                     {video.compositeThumbnailUrl ? (
@@ -90002,6 +90088,32 @@ export default function UgcDashboardPage() {
                         className="aspect-[9/16] w-full bg-black object-cover"
                       />
                     )}
+                    {/* Hover-Delete oben rechts */}
+                    <button
+                      title="Delete"
+                      onClick={async () => {
+                        try {
+                          setDeletingId(video.id);
+                          const res = await fetch(
+                            `/api/ugc/videos/${video.id}`,
+                            { method: "DELETE" },
+                          );
+                          if (!res.ok) throw new Error("Delete failed");
+                          setVideos((prev) =>
+                            prev.filter((v) => v.id !== video.id),
+                          );
+                          toast.success("Video deleted");
+                        } catch (e) {
+                          toast.error("Delete failed");
+                        } finally {
+                          setDeletingId(null);
+                        }
+                      }}
+                      className="absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-black opacity-0 transition-opacity group-hover:opacity-100"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+
                     {/* Overlay-Buttons im Bild – wie Recently Created */}
                     <div className="absolute inset-x-2 bottom-2 flex flex-col gap-2">
                       <Link
@@ -90010,7 +90122,11 @@ export default function UgcDashboardPage() {
                         rel="noopener noreferrer"
                         className="inline-flex"
                       >
-                        <Button variant="secondary" size="sm" className="w-full rounded-full">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="w-full rounded-full"
+                        >
                           Open in new tab
                         </Button>
                       </Link>
@@ -90609,28 +90725,123 @@ export async function ingestTikTokPost({
       );
     }
   } else {
-    // Normal user: add to user collection
+    // Normal user: create post in public library first, then add to user collection
     if (ownerUserId) {
       try {
-        await fetch(`${API_BASE_URL}/slideshow-library/user-posts`, {
+        console.log("[apify/run] Normal user detected, creating post and linking to user collection");
+
+        // First, find or create the account to get a valid database ID
+        const accountResponse = await fetch(
+          `${API_BASE_URL}/slideshow-library/accounts/find-or-create`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username: accountData.username,
+              displayName: accountData.displayName,
+              bio: accountData.bio,
+              profileImageUrl: accountData.profileImageUrl,
+              followerCount: accountData.followerCount,
+              followingCount: accountData.followingCount,
+              isVerified: accountData.isVerified,
+            }),
+          },
+        );
+
+        if (!accountResponse.ok) {
+          const errorText = await accountResponse.text();
+          throw new Error(`Failed to find or create account: ${errorText}`);
+        }
+
+        const createdAccount = await accountResponse.json();
+        console.log("[apify/run] Account found/created for normal user:", {
+          accountId: createdAccount.id,
+          username: createdAccount.username,
+        });
+
+        // Create the post in public library
+        const publicPostData = {
+          accountId: createdAccount.id,
+          postId: postData.postId,
+          caption: postData.caption,
+          categories: postData.categories,
+          likeCount: postData.likeCount,
+          viewCount: postData.viewCount,
+          publishedAt: postData.publishedAt.toISOString(),
+          createdAt: postData.createdAt.toISOString(),
+          duration: postData.duration,
+          slides: postData.slides,
+        };
+
+        console.log("[apify/run] Creating post in public library for normal user:", {
+          postId: postData.postId,
+          accountId: createdAccount.id,
+          slidesCount: postData.slides?.length || 0,
+        });
+
+        const publicPostResponse = await fetch(
+          `${API_BASE_URL}/slideshow-library/posts`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(publicPostData),
+          },
+        );
+
+        if (!publicPostResponse.ok) {
+          const responseText = await publicPostResponse.text();
+          throw new Error(`Failed to create post in public library: ${responseText}`);
+        }
+
+        const createdPost = await publicPostResponse.json();
+        console.log("[apify/run] Post created successfully in public library:", {
+          postId: createdPost.id,
+          originalPostId: postData.postId,
+        });
+
+        // Now link the post to the user's collection
+        const linkResponse = await fetch(`${API_BASE_URL}/slideshow-library/user-posts`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId: ownerUserId,
-            postId: postData.id,
+            postId: createdPost.id, // Use the actual database post ID
           }),
         });
+
+        if (!linkResponse.ok) {
+          const errorText = await linkResponse.text();
+          console.warn("[apify/run] Failed to link post to user collection", {
+            userId: ownerUserId,
+            postId: createdPost.id,
+            error: errorText,
+          });
+        } else {
+          console.log("[apify/run] Successfully linked post to user collection:", {
+            userId: ownerUserId,
+            postId: createdPost.id,
+          });
+        }
       } catch (error) {
-        console.warn("[apify/run] Failed to link post to user", {
+        console.error("[apify/run] Error processing normal user post", {
           userId: ownerUserId,
-          postId: postData?.id,
+          postId: postData.postId,
           error,
         });
       }
     }
   }
 
-  return {
+  let resultPostData = postData;
+
+  // For normal users, update the post data with the created database IDs
+  if (ownerUserId !== "admin-library") {
+    // The postData object still contains the original data, but we need to
+    // return the actual database IDs that were created
+    console.log("[apify/run] Preparing result for normal user");
+  }
+
+  const result = {
     request: {
       awemeId,
       profileUsername: trimmedProfileUsername,
@@ -90642,8 +90853,10 @@ export async function ingestTikTokPost({
     accountDetail,
     awemeDetail,
     account: accountData,
-    post: postData,
+    post: resultPostData,
   };
+
+  return result;
 }
 
 export async function POST(request: Request) {

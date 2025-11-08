@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
+import { utapi } from "@/app/api/uploadthing/core";
 
 const updateSchema = z
   .object({
@@ -113,26 +114,40 @@ export async function DELETE(_: Request, { params }: RouteParams) {
   }
 
   const { id: videoId } = await params;
-  if (!videoId) {
-    return NextResponse.json({ error: "Missing video id" }, { status: 400 });
-  }
 
+  // Zuerst Video holen, um die URL zu haben
   const existing = await db.userUGCVideo.findFirst({
     where: { id: videoId, userId: session.user.id },
-    select: { id: true },
+    select: { id: true, compositeVideoUrl: true },
   });
   if (!existing) {
-    return NextResponse.json({ error: "Video not found" }, { status: 404 });
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  try {
-    await db.userUGCVideo.delete({ where: { id: videoId } });
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("[UGC][Videos][DELETE] Failed to delete video", error);
-    return NextResponse.json(
-      { error: "Failed to delete video" },
-      { status: 500 },
-    );
+  // File-Key aus UploadThing-URL extrahieren (letzter Pfadteil)
+  const fileKey = (() => {
+    const url = existing.compositeVideoUrl || "";
+    try {
+      const u = new URL(url);
+      const parts = u.pathname.split("/").filter(Boolean);
+      return parts[parts.length - 1] || null;
+    } catch {
+      return null;
+    }
+  })();
+
+  // Datei bei UploadThing löschen (best-effort)
+  if (fileKey) {
+    try {
+      await utapi.deleteFiles(fileKey);
+    } catch {
+      // kein Hard-Fail – wir löschen trotzdem den DB-Eintrag
+    }
   }
+
+  const video = await db.userUGCVideo.delete({
+    where: { id: existing.id },
+  });
+
+  return NextResponse.json({ ok: true, video });
 }

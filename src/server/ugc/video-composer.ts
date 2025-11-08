@@ -403,10 +403,9 @@ const uploadBuffer = async (buf: Buffer, key: string, mimeType: string = "video/
   // Sprechender Dateiname + korrekter MIME-Type
   const extension = mimeType === "video/mp4" ? ".mp4" : ".jpg";
   const filename = `${key}${extension}`;
-  const utFile = new File([buf], filename, {
-    type: mimeType,
-    lastModified: Date.now(),
-  });
+  // In Node keine Web-File-API nutzen: UploadThing erwartet UTFile (server)
+  // Buffer -> Uint8Array, damit der Konstruktor sauber typisiert ist
+  const utFile = new UTFile([new Uint8Array(buf)], filename, { type: mimeType });
 
   // Retry mit Exponential Backoff bei Pool/Rate/Server-Fehlern
   const maxAttempts = 5;

@@ -60,7 +60,7 @@ export default function AdminSounds() {
       alert("Sound (und ggf. Cover) hochgeladen.");
     } catch (err) {
       console.error("[AdminSounds] Upload error:", err);
-      alert(err?.message || "Upload failed");
+      alert(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setBusy(false);
     }

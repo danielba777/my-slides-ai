@@ -9,18 +9,27 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 import { cn } from "@/lib/utils";
 import type { DemoVideo, GeneratedVideo, ReactionAvatar } from "@/types/ugc";
 
-type SoundItem = { key: string; name: string; size: number; ufsUrl?: string; url?: string; coverUrl?: string | null };
+type SoundItem = {
+  key: string;
+  name: string;
+  size: number;
+  ufsUrl?: string;
+  url?: string;
+  coverUrl?: string | null;
+};
+// bessere Icons für vertikale Ausrichtung
 import {
   AlignVerticalJustifyCenter,
-  AlignVerticalJustifyStart,
+  AlignVerticalJustifyStart, // top-alignment icon
   Music,
   Plus,
+  Trash2,
   VideoOff,
+  X,
 } from "lucide-react";
 // Sound popover (dialog)
 import {
@@ -56,8 +65,8 @@ export default function UgcDashboardPage() {
   const [avatars, setAvatars] = useState<ReactionAvatar[]>([]);
   const [avatarsLoading, setAvatarsLoading] = useState(true);
   const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(null);
-  // Avatar-Tabs entfallen – direkte Grid-Ansicht
-  const [avatarTab] = useState("community");
+  // Community-Tab wird nicht mehr angezeigt
+  const [avatarTab, setAvatarTab] = useState("community"); // bleibt intern, UI blendet "Community" aus
 
   const [demos, setDemos] = useState<DemoVideo[]>([]);
   const [demosLoading, setDemosLoading] = useState(true);
@@ -65,6 +74,7 @@ export default function UgcDashboardPage() {
 
   const [videos, setVideos] = useState<GeneratedVideo[]>([]);
   const [videosLoading, setVideosLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [hook, setHook] = useState("");
   // TikTok-like hook overlay position (preview/UI only)
@@ -642,38 +652,31 @@ export default function UgcDashboardPage() {
                         />
                       </>
                     ) : null}
-                    {/* Hook Overlay */}
+                    {/* Hook Overlay (ohne IIFE im style → Parser-sicher) */}
                     {hook.trim().length > 0 && (
                       <div
-                        style={(function() {
-                          // Preview-Größe dynamisch skalieren, damit 1:1 wie ffmpeg-Export (1080x1920 → 54px Font)
-                          const preview = document.querySelector("video, canvas");
-                          const baseHeight = 1920;
-                          const currentHeight = preview?.clientHeight || baseHeight;
-                          const scale = currentHeight / baseHeight;
-
-                          return {
-                            // Einheitliche TikTok-Schrift wie in den Slideshows
-                            // nutzt die in app/layout.tsx registrierte Font-Variable
-                            fontFamily: "TikTok Sans, var(--font-sans), sans-serif",
-                            fontSize: `${54 * scale}px`,
-                            fontWeight: 800,
-                            lineHeight: 1.1,
-                            WebkitTextStroke: `${3 * scale}px black`,
-                            textShadow: `${2 * scale}px ${2 * scale}px ${4 * scale}px rgba(0,0,0,0.65), 0 0 ${3 * scale}px rgba(0,0,0,0.55)`,
-                            letterSpacing: `${0.2 * scale}px`,
-                            transform: `translate(-50%, ${hookPosition === "middle" ? "-50%" : "0"})`,
-                            position: "absolute",
-                            width: "86%",
-                            left: "50%",
-                            top: hookPosition === "middle" ? "50%" : "18%",
-                            color: "white",
-                            textAlign: "center",
-                            pointerEvents: "none",
-                          };
-                        })()}
+                        className={cn(
+                          "pointer-events-none absolute left-1/2 w-[86%] -translate-x-1/2 text-white",
+                          hookPosition === "middle"
+                            ? "top-1/2 -translate-y-1/2"
+                            : "top-[18%]",
+                        )}
                       >
-                        {hook}
+                        <span
+                          className="block text-center font-extrabold"
+                          style={{
+                            fontFamily:
+                              "TikTok Sans, var(--font-sans), sans-serif",
+                            fontSize: "54px",
+                            lineHeight: 1.1,
+                            WebkitTextStroke: "3px black",
+                            textShadow:
+                              "2px 2px 4px rgba(0,0,0,0.65), 0 0 3px rgba(0,0,0,0.55)",
+                            letterSpacing: "0.2px",
+                          }}
+                        >
+                          {hook}
+                        </span>
                       </div>
                     )}
                   </>
@@ -695,8 +698,9 @@ export default function UgcDashboardPage() {
                   variant={hookPosition === "middle" ? "default" : "outline"}
                   onClick={() => setHookPosition("middle")}
                   className="rounded-full px-3"
-                  title="Vertikal zentrieren"
+                  title="Center vertically"
                 >
+                  {/* Linkes Icon: vertikal zentriert */}
                   <AlignVerticalJustifyCenter className="h-4 w-4" />
                 </Button>
                 <Button
@@ -705,25 +709,26 @@ export default function UgcDashboardPage() {
                   variant={hookPosition === "upper" ? "default" : "outline"}
                   onClick={() => setHookPosition("upper")}
                   className="rounded-full px-3"
-                  title="Weiter oben positionieren"
+                  title="Top vertically"
                 >
+                  {/* Rechtes Icon: Top Alignment */}
                   <AlignVerticalJustifyStart className="h-4 w-4" />
                 </Button>
               </div>
 
-              {/* Sound-Auswahl links, Generate rechts in einer Zeile */}
-              <div className="mt-2 flex w-full items-center justify-between gap-3">
-                {/* LINKS: Sound-Menübutton */}
-                <div className="flex items-center gap-2">
+              {/* Sound (70%) links, Generate (30%) rechts – gemeinsames Flex-Layout */}
+              <div className="mt-2 w-full flex items-stretch gap-3">
+                {/* LINKS: Sound – 70% Breite */}
+                <div className="min-w-0 basis-[70%]">
                   <Dialog open={soundOpen} onOpenChange={setSoundOpen}>
                     <DialogTrigger asChild>
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-10 rounded-2xl border overflow-hidden max-w-[260px] px-0"
+                        className="h-12 w-full rounded-full border overflow-hidden px-0 py-0 items-stretch gap-0"
                       >
                         {/* Bild links, abgerundet; rechte Abschlusslinie */}
-                        <div className="relative h-full w-10 shrink-0 overflow-hidden rounded-l-2xl border-r">
+                        <div className="relative h-full w-12 self-stretch shrink-0 overflow-hidden rounded-l-full border-r">
                           {selectedSound?.coverUrl ? (
                             <img
                               src={selectedSound.coverUrl}
@@ -734,116 +739,179 @@ export default function UgcDashboardPage() {
                             <div className="h-full w-full bg-muted" />
                           )}
                         </div>
-                        {/* Text rechts, sehr kompakt */}
-                        <div className="flex-1 px-2">
-                          <div className="text-xs font-medium leading-none">Sound</div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
-                            {selectedSound ? selectedSound.name : "Keiner gewählt"}
-                          </div>
+                        {/* Text rechts: zentriert & nur Name */}
+                        <div className="flex-1 px-3 flex items-center justify-center">
+                          <span className="truncate text-base sm:text-lg font-semibold leading-none text-center">
+                            {selectedSound ? selectedSound.name : "No sound"}
+                          </span>
                         </div>
                       </Button>
                     </DialogTrigger>
                     {/* Sound Dialog */}
                     <DialogContent className="max-w-xl">
-                  <DialogHeader>
-                    <DialogTitle>Sound auswählen</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    {soundsLoading ? (
-                      <div className="flex h-32 items-center justify-center">
-                        <Spinner className="h-6 w-6" />
-                      </div>
+                      <DialogHeader>
+                        <DialogTitle>Choose sound</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        {soundsLoading ? (
+                          <div className="flex h-32 items-center justify-center">
+                            <Spinner className="h-6 w-6" />
+                          </div>
                         ) : sounds.length === 0 ? (
-                      <div className="text-center text-sm text-muted-foreground">
-                        Keine Sounds verfügbar.
-                      </div>
-                    ) : (
-                      <div className="grid gap-2 max-h-64 overflow-y-auto">
-                        {sounds.map((sound) => (
-                           <button
-                             key={sound.key}
-                            onClick={() => {
-                              setTempSound(sound);
-                              // Preview direkt loopen
-                              setTimeout(() => {
+                          <div className="text-center text-sm text-muted-foreground">
+                            No sounds available.
+                          </div>
+                        ) : (
+                          <div className="grid gap-2 max-h-64 overflow-y-auto">
+                            {/* Special 'No sound' option */}
+                            <button
+                              onClick={() => {
+                                setTempSound(null);
                                 if (audioRef.current) {
+                                  audioRef.current.pause();
                                   audioRef.current.currentTime = 0;
-                                  audioRef.current.play().catch(()=>{});
                                 }
-                              }, 0);
+                              }}
+                              className={cn(
+                                "flex items-center gap-3 p-3 rounded-xl border text-left transition-colors hover:bg-muted/50",
+                                tempSound === null ||
+                                  (tempSound === undefined &&
+                                    selectedSound === null)
+                                  ? "border-primary bg-primary/5"
+                                  : "border-border",
+                              )}
+                            >
+                              <div className="h-10 w-10 rounded-lg overflow-hidden flex-shrink-0">
+                                <div className="h-full w-full bg-muted/70 flex items-center justify-center">
+                                  <X className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div
+                                  className={cn(
+                                    "truncate",
+                                    tempSound === null ||
+                                      (tempSound === undefined &&
+                                        selectedSound === null)
+                                      ? "font-semibold text-foreground"
+                                      : "font-medium",
+                                  )}
+                                >
+                                  No sound
+                                </div>
+                              </div>
+                            </button>
+                            {sounds.map((sound) => (
+                              <button
+                                key={sound.key}
+                                onClick={() => {
+                                  setTempSound(sound);
+                                  // Preview direkt loopen
+                                  setTimeout(() => {
+                                    if (audioRef.current) {
+                                      audioRef.current.currentTime = 0;
+                                      audioRef.current.play().catch(() => {});
+                                    }
+                                  }, 0);
+                                }}
+                                className={cn(
+                                  "flex items-center gap-3 p-3 rounded-xl border text-left transition-colors hover:bg-muted/50",
+                                  (tempSound?.key ?? selectedSound?.key) ===
+                                    sound.key
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border",
+                                )}
+                              >
+                                <div className="h-10 w-10 rounded-lg overflow-hidden flex-shrink-0">
+                                  {sound.coverUrl ? (
+                                    <img
+                                      src={sound.coverUrl}
+                                      alt=""
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="h-full w-full bg-muted flex items-center justify-center">
+                                      <Music className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div
+                                    className={cn(
+                                      "truncate",
+                                      (tempSound?.key ?? selectedSound?.key) ===
+                                        sound.key
+                                        ? "font-semibold text-foreground"
+                                        : "font-medium",
+                                    )}
+                                  >
+                                    {sound.name}
+                                  </div>
+                                  {/* KB-Anzeige entfernt */}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {/* versteckter Audio-Player für Loop-Preview */}
+                      <DialogFooter className="flex items-center justify-between gap-3">
+                        <audio
+                          ref={audioRef}
+                          src={
+                            (tempSound ?? selectedSound)?.ufsUrl ??
+                            (tempSound ?? selectedSound)?.url ??
+                            undefined
+                          }
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setTempSound(null);
+                              setSoundOpen(false);
                             }}
-                             className={cn(
-                               "flex items-center gap-3 p-3 rounded-xl border text-left transition-colors hover:bg-muted/50",
-                              (tempSound?.key ?? selectedSound?.key) === sound.key
-                                 ? "border-primary bg-primary/5"
-                                 : "border-border"
-                             )}
-                           >
-                             <div className="h-10 w-10 rounded-lg overflow-hidden flex-shrink-0">
-                               {sound.coverUrl ? (
-                                 <img
-                                   src={sound.coverUrl}
-                                   alt=""
-                                   className="h-full w-full object-cover"
-                                 />
-                               ) : (
-                                 <div className="h-full w-full bg-muted flex items-center justify-center">
-                                   <Music className="h-4 w-4 text-muted-foreground" />
-                                 </div>
-                               )}
-                             </div>
-                             <div className="min-w-0 flex-1">
-                               <div className="font-medium truncate">{sound.name}</div>
-                               <div className="text-xs text-muted-foreground">
-                                 {(sound.size / 1024).toFixed(1)} KB
-                               </div>
-                             </div>
-                            {(tempSound?.key ?? selectedSound?.key) === sound.key && (
-                               <div className="w-2 h-2 rounded-full bg-primary" />
-                             )}
-                           </button>
-                         ))}
-                       </div>
-                     )}
-                   </div>
-                  {/* versteckter Audio-Player für Loop-Preview */}
-                       <DialogFooter className="flex items-center justify-between gap-3">
-                         <audio ref={audioRef} src={(tempSound ?? selectedSound)?.ufsUrl ?? (tempSound ?? selectedSound)?.url ?? undefined} />
-                         <div className="text-xs text-muted-foreground truncate">
-                           {tempSound ? tempSound.name : selectedSound ? selectedSound.name : "Kein Sound ausgewählt"}
-                         </div>
-                         <div className="flex gap-2">
-                           <Button
-                             type="button"
-                             variant="outline"
-                             onClick={() => { setTempSound(null); setSoundOpen(false); }}
-                           >
-                             Abbrechen
-                           </Button>
-                           <Button
-                             type="button"
-                             onClick={() => {
-                               setSelectedSound(tempSound ?? selectedSound ?? null);
-                               setSoundOpen(false);
-                             }}
-                           >
-                             Übernehmen
-                           </Button>
-                         </div>
-                       </DialogFooter>
-                </DialogContent>
-              </Dialog>
-                   </div>
-                   <Button
-                     onClick={handleGenerate}
-                     disabled={isGenerating || !selectedAvatarId}
-                     className="h-12 rounded-full px-8 text-base"
-                   >
-                     {isGenerating ? "Generating…" : "Generate"}
-                   </Button>
-                 </div>
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              // Exklusives Verhalten für "No sound":
+                              // - Wenn tempSound === null → immer stumm schalten.
+                              // - Wenn tempSound ein Sound-Objekt ist → diesen übernehmen.
+                              // - Wenn tempSound === undefined → Auswahl unverändert lassen.
+                              if (tempSound === null) {
+                                setSelectedSound(null);
+                              } else if (typeof tempSound !== "undefined") {
+                                setSelectedSound(tempSound);
+                              }
+                              setSoundOpen(false);
+                            }}
+                          >
+                            Apply
+                          </Button>
+                        </div>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                {/* RECHTS: Generate – 30% Breite */}
+                <div className="basis-[30%]">
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={isGenerating || !selectedAvatarId}
+                    className="h-12 w-full rounded-full px-6 text-base"
+                  >
+                    {isGenerating ? "Generating…" : "Generate"}
+                  </Button>
+                </div>
               </div>
+              {/* schließt RIGHT column */}
+            </div>
           </div>
+          {/* schließt den grid-Container (lg:grid-cols-[...]) */}
         </CardContent>
       </Card>
 
@@ -873,13 +941,16 @@ export default function UgcDashboardPage() {
               ))}
             </div>
             <p className="mt-4 text-center text-sm text-muted-foreground">
-              Noch keine Videos – Generiere dein erstes UGC-Video oben links.
+              No videos yet — generate your first UGC video above.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             {videos.map((video) => (
-              <Card key={video.id} className="overflow-hidden rounded-2xl">
+              <Card
+                key={video.id}
+                className="group overflow-hidden rounded-2xl"
+              >
                 <CardContent className="p-0">
                   <div className="relative">
                     {video.compositeThumbnailUrl ? (
@@ -895,6 +966,32 @@ export default function UgcDashboardPage() {
                         className="aspect-[9/16] w-full bg-black object-cover"
                       />
                     )}
+                    {/* Hover-Delete oben rechts */}
+                    <button
+                      title="Delete"
+                      onClick={async () => {
+                        try {
+                          setDeletingId(video.id);
+                          const res = await fetch(
+                            `/api/ugc/videos/${video.id}`,
+                            { method: "DELETE" },
+                          );
+                          if (!res.ok) throw new Error("Delete failed");
+                          setVideos((prev) =>
+                            prev.filter((v) => v.id !== video.id),
+                          );
+                          toast.success("Video deleted");
+                        } catch (e) {
+                          toast.error("Delete failed");
+                        } finally {
+                          setDeletingId(null);
+                        }
+                      }}
+                      className="absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-black opacity-0 transition-opacity group-hover:opacity-100"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+
                     {/* Overlay-Buttons im Bild – wie Recently Created */}
                     <div className="absolute inset-x-2 bottom-2 flex flex-col gap-2">
                       <Link
@@ -903,7 +1000,11 @@ export default function UgcDashboardPage() {
                         rel="noopener noreferrer"
                         className="inline-flex"
                       >
-                        <Button variant="secondary" size="sm" className="w-full rounded-full">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="w-full rounded-full"
+                        >
                           Open in new tab
                         </Button>
                       </Link>
