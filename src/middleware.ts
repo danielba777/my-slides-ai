@@ -58,6 +58,12 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isAdminPath) {
+    // First check isAdmin property (preferred method)
+    if (session?.user?.isAdmin) {
+      return NextResponse.next();
+    }
+
+    // Fallback to email-based check for backward compatibility
     const allowedEmails = env.ADMIN_ALLOWED_EMAILS
       ? env.ADMIN_ALLOWED_EMAILS.split(",")
           .map((email) => email.trim().toLowerCase())
