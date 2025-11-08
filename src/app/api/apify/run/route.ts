@@ -412,28 +412,123 @@ export async function ingestTikTokPost({
       );
     }
   } else {
-    // Normal user: add to user collection
+    // Normal user: create post in public library first, then add to user collection
     if (ownerUserId) {
       try {
-        await fetch(`${API_BASE_URL}/slideshow-library/user-posts`, {
+        console.log("[apify/run] Normal user detected, creating post and linking to user collection");
+
+        // First, find or create the account to get a valid database ID
+        const accountResponse = await fetch(
+          `${API_BASE_URL}/slideshow-library/accounts/find-or-create`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username: accountData.username,
+              displayName: accountData.displayName,
+              bio: accountData.bio,
+              profileImageUrl: accountData.profileImageUrl,
+              followerCount: accountData.followerCount,
+              followingCount: accountData.followingCount,
+              isVerified: accountData.isVerified,
+            }),
+          },
+        );
+
+        if (!accountResponse.ok) {
+          const errorText = await accountResponse.text();
+          throw new Error(`Failed to find or create account: ${errorText}`);
+        }
+
+        const createdAccount = await accountResponse.json();
+        console.log("[apify/run] Account found/created for normal user:", {
+          accountId: createdAccount.id,
+          username: createdAccount.username,
+        });
+
+        // Create the post in public library
+        const publicPostData = {
+          accountId: createdAccount.id,
+          postId: postData.postId,
+          caption: postData.caption,
+          categories: postData.categories,
+          likeCount: postData.likeCount,
+          viewCount: postData.viewCount,
+          publishedAt: postData.publishedAt.toISOString(),
+          createdAt: postData.createdAt.toISOString(),
+          duration: postData.duration,
+          slides: postData.slides,
+        };
+
+        console.log("[apify/run] Creating post in public library for normal user:", {
+          postId: postData.postId,
+          accountId: createdAccount.id,
+          slidesCount: postData.slides?.length || 0,
+        });
+
+        const publicPostResponse = await fetch(
+          `${API_BASE_URL}/slideshow-library/posts`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(publicPostData),
+          },
+        );
+
+        if (!publicPostResponse.ok) {
+          const responseText = await publicPostResponse.text();
+          throw new Error(`Failed to create post in public library: ${responseText}`);
+        }
+
+        const createdPost = await publicPostResponse.json();
+        console.log("[apify/run] Post created successfully in public library:", {
+          postId: createdPost.id,
+          originalPostId: postData.postId,
+        });
+
+        // Now link the post to the user's collection
+        const linkResponse = await fetch(`${API_BASE_URL}/slideshow-library/user-posts`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId: ownerUserId,
-            postId: postData.id,
+            postId: createdPost.id, // Use the actual database post ID
           }),
         });
+
+        if (!linkResponse.ok) {
+          const errorText = await linkResponse.text();
+          console.warn("[apify/run] Failed to link post to user collection", {
+            userId: ownerUserId,
+            postId: createdPost.id,
+            error: errorText,
+          });
+        } else {
+          console.log("[apify/run] Successfully linked post to user collection:", {
+            userId: ownerUserId,
+            postId: createdPost.id,
+          });
+        }
       } catch (error) {
-        console.warn("[apify/run] Failed to link post to user", {
+        console.error("[apify/run] Error processing normal user post", {
           userId: ownerUserId,
-          postId: postData?.id,
+          postId: postData.postId,
           error,
         });
       }
     }
   }
 
-  return {
+  let resultPostData = postData;
+
+  // For normal users, update the post data with the created database IDs
+  if (ownerUserId !== "admin-library") {
+    // The postData object still contains the original data, but we need to
+    // return the actual database IDs that were created
+    console.log("[apify/run] Preparing result for normal user");
+  }
+
+  const result = {
     request: {
       awemeId,
       profileUsername: trimmedProfileUsername,
@@ -445,8 +540,10 @@ export async function ingestTikTokPost({
     accountDetail,
     awemeDetail,
     account: accountData,
-    post: postData,
+    post: resultPostData,
   };
+
+  return result;
 }
 
 export async function POST(request: Request) {
