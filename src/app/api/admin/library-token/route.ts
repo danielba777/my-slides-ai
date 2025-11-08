@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { db } from "@/server/auth";
+import { db } from "@/server/db";
 
 const ADMIN_LIBRARY_TOKEN = process.env.ADMIN_LIBRARY_TOKEN;
 
