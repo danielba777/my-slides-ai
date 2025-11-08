@@ -85,7 +85,7 @@ const ugcItems: SidebarItem[] = [
   },
   {
     title: "Sounds",
-    url: "/dashboard/admin/sounds",
+    url: "/admin/sounds",
     icon: Music,
   },
 ];

@@ -14,6 +14,7 @@ export default function AdminSounds() {
   const [items, setItems] = useState<SoundItem[]>([]);
   const [sound, setSound] = useState<File | null>(null);
   const [cover, setCover] = useState<File | null>(null);
+  const [displayName, setDisplayName] = useState<string>("");
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -33,14 +34,21 @@ export default function AdminSounds() {
       const fd = new FormData();
       fd.append("sound", sound);
       if (cover) fd.append("cover", cover);
+      if (displayName.trim()) fd.append("name", displayName.trim());
       const res = await fetch("/api/admin/ugc/sounds", {
         method: "POST",
         body: fd,
       });
-      if (!res.ok) throw new Error("Upload failed");
+      if (!res.ok) {
+        let detail = "";
+        try { const j = await res.json(); detail = j?.upstreamBodySnippet || j?.detail || j?.error || ""; } catch {}
+        throw new Error(`Upload failed (${res.status}) ${detail}`.trim());
+      }
+      const data = await res.json().catch(() => ({}));
       await load();
       setSound(null);
       setCover(null);
+      setDisplayName("");
       (document.getElementById("sound-input") as HTMLInputElement | null)
         ?.value &&
         ((document.getElementById("sound-input") as HTMLInputElement).value =
@@ -51,7 +59,8 @@ export default function AdminSounds() {
           "");
       alert("Sound (und ggf. Cover) hochgeladen.");
     } catch (err) {
-      alert(String((err as any).message ?? err));
+      console.error("[AdminSounds] Upload error:", err);
+      alert(err?.message || "Upload failed");
     } finally {
       setBusy(false);
     }
@@ -68,6 +77,14 @@ export default function AdminSounds() {
         className="grid gap-3 md:grid-cols-[1fr_auto] items-end"
       >
         <div className="grid gap-2">
+          <label className="text-sm font-medium">Name (Anzeige im Auswahl-Pop-up)</label>
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="z. B. Chill Vibes 120bpm"
+            className="h-10 rounded-lg border px-3"
+          />
           <label className="text-sm font-medium">Audio-Datei</label>
           <input
             id="sound-input"
@@ -104,10 +121,10 @@ export default function AdminSounds() {
                 <img
                   src={it.coverUrl}
                   alt=""
-                  className="h-10 w-10 rounded-xl object-cover"
+                  className="h-10 w-10 rounded-lg object-cover"
                 />
               ) : (
-                <div className="h-10 w-10 rounded-xl bg-muted" />
+                <div className="h-10 w-10 rounded-lg bg-muted" />
               )}
               <div className="min-w-0">
                 <div className="font-medium truncate">{it.name}</div>
@@ -120,7 +137,7 @@ export default function AdminSounds() {
               href={it.ufsUrl || it.url}
               target="_blank"
               rel="noreferrer"
-              className="text-sm text-primary underline"
+              className="text-primary text-sm underline"
             >
               Öffnen
             </a>

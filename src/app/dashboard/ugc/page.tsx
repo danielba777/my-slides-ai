@@ -69,7 +69,9 @@ export default function UgcDashboardPage() {
   const [soundOpen, setSoundOpen] = useState(false);
   const [sounds, setSounds] = useState<SoundItem[]>([]);
   const [soundsLoading, setSoundsLoading] = useState(false);
-  const [selectedSound, setSelectedSound] = useState<SoundItem | null>(null);
+  const [selectedSound, setSelectedSound] = useState<SoundItem | null>(null); // persistierte Auswahl
+  const [tempSound, setTempSound] = useState<SoundItem | null>(null); // Auswahl im Dialog
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [dialogState, setDialogState] = useState<VideoDialogState>({
@@ -724,37 +726,37 @@ export default function UgcDashboardPage() {
                 </Button>
               </div>
 
-              {/* Sound-Auswahl mit Cover links + Abschlußlinie + Text rechts */}
-              <div className="mt-2 rounded-2xl border overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setSoundOpen(true)}
-                  className="w-full flex items-center text-left"
-                >
-                  {/* Linker Bildbereich: folgt der Box-Form, abgerundet links, vertikale Linie rechts */}
-                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-l-2xl border-r">
-                    {selectedSound?.coverUrl ? (
-                      <img
-                        src={selectedSound.coverUrl}
-                        alt=""
+              {/* Sound-Auswahl – kompakt, damit links neben Generate passt */}
+              <div className="mt-2 rounded-2xl border overflow-hidden h-10 max-w-[260px]">
+                 <button
+                   type="button"
+                   onClick={() => setSoundOpen(true)}
+                  className="w-full h-full flex items-center text-left"
+                 >
+                  {/* Bild links, abgerundet; rechte Abschlusslinie */}
+                  <div className="relative h-full w-10 shrink-0 overflow-hidden rounded-l-2xl border-r">
+                     {selectedSound?.coverUrl ? (
+                       <img
+                         src={selectedSound.coverUrl}
+                         alt=""
                         className="h-full w-full object-cover"
-                      />
-                    ) : (
+                       />
+                     ) : (
                       <div className="h-full w-full bg-muted" />
-                    )}
-                  </div>
-                  {/* Rechter Textbereich */}
-                  <div className="flex-1 px-3 py-3">
-                    <div className="text-sm font-medium leading-none">Sound</div>
-                    <div className="text-xs text-muted-foreground mt-1 truncate">
-                      {selectedSound ? selectedSound.name : "Kein Sound gewählt"}
+                     )}
+                   </div>
+                  {/* Text rechts, sehr kompakt */}
+                  <div className="flex-1 px-2">
+                    <div className="text-xs font-medium leading-none">Sound</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                      {selectedSound ? selectedSound.name : "Keiner gewählt"}
                     </div>
-                  </div>
-                </button>
-              </div>
+                   </div>
+                 </button>
+               </div>
 
               {/* Sound Dialog */}
-              <Dialog open={soundOpen} onOpenChange={setSoundOpen}>
+              <Dialog open={soundOpen} onOpenChange={(o)=>{setSoundOpen(o); if(!o) setTempSound(null);}}>
                 <DialogContent className="max-w-xl">
                   <DialogHeader>
                     <DialogTitle>Sound auswählen</DialogTitle>
@@ -771,46 +773,73 @@ export default function UgcDashboardPage() {
                     ) : (
                       <div className="grid gap-2 max-h-64 overflow-y-auto">
                         {sounds.map((sound) => (
-                          <button
-                            key={sound.key}
+                           <button
+                             key={sound.key}
                             onClick={() => {
-                              setSelectedSound(sound);
-                              setSoundOpen(false);
+                              setTempSound(sound);
+                              // Preview direkt loopen
+                              setTimeout(() => {
+                                if (audioRef.current) {
+                                  audioRef.current.currentTime = 0;
+                                  audioRef.current.play().catch(()=>{});
+                                }
+                              }, 0);
                             }}
-                            className={cn(
-                              "flex items-center gap-3 p-3 rounded-xl border text-left transition-colors hover:bg-muted/50",
-                              selectedSound?.key === sound.key
-                                ? "border-primary bg-primary/5"
-                                : "border-border"
-                            )}
-                          >
-                            <div className="h-10 w-10 rounded-lg overflow-hidden flex-shrink-0">
-                              {sound.coverUrl ? (
-                                <img
-                                  src={sound.coverUrl}
-                                  alt=""
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <div className="h-full w-full bg-muted flex items-center justify-center">
-                                  <Music className="h-4 w-4 text-muted-foreground" />
-                                </div>
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="font-medium truncate">{sound.name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {(sound.size / 1024).toFixed(1)} KB
-                              </div>
-                            </div>
-                            {selectedSound?.key === sound.key && (
-                              <div className="w-2 h-2 rounded-full bg-primary" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                             className={cn(
+                               "flex items-center gap-3 p-3 rounded-xl border text-left transition-colors hover:bg-muted/50",
+                              (tempSound?.key ?? selectedSound?.key) === sound.key
+                                 ? "border-primary bg-primary/5"
+                                 : "border-border"
+                             )}
+                           >
+                             <div className="h-10 w-10 rounded-lg overflow-hidden flex-shrink-0">
+                               {sound.coverUrl ? (
+                                 <img
+                                   src={sound.coverUrl}
+                                   alt=""
+                                   className="h-full w-full object-cover"
+                                 />
+                               ) : (
+                                 <div className="h-full w-full bg-muted flex items-center justify-center">
+                                   <Music className="h-4 w-4 text-muted-foreground" />
+                                 </div>
+                               )}
+                             </div>
+                             <div className="min-w-0 flex-1">
+                               <div className="font-medium truncate">{sound.name}</div>
+                               <div className="text-xs text-muted-foreground">
+                                 {(sound.size / 1024).toFixed(1)} KB
+                               </div>
+                             </div>
+                            {(tempSound?.key ?? selectedSound?.key) === sound.key && (
+                               <div className="w-2 h-2 rounded-full bg-primary" />
+                             )}
+                           </button>
+                         ))}
+                       </div>
+                     )}
+                   </div>
+                  {/* versteckter Audio-Player für Loop-Preview */}
+                  <audio ref={audioRef} src={(tempSound ?? selectedSound)?.ufsUrl || (tempSound ?? selectedSound)?.url || undefined} loop />
+                  <DialogFooter className="justify-end">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setTempSound(null);
+                        setSoundOpen(false);
+                      }}
+                    >
+                      Abbrechen
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        if (tempSound) setSelectedSound(tempSound);
+                        setSoundOpen(false);
+                      }}
+                    >
+                      Bestätigen
+                    </Button>
+                  </DialogFooter>
                 </DialogContent>
               </Dialog>
 

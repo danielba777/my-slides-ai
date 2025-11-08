@@ -70,6 +70,7 @@ src/app/admin/slideshows/custom-imagesets/page.tsx
 src/app/admin/slideshows/download/page.tsx
 src/app/admin/slideshows/imagesets/[id]/page.tsx
 src/app/admin/slideshows/imagesets/page.tsx
+src/app/admin/sounds/page.tsx
 src/app/admin/ugc/hook-generator/page.tsx
 src/app/admin/ugc/reaction-avatars/page.tsx
 src/app/api/account/extension-token/route.ts
@@ -4219,53 +4220,15 @@ export default function ImageSetsAdminPage() {
 }
 </file>
 
-<file path="src/app/api/admin/ugc/sounds/route.ts">
-import { NextResponse } from "next/server";
-import { utapi } from "@/app/api/uploadthing/core";
+<file path="src/app/admin/sounds/page.tsx">
+import AdminSounds from "@/components/dashboard/admin/AdminSounds";
 
-// POST multipart/form-data
-// fields:
-//  - sound (audio/*)  REQUIRED
-//  - cover (image/*)  OPTIONAL
-export async function POST(req: Request) {
-  try {
-    const form = await req.formData();
-    const sound = form.get("sound");
-    const cover = form.get("cover");
-    if (!(sound instanceof File)) {
-      return NextResponse.json({ error: "No sound file" }, { status: 400 });
-    }
-
-    const baseName = `${Date.now()}-${sound.name.replace(/\s+/g, "_")}`;
-    const soundKey = `ugc/sounds/${baseName}`;
-
-    const soundUploadInput = new File([await sound.arrayBuffer()], soundKey, {
-      type: sound.type || "audio/mpeg",
-    });
-
-    const wantsCover = cover instanceof File;
-    const coverExt = wantsCover ? (cover.name.split(".").pop() || "jpg").toLowerCase() : "jpg";
-    const coverKey = `ugc/sounds/${baseName}.cover.${coverExt}`;
-    const coverUploadInput = wantsCover
-      ? new File([await (cover as File).arrayBuffer()], coverKey, {
-          type: (cover as File).type || "image/jpeg",
-        })
-      : null;
-
-    const uploads = await utapi.uploadFiles(coverUploadInput ? [soundUploadInput, coverUploadInput] : [soundUploadInput]);
-    const s = uploads[0];
-    const c = coverUploadInput ? uploads[1] : null;
-
-    if (!s?.data?.ufsUrl) {
-      return NextResponse.json({ error: s?.error ?? "Upload failed" }, { status: 400 });
-    }
-    return NextResponse.json({
-      sound: { key: s.data.key, ufsUrl: s.data.ufsUrl, url: s.data.url },
-      cover: c?.data ? { key: c.data.key, ufsUrl: c.data.ufsUrl, url: c.data.url } : null,
-    });
-  } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
-  }
+export default function AdminSoundsPage() {
+  return (
+    <div className="p-4 sm:p-6">
+      <AdminSounds />
+    </div>
+  );
 }
 </file>
 
@@ -6889,50 +6852,6 @@ export async function GET() {
 }
 </file>
 
-<file path="src/app/api/ugc/sounds/route.ts">
-import { NextResponse } from "next/server";
-import { utapi } from "@/app/api/uploadthing/core";
-
-// Listet Sounds + optionales Cover (Naming: "<basename>.<ext>" & "<basename>.<ext>.cover.<imgext>")
-export async function GET() {
-  try {
-    const list = await utapi.listFiles({ limit: 500, prefix: "ugc/sounds/" });
-    const files = list.files ?? [];
-
-    // Trenne Audio/Image – und mappe Cover anhand des gemeinsamen Basenamens vor ".cover."
-    const isImage = (k: string) => /\.(png|jpe?g|webp|gif|avif)$/i.test(k);
-    const isCover = (k: string) => /\.cover\.(png|jpe?g|webp|gif|avif)$/i.test(k);
-    const isAudio = (k: string) => /\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(k) && !isCover(k);
-
-    const images = new Map<string, any>(); // coverKeyByBase
-    for (const f of files) {
-      if (isImage(f.key) && isCover(f.key)) {
-        const base = f.key.replace(/\.cover\.(png|jpe?g|webp|gif|avif)$/i, "");
-        images.set(base, f);
-      }
-    }
-
-    const items = files
-      .filter((f: any) => isAudio(f.key))
-      .map((f: any) => {
-        const cover = images.get(f.key);
-        return {
-          key: f.key,
-          name: f.name,
-          size: f.size,
-          url: f.url,
-          ufsUrl: f.ufsUrl,
-          coverUrl: cover?.ufsUrl || cover?.url || null,
-        };
-      });
-
-    return NextResponse.json({ items });
-  } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
-  }
-}
-</file>
-
 <file path="src/app/api/uploadthing/core.ts">
 import { auth } from "@/server/auth";
 import "server-only";
@@ -7306,18 +7225,6 @@ export default async function AccountSettingsPage() {
   const session = await auth();
   if (!session?.user) redirect("/auth/signin");
   return <SettingsPage />;
-}
-</file>
-
-<file path="src/app/dashboard/admin/sounds/page.tsx">
-import AdminSounds from "@/components/dashboard/admin/AdminSounds";
-
-export default function AdminSoundsPage() {
-  return (
-    <div className="p-4 sm:p-6">
-      <AdminSounds />
-    </div>
-  );
 }
 </file>
 
@@ -14573,215 +14480,6 @@ export function ConnectionCard() {
                 </span>
               </Badge>
             ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/dashboard/account/SettingsSounds.tsx">
-"use client";
-import { useEffect, useState } from "react";
-
-type SoundItem = { key: string; name: string; size: number; ufsUrl?: string; url?: string };
-
-export default function SettingsSounds() {
-  const [items, setItems] = useState<SoundItem[]>([]);
-  const [file, setFile] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function load() {
-    const res = await fetch("/api/ugc/sounds", { cache: "no-store" });
-    const json = await res.json();
-    setItems(json.items ?? []);
-  }
-  useEffect(() => { load(); }, []);
-
-  async function handleUpload(e: React.FormEvent) {
-    e.preventDefault();
-    if (!file) return;
-    setBusy(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/admin/ugc/sounds", { method: "POST", body: fd });
-      if (!res.ok) throw new Error("Upload failed");
-      await load();
-      setFile(null);
-      alert("Sound hochgeladen.");
-    } catch (err) {
-      alert(String((err as any).message ?? err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <form onSubmit={handleUpload} className="flex items-center gap-3">
-        <input
-          type="file"
-          accept="audio/*"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        />
-        <button className="px-3 py-2 rounded-xl bg-primary text-primary-foreground disabled:opacity-60" disabled={busy || !file}>
-          {busy ? "Lädt…" : "Sound hochladen"}
-        </button>
-      </form>
-      <div className="text-sm text-muted-foreground">Ablage: <code>ugc/sounds/…</code></div>
-      <div className="grid gap-2">
-        {items.map((it) => (
-          <div key={it.key} className="rounded-xl border p-3 flex items-center justify-between">
-            <div className="truncate">
-              <div className="font-medium truncate">{it.name}</div>
-              <div className="text-xs opacity-70">{(it.size/1024).toFixed(1)} KB</div>
-            </div>
-            <a href={it.ufsUrl || it.url} target="_blank" rel="noreferrer" className="text-primary text-sm underline">
-              Öffnen
-            </a>
-          </div>
-        ))}
-        {items.length === 0 && <div className="text-sm opacity-70">Noch keine Sounds hochgeladen.</div>}
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/dashboard/admin/AdminSounds.tsx">
-"use client";
-import { useEffect, useState } from "react";
-
-type SoundItem = {
-  key: string;
-  name: string;
-  size: number;
-  ufsUrl?: string;
-  url?: string;
-  coverUrl?: string | null;
-};
-
-export default function AdminSounds() {
-  const [items, setItems] = useState<SoundItem[]>([]);
-  const [sound, setSound] = useState<File | null>(null);
-  const [cover, setCover] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function load() {
-    const res = await fetch("/api/ugc/sounds", { cache: "no-store" });
-    const json = await res.json();
-    setItems(json.items ?? []);
-  }
-  useEffect(() => {
-    load();
-  }, []);
-
-  async function handleUpload(e: React.FormEvent) {
-    e.preventDefault();
-    if (!sound) return;
-    setBusy(true);
-    try {
-      const fd = new FormData();
-      fd.append("sound", sound);
-      if (cover) fd.append("cover", cover);
-      const res = await fetch("/api/admin/ugc/sounds", {
-        method: "POST",
-        body: fd,
-      });
-      if (!res.ok) throw new Error("Upload failed");
-      await load();
-      setSound(null);
-      setCover(null);
-      (document.getElementById("sound-input") as HTMLInputElement | null)
-        ?.value &&
-        ((document.getElementById("sound-input") as HTMLInputElement).value =
-          "");
-      (document.getElementById("cover-input") as HTMLInputElement | null)
-        ?.value &&
-        ((document.getElementById("cover-input") as HTMLInputElement).value =
-          "");
-      alert("Sound (und ggf. Cover) hochgeladen.");
-    } catch (err) {
-      alert(String((err as any).message ?? err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold">Sounds</h2>
-      </div>
-
-      <form
-        onSubmit={handleUpload}
-        className="grid gap-3 md:grid-cols-[1fr_auto] items-end"
-      >
-        <div className="grid gap-2">
-          <label className="text-sm font-medium">Audio-Datei</label>
-          <input
-            id="sound-input"
-            type="file"
-            accept="audio/*"
-            onChange={(e) => setSound(e.target.files?.[0] ?? null)}
-          />
-          <label className="text-sm font-medium mt-3">
-            Cover-Bild (optional)
-          </label>
-          <input
-            id="cover-input"
-            type="file"
-            accept="image/*"
-            onChange={(e) => setCover(e.target.files?.[0] ?? null)}
-          />
-        </div>
-        <button
-          className="h-10 px-4 rounded-xl bg-primary text-primary-foreground disabled:opacity-60"
-          disabled={busy || !sound}
-        >
-          {busy ? "Lädt…" : "Hochladen"}
-        </button>
-      </form>
-
-      <div className="grid gap-3">
-        {items.map((it) => (
-          <div
-            key={it.key}
-            className="flex items-center justify-between rounded-2xl border p-3"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              {it.coverUrl ? (
-                <img
-                  src={it.coverUrl}
-                  alt=""
-                  className="h-10 w-10 rounded-xl object-cover"
-                />
-              ) : (
-                <div className="h-10 w-10 rounded-xl bg-muted" />
-              )}
-              <div className="min-w-0">
-                <div className="font-medium truncate">{it.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  {(it.size / 1024).toFixed(1)} KB
-                </div>
-              </div>
-            </div>
-            <a
-              href={it.ufsUrl || it.url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm text-primary underline"
-            >
-              Öffnen
-            </a>
-          </div>
-        ))}
-        {items.length === 0 && (
-          <div className="text-sm opacity-70">
-            Noch keine Sounds hochgeladen.
           </div>
         )}
       </div>
@@ -72380,6 +72078,141 @@ export async function POST() {
 }
 </file>
 
+<file path="src/app/api/admin/ugc/sounds/route.ts">
+import { NextResponse } from "next/server";
+import { env } from "@/env";
+import { auth } from "@/server/auth";
+
+// POST multipart/form-data
+// fields:
+//  - sound (audio/*)  REQUIRED
+//  - cover (image/*)  OPTIONAL
+//  - name (string)    OPTIONAL - custom display name
+export async function POST(req: Request) {
+  const t0 = Date.now();
+  const session = await auth();
+  if (!session?.user?.id) {
+    console.error("[SoundsUpload][POST] Unauthorized – no session.user.id");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!env.SLIDESCOCKPIT_API) {
+    console.error("[SoundsUpload][POST] Missing env.SLIDESCOCKPIT_API");
+    return NextResponse.json(
+      { error: "Server misconfigured", detail: "SLIDESCOCKPIT_API not set" },
+      { status: 500 },
+    );
+  }
+  try {
+    const form = await req.formData();
+    const sound = form.get("sound");
+    const cover = form.get("cover");
+    const displayName = (form.get("name") as string | null)?.trim() || "";
+    if (!(sound instanceof File)) {
+      console.error("[SoundsUpload][POST] No sound file in multipart");
+      return NextResponse.json({ error: "No sound file" }, { status: 400 });
+    }
+
+    // ----- Dateinamen bauen (S3 Keys) -----
+    const original = (sound.name || "sound.mp3").toLowerCase();
+    const ext = original.includes(".") ? original.split(".").pop()! : "mp3";
+    const baseSlug = (displayName || original)
+      .replace(/\s+/g, "_")
+      .replace(/[^a-z0-9._-]/gi, "_")
+      .replace(/^_+|_+$/g, "");
+    const baseName = `${Date.now()}-${baseSlug}${ext.startsWith(".") ? "" : "."}${ext}`;
+    const soundKey = `ugc/sounds/${baseName}`;
+
+    const coverIsFile = cover instanceof File;
+    const coverExt = coverIsFile ? ((cover as File).name.split(".").pop() || "jpg").toLowerCase() : "jpg";
+    const coverKey = coverIsFile ? `${soundKey}.cover.${coverExt}` : null;
+
+    // ----- Presign für Sound holen -----
+    const presignUrl = `${env.SLIDESCOCKPIT_API}/sounds/presign?key=${encodeURIComponent(soundKey)}&contentType=${encodeURIComponent((sound as File).type || "audio/mpeg")}`;
+    console.log("[SoundsUpload][POST] presign(sound) →", presignUrl);
+    const presignRes = await fetch(presignUrl, {
+      headers: { "x-user-id": session.user.id },
+    });
+    const presign = await presignRes.json().catch(() => null);
+    if (!presignRes.ok || !presign?.uploadUrl || !presign?.publicUrl) {
+      console.error("[SoundsUpload][POST] presign(sound) failed:", {
+        status: presignRes.status,
+        body: presign,
+      });
+      return NextResponse.json(
+        { error: "Presign (sound) failed", detail: presign },
+        { status: presignRes.status || 502 },
+      );
+    }
+
+    // ----- Upload Sound (PUT) -----
+    const putSound = await fetch(presign.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": (sound as File).type || "audio/mpeg" },
+      body: sound as File,
+    });
+    if (!putSound.ok) {
+      const txt = await putSound.text().catch(() => "");
+      console.error("[SoundsUpload][POST] PUT(sound) failed:", putSound.status, txt.slice(0, 400));
+      return NextResponse.json(
+        { error: "Upload sound failed", upstreamStatus: putSound.status, upstreamBodySnippet: txt.slice(0, 400) },
+        { status: 502 },
+      );
+    }
+
+    // ----- Optional: Presign & Upload Cover -----
+    let coverPublicUrl: string | null = null;
+    if (coverIsFile && coverKey) {
+      const presignCoverUrl = `${env.SLIDESCOCKPIT_API}/sounds/presign?key=${encodeURIComponent(coverKey)}&contentType=${encodeURIComponent((cover as File).type || "image/jpeg")}`;
+      console.log("[SoundsUpload][POST] presign(cover) →", presignCoverUrl);
+      const presignCoverRes = await fetch(presignCoverUrl, {
+        headers: { "x-user-id": session.user.id },
+      });
+      const presignCover = await presignCoverRes.json().catch(() => null);
+      if (!presignCoverRes.ok || !presignCover?.uploadUrl || !presignCover?.publicUrl) {
+        console.error("[SoundsUpload][POST] presign(cover) failed:", {
+          status: presignCoverRes.status,
+          body: presignCover,
+        });
+        return NextResponse.json(
+          { error: "Presign (cover) failed", detail: presignCover },
+          { status: presignCoverRes.status || 502 },
+        );
+      }
+      const putCover = await fetch(presignCover.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": (cover as File).type || "image/jpeg" },
+        body: cover as File,
+      });
+      if (!putCover.ok) {
+        const txt = await putCover.text().catch(() => "");
+        console.error("[SoundsUpload][POST] PUT(cover) failed:", putCover.status, txt.slice(0, 400));
+        return NextResponse.json(
+          { error: "Upload cover failed", upstreamStatus: putCover.status, upstreamBodySnippet: txt.slice(0, 400) },
+          { status: 502 },
+        );
+      }
+      coverPublicUrl = presignCover.publicUrl;
+    }
+
+    const t1 = Date.now();
+    console.log("[SoundsUpload][POST] success", {
+      key: soundKey,
+      url: presign.publicUrl,
+      coverUrl: coverPublicUrl,
+      durationMs: t1 - t0,
+    });
+    return NextResponse.json({
+      sound: { key: soundKey, url: presign.publicUrl },
+      cover: coverPublicUrl ? { key: coverKey, url: coverPublicUrl } : null,
+      name: displayName || baseSlug,
+    });
+  } catch (e: any) {
+    console.error("[SoundsUpload][POST] failed:", e);
+    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
+  }
+}
+</file>
+
 <file path="src/app/api/admin/user-image-collections/route.ts">
 import { db } from "@/server/db";
 import { auth } from "@/server/auth";
@@ -74065,6 +73898,118 @@ export async function POST(req: Request) {
 }
 </file>
 
+<file path="src/app/api/ugc/sounds/route.ts">
+import { NextResponse } from "next/server";
+import { env } from "@/env";
+import { auth } from "@/server/auth";
+
+// Proxy: Liste der Sounds kommt aus dem entkoppelten API-Projekt
+export async function GET() {
+  const t0 = Date.now();
+  const session = await auth();
+  if (!session?.user?.id) {
+    console.error("[SoundsProxy][GET] Unauthorized – no session.user.id");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!env.SLIDESCOCKPIT_API) {
+    console.error("[SoundsProxy][GET] Missing env.SLIDESCOCKPIT_API");
+    return NextResponse.json(
+      { error: "Server misconfigured", detail: "SLIDESCOCKPIT_API not set" },
+      { status: 500 },
+    );
+  }
+  try {
+    const upstreamUrl = `${env.SLIDESCOCKPIT_API}/sounds`;
+    console.log("[SoundsProxy][GET] →", upstreamUrl, { userId: session.user.id });
+    const res = await fetch(upstreamUrl, {
+      method: "GET",
+      headers: { "x-user-id": session.user.id },
+      cache: "no-store",
+      redirect: "manual",
+    });
+    const clone = res.clone();
+    const textBody = await clone.text().catch(() => "");
+    const data = await res.json().catch(() => null);
+    const t1 = Date.now();
+    const logOut = {
+      status: res.status,
+      statusText: res.statusText,
+      url: upstreamUrl,
+      durationMs: t1 - t0,
+      contentType: res.headers.get("content-type"),
+      bodyPreview: textBody.slice(0, 400),
+    };
+    if (!res.ok) {
+      console.error("[SoundsProxy][GET] Upstream error:", logOut);
+      return NextResponse.json(
+        {
+          error: "Failed to load sounds",
+          upstreamStatus: res.status,
+          upstreamUrl,
+          upstreamBodySnippet: logOut.bodyPreview,
+        },
+        { status: res.status || 502 },
+      );
+    }
+    console.log("[SoundsProxy][GET] Upstream success:", logOut);
+    // Normalisieren: API kann {items:[...]} ODER {sounds:[...]} liefern
+    const items = Array.isArray(data?.items)
+      ? data.items
+      : Array.isArray(data?.sounds)
+        ? data.sounds
+        : Array.isArray(data)
+          ? data
+          : [];
+    // Hilfsfunktion: sauberen Anzeigenamen ausgeben
+    const cleanName = (raw: string): string => {
+      try {
+        if (!raw) return "Unbenannt";
+        // Falls ein Pfad kommt, nur den Dateinamen nehmen
+        const base = raw.split("/").pop() || raw;
+        // Extension entfernen
+        const noExt = base.replace(/\.[a-z0-9]+$/i, "");
+        // Führende Zeitstempel/Ziffern + Trenner (z. B. "1699999999999-", "12345_") entfernen
+        const noStamp = noExt.replace(/^[\d]+[-_]+/i, "");
+        // Mehrfache Unterstriche/Bindestriche zu Leerzeichen
+        const spaced = noStamp.replace(/[-_]+/g, " ");
+        // Aufräumen: trimmen + mehrere Spaces reduzieren
+        const pretty = spaced.replace(/\s{2,}/g, " ").trim();
+        // Falls nach dem Cleanen nichts übrig bleibt
+        return pretty || "Unbenannt";
+      } catch {
+        return "Unbenannt";
+      }
+    };
+
+    const normalized = items.map((it: any) => {
+      // Quelle für Name: bevorzugt echtes 'name' Feld, sonst 'filename', sonst 'key'/'url'
+      const rawName: string =
+        (typeof it?.name === "string" && it.name.trim().length > 0
+          ? it.name
+          : (typeof it?.filename === "string" ? it.filename : "")) ||
+        (typeof it?.key === "string" ? it.key : "") ||
+        (typeof it?.url === "string" ? it.url : "") ||
+        "";
+
+      return {
+        key: String(it.key ?? it.id ?? it.url ?? crypto.randomUUID()),
+        // Wichtig: Name hübsch formatieren (führt deinen Admin-Namen ohne Präfix/Endung)
+        name: cleanName(rawName),
+        size: Number(it.size ?? 0),
+        url: it.url ?? null,
+        ufsUrl: it.ufsUrl ?? null,
+        coverUrl: it.coverUrl ?? null,
+      };
+    });
+    console.log("[SoundsProxy][GET] normalized items:", normalized.length);
+    return NextResponse.json({ items: normalized });
+  } catch (error: any) {
+    console.error("[SoundsProxy][GET] proxy failed:", error);
+    return NextResponse.json({ error: String(error?.message ?? error) }, { status: 500 });
+  }
+}
+</file>
+
 <file path="src/app/api/ugc/videos/[id]/route.ts">
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -74346,6 +74291,18 @@ export async function POST(req: Request, { params }: RouteParams) {
       { status: 500 },
     );
   }
+}
+</file>
+
+<file path="src/app/dashboard/admin/sounds/page.tsx">
+import AdminSounds from "@/components/dashboard/admin/AdminSounds";
+
+export default function AdminSoundsPage() {
+  return (
+    <div className="p-4 sm:p-6">
+      <AdminSounds />
+    </div>
+  );
 }
 </file>
 
@@ -75368,6 +75325,232 @@ export default function SettingsChromeExtension() {
         )}
       </CardContent>
     </Card>
+  );
+}
+</file>
+
+<file path="src/components/dashboard/account/SettingsSounds.tsx">
+"use client";
+import { useEffect, useState } from "react";
+
+type SoundItem = { key: string; name: string; size: number; ufsUrl?: string; url?: string };
+
+export default function SettingsSounds() {
+  const [items, setItems] = useState<SoundItem[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    const res = await fetch("/api/ugc/sounds", { cache: "no-store" });
+    const json = await res.json();
+    setItems(json.items ?? []);
+  }
+  useEffect(() => { load(); }, []);
+
+  async function handleUpload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file) return;
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/admin/ugc/sounds", { method: "POST", body: fd });
+      if (!res.ok) throw new Error("Upload failed");
+      await load();
+      setFile(null);
+      alert("Sound hochgeladen.");
+    } catch (err) {
+      alert(String((err as any).message ?? err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <form onSubmit={handleUpload} className="flex items-center gap-3">
+        <input
+          type="file"
+          accept="audio/*"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        />
+        <button className="px-3 py-2 rounded-xl bg-primary text-primary-foreground disabled:opacity-60" disabled={busy || !file}>
+          {busy ? "Lädt…" : "Sound hochladen"}
+        </button>
+      </form>
+      <div className="text-sm text-muted-foreground">Ablage: <code>ugc/sounds/…</code></div>
+      <div className="grid gap-2">
+        {items.map((it) => (
+          <div key={it.key} className="rounded-xl border p-3 flex items-center justify-between">
+            <div className="truncate">
+              <div className="font-medium truncate">{it.name}</div>
+              <div className="text-xs opacity-70">{(it.size/1024).toFixed(1)} KB</div>
+            </div>
+            <a href={it.ufsUrl || it.url} target="_blank" rel="noreferrer" className="text-primary text-sm underline">
+              Öffnen
+            </a>
+          </div>
+        ))}
+        {items.length === 0 && <div className="text-sm opacity-70">Noch keine Sounds hochgeladen.</div>}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/dashboard/admin/AdminSounds.tsx">
+"use client";
+import { useEffect, useState } from "react";
+
+type SoundItem = {
+  key: string;
+  name: string;
+  size: number;
+  ufsUrl?: string;
+  url?: string;
+  coverUrl?: string | null;
+};
+
+export default function AdminSounds() {
+  const [items, setItems] = useState<SoundItem[]>([]);
+  const [sound, setSound] = useState<File | null>(null);
+  const [cover, setCover] = useState<File | null>(null);
+  const [displayName, setDisplayName] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    const res = await fetch("/api/ugc/sounds", { cache: "no-store" });
+    const json = await res.json();
+    setItems(json.items ?? []);
+  }
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function handleUpload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!sound) return;
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("sound", sound);
+      if (cover) fd.append("cover", cover);
+      if (displayName.trim()) fd.append("name", displayName.trim());
+      const res = await fetch("/api/admin/ugc/sounds", {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) {
+        let detail = "";
+        try { const j = await res.json(); detail = j?.upstreamBodySnippet || j?.detail || j?.error || ""; } catch {}
+        throw new Error(`Upload failed (${res.status}) ${detail}`.trim());
+      }
+      const data = await res.json().catch(() => ({}));
+      await load();
+      setSound(null);
+      setCover(null);
+      setDisplayName("");
+      (document.getElementById("sound-input") as HTMLInputElement | null)
+        ?.value &&
+        ((document.getElementById("sound-input") as HTMLInputElement).value =
+          "");
+      (document.getElementById("cover-input") as HTMLInputElement | null)
+        ?.value &&
+        ((document.getElementById("cover-input") as HTMLInputElement).value =
+          "");
+      alert("Sound (und ggf. Cover) hochgeladen.");
+    } catch (err) {
+      console.error("[AdminSounds] Upload error:", err);
+      alert(err?.message || "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold">Sounds</h2>
+      </div>
+
+      <form
+        onSubmit={handleUpload}
+        className="grid gap-3 md:grid-cols-[1fr_auto] items-end"
+      >
+        <div className="grid gap-2">
+          <label className="text-sm font-medium">Name (Anzeige im Auswahl-Pop-up)</label>
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="z. B. Chill Vibes 120bpm"
+            className="h-10 rounded-lg border px-3"
+          />
+          <label className="text-sm font-medium">Audio-Datei</label>
+          <input
+            id="sound-input"
+            type="file"
+            accept="audio/*"
+            onChange={(e) => setSound(e.target.files?.[0] ?? null)}
+          />
+          <label className="text-sm font-medium mt-3">
+            Cover-Bild (optional)
+          </label>
+          <input
+            id="cover-input"
+            type="file"
+            accept="image/*"
+            onChange={(e) => setCover(e.target.files?.[0] ?? null)}
+          />
+        </div>
+        <button
+          className="h-10 px-4 rounded-xl bg-primary text-primary-foreground disabled:opacity-60"
+          disabled={busy || !sound}
+        >
+          {busy ? "Lädt…" : "Hochladen"}
+        </button>
+      </form>
+
+      <div className="grid gap-3">
+        {items.map((it) => (
+          <div
+            key={it.key}
+            className="flex items-center justify-between rounded-2xl border p-3"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              {it.coverUrl ? (
+                <img
+                  src={it.coverUrl}
+                  alt=""
+                  className="h-10 w-10 rounded-lg object-cover"
+                />
+              ) : (
+                <div className="h-10 w-10 rounded-lg bg-muted" />
+              )}
+              <div className="min-w-0">
+                <div className="font-medium truncate">{it.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  {(it.size / 1024).toFixed(1)} KB
+                </div>
+              </div>
+            </div>
+            <a
+              href={it.ufsUrl || it.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary text-sm underline"
+            >
+              Öffnen
+            </a>
+          </div>
+        ))}
+        {items.length === 0 && (
+          <div className="text-sm opacity-70">
+            Noch keine Sounds hochgeladen.
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 </file>
@@ -80404,143 +80587,6 @@ export async function GET(
 }
 </file>
 
-<file path="src/app/api/ugc/videos/route.ts">
-export const runtime = "nodejs";
-
-import { NextResponse } from "next/server";
-import { z } from "zod";
-
-import { auth } from "@/server/auth";
-import { db } from "@/server/db";
-import { composeReactionDemoVideo } from "@/server/ugc/video-composer";
-
-const createVideoSchema = z.object({
-  reactionAvatarId: z.string().trim().min(1, "reactionAvatarId is required"),
-  demoVideoId: z.string().trim().min(1).optional().or(z.literal("")).nullable(),
-  title: z.string().trim().max(120).optional(),
-  // NEU: Hook-Text wirklich einbrennen wie in der Preview
-  overlayText: z.string().trim().max(180).optional(),
-  overlayPosition: z.enum(["upper", "middle"]).optional(),
-  soundUrl: z.string().trim().url().optional(), // optionaler Sound-URL
-});
-
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  try {
-    const videos = await db.userUGCVideo.findMany({
-      where: { userId: session.user.id },
-      include: {
-        reactionAvatar: {
-          select: { id: true, name: true, thumbnailUrl: true },
-        },
-        demoVideo: {
-          select: { id: true, name: true, thumbnailUrl: true, videoUrl: true },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    return NextResponse.json({ videos });
-  } catch (error) {
-    console.error("[UGC][Videos][GET] Failed to fetch videos", error);
-    return NextResponse.json(
-      { error: "Failed to load generated videos" },
-      { status: 500 },
-    );
-  }
-}
-
-export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  const parsed = createVideoSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.flatten().fieldErrors },
-      { status: 400 },
-    );
-  }
-
-  const { reactionAvatarId, demoVideoId, title, overlayText, overlayPosition, soundUrl } = parsed.data;
-
-  const avatar = await db.reactionAvatar.findUnique({
-    where: { id: reactionAvatarId },
-  });
-  if (!avatar || !avatar.isActive) {
-    return NextResponse.json({ error: "Reaction avatar not available" }, { status: 404 });
-  }
-
-  let demo: { id: string; videoUrl: string } | null = null;
-  if (demoVideoId) {
-    demo = await db.userDemoVideo.findFirst({
-      where: { id: demoVideoId, userId: session.user.id },
-      select: { id: true, videoUrl: true },
-    });
-    if (!demo) {
-      return NextResponse.json({ error: "Demo video not found" }, { status: 404 });
-    }
-  }
-
-  try {
-    const composed = await composeReactionDemoVideo({
-      reactionUrl: avatar.videoUrl,
-      demoUrl: demo?.videoUrl ?? null,
-      userId: session.user.id,
-      overlayText: overlayText ?? title ?? undefined,
-      overlayPosition: overlayPosition ?? "upper",
-      soundUrl, // optional
-    });
-
-    const video = await db.userUGCVideo.create({
-      data: {
-        userId: session.user.id,
-        title: title && title.length > 0 ? title : null,
-        reactionAvatarId: avatar.id,
-        demoVideoId: demo?.id ?? null,
-        compositeVideoUrl: composed.videoUrl,
-        compositeThumbnailUrl: composed.thumbnailUrl ?? null,
-        status: "READY",
-        durationMs: composed.durationMs,
-        processedAt: new Date(),
-        rawSegments: {
-          reactionVideoUrl: avatar.videoUrl,
-          demoVideoUrl: demo?.videoUrl ?? null,
-        },
-      },
-      include: {
-        reactionAvatar: {
-          select: { id: true, name: true, thumbnailUrl: true },
-        },
-        demoVideo: {
-          select: { id: true, name: true, thumbnailUrl: true, videoUrl: true },
-        },
-      },
-    });
-
-    return NextResponse.json({ video }, { status: 201 });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown error";
-    console.error("[UGC][Videos][POST] Failed to compose video", error);
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
-</file>
-
 <file path="src/app/dashboard/image-collections/page.tsx">
 "use client";
 
@@ -83135,6 +83181,143 @@ async function authenticateExtensionUser(request: Request) {
 }
 </file>
 
+<file path="src/app/api/ugc/videos/route.ts">
+export const runtime = "nodejs";
+
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { auth } from "@/server/auth";
+import { db } from "@/server/db";
+import { composeReactionDemoVideo } from "@/server/ugc/video-composer";
+
+const createVideoSchema = z.object({
+  reactionAvatarId: z.string().trim().min(1, "reactionAvatarId is required"),
+  demoVideoId: z.string().trim().min(1).optional().or(z.literal("")).nullable(),
+  title: z.string().trim().max(120).optional(),
+  // NEU: Hook-Text wirklich einbrennen wie in der Preview
+  overlayText: z.string().trim().max(180).optional(),
+  overlayPosition: z.enum(["upper", "middle"]).optional(),
+  soundUrl: z.string().trim().url().optional(), // optionaler Sound-URL
+});
+
+export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const videos = await db.userUGCVideo.findMany({
+      where: { userId: session.user.id },
+      include: {
+        reactionAvatar: {
+          select: { id: true, name: true, thumbnailUrl: true },
+        },
+        demoVideo: {
+          select: { id: true, name: true, thumbnailUrl: true, videoUrl: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return NextResponse.json({ videos });
+  } catch (error) {
+    console.error("[UGC][Videos][GET] Failed to fetch videos", error);
+    return NextResponse.json(
+      { error: "Failed to load generated videos" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const parsed = createVideoSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.flatten().fieldErrors },
+      { status: 400 },
+    );
+  }
+
+  const { reactionAvatarId, demoVideoId, title, overlayText, overlayPosition, soundUrl } = parsed.data;
+
+  const avatar = await db.reactionAvatar.findUnique({
+    where: { id: reactionAvatarId },
+  });
+  if (!avatar || !avatar.isActive) {
+    return NextResponse.json({ error: "Reaction avatar not available" }, { status: 404 });
+  }
+
+  let demo: { id: string; videoUrl: string } | null = null;
+  if (demoVideoId) {
+    demo = await db.userDemoVideo.findFirst({
+      where: { id: demoVideoId, userId: session.user.id },
+      select: { id: true, videoUrl: true },
+    });
+    if (!demo) {
+      return NextResponse.json({ error: "Demo video not found" }, { status: 404 });
+    }
+  }
+
+  try {
+    const composed = await composeReactionDemoVideo({
+      reactionUrl: avatar.videoUrl,
+      demoUrl: demo?.videoUrl ?? null,
+      userId: session.user.id,
+      overlayText: overlayText ?? title ?? undefined,
+      overlayPosition: overlayPosition ?? "upper",
+      soundUrl, // optional
+    });
+
+    const video = await db.userUGCVideo.create({
+      data: {
+        userId: session.user.id,
+        title: title && title.length > 0 ? title : null,
+        reactionAvatarId: avatar.id,
+        demoVideoId: demo?.id ?? null,
+        compositeVideoUrl: composed.videoUrl,
+        compositeThumbnailUrl: composed.thumbnailUrl ?? null,
+        status: "READY",
+        durationMs: composed.durationMs,
+        processedAt: new Date(),
+        rawSegments: {
+          reactionVideoUrl: avatar.videoUrl,
+          demoVideoUrl: demo?.videoUrl ?? null,
+        },
+      },
+      include: {
+        reactionAvatar: {
+          select: { id: true, name: true, thumbnailUrl: true },
+        },
+        demoVideo: {
+          select: { id: true, name: true, thumbnailUrl: true, videoUrl: true },
+        },
+      },
+    });
+
+    return NextResponse.json({ video }, { status: 201 });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown error";
+    console.error("[UGC][Videos][POST] Failed to compose video", error);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+</file>
+
 <file path="src/components/dashboard/post-collections/PostCollectionsClient.tsx">
 "use client";
 
@@ -84438,6 +84621,8 @@ export function useTikTokDirectPost(
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.6.0",
+    "execa": "^9.6.0",
+    "ffmpeg-static": "^5.2.0",
     "fontfaceobserver": "^2.3.0",
     "framer-motion": "^11.18.2",
     "html2canvas-pro": "^1.5.11",
@@ -85833,6 +86018,490 @@ const config = {
 export default config;
 </file>
 
+<file path="src/app/dashboard/create/slideshow/page.tsx">
+"use client";
+
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+
+import { TikTokPostForm } from "@/components/tiktok/TikTokPostForm";
+import { TikTokScheduleForm } from "@/components/tiktok/TikTokScheduleForm";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { useTikTokDirectPost } from "@/hooks/use-tiktok-direct-post";
+import { useTikTokScheduleAction } from "@/hooks/use-tiktok-schedule-action";
+import { useSlideshowPostState } from "@/states/slideshow-post-state";
+import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
+import { TikTokPostingLoader } from "@/components/tiktok/TikTokPostingLoader";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
+
+export default function CreateSlideshowPostPage() {
+  const router = useRouter();
+  const prepared = useSlideshowPostState((state) => state.prepared);
+
+  // Use the new direct post hook
+  const directPostAction = useTikTokDirectPost({
+    defaultValues: {
+      caption: "",
+      title: "",
+      photoImages: prepared?.slideImageUrls ?? [],
+    },
+  });
+
+  // Keep schedule action for scheduling functionality
+  const scheduleAction = useTikTokScheduleAction({
+    defaultValues: {
+      caption: "",
+      title: "",
+      photoImages: prepared?.slideImageUrls ?? [],
+    },
+  });
+
+  // Get accounts from separate hook
+  const { accounts, loading: accountsLoading, refresh: refreshAccounts } = useTikTokAccounts();
+
+  const updateDirectPostField = directPostAction.updateField;
+  const updateScheduleField = scheduleAction.updateField;
+
+  const slides = prepared?.slides ?? [];
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState(
+    scheduleAction.form.publishAt ?? "",
+  );
+  const [finalizing, setFinalizing] = useState(false);
+  const [finalizingMode, setFinalizingMode] = useState<"post" | "schedule" | null>(null);
+  const [postingData, setPostingData] = useState<{
+    publishId: string;
+    caption: string;
+  } | null>(null);
+  const [tiktokMetadata, setTiktokMetadata] = useState<any>(null);
+
+  // Check if metadata is valid (privacy level selected)
+  const [isMetadataValid, setIsMetadataValid] = useState(true);
+
+  const missingPreparationToastShown = useRef(false);
+  const noAccountsToastShown = useRef(false);
+  const noSlidesToastShown = useRef(false);
+
+  // Update metadata validity when global state changes
+  useEffect(() => {
+    const checkMetadataValid = () => {
+      const valid = typeof window !== 'undefined' ?
+        ((window as any).__tiktokMetadataValid !== false) : true;
+      setIsMetadataValid(valid);
+    };
+
+    checkMetadataValid();
+    // Set up interval to check for changes
+    const interval = setInterval(checkMetadataValid, 100);
+    return () => clearInterval(interval);
+  }, []);
+  useEffect(() => {
+    if (!prepared && !missingPreparationToastShown.current) {
+      toast.error("No prepared slides found. Export the slideshow again to continue.");
+      missingPreparationToastShown.current = true;
+      router.replace("/dashboard/slideshows");
+    } else if (prepared) {
+      missingPreparationToastShown.current = false;
+    }
+  }, [prepared, router]);
+
+  useEffect(() => {
+    if (slides.length === 0) {
+      setCurrentSlide(0);
+      if (prepared && !noSlidesToastShown.current) {
+        toast.error("No slides available for this slideshow. Please export from the editor again.");
+        noSlidesToastShown.current = true;
+      }
+      return;
+    }
+    noSlidesToastShown.current = false;
+    setCurrentSlide((prev) => Math.min(prev, slides.length - 1));
+  }, [prepared, slides.length]);
+
+  useEffect(() => {
+    if (!accountsLoading && accounts.length === 0 && !noAccountsToastShown.current) {
+      toast.error("No TikTok accounts connected. Connect one before posting.");
+      noAccountsToastShown.current = true;
+    }
+    if (accounts.length > 0) {
+      noAccountsToastShown.current = false;
+    }
+  }, [accounts, accountsLoading]);
+
+  useEffect(() => {
+    if (!prepared) return;
+    updateDirectPostField("photoImages", prepared.slideImageUrls ?? []);
+    updateScheduleField("photoImages", prepared.slideImageUrls ?? []);
+    if (!scheduledAt) {
+      setScheduledAt(scheduleAction.form.publishAt ?? "");
+    }
+  }, [prepared, updateDirectPostField, updateScheduleField]);
+
+  useEffect(() => {
+    setScheduledAt(scheduleAction.form.publishAt ?? "");
+  }, [scheduleAction.form.publishAt]);
+
+  const isPosting = directPostAction.submitting;
+  const isScheduling = scheduleAction.submitting;
+
+  const handlePrimaryAction = async () => {
+    if (scheduleEnabled && !scheduledAt) {
+      return;
+    }
+
+    // Check if privacy level is selected before posting
+    const metadata = typeof window !== 'undefined' ? (window as any).__tiktokMetadata : null;
+    if (!metadata || !metadata.privacyLevel) {
+      toast.error("Please select who can see this post before posting.");
+      return;
+    }
+
+    const mode: "post" | "schedule" = scheduleEnabled ? "schedule" : "post";
+    setFinalizing(true);
+    setFinalizingMode(mode);
+
+    let redirected = false;
+    try {
+      if (mode === "schedule") {
+        setFinalizing(true);
+        setFinalizingMode("schedule");
+        const result = await scheduleAction.handleSubmit();
+        if (result?.scheduled) {
+          redirected = true;
+          router.push("/dashboard/posts/scheduled");
+        }
+      } else {
+        // Apply metadata from global state before submitting
+        if (typeof window !== 'undefined' && (window as any).__tiktokMetadata) {
+          const metadata = (window as any).__tiktokMetadata;
+          updateDirectPostField("privacyLevel", metadata.privacyLevel);
+          updateDirectPostField("disableComment", metadata.disableComment);
+          updateDirectPostField("disableDuet", metadata.disableDuet);
+          updateDirectPostField("disableStitch", metadata.disableStitch);
+          updateDirectPostField("isCommercialContent", metadata.isCommercialContent);
+          updateDirectPostField("brandOption", metadata.brandOption);
+        }
+
+        const result = await directPostAction.handleSubmit();
+        if (result && result.publishId) {
+          // Show loading screen for processing immediately
+          setPostingData({
+            publishId: result.publishId,
+            caption: directPostAction.form.caption,
+          });
+          redirected = true; // Prevent error fallback
+        }
+      }
+    } catch (error) {
+      console.error("[CreateSlideshowPostPage] Submission failed", error);
+
+      // Show error as toast
+      const errorMessage = error instanceof Error ? error.message : "Failed to post to TikTok";
+      toast.error(errorMessage);
+
+      setFinalizing(false);
+      setFinalizingMode(null);
+    } finally {
+      if (!redirected) {
+        setFinalizing(false);
+        setFinalizingMode(null);
+      }
+    }
+  };
+
+  const handleToggleSchedule = (checked: boolean) => {
+    setScheduleEnabled(checked);
+    if (checked) {
+      const publishAt = scheduleAction.form.publishAt ?? scheduledAt ?? "";
+      if (publishAt) {
+        setScheduledAt(publishAt);
+        updateScheduleField("publishAt", publishAt);
+      }
+      toast("Scheduled posts use UTC time.");
+    }
+  };
+
+  const handleScheduledAtChange = (value: string) => {
+    setScheduledAt(value);
+    updateScheduleField("publishAt", value);
+  };
+
+  const handleSelectAccount = (openId: string) => {
+    updateDirectPostField("openId", openId);
+    updateScheduleField("openId", openId);
+  };
+
+  const handlePostingComplete = (status: string, postId?: string, releaseUrl?: string) => {
+    setFinalizing(false);
+    setFinalizingMode(null);
+    setPostingData(null);
+
+    // Auto-redirect handled by TikTokPostingLoader component
+  };
+
+  const handlePostingError = (error: string) => {
+    setFinalizing(false);
+    setFinalizingMode(null);
+    setPostingData(null);
+  };
+
+  if (!prepared) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6 p-6 lg:p-8">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-semibold">Create Slideshow Post</h1>
+        </div>
+      </header>
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-6">
+          <section className="rounded-lg">
+            <div className="flex items-start gap-3 p-4">
+              <div className="flex gap-4 overflow-x-auto pb-1">
+                {accountsLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-label="Loading accounts" />
+                ) : accounts.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <Button variant="outline" onClick={() => refreshAccounts()}>
+                      Refresh accounts
+                    </Button>
+                    <Button onClick={() => router.push("/dashboard/settings/social")}>
+                      Manage TikTok accounts
+                    </Button>
+                  </div>
+                ) : (
+                  accounts.map((account) => {
+                    const label =
+                      account.username ?? account.displayName ?? account.openId;
+                    const isSelected =
+                      directPostAction.form.openId === account.openId;
+                    const initials = label
+                      .split(" ")
+                      .map((part) => part[0]?.toUpperCase())
+                      .join("")
+                      .slice(0, 2);
+
+                    return (
+                      <button
+                        key={account.openId}
+                        type="button"
+                        onClick={() => handleSelectAccount(account.openId)}
+                        className="flex flex-col items-center gap-2"
+                        aria-pressed={isSelected}
+                      >
+                        <span
+                          className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${isSelected ? "border-blue-500" : "border-border"}`}
+                        >
+                          {account.avatarUrl ? (
+                            <img
+                              src={account.avatarUrl}
+                              alt={label}
+                              className={`h-14 w-14 rounded-full object-cover transition-all ${isSelected ? "" : "grayscale opacity-70"}`}
+                            />
+                          ) : (
+                            <span
+                              className={`flex h-14 w-14 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground transition-all ${isSelected ? "text-primary" : ""}`}
+                            >
+                              {initials || "TikTok"}
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className={`text-xs ${isSelected ? "font-semibold" : "text-muted-foreground"}`}
+                        >
+                          {label}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </section>
+
+          <TikTokPostForm
+            action={directPostAction}
+            cardTitle="Post configuration"
+            submitLabel="Post to TikTok"
+            refreshLabel="Refresh accounts"
+            showSubmitButton={false}
+            showRefreshButton={false}
+            renderAccountSelector={false}
+          />
+          {scheduleEnabled && (
+            <TikTokScheduleForm
+              action={scheduleAction}
+              cardTitle="Schedule configuration"
+              submitLabel="Schedule TikTok post"
+              refreshLabel="Refresh accounts"
+              showSubmitButton={false}
+              showRefreshButton={false}
+              showPublishControls={false}
+              renderAccountSelector={false}
+              onSelectAccount={handleSelectAccount}
+            />
+          )}
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <aside className="flex flex-col rounded-lg border bg-card">
+            <div className="border-b px-4 py-3">
+              <h2 className="text-lg font-semibold">Media Preview</h2>
+            </div>
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4">
+              {slides.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-3">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-label="Waiting for slides" />
+                  <Button onClick={() => router.push("/dashboard/slideshows")}>
+                    Back to slideshows
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() =>
+                        setCurrentSlide(
+                          (currentSlide - 1 + slides.length) % slides.length,
+                        )
+                      }
+                      aria-label="Previous slide"
+                    >
+                      <ChevronLeft className="h-4 w-4" aria-hidden />
+                    </Button>
+                    <div className="relative aspect-[2/3] w-56 overflow-hidden rounded-lg border border-border/70 sm:w-64">
+                      <Image
+                        src={slides[currentSlide]?.dataUrl ?? ""}
+                        alt={`Slide ${currentSlide + 1}`}
+                        fill
+                        className="object-cover"
+                        sizes="256px"
+                        unoptimized
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() =>
+                        setCurrentSlide((currentSlide + 1) % slides.length)
+                      }
+                      aria-label="Next slide"
+                    >
+                      <ChevronRight className="h-4 w-4" aria-hidden />
+                    </Button>
+                  </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      {slides.map((slide, index) => (
+                        <button
+                          key={slide.id}
+                          type="button"
+                          aria-label={`Show slide ${index + 1}`}
+                          onClick={() => setCurrentSlide(index)}
+                          className={`h-2.5 w-2.5 rounded-full transition-colors ${index === currentSlide ? "bg-primary" : "bg-border"}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </aside>
+          <aside className="flex flex-col rounded-lg border bg-card">
+            <div className="flex flex-col gap-4 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Schedule post</p>
+                  <p className="text-xs text-muted-foreground">
+                    Enable to pick a publish date and time.
+                  </p>
+                </div>
+                <Switch
+                  checked={scheduleEnabled}
+                  onCheckedChange={handleToggleSchedule}
+                  aria-label="Toggle scheduling"
+                />
+              </div>
+
+              {scheduleEnabled && (
+                <div className="space-y-2">
+                  <Label htmlFor="scheduledAt">Publish at</Label>
+                  <Input
+                    id="scheduledAt"
+                    type="datetime-local"
+                    value={scheduledAt}
+                    onChange={(event) =>
+                      handleScheduledAtChange(event.target.value)
+                    }
+                  />
+                </div>
+              )}
+
+              <Button
+                size="lg"
+                onClick={() => void handlePrimaryAction()}
+                disabled={
+                  isPosting ||
+                  isScheduling ||
+                  accountsLoading ||
+                  accounts.length === 0 ||
+                  !directPostAction.form.openId ||
+                  finalizing ||
+                  (scheduleEnabled && !scheduledAt) ||
+                  directPostAction.form.photoImages.length === 0 ||
+                  !isMetadataValid
+                }
+              >
+                {scheduleEnabled
+                  ? isScheduling
+                    ? "Scheduling…"
+                    : "Schedule Now"
+                  : isPosting
+                    ? "Posting…"
+                    : "Post Now"}
+              </Button>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      {/* TikTok Posting Loader - Integrated into page */}
+      {postingData && (
+        <div className="fixed inset-0 top-0 left-0 w-full h-full bg-background/95 backdrop-blur-sm z-50">
+          <div className="flex flex-col items-center justify-center min-h-screen p-8">
+            <div className="w-full max-w-2xl">
+              <TikTokPostingLoader
+                publishId={postingData.publishId}
+                openId={directPostAction.form.openId}
+                caption={postingData.caption}
+                onComplete={handlePostingComplete}
+                onError={handlePostingError}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/admin/AdminSidebar.tsx">
 "use client";
 
@@ -85921,7 +86590,7 @@ const ugcItems: SidebarItem[] = [
   },
   {
     title: "Sounds",
-    url: "/dashboard/admin/sounds",
+    url: "/admin/sounds",
     icon: Music,
   },
 ];
@@ -86056,6 +86725,255 @@ export function AdminSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="space-y-3">
+        <SidebarUsageSummary />
+        <SidebarAccountSection />
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
+</file>
+
+<file path="src/components/app-sidebar.tsx">
+"use client";
+import {
+  Calendar,
+  CalendarClock,
+  Clapperboard,
+  FileCheck,
+  Folder,
+  Home,
+  Images,
+  TestTube2,
+  User,
+  Bookmark,
+  type LucideIcon,
+} from "lucide-react";
+import { usePathname } from "next/navigation";
+
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
+import { SidebarAccountSection } from "./app-sidebar-account";
+import { SidebarSettingsButton } from "./app-sidebar-settings";
+import { SidebarSupportButton } from "./app-sidebar-support";
+import { SidebarUsageSummary } from "./app-sidebar-usage";
+import { AppLogo } from "./logo/AppLogo";
+
+interface SidebarItem {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+}
+
+const startItems: SidebarItem[] = [
+  {
+    title: "Home",
+    url: "/dashboard/home",
+    icon: Home,
+  },
+];
+
+const playgroundItems: SidebarItem[] = [
+  {
+    title: "Slideshows",
+    url: "/dashboard/slideshows",
+    icon: Images,
+  },
+  {
+    title: "AI Avatars",
+    url: "/dashboard/ai-avatars",
+    icon: User,
+  },
+  {
+    title: "Hook + Demo",
+    url: "/dashboard/ugc",
+    icon: Clapperboard,
+  },
+];
+
+const resourceItems: SidebarItem[] = [
+  {
+    title: "Image Collections",
+    url: "/dashboard/image-collections",
+    icon: Folder,
+  },
+  {
+    title: "Post Collections",
+    url: "/dashboard/post-collections",
+    icon: Bookmark,
+  },
+];
+
+const postItems: SidebarItem[] = [
+  {
+    title: "Calendar",
+    url: "/dashboard/posts/calendar",
+    icon: Calendar,
+  },
+  {
+    title: "Scheduled",
+    url: "/dashboard/posts/scheduled",
+    icon: CalendarClock,
+  },
+  {
+    title: "Posted",
+    url: "/dashboard/posts/posted",
+    icon: FileCheck,
+  },
+];
+
+const debugItems: SidebarItem[] = [
+  {
+    title: "TikTok Posting",
+    url: "/dashboard/tests/tiktok-post",
+    icon: TestTube2,
+  },
+  {
+    title: "TikTok Scheduling",
+    url: "/dashboard/tests/tiktok-schedule",
+    icon: CalendarClock,
+  },
+];
+
+export function AppSidebar() {
+  const pathname = usePathname();
+
+  return (
+    <Sidebar>
+      <SidebarContent className="px-2">
+        <div className="flex justify-center items-center gap-2 py-4">
+          <AppLogo size={32} borderRadius={6} />
+          <p className="text-lg font-bold">SlidesCockpit</p>
+        </div>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {startItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname === item.url}
+                  >
+                    <a href={item.url}>
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sm">Playground</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {playgroundItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname === item.url}
+                  >
+                    <a href={item.url}>
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sm">Ressources</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {resourceItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname.startsWith(item.url)}
+                  >
+                    <a href={item.url}>
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sm">Posts</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {postItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname.startsWith(item.url)}
+                  >
+                    <a
+                      href={item.url}
+                      data-active={pathname.startsWith(item.url)}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        {/*
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-red-500">DEBUG</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {debugItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname.startsWith(item.url)}
+                  >
+                    <a
+                      href={item.url}
+                      data-active={pathname.startsWith(item.url)}
+                    >
+                      <item.icon className="w-5 h-5 text-red-500" />
+                      <span className="font-semibold text-red-500">
+                        {item.title}
+                      </span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        */}
+      </SidebarContent>
+      <SidebarFooter className="space-y-2">
+        <div className="flex flex-col gap-1 px-2">
+          <SidebarSettingsButton />
+          <SidebarSupportButton />
+        </div>
         <SidebarUsageSummary />
         <SidebarAccountSection />
       </SidebarFooter>
@@ -86953,735 +87871,552 @@ export async function composeReactionDemoVideo({
 }
 </file>
 
-<file path="src/app/dashboard/create/slideshow/page.tsx">
+<file path="src/components/marketing/Hero.tsx">
 "use client";
-
-import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-
-import { TikTokPostForm } from "@/components/tiktok/TikTokPostForm";
-import { TikTokScheduleForm } from "@/components/tiktok/TikTokScheduleForm";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { useTikTokDirectPost } from "@/hooks/use-tiktok-direct-post";
-import { useTikTokScheduleAction } from "@/hooks/use-tiktok-schedule-action";
-import { useSlideshowPostState } from "@/states/slideshow-post-state";
-import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
-import { TikTokPostingLoader } from "@/components/tiktok/TikTokPostingLoader";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import toast from "react-hot-toast";
+import { motion } from "framer-motion";
+import {
+  ArrowRightIcon,
+  BarChart3Icon,
+  CheckCircle2Icon,
+  StarIcon,
+  TrendingUpIcon,
+  ZapIcon,
+} from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { Section } from "./Section";
 
-export default function CreateSlideshowPostPage() {
-  const router = useRouter();
-  const prepared = useSlideshowPostState((state) => state.prepared);
+const HERO_POSTER_ROWS = 8;
+const HERO_POSTERS_PER_ROW = 28;
+const HERO_FETCH_LIMIT = 300;
 
-  // Use the new direct post hook
-  const directPostAction = useTikTokDirectPost({
-    defaultValues: {
-      caption: "",
-      title: "",
-      photoImages: prepared?.slideImageUrls ?? [],
-    },
-  });
+type HeroSlide = {
+  imageUrl?: string | null;
+};
 
-  // Keep schedule action for scheduling functionality
-  const scheduleAction = useTikTokScheduleAction({
-    defaultValues: {
-      caption: "",
-      title: "",
-      photoImages: prepared?.slideImageUrls ?? [],
-    },
-  });
+type HeroPost = {
+  slides?: HeroSlide[];
+};
 
-  // Get accounts from separate hook
-  const { accounts, loading: accountsLoading, refresh: refreshAccounts } = useTikTokAccounts();
+export function MarketingHero({
+  session,
+  category,
+  heroTitle,
+  heroSubtitle,
+}: {
+  session: boolean;
+  category?: string;
+  heroTitle?: string;
+  heroSubtitle?: string;
+}) {
+  const [posterImages, setPosterImages] = useState<string[]>([]);
 
-  const updateDirectPostField = directPostAction.updateField;
-  const updateScheduleField = scheduleAction.updateField;
-
-  const slides = prepared?.slides ?? [];
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [scheduleEnabled, setScheduleEnabled] = useState(false);
-  const [scheduledAt, setScheduledAt] = useState(
-    scheduleAction.form.publishAt ?? "",
-  );
-  const [finalizing, setFinalizing] = useState(false);
-  const [finalizingMode, setFinalizingMode] = useState<"post" | "schedule" | null>(null);
-  const [postingData, setPostingData] = useState<{
-    publishId: string;
-    caption: string;
-  } | null>(null);
-  const [tiktokMetadata, setTiktokMetadata] = useState<any>(null);
-
-  // Check if metadata is valid (privacy level selected)
-  const [isMetadataValid, setIsMetadataValid] = useState(true);
-
-  const missingPreparationToastShown = useRef(false);
-  const noAccountsToastShown = useRef(false);
-  const noSlidesToastShown = useRef(false);
-
-  // Update metadata validity when global state changes
   useEffect(() => {
-    const checkMetadataValid = () => {
-      const valid = typeof window !== 'undefined' ?
-        ((window as any).__tiktokMetadataValid !== false) : true;
-      setIsMetadataValid(valid);
+    const controller = new AbortController();
+
+    const fetchSlides = async () => {
+      try {
+        const params = new URLSearchParams({
+          limit: HERO_FETCH_LIMIT.toString(),
+        });
+        if (category) {
+          params.set("category", category);
+        }
+
+        const response = await fetch(
+          `/api/slideshow-library/posts?${params.toString()}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to load hero slides: ${response.status}`);
+        }
+
+        const data = (await response.json()) as unknown;
+        if (!Array.isArray(data)) return;
+
+        const collected = new Set<string>();
+
+        for (const post of data as HeroPost[]) {
+          if (!post?.slides?.length) continue;
+
+          for (const slide of post.slides) {
+            if (!slide?.imageUrl) continue;
+            collected.add(slide.imageUrl);
+          }
+        }
+
+        if (!collected.size) return;
+
+        const deduped = Array.from(collected);
+        for (let index = deduped.length - 1; index > 0; index--) {
+          const swapIndex = Math.floor(Math.random() * (index + 1));
+          const current = deduped[index];
+          const swap = deduped[swapIndex];
+          if (current === undefined || swap === undefined) {
+            continue;
+          }
+          deduped[index] = swap;
+          deduped[swapIndex] = current;
+        }
+
+        setPosterImages(deduped);
+      } catch (error) {
+        if ((error as Error).name === "AbortError") {
+          return;
+        }
+        console.error("Error loading hero slide images", error);
+      }
     };
 
-    checkMetadataValid();
-    // Set up interval to check for changes
-    const interval = setInterval(checkMetadataValid, 100);
-    return () => clearInterval(interval);
-  }, []);
-  useEffect(() => {
-    if (!prepared && !missingPreparationToastShown.current) {
-      toast.error("No prepared slides found. Export the slideshow again to continue.");
-      missingPreparationToastShown.current = true;
-      router.replace("/dashboard/slideshows");
-    } else if (prepared) {
-      missingPreparationToastShown.current = false;
-    }
-  }, [prepared, router]);
+    void fetchSlides();
 
-  useEffect(() => {
-    if (slides.length === 0) {
-      setCurrentSlide(0);
-      if (prepared && !noSlidesToastShown.current) {
-        toast.error("No slides available for this slideshow. Please export from the editor again.");
-        noSlidesToastShown.current = true;
-      }
-      return;
-    }
-    noSlidesToastShown.current = false;
-    setCurrentSlide((prev) => Math.min(prev, slides.length - 1));
-  }, [prepared, slides.length]);
+    return () => {
+      controller.abort();
+    };
+  }, [category]);
 
-  useEffect(() => {
-    if (!accountsLoading && accounts.length === 0 && !noAccountsToastShown.current) {
-      toast.error("No TikTok accounts connected. Connect one before posting.");
-      noAccountsToastShown.current = true;
-    }
-    if (accounts.length > 0) {
-      noAccountsToastShown.current = false;
-    }
-  }, [accounts, accountsLoading]);
+  const posterMatrix = useMemo(() => {
+    const perRow = HERO_POSTERS_PER_ROW;
+    const totalRows = HERO_POSTER_ROWS;
 
-  useEffect(() => {
-    if (!prepared) return;
-    updateDirectPostField("photoImages", prepared.slideImageUrls ?? []);
-    updateScheduleField("photoImages", prepared.slideImageUrls ?? []);
-    if (!scheduledAt) {
-      setScheduledAt(scheduleAction.form.publishAt ?? "");
-    }
-  }, [prepared, updateDirectPostField, updateScheduleField]);
+     // Until we have real images, render nothing (no placeholders).
+     if (!posterImages.length) return [];
 
-  useEffect(() => {
-    setScheduledAt(scheduleAction.form.publishAt ?? "");
-  }, [scheduleAction.form.publishAt]);
+     const rows: string[][] = [];
+     for (let r = 0; r < totalRows; r++) {
+       const start = r * perRow;
+       const end = start + perRow;
+       rows.push(posterImages.slice(start, end));
+     }
+     return rows;
 
-  const isPosting = directPostAction.submitting;
-  const isScheduling = scheduleAction.submitting;
+}, [posterImages]);
 
-  const handlePrimaryAction = async () => {
-    if (scheduleEnabled && !scheduledAt) {
-      return;
-    }
-
-    // Check if privacy level is selected before posting
-    const metadata = typeof window !== 'undefined' ? (window as any).__tiktokMetadata : null;
-    if (!metadata || !metadata.privacyLevel) {
-      toast.error("Please select who can see this post before posting.");
-      return;
-    }
-
-    const mode: "post" | "schedule" = scheduleEnabled ? "schedule" : "post";
-    setFinalizing(true);
-    setFinalizingMode(mode);
-
-    let redirected = false;
+  // TikTok-Bilder NICHT über next/image rendern (Host-Whitelist von Next schlägt oft zu).
+  // Alles andere weiter mit next/image (Optimierung bleibt erhalten).
+  const isTikTokCdn = (urlStr: string) => {
     try {
-      if (mode === "schedule") {
-        setFinalizing(true);
-        setFinalizingMode("schedule");
-        const result = await scheduleAction.handleSubmit();
-        if (result?.scheduled) {
-          redirected = true;
-          router.push("/dashboard/posts/scheduled");
-        }
-      } else {
-        // Apply metadata from global state before submitting
-        if (typeof window !== 'undefined' && (window as any).__tiktokMetadata) {
-          const metadata = (window as any).__tiktokMetadata;
-          updateDirectPostField("privacyLevel", metadata.privacyLevel);
-          updateDirectPostField("disableComment", metadata.disableComment);
-          updateDirectPostField("disableDuet", metadata.disableDuet);
-          updateDirectPostField("disableStitch", metadata.disableStitch);
-          updateDirectPostField("isCommercialContent", metadata.isCommercialContent);
-          updateDirectPostField("brandOption", metadata.brandOption);
-        }
-
-        const result = await directPostAction.handleSubmit();
-        if (result && result.publishId) {
-          // Show loading screen for processing immediately
-          setPostingData({
-            publishId: result.publishId,
-            caption: directPostAction.form.caption,
-          });
-          redirected = true; // Prevent error fallback
-        }
-      }
-    } catch (error) {
-      console.error("[CreateSlideshowPostPage] Submission failed", error);
-
-      // Show error as toast
-      const errorMessage = error instanceof Error ? error.message : "Failed to post to TikTok";
-      toast.error(errorMessage);
-
-      setFinalizing(false);
-      setFinalizingMode(null);
-    } finally {
-      if (!redirected) {
-        setFinalizing(false);
-        setFinalizingMode(null);
-      }
+      const u = new URL(urlStr);
+      // Beispiele: p16-pu-sign-no.tiktokcdn-eu.com, p19-common-sign-useastred.tiktokcdn-eu.com, ...
+      return /(^|\.)tiktokcdn(?:-eu)?\.com$/i.test(u.hostname);
+    } catch {
+      return false;
     }
   };
-
-  const handleToggleSchedule = (checked: boolean) => {
-    setScheduleEnabled(checked);
-    if (checked) {
-      const publishAt = scheduleAction.form.publishAt ?? scheduledAt ?? "";
-      if (publishAt) {
-        setScheduledAt(publishAt);
-        updateScheduleField("publishAt", publishAt);
-      }
-      toast("Scheduled posts use UTC time.");
-    }
-  };
-
-  const handleScheduledAtChange = (value: string) => {
-    setScheduledAt(value);
-    updateScheduleField("publishAt", value);
-  };
-
-  const handleSelectAccount = (openId: string) => {
-    updateDirectPostField("openId", openId);
-    updateScheduleField("openId", openId);
-  };
-
-  const handlePostingComplete = (status: string, postId?: string, releaseUrl?: string) => {
-    setFinalizing(false);
-    setFinalizingMode(null);
-    setPostingData(null);
-
-    // Auto-redirect handled by TikTokPostingLoader component
-  };
-
-  const handlePostingError = (error: string) => {
-    setFinalizing(false);
-    setFinalizingMode(null);
-    setPostingData(null);
-  };
-
-  if (!prepared) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
   return (
-    <div className="flex flex-col gap-6 p-6 lg:p-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold">Create Slideshow Post</h1>
-        </div>
-      </header>
+    <Section className="relative min-h-[85vh] overflow-hidden bg-[#111] py-0">
+      {/* Netflix Background - Fixed z-index hierarchy */}
+      {posterMatrix.length > 0 && (
+        <div className="hero-background-container">
+          {/* Gradient Overlay */}
+          <div className="hero-gradient-overlay" />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-6">
-          <section className="rounded-lg">
-            <div className="flex items-start gap-3 p-4">
-              <div className="flex gap-4 overflow-x-auto pb-1">
-                {accountsLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-label="Loading accounts" />
-                ) : accounts.length === 0 ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <Button variant="outline" onClick={() => refreshAccounts()}>
-                      Refresh accounts
-                    </Button>
-                    <Button onClick={() => router.push("/dashboard/settings/social")}>
-                      Manage TikTok accounts
-                    </Button>
-                  </div>
-                ) : (
-                  accounts.map((account) => {
-                    const label =
-                      account.username ?? account.displayName ?? account.openId;
-                    const isSelected =
-                      directPostAction.form.openId === account.openId;
-                    const initials = label
-                      .split(" ")
-                      .map((part) => part[0]?.toUpperCase())
-                      .join("")
-                      .slice(0, 2);
-
-                    return (
-                      <button
-                        key={account.openId}
-                        type="button"
-                        onClick={() => handleSelectAccount(account.openId)}
-                        className="flex flex-col items-center gap-2"
-                        aria-pressed={isSelected}
-                      >
-                        <span
-                          className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${isSelected ? "border-blue-500" : "border-border"}`}
-                        >
-                          {account.avatarUrl ? (
-                            <img
-                              src={account.avatarUrl}
-                              alt={label}
-                              className={`h-14 w-14 rounded-full object-cover transition-all ${isSelected ? "" : "grayscale opacity-70"}`}
-                            />
-                          ) : (
-                            <span
-                              className={`flex h-14 w-14 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground transition-all ${isSelected ? "text-primary" : ""}`}
-                            >
-                              {initials || "TikTok"}
-                            </span>
-                          )}
-                        </span>
-                        <span
-                          className={`text-xs ${isSelected ? "font-semibold" : "text-muted-foreground"}`}
-                        >
-                          {label}
-                        </span>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </section>
-
-          <TikTokPostForm
-            action={directPostAction}
-            cardTitle="Post configuration"
-            submitLabel="Post to TikTok"
-            refreshLabel="Refresh accounts"
-            showSubmitButton={false}
-            showRefreshButton={false}
-            renderAccountSelector={false}
-          />
-          {scheduleEnabled && (
-            <TikTokScheduleForm
-              action={scheduleAction}
-              cardTitle="Schedule configuration"
-              submitLabel="Schedule TikTok post"
-              refreshLabel="Refresh accounts"
-              showSubmitButton={false}
-              showRefreshButton={false}
-              showPublishControls={false}
-              renderAccountSelector={false}
-              onSelectAccount={handleSelectAccount}
-            />
-          )}
-        </div>
-
-        <div className="flex flex-col gap-4">
-          <aside className="flex flex-col rounded-lg border bg-card">
-            <div className="border-b px-4 py-3">
-              <h2 className="text-lg font-semibold">Media Preview</h2>
-            </div>
-            <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4">
-              {slides.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-3">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-label="Waiting for slides" />
-                  <Button onClick={() => router.push("/dashboard/slideshows")}>
-                    Back to slideshows
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        setCurrentSlide(
-                          (currentSlide - 1 + slides.length) % slides.length,
-                        )
-                      }
-                      aria-label="Previous slide"
+          {/* Animated Background */}
+          <div className="hero-perspective-wrapper">
+            <div className="hero-animated-grid">
+              {posterMatrix.map((row, rowIndex) => (
+                <div key={`hero-row-${rowIndex}`} className="hero-image-row">
+                  {row.map((imageUrl, itemIndex) => (
+                    <div
+                      key={`hero-row-${rowIndex}-item-${itemIndex}`}
+                      className="hero-image-card"
                     >
-                      <ChevronLeft className="h-4 w-4" aria-hidden />
-                    </Button>
-                    <div className="relative aspect-[2/3] w-56 overflow-hidden rounded-lg border border-border/70 sm:w-64">
-                      <Image
-                        src={slides[currentSlide]?.dataUrl ?? ""}
-                        alt={`Slide ${currentSlide + 1}`}
-                        fill
-                        className="object-cover"
-                        sizes="256px"
-                        unoptimized
-                      />
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        setCurrentSlide((currentSlide + 1) % slides.length)
-                      }
-                      aria-label="Next slide"
-                    >
-                      <ChevronRight className="h-4 w-4" aria-hidden />
-                    </Button>
-                  </div>
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="flex flex-wrap items-center justify-center gap-2">
-                      {slides.map((slide, index) => (
-                        <button
-                          key={slide.id}
-                          type="button"
-                          aria-label={`Show slide ${index + 1}`}
-                          onClick={() => setCurrentSlide(index)}
-                          className={`h-2.5 w-2.5 rounded-full transition-colors ${index === currentSlide ? "bg-primary" : "bg-border"}`}
+                      {isTikTokCdn(imageUrl) ? (
+                        // Fallback auf <img> für TikTok-CDNs → keine Next-Whitelist nötig
+                        <img
+                          src={imageUrl}
+                          alt=""
+                          loading={rowIndex < 2 ? "eager" : "lazy"}
+                          className="h-full w-full object-cover"
+                          decoding="async"
                         />
-                      ))}
+                      ) : (
+                        <Image
+                          src={imageUrl}
+                          alt=""
+                          fill
+                          /* Nur für die kleinen Kacheln: extrem klein halten */
+                          sizes="125px"
+                          /* Next darf optimieren -> erzeugt AVIF/WebP automatisch */
+                          quality={60}
+                          // Avoid Next.js runtime error: can't set both priority and loading
+                          // Use priority for first 2 rows, lazy for the rest
+                          priority={rowIndex < 2}
+                          loading={rowIndex < 2 ? undefined : "lazy"}
+                          style={{ objectFit: "cover", objectPosition: "center" }}
+                        />
+                      )}
                     </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </aside>
-          <aside className="flex flex-col rounded-lg border bg-card">
-            <div className="flex flex-col gap-4 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Schedule post</p>
-                  <p className="text-xs text-muted-foreground">
-                    Enable to pick a publish date and time.
-                  </p>
+                  ))}
                 </div>
-                <Switch
-                  checked={scheduleEnabled}
-                  onCheckedChange={handleToggleSchedule}
-                  aria-label="Toggle scheduling"
-                />
-              </div>
-
-              {scheduleEnabled && (
-                <div className="space-y-2">
-                  <Label htmlFor="scheduledAt">Publish at</Label>
-                  <Input
-                    id="scheduledAt"
-                    type="datetime-local"
-                    value={scheduledAt}
-                    onChange={(event) =>
-                      handleScheduledAtChange(event.target.value)
-                    }
-                  />
-                </div>
-              )}
-
-              <Button
-                size="lg"
-                onClick={() => void handlePrimaryAction()}
-                disabled={
-                  isPosting ||
-                  isScheduling ||
-                  accountsLoading ||
-                  accounts.length === 0 ||
-                  !directPostAction.form.openId ||
-                  finalizing ||
-                  (scheduleEnabled && !scheduledAt) ||
-                  directPostAction.form.photoImages.length === 0 ||
-                  !isMetadataValid
-                }
-              >
-                {scheduleEnabled
-                  ? isScheduling
-                    ? "Scheduling…"
-                    : "Schedule Now"
-                  : isPosting
-                    ? "Posting…"
-                    : "Post Now"}
-              </Button>
-            </div>
-          </aside>
-        </div>
-      </div>
-
-      {/* TikTok Posting Loader - Integrated into page */}
-      {postingData && (
-        <div className="fixed inset-0 top-0 left-0 w-full h-full bg-background/95 backdrop-blur-sm z-50">
-          <div className="flex flex-col items-center justify-center min-h-screen p-8">
-            <div className="w-full max-w-2xl">
-              <TikTokPostingLoader
-                publishId={postingData.publishId}
-                openId={directPostAction.form.openId}
-                caption={postingData.caption}
-                onComplete={handlePostingComplete}
-                onError={handlePostingError}
-              />
+              ))}
             </div>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-</file>
 
-<file path="src/components/app-sidebar.tsx">
-"use client";
-import {
-  Calendar,
-  CalendarClock,
-  Clapperboard,
-  FileCheck,
-  Folder,
-  Home,
-  Images,
-  TestTube2,
-  User,
-  Bookmark,
-  type LucideIcon,
-} from "lucide-react";
-import { usePathname } from "next/navigation";
+      {/* Foreground Content - Isolated stacking context */}
+      <div className="hero-content-wrapper">
+        <div className="mx-auto max-w-5xl text-center">
+          {/* Status badge */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="inline-flex items-center gap-3 rounded-full border border-indigo-300/20 bg-indigo-500/40 backdrop-blur-sm px-4 py-2 text-xs sm:text-sm font-medium text-indigo-100 shadow-lg mb-2 sm:mb-4 lg:mb-6 mt-[-0.5rem] sm:mt-[-1rem]"
+          >
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
+              <span>10M+ views generated with SlidesCockpit</span>
+            </div>
+            <div className="hidden sm:block h-4 w-px bg-indigo-300/30"></div>
+            <div className="flex items-center gap-1">
+              <TrendingUpIcon className="w-4 h-4" />
+              <span>2025</span>
+            </div>
+          </motion.div>
 
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
-import { SidebarAccountSection } from "./app-sidebar-account";
-import { SidebarSettingsButton } from "./app-sidebar-settings";
-import { SidebarSupportButton } from "./app-sidebar-support";
-import { SidebarUsageSummary } from "./app-sidebar-usage";
-import { AppLogo } from "./logo/AppLogo";
+          {/* Main headline */}
+          <motion.h1
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08, duration: 0.7 }}
+            className="py-2 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight text-white"
+          >
+            {heroTitle ? (
+              (() => {
+                // Teile den Title in Wörter auf
+                const words = heroTitle.split(" ");
 
-interface SidebarItem {
-  title: string;
-  url: string;
-  icon: LucideIcon;
-}
+                // Wenn weniger als 3 Wörter, zeige alles normal
+                if (words.length < 3) {
+                  return <span className="block">{heroTitle}</span>;
+                }
 
-const startItems: SidebarItem[] = [
-  {
-    title: "Home",
-    url: "/dashboard/home",
-    icon: Home,
-  },
-];
+                // Nimm die letzten 2 Wörter für den Gradient
+                const lastTwoWords = words.slice(-2).join(" ");
+                const restOfTitle = words.slice(0, -2).join(" ");
 
-const playgroundItems: SidebarItem[] = [
-  {
-    title: "Slideshows",
-    url: "/dashboard/slideshows",
-    icon: Images,
-  },
-  {
-    title: "AI Avatars",
-    url: "/dashboard/ai-avatars",
-    icon: User,
-  },
-  {
-    title: "Hook + Demo",
-    url: "/dashboard/ugc",
-    icon: Clapperboard,
-  },
-];
+                return (
+                  <>
+                    <span className="block sm:inline">{restOfTitle}&nbsp;</span>
+                    <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
+                      {lastTwoWords}
+                    </span>
+                  </>
+                );
+              })()
+            ) : (
+              <>
+                <span className="block">Automate TikTok slides</span>
+                {/* Mobile ≈3 Zeilen, ab sm → 2 Zeilen */}
+                <span className="block sm:inline sm:whitespace-nowrap">
+                  that actually&nbsp;
+                </span>
+                <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
+                  drive traffic
+                </span>
+              </>
+            )}
+          </motion.h1>
 
-const resourceItems: SidebarItem[] = [
-  {
-    title: "Image Collections",
-    url: "/dashboard/image-collections",
-    icon: Folder,
-  },
-  {
-    title: "Post Collections",
-    url: "/dashboard/post-collections",
-    icon: Bookmark,
-  },
-];
+          {/* Subheadline */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15, duration: 0.6 }}
+            className="mt-2 pb-4 text-lg sm:text-xl lg:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed font-light"
+          >
+            {heroSubtitle ||
+              "Create viral TikTok slides in seconds. Visually stunning, authentic, and built to perform."}
+          </motion.p>
 
-const postItems: SidebarItem[] = [
-  {
-    title: "Calendar",
-    url: "/dashboard/posts/calendar",
-    icon: Calendar,
-  },
-  {
-    title: "Scheduled",
-    url: "/dashboard/posts/scheduled",
-    icon: CalendarClock,
-  },
-  {
-    title: "Posted",
-    url: "/dashboard/posts/posted",
-    icon: FileCheck,
-  },
-];
+          {/* CTA buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-5"
+          >
+            {session ? (
+              <Link href="/dashboard/home" className="w-full sm:w-auto">
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
+                >
+                  Go to the app
+                  <ArrowRightIcon className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
+                </Button>
+              </Link>
+            ) : (
+              <div className="w-full sm:w-auto">
+                <GoogleSignInButton />
+              </div>
+            )}
 
-const debugItems: SidebarItem[] = [
-  {
-    title: "TikTok Posting",
-    url: "/dashboard/tests/tiktok-post",
-    icon: TestTube2,
-  },
-  {
-    title: "TikTok Scheduling",
-    url: "/dashboard/tests/tiktok-schedule",
-    icon: CalendarClock,
-  },
-];
+            <a
+              href="#library"
+              className="inline-flex items-center gap-2 text-white/80 hover:text-white text-sm sm:text-base font-medium underline-offset-4 hover:underline transition-all duration-200 px-2 py-1"
+            >
+              <StarIcon className="w-4 h-4 text-yellow-400" />
+              Browse examples
+            </a>
+          </motion.div>
 
-export function AppSidebar() {
-  const pathname = usePathname();
+          {/* Feature highlights */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 text-left"
+          >
+            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
+                  <ZapIcon className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-white font-semibold">Live in seconds</h2>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                From idea to finished slides instantly. No setup, no hassle.
+              </p>
+            </div>
 
-  return (
-    <Sidebar>
-      <SidebarContent className="px-2">
-        <div className="flex justify-center items-center gap-2 py-4">
-          <AppLogo size={32} borderRadius={6} />
-          <p className="text-lg font-bold">SlidesCockpit</p>
+            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
+                  <BarChart3Icon className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-white font-semibold">
+                  Templates that convert
+                </h2>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                Battle-tested winners. More reach, more followers.
+              </p>
+            </div>
+
+            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
+                  <CheckCircle2Icon className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-white font-semibold">Looks handcrafted</h2>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                Creator aesthetic instead of AI vibe. Natural and trustworthy.
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Social proof stats */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+            className="mt-14 px-4"
+          >
+            <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-indigo-500/40 hover:bg-indigo-500/50 duration-300 backdrop-blur-sm p-5 sm:p-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 mb-1">
+                    10M+
+                  </div>
+                  <div className="text-sm text-gray-300/90">TikTok Views</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
+                    100+
+                  </div>
+                  <div className="text-sm text-gray-300/90">Happy creators</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
+                    20K+
+                  </div>
+                  <div className="text-sm text-gray-300/90">
+                    Slides produced
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
+                    100%
+                  </div>
+                  <div className="text-sm text-gray-300/90">Success rate</div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
+      </div>
 
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {startItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname === item.url}
-                  >
-                    <a href={item.url}>
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-semibold">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sm">Playground</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {playgroundItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname === item.url}
-                  >
-                    <a href={item.url}>
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-semibold">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sm">Ressources</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {resourceItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname.startsWith(item.url)}
-                  >
-                    <a href={item.url}>
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-semibold">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sm">Posts</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {postItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname.startsWith(item.url)}
-                  >
-                    <a
-                      href={item.url}
-                      data-active={pathname.startsWith(item.url)}
-                    >
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-semibold">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        {/*
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-red-500">DEBUG</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {debugItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname.startsWith(item.url)}
-                  >
-                    <a
-                      href={item.url}
-                      data-active={pathname.startsWith(item.url)}
-                    >
-                      <item.icon className="w-5 h-5 text-red-500" />
-                      <span className="font-semibold text-red-500">
-                        {item.title}
-                      </span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        */}
-      </SidebarContent>
-      <SidebarFooter className="space-y-2">
-        <div className="flex flex-col gap-1 px-2">
-          <SidebarSettingsButton />
-          <SidebarSupportButton />
-        </div>
-        <SidebarUsageSummary />
-        <SidebarAccountSection />
-      </SidebarFooter>
-    </Sidebar>
+      {/* Optimized Styles - Fixed z-index hierarchy and GPU acceleration */}
+      <style jsx global>{`
+        /* Background Container - Lowest layer */
+        .hero-background-container {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          background-color: #111;
+          z-index: 1;
+          pointer-events: none;
+          /* Create isolated stacking context */
+          isolation: isolate;
+          /* Promote to own layer */
+          will-change: transform;
+          transform: translateZ(0);
+        }
+
+        /* Gradient Overlay - Above background */
+        .hero-gradient-overlay {
+          position: absolute;
+          inset: 0;
+          z-index: 2;
+          background: linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.8) 15%,
+            rgba(0, 0, 0, 0.8) 50%,
+            rgba(0, 0, 0, 0.95) 70%,
+            rgba(0, 0, 0, 0.6) 95%,
+            rgba(0, 0, 0, 1) 100%
+          );
+          opacity: 0.65;
+          pointer-events: none;
+          /* Fixed property for better performance */
+          will-change: opacity;
+        }
+
+        /* Perspective Wrapper */
+        .hero-perspective-wrapper {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          perspective: 500px;
+          perspective-origin: center center;
+          z-index: 1;
+          /* Contain layout and paint for performance */
+          contain: layout style paint;
+        }
+
+        /* Animated Grid */
+        .hero-animated-grid {
+          width: 100%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-start;
+          transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
+            translateX(1300px) translateZ(0);
+          transform-style: preserve-3d;
+          animation: heroBackgroundMove 180s linear infinite alternate;
+          /* Force GPU acceleration */
+          will-change: transform;
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
+          -webkit-transform-style: preserve-3d;
+        }
+
+        /* Image Rows */
+        .hero-image-row {
+          margin: 0;
+          display: flex;
+          justify-content: flex-end;
+          width: 100%;
+          flex-wrap: nowrap;
+          flex-grow: 1;
+          transform: translateX(100px) translateY(-120px) translateZ(0);
+          /* Prevent layout thrashing */
+          contain: layout style;
+        }
+
+        /* Individual Image Cards */
+        .hero-image-card {
+          position: relative;
+          transform-style: preserve-3d;
+          transform: rotateX(20deg) rotateY(0deg) skewX(335deg) translateZ(0);
+          min-width: 125px;
+          min-height: 187px;
+          display: inline-block;
+          margin: 7px;
+          border-radius: 12px;
+          box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
+          opacity: 0.9;
+          overflow: hidden;
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
+          /* Performance optimization */
+          will-change: transform;
+        }
+
+        /* Content Wrapper - keep it BELOW the fixed navbar (navbar is z-50) */
+        .hero-content-wrapper {
+          position: relative;
+          /* Navbar has z-50 — set hero below it to avoid overlapping while scrolling */
+          z-index: 20;
+          /* Create new stacking context isolated from background */
+          isolation: isolate;
+          /* Promote to own layer */
+          will-change: transform;
+          transform: translateZ(0);
+          min-height: 89vh;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          padding: 5rem 1.25rem 2.5rem;
+        }
+
+        @media (min-width: 640px) {
+          .hero-content-wrapper {
+            padding: 5rem 1.5rem 2.5rem;
+          }
+        }
+
+        @media (min-width: 1024px) {
+          .hero-content-wrapper {
+            padding-top: 5rem;
+          }
+        }
+
+        /* Optimized Animation */
+        @keyframes heroBackgroundMove {
+          from {
+            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
+              translateX(1300px) translateZ(0);
+          }
+          to {
+            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
+              translateX(-190px) translateZ(0);
+          }
+        }
+
+        /* Force hardware acceleration for smooth animation */
+        @media (prefers-reduced-motion: no-preference) {
+          .hero-animated-grid {
+            animation-play-state: running;
+          }
+        }
+
+        /* Pause animation if user prefers reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+          .hero-animated-grid {
+            animation-play-state: paused;
+          }
+        }
+      `}</style>
+    </Section>
   );
 }
 </file>
@@ -87758,7 +88493,9 @@ export default function UgcDashboardPage() {
   const [soundOpen, setSoundOpen] = useState(false);
   const [sounds, setSounds] = useState<SoundItem[]>([]);
   const [soundsLoading, setSoundsLoading] = useState(false);
-  const [selectedSound, setSelectedSound] = useState<SoundItem | null>(null);
+  const [selectedSound, setSelectedSound] = useState<SoundItem | null>(null); // persistierte Auswahl
+  const [tempSound, setTempSound] = useState<SoundItem | null>(null); // Auswahl im Dialog
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [dialogState, setDialogState] = useState<VideoDialogState>({
@@ -88413,37 +89150,37 @@ export default function UgcDashboardPage() {
                 </Button>
               </div>
 
-              {/* Sound-Auswahl mit Cover links + Abschlußlinie + Text rechts */}
-              <div className="mt-2 rounded-2xl border overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setSoundOpen(true)}
-                  className="w-full flex items-center text-left"
-                >
-                  {/* Linker Bildbereich: folgt der Box-Form, abgerundet links, vertikale Linie rechts */}
-                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-l-2xl border-r">
-                    {selectedSound?.coverUrl ? (
-                      <img
-                        src={selectedSound.coverUrl}
-                        alt=""
+              {/* Sound-Auswahl – kompakt, damit links neben Generate passt */}
+              <div className="mt-2 rounded-2xl border overflow-hidden h-10 max-w-[260px]">
+                 <button
+                   type="button"
+                   onClick={() => setSoundOpen(true)}
+                  className="w-full h-full flex items-center text-left"
+                 >
+                  {/* Bild links, abgerundet; rechte Abschlusslinie */}
+                  <div className="relative h-full w-10 shrink-0 overflow-hidden rounded-l-2xl border-r">
+                     {selectedSound?.coverUrl ? (
+                       <img
+                         src={selectedSound.coverUrl}
+                         alt=""
                         className="h-full w-full object-cover"
-                      />
-                    ) : (
+                       />
+                     ) : (
                       <div className="h-full w-full bg-muted" />
-                    )}
-                  </div>
-                  {/* Rechter Textbereich */}
-                  <div className="flex-1 px-3 py-3">
-                    <div className="text-sm font-medium leading-none">Sound</div>
-                    <div className="text-xs text-muted-foreground mt-1 truncate">
-                      {selectedSound ? selectedSound.name : "Kein Sound gewählt"}
+                     )}
+                   </div>
+                  {/* Text rechts, sehr kompakt */}
+                  <div className="flex-1 px-2">
+                    <div className="text-xs font-medium leading-none">Sound</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                      {selectedSound ? selectedSound.name : "Keiner gewählt"}
                     </div>
-                  </div>
-                </button>
-              </div>
+                   </div>
+                 </button>
+               </div>
 
               {/* Sound Dialog */}
-              <Dialog open={soundOpen} onOpenChange={setSoundOpen}>
+              <Dialog open={soundOpen} onOpenChange={(o)=>{setSoundOpen(o); if(!o) setTempSound(null);}}>
                 <DialogContent className="max-w-xl">
                   <DialogHeader>
                     <DialogTitle>Sound auswählen</DialogTitle>
@@ -88460,46 +89197,73 @@ export default function UgcDashboardPage() {
                     ) : (
                       <div className="grid gap-2 max-h-64 overflow-y-auto">
                         {sounds.map((sound) => (
-                          <button
-                            key={sound.key}
+                           <button
+                             key={sound.key}
                             onClick={() => {
-                              setSelectedSound(sound);
-                              setSoundOpen(false);
+                              setTempSound(sound);
+                              // Preview direkt loopen
+                              setTimeout(() => {
+                                if (audioRef.current) {
+                                  audioRef.current.currentTime = 0;
+                                  audioRef.current.play().catch(()=>{});
+                                }
+                              }, 0);
                             }}
-                            className={cn(
-                              "flex items-center gap-3 p-3 rounded-xl border text-left transition-colors hover:bg-muted/50",
-                              selectedSound?.key === sound.key
-                                ? "border-primary bg-primary/5"
-                                : "border-border"
-                            )}
-                          >
-                            <div className="h-10 w-10 rounded-lg overflow-hidden flex-shrink-0">
-                              {sound.coverUrl ? (
-                                <img
-                                  src={sound.coverUrl}
-                                  alt=""
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <div className="h-full w-full bg-muted flex items-center justify-center">
-                                  <Music className="h-4 w-4 text-muted-foreground" />
-                                </div>
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="font-medium truncate">{sound.name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {(sound.size / 1024).toFixed(1)} KB
-                              </div>
-                            </div>
-                            {selectedSound?.key === sound.key && (
-                              <div className="w-2 h-2 rounded-full bg-primary" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                             className={cn(
+                               "flex items-center gap-3 p-3 rounded-xl border text-left transition-colors hover:bg-muted/50",
+                              (tempSound?.key ?? selectedSound?.key) === sound.key
+                                 ? "border-primary bg-primary/5"
+                                 : "border-border"
+                             )}
+                           >
+                             <div className="h-10 w-10 rounded-lg overflow-hidden flex-shrink-0">
+                               {sound.coverUrl ? (
+                                 <img
+                                   src={sound.coverUrl}
+                                   alt=""
+                                   className="h-full w-full object-cover"
+                                 />
+                               ) : (
+                                 <div className="h-full w-full bg-muted flex items-center justify-center">
+                                   <Music className="h-4 w-4 text-muted-foreground" />
+                                 </div>
+                               )}
+                             </div>
+                             <div className="min-w-0 flex-1">
+                               <div className="font-medium truncate">{sound.name}</div>
+                               <div className="text-xs text-muted-foreground">
+                                 {(sound.size / 1024).toFixed(1)} KB
+                               </div>
+                             </div>
+                            {(tempSound?.key ?? selectedSound?.key) === sound.key && (
+                               <div className="w-2 h-2 rounded-full bg-primary" />
+                             )}
+                           </button>
+                         ))}
+                       </div>
+                     )}
+                   </div>
+                  {/* versteckter Audio-Player für Loop-Preview */}
+                  <audio ref={audioRef} src={(tempSound ?? selectedSound)?.ufsUrl || (tempSound ?? selectedSound)?.url || undefined} loop />
+                  <DialogFooter className="justify-end">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setTempSound(null);
+                        setSoundOpen(false);
+                      }}
+                    >
+                      Abbrechen
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        if (tempSound) setSelectedSound(tempSound);
+                        setSoundOpen(false);
+                      }}
+                    >
+                      Bestätigen
+                    </Button>
+                  </DialogFooter>
                 </DialogContent>
               </Dialog>
 
@@ -88771,556 +89535,6 @@ export default function UgcDashboardPage() {
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-</file>
-
-<file path="src/components/marketing/Hero.tsx">
-"use client";
-import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
-import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
-import {
-  ArrowRightIcon,
-  BarChart3Icon,
-  CheckCircle2Icon,
-  StarIcon,
-  TrendingUpIcon,
-  ZapIcon,
-} from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { Section } from "./Section";
-
-const HERO_POSTER_ROWS = 8;
-const HERO_POSTERS_PER_ROW = 28;
-const HERO_FETCH_LIMIT = 300;
-
-type HeroSlide = {
-  imageUrl?: string | null;
-};
-
-type HeroPost = {
-  slides?: HeroSlide[];
-};
-
-export function MarketingHero({
-  session,
-  category,
-  heroTitle,
-  heroSubtitle,
-}: {
-  session: boolean;
-  category?: string;
-  heroTitle?: string;
-  heroSubtitle?: string;
-}) {
-  const [posterImages, setPosterImages] = useState<string[]>([]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchSlides = async () => {
-      try {
-        const params = new URLSearchParams({
-          limit: HERO_FETCH_LIMIT.toString(),
-        });
-        if (category) {
-          params.set("category", category);
-        }
-
-        const response = await fetch(
-          `/api/slideshow-library/posts?${params.toString()}`,
-          {
-            cache: "no-store",
-            signal: controller.signal,
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to load hero slides: ${response.status}`);
-        }
-
-        const data = (await response.json()) as unknown;
-        if (!Array.isArray(data)) return;
-
-        const collected = new Set<string>();
-
-        for (const post of data as HeroPost[]) {
-          if (!post?.slides?.length) continue;
-
-          for (const slide of post.slides) {
-            if (!slide?.imageUrl) continue;
-            collected.add(slide.imageUrl);
-          }
-        }
-
-        if (!collected.size) return;
-
-        const deduped = Array.from(collected);
-        for (let index = deduped.length - 1; index > 0; index--) {
-          const swapIndex = Math.floor(Math.random() * (index + 1));
-          const current = deduped[index];
-          const swap = deduped[swapIndex];
-          if (current === undefined || swap === undefined) {
-            continue;
-          }
-          deduped[index] = swap;
-          deduped[swapIndex] = current;
-        }
-
-        setPosterImages(deduped);
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          return;
-        }
-        console.error("Error loading hero slide images", error);
-      }
-    };
-
-    void fetchSlides();
-
-    return () => {
-      controller.abort();
-    };
-  }, [category]);
-
-  const posterMatrix = useMemo(() => {
-    const perRow = HERO_POSTERS_PER_ROW;
-    const totalRows = HERO_POSTER_ROWS;
-
-     // Until we have real images, render nothing (no placeholders).
-     if (!posterImages.length) return [];
-
-     const rows: string[][] = [];
-     for (let r = 0; r < totalRows; r++) {
-       const start = r * perRow;
-       const end = start + perRow;
-       rows.push(posterImages.slice(start, end));
-     }
-     return rows;
-
-}, [posterImages]);
-
-  // TikTok-Bilder NICHT über next/image rendern (Host-Whitelist von Next schlägt oft zu).
-  // Alles andere weiter mit next/image (Optimierung bleibt erhalten).
-  const isTikTokCdn = (urlStr: string) => {
-    try {
-      const u = new URL(urlStr);
-      // Beispiele: p16-pu-sign-no.tiktokcdn-eu.com, p19-common-sign-useastred.tiktokcdn-eu.com, ...
-      return /(^|\.)tiktokcdn(?:-eu)?\.com$/i.test(u.hostname);
-    } catch {
-      return false;
-    }
-  };
-
-  return (
-    <Section className="relative min-h-[85vh] overflow-hidden bg-[#111] py-0">
-      {/* Netflix Background - Fixed z-index hierarchy */}
-      {posterMatrix.length > 0 && (
-        <div className="hero-background-container">
-          {/* Gradient Overlay */}
-          <div className="hero-gradient-overlay" />
-
-          {/* Animated Background */}
-          <div className="hero-perspective-wrapper">
-            <div className="hero-animated-grid">
-              {posterMatrix.map((row, rowIndex) => (
-                <div key={`hero-row-${rowIndex}`} className="hero-image-row">
-                  {row.map((imageUrl, itemIndex) => (
-                    <div
-                      key={`hero-row-${rowIndex}-item-${itemIndex}`}
-                      className="hero-image-card"
-                    >
-                      {isTikTokCdn(imageUrl) ? (
-                        // Fallback auf <img> für TikTok-CDNs → keine Next-Whitelist nötig
-                        <img
-                          src={imageUrl}
-                          alt=""
-                          loading={rowIndex < 2 ? "eager" : "lazy"}
-                          className="h-full w-full object-cover"
-                          decoding="async"
-                        />
-                      ) : (
-                        <Image
-                          src={imageUrl}
-                          alt=""
-                          fill
-                          /* Nur für die kleinen Kacheln: extrem klein halten */
-                          sizes="125px"
-                          /* Next darf optimieren -> erzeugt AVIF/WebP automatisch */
-                          quality={60}
-                          // Avoid Next.js runtime error: can't set both priority and loading
-                          // Use priority for first 2 rows, lazy for the rest
-                          priority={rowIndex < 2}
-                          loading={rowIndex < 2 ? undefined : "lazy"}
-                          style={{ objectFit: "cover", objectPosition: "center" }}
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Foreground Content - Isolated stacking context */}
-      <div className="hero-content-wrapper">
-        <div className="mx-auto max-w-5xl text-center">
-          {/* Status badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-3 rounded-full border border-indigo-300/20 bg-indigo-500/40 backdrop-blur-sm px-4 py-2 text-xs sm:text-sm font-medium text-indigo-100 shadow-lg mb-2 sm:mb-4 lg:mb-6 mt-[-0.5rem] sm:mt-[-1rem]"
-          >
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
-              <span>10M+ views generated with SlidesCockpit</span>
-            </div>
-            <div className="hidden sm:block h-4 w-px bg-indigo-300/30"></div>
-            <div className="flex items-center gap-1">
-              <TrendingUpIcon className="w-4 h-4" />
-              <span>2025</span>
-            </div>
-          </motion.div>
-
-          {/* Main headline */}
-          <motion.h1
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08, duration: 0.7 }}
-            className="py-2 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight text-white"
-          >
-            {heroTitle ? (
-              (() => {
-                // Teile den Title in Wörter auf
-                const words = heroTitle.split(" ");
-
-                // Wenn weniger als 3 Wörter, zeige alles normal
-                if (words.length < 3) {
-                  return <span className="block">{heroTitle}</span>;
-                }
-
-                // Nimm die letzten 2 Wörter für den Gradient
-                const lastTwoWords = words.slice(-2).join(" ");
-                const restOfTitle = words.slice(0, -2).join(" ");
-
-                return (
-                  <>
-                    <span className="block sm:inline">{restOfTitle}&nbsp;</span>
-                    <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
-                      {lastTwoWords}
-                    </span>
-                  </>
-                );
-              })()
-            ) : (
-              <>
-                <span className="block">Automate TikTok slides</span>
-                {/* Mobile ≈3 Zeilen, ab sm → 2 Zeilen */}
-                <span className="block sm:inline sm:whitespace-nowrap">
-                  that actually&nbsp;
-                </span>
-                <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
-                  drive traffic
-                </span>
-              </>
-            )}
-          </motion.h1>
-
-          {/* Subheadline */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.15, duration: 0.6 }}
-            className="mt-2 pb-4 text-lg sm:text-xl lg:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed font-light"
-          >
-            {heroSubtitle ||
-              "Create viral TikTok slides in seconds. Visually stunning, authentic, and built to perform."}
-          </motion.p>
-
-          {/* CTA buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-5"
-          >
-            {session ? (
-              <Link href="/dashboard/home" className="w-full sm:w-auto">
-                <Button
-                  size="lg"
-                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
-                >
-                  Go to the app
-                  <ArrowRightIcon className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
-                </Button>
-              </Link>
-            ) : (
-              <div className="w-full sm:w-auto">
-                <GoogleSignInButton />
-              </div>
-            )}
-
-            <a
-              href="#library"
-              className="inline-flex items-center gap-2 text-white/80 hover:text-white text-sm sm:text-base font-medium underline-offset-4 hover:underline transition-all duration-200 px-2 py-1"
-            >
-              <StarIcon className="w-4 h-4 text-yellow-400" />
-              Browse examples
-            </a>
-          </motion.div>
-
-          {/* Feature highlights */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 text-left"
-          >
-            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
-                  <ZapIcon className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-white font-semibold">Live in seconds</h2>
-              </div>
-              <p className="text-gray-300 text-sm leading-relaxed">
-                From idea to finished slides instantly. No setup, no hassle.
-              </p>
-            </div>
-
-            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
-                  <BarChart3Icon className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-white font-semibold">
-                  Templates that convert
-                </h2>
-              </div>
-              <p className="text-gray-300 text-sm leading-relaxed">
-                Battle-tested winners. More reach, more followers.
-              </p>
-            </div>
-
-            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
-                  <CheckCircle2Icon className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-white font-semibold">Looks handcrafted</h2>
-              </div>
-              <p className="text-gray-300 text-sm leading-relaxed">
-                Creator aesthetic instead of AI vibe. Natural and trustworthy.
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Social proof stats */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4, duration: 0.6 }}
-            className="mt-14 px-4"
-          >
-            <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-indigo-500/40 hover:bg-indigo-500/50 duration-300 backdrop-blur-sm p-5 sm:p-6">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 mb-1">
-                    10M+
-                  </div>
-                  <div className="text-sm text-gray-300/90">TikTok Views</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-                    100+
-                  </div>
-                  <div className="text-sm text-gray-300/90">Happy creators</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-                    20K+
-                  </div>
-                  <div className="text-sm text-gray-300/90">
-                    Slides produced
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-                    100%
-                  </div>
-                  <div className="text-sm text-gray-300/90">Success rate</div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-
-      {/* Optimized Styles - Fixed z-index hierarchy and GPU acceleration */}
-      <style jsx global>{`
-        /* Background Container - Lowest layer */
-        .hero-background-container {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-          background-color: #111;
-          z-index: 1;
-          pointer-events: none;
-          /* Create isolated stacking context */
-          isolation: isolate;
-          /* Promote to own layer */
-          will-change: transform;
-          transform: translateZ(0);
-        }
-
-        /* Gradient Overlay - Above background */
-        .hero-gradient-overlay {
-          position: absolute;
-          inset: 0;
-          z-index: 2;
-          background: linear-gradient(
-            to bottom,
-            rgba(0, 0, 0, 0.8) 15%,
-            rgba(0, 0, 0, 0.8) 50%,
-            rgba(0, 0, 0, 0.95) 70%,
-            rgba(0, 0, 0, 0.6) 95%,
-            rgba(0, 0, 0, 1) 100%
-          );
-          opacity: 0.65;
-          pointer-events: none;
-          /* Fixed property for better performance */
-          will-change: opacity;
-        }
-
-        /* Perspective Wrapper */
-        .hero-perspective-wrapper {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          perspective: 500px;
-          perspective-origin: center center;
-          z-index: 1;
-          /* Contain layout and paint for performance */
-          contain: layout style paint;
-        }
-
-        /* Animated Grid */
-        .hero-animated-grid {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: flex-start;
-          transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
-            translateX(1300px) translateZ(0);
-          transform-style: preserve-3d;
-          animation: heroBackgroundMove 180s linear infinite alternate;
-          /* Force GPU acceleration */
-          will-change: transform;
-          backface-visibility: hidden;
-          -webkit-backface-visibility: hidden;
-          -webkit-transform-style: preserve-3d;
-        }
-
-        /* Image Rows */
-        .hero-image-row {
-          margin: 0;
-          display: flex;
-          justify-content: flex-end;
-          width: 100%;
-          flex-wrap: nowrap;
-          flex-grow: 1;
-          transform: translateX(100px) translateY(-120px) translateZ(0);
-          /* Prevent layout thrashing */
-          contain: layout style;
-        }
-
-        /* Individual Image Cards */
-        .hero-image-card {
-          position: relative;
-          transform-style: preserve-3d;
-          transform: rotateX(20deg) rotateY(0deg) skewX(335deg) translateZ(0);
-          min-width: 125px;
-          min-height: 187px;
-          display: inline-block;
-          margin: 7px;
-          border-radius: 12px;
-          box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
-          opacity: 0.9;
-          overflow: hidden;
-          backface-visibility: hidden;
-          -webkit-backface-visibility: hidden;
-          /* Performance optimization */
-          will-change: transform;
-        }
-
-        /* Content Wrapper - keep it BELOW the fixed navbar (navbar is z-50) */
-        .hero-content-wrapper {
-          position: relative;
-          /* Navbar has z-50 — set hero below it to avoid overlapping while scrolling */
-          z-index: 20;
-          /* Create new stacking context isolated from background */
-          isolation: isolate;
-          /* Promote to own layer */
-          will-change: transform;
-          transform: translateZ(0);
-          min-height: 89vh;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          padding: 5rem 1.25rem 2.5rem;
-        }
-
-        @media (min-width: 640px) {
-          .hero-content-wrapper {
-            padding: 5rem 1.5rem 2.5rem;
-          }
-        }
-
-        @media (min-width: 1024px) {
-          .hero-content-wrapper {
-            padding-top: 5rem;
-          }
-        }
-
-        /* Optimized Animation */
-        @keyframes heroBackgroundMove {
-          from {
-            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
-              translateX(1300px) translateZ(0);
-          }
-          to {
-            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
-              translateX(-190px) translateZ(0);
-          }
-        }
-
-        /* Force hardware acceleration for smooth animation */
-        @media (prefers-reduced-motion: no-preference) {
-          .hero-animated-grid {
-            animation-play-state: running;
-          }
-        }
-
-        /* Pause animation if user prefers reduced motion */
-        @media (prefers-reduced-motion: reduce) {
-          .hero-animated-grid {
-            animation-play-state: paused;
-          }
-        }
-      `}</style>
-    </Section>
   );
 }
 </file>
