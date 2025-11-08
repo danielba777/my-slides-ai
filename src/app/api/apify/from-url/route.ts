@@ -123,6 +123,32 @@ async function authenticateExtensionUser(request: Request) {
     throw new ApifyIngestError("Missing extension token", 401);
   }
 
+  // First check if it's an admin library token
+  try {
+    const adminResponse = await fetch(`${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/admin/library-token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+
+    if (adminResponse.ok) {
+      const adminResult = await adminResponse.json();
+      if (adminResult.isValid) {
+        console.log("[apify/from-url] Admin library token detected");
+        // Return a special admin user object
+        return {
+          id: "admin-library",
+          email: "admin@slidescockpit.com",
+          isAdmin: true
+        };
+      }
+    }
+  } catch (error) {
+    // Continue with normal user authentication if admin check fails
+    console.debug("[apify/from-url] Admin token check failed, trying normal user:", error);
+  }
+
+  // Normal user authentication
   const user = await db.user.findUnique({
     where: { extensionToken: token },
     select: { id: true, email: true },
@@ -132,5 +158,5 @@ async function authenticateExtensionUser(request: Request) {
     throw new ApifyIngestError("Invalid extension token", 401);
   }
 
-  return user;
+  return { ...user, isAdmin: false };
 }
