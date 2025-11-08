@@ -94,7 +94,11 @@ function extractSlidesFromAwemeDetail(awemeDetail: any): Array<{
   const images = awemeDetail?.imagePost?.images || [];
 
   images.forEach((image: any, index: number) => {
-    if (image?.url_list && Array.isArray(image.url_list) && image.url_list.length > 0) {
+    if (
+      image?.url_list &&
+      Array.isArray(image.url_list) &&
+      image.url_list.length > 0
+    ) {
       slides.push({
         id: `slide-${index}`,
         imageUrl: image.url_list[0],
@@ -111,7 +115,11 @@ function extractSlidesFromAwemeDetail(awemeDetail: any): Array<{
   // If no slides found from imagePost, try other structures
   if (slides.length === 0) {
     const videoCover = awemeDetail?.video?.cover;
-    if (videoCover?.url_list && Array.isArray(videoCover.url_list) && videoCover.url_list.length > 0) {
+    if (
+      videoCover?.url_list &&
+      Array.isArray(videoCover.url_list) &&
+      videoCover.url_list.length > 0
+    ) {
       slides.push({
         id: `slide-0`,
         imageUrl: videoCover.url_list[0],
@@ -124,26 +132,50 @@ function extractSlidesFromAwemeDetail(awemeDetail: any): Array<{
   return slides;
 }
 
-async function callApify(params: Record<string, string | number>) {
-  const url = new URL(
-    `https://api.apify.com/v2/acts/lokeshpazhan~tiktok-scraper/run-sync?token=${process.env.APIFY_API_KEY}`,
-  );
-  Object.entries(params).forEach(([key, value]) => {
-    url.searchParams.append(key, String(value));
+async function callApify(payload: Record<string, unknown>) {
+  console.log("[apify/run] Calling Apify with payload:", {
+    payload,
   });
 
-  const response = await fetch(url, {
-    method: "POST",
+  const response = await fetch(
+    `https://api.apify.com/v2/acts/scraptik~tiktok-api/run-sync-get-dataset-items?token=${process.env.APIFY_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const responseText = await response.text();
+
+  console.log("[apify/run] Apify response:", {
+    status: response.status,
+    statusText: response.statusText,
+    headers: Object.fromEntries(response.headers.entries()),
+    responseLength: responseText.length,
+    responseText: responseText,
   });
 
   if (!response.ok) {
     throw new ApifyIngestError(
-      `Apify API request failed with status ${response.status}`,
+      `Apify API request failed with status ${response.status}: ${responseText}`,
       response.status,
+      responseText,
     );
   }
 
-  const json = await response.json();
+  let json;
+  try {
+    json = JSON.parse(responseText);
+  } catch (parseError) {
+    console.error("[apify/run] Failed to parse JSON response:", parseError);
+    throw new ApifyIngestError(
+      `Failed to parse Apify response: ${parseError}`,
+      500,
+      responseText,
+    );
+  }
+
   const items = Array.isArray(json) ? json : [json];
   return { items, raw: json };
 }
@@ -221,7 +253,7 @@ export async function ingestTikTokPost({
   };
 
   const postFetch = await callApify({
-    aweme_id: awemeId,
+    post_awemeId: awemeId,
   });
 
   const awemeDetail = findAwemeDetail(postFetch);
@@ -237,16 +269,14 @@ export async function ingestTikTokPost({
     ? awemeDetail.video?.play_addr?.url_list?.[0]
     : awemeDetail.video?.play_addr_h264?.url_list?.[0];
 
-  const videoUrlLow = Array.isArray(
-    awemeDetail.video?.download_addr?.url_list,
-  )
+  const videoUrlLow = Array.isArray(awemeDetail.video?.download_addr?.url_list)
     ? awemeDetail.video?.download_addr?.url_list?.[0]
     : awemeDetail.video?.play_addr_lowbr?.url_list?.[0];
 
   const videoDownloadUrl =
-    videoUrlLow ??
+    (videoUrlLow ??
     videoUrl ??
-    Array.isArray(awemeDetail.video?.bit_rate?.[0]?.play_addr?.url_list)
+    Array.isArray(awemeDetail.video?.bit_rate?.[0]?.play_addr?.url_list))
       ? awemeDetail.video?.bit_rate?.[0]?.play_addr?.url_list?.[0]
       : null;
 
@@ -278,42 +308,99 @@ export async function ingestTikTokPost({
 
   // If it's an admin user, add directly to public library instead of user collection
   if (ownerUserId === "admin-library") {
-    console.log("[apify/run] Admin library user detected, adding directly to public library", {
-      postId: postData.postId,
-    });
+    console.log(
+      "[apify/run] Admin library user detected, adding directly to public library",
+      {
+        postId: postData.postId,
+      },
+    );
 
     try {
-      const publicPostResponse = await fetch(`${API_BASE_URL}/slideshow-library/posts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          accountId: accountData.id,
-          postId: postData.postId,
-          caption: postData.caption,
-          categories: postData.categories,
-          likeCount: postData.likeCount,
-          viewCount: postData.viewCount,
-          publishedAt: postData.publishedAt.toISOString(),
-          createdAt: postData.createdAt.toISOString(),
-          duration: postData.duration,
-          slides: postData.slides,
-        }),
+      // First, find or create the account to get a valid database ID
+      console.log("[apify/run] Finding or creating account:", {
+        username: accountData.username,
+        displayName: accountData.displayName,
       });
 
+      const accountResponse = await fetch(
+        `${API_BASE_URL}/slideshow-library/accounts/find-or-create`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: accountData.username,
+            displayName: accountData.displayName,
+            bio: accountData.bio,
+            profileImageUrl: accountData.profileImageUrl,
+            followerCount: accountData.followerCount,
+            followingCount: accountData.followingCount,
+            isVerified: accountData.isVerified,
+          }),
+        },
+      );
+
+      if (!accountResponse.ok) {
+        const errorText = await accountResponse.text();
+        throw new Error(`Failed to find or create account: ${errorText}`);
+      }
+
+      const createdAccount = await accountResponse.json();
+      console.log("[apify/run] Account found/created:", {
+        accountId: createdAccount.id,
+        username: createdAccount.username,
+      });
+
+      const publicPostData = {
+        accountId: createdAccount.id, // Use the database account ID
+        postId: postData.postId,
+        caption: postData.caption,
+        categories: postData.categories,
+        likeCount: postData.likeCount,
+        viewCount: postData.viewCount,
+        publishedAt: postData.publishedAt.toISOString(),
+        createdAt: postData.createdAt.toISOString(),
+        duration: postData.duration,
+        slides: postData.slides,
+      };
+
+      console.log("[apify/run] Sending admin post to backend:", {
+        apiBase: API_BASE_URL,
+        endpoint: `${API_BASE_URL}/slideshow-library/posts`,
+        postId: postData.postId,
+        accountId: createdAccount.id,
+        slidesCount: postData.slides?.length || 0,
+        payload: publicPostData,
+      });
+
+      const publicPostResponse = await fetch(
+        `${API_BASE_URL}/slideshow-library/posts`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(publicPostData),
+        },
+      );
+
       if (publicPostResponse.ok) {
-        console.log("[apify/run] Successfully added admin post to public library", {
-          postId: postData.postId,
-        });
+        console.log(
+          "[apify/run] Successfully added admin post to public library",
+          {
+            postId: postData.postId,
+          },
+        );
       } else {
         const responseText = await publicPostResponse.text();
-        console.error("[apify/run] Failed to add admin post to public library", {
-          status: publicPostResponse.status,
-          postId: postData.postId,
-          error: responseText,
-        });
+        console.error(
+          "[apify/run] Failed to add admin post to public library",
+          {
+            status: publicPostResponse.status,
+            postId: postData.postId,
+            error: responseText,
+          },
+        );
         throw new ApifyIngestError(
           `Failed to add admin post to public library: ${responseText}`,
-          500
+          500,
         );
       }
     } catch (error) {
@@ -323,7 +410,7 @@ export async function ingestTikTokPost({
       });
       throw new ApifyIngestError(
         `Error adding admin post to public library: ${error}`,
-        500
+        500,
       );
     }
   } else {
