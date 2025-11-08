@@ -33,6 +33,32 @@ function extractFromTikTokUrl(rawUrl: string) {
   const numericMatch = possibleId.match(/\d+/);
   const awemeId = numericMatch ? numericMatch[0] : null;
 
+  console.log("[apify/from-url] URL extraction debug:", {
+    url: rawUrl,
+    segments,
+    possibleId,
+    numericMatch,
+    awemeId,
+    profileUsername,
+    hasPhotoSegment: segments.includes("photo"),
+    hasVideoSegment: segments.includes("video"),
+  });
+
+  // Check if this is a photo post and log it
+  if (segments.includes("photo")) {
+    console.log("[apify/from-url] Detected photo post", {
+      awemeId,
+      profileUsername,
+      urlType: "photo",
+    });
+  } else if (segments.includes("video")) {
+    console.log("[apify/from-url] Detected video post", {
+      awemeId,
+      profileUsername,
+      urlType: "video",
+    });
+  }
+
   if (!awemeId || !profileUsername) {
     throw new ApifyIngestError(
       "Could not extract aweme id or username from TikTok URL",
