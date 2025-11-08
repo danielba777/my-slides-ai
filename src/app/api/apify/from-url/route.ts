@@ -3,6 +3,13 @@ import { NextResponse } from "next/server";
 import { ApifyIngestError, ingestTikTokPost } from "../run/route";
 import { db } from "@/server/db";
 
+// CORS Headers für Extension-Zugriff
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
 function extractFromTikTokUrl(rawUrl: string) {
   let url: URL;
   try {
@@ -34,6 +41,14 @@ function extractFromTikTokUrl(rawUrl: string) {
   }
 
   return { awemeId, profileUsername };
+}
+
+// OPTIONS Handler für CORS Preflight
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders
+  });
 }
 
 export async function POST(request: Request) {
@@ -69,7 +84,9 @@ export async function POST(request: Request) {
       postId: result.post?.id,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json(result, {
+  headers: corsHeaders
+});
   } catch (error) {
     if (error instanceof ApifyIngestError) {
       console.warn("[apify/from-url] Known ingestion error", {
@@ -79,14 +96,20 @@ export async function POST(request: Request) {
       });
       return NextResponse.json(
         { error: error.message, data: error.payload },
-        { status: error.status },
+        {
+          status: error.status,
+          headers: corsHeaders
+        },
       );
     }
 
     console.error("[apify/from-url] Unexpected failure", error);
     return NextResponse.json(
       { error: "Failed to ingest TikTok URL" },
-      { status: 500 },
+      {
+        status: 500,
+        headers: corsHeaders
+      },
     );
   }
 }
