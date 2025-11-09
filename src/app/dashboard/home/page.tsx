@@ -22,8 +22,16 @@ import {
   User,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
+import { SimplePagination } from "@/components/ui/simple-pagination";
+import { PostSkeletonGrid, DummyPost } from "@/components/ui/post-skeleton";
 
 interface SlideshowPostSummary {
   id: string;
@@ -89,10 +97,17 @@ const formatCount = (value: number) => compactNumberFormatter.format(value);
 const normalizePrompt = (value: string | null | undefined) =>
   (value ?? "").trim();
 
+const POSTS_PER_PAGE = 60;
+
 export default function DashboardHome() {
   const [posts, setPosts] = useState<SlideshowPostSummary[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isChangingPage, setIsChangingPage] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPosts, setTotalPosts] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<SlideshowPostDetail | null>(
     null,
@@ -111,41 +126,83 @@ export default function DashboardHome() {
   const [promptDraft, setPromptDraft] = useState("");
   const [isSavingPrompt, setIsSavingPrompt] = useState(false);
   const [sortOption, setSortOption] = useState<
-    "views-desc" | "views-asc" | "likes-desc" | "likes-asc"
-  >("views-desc");
+    "views-desc" | "views-asc" | "likes-desc" | "likes-asc" | "random"
+  >("random");
+  const pageTopRef = useRef<HTMLDivElement | null>(null);
+  const hasPaginatedRef = useRef(false);
 
   useEffect(() => {
     const loadPosts = async () => {
       try {
-        setIsLoadingPosts(true);
-        const response = await fetch("/api/slideshow-library/posts");
+        // Show loading spinner on initial load, skeletons on page changes
+        if (isInitialLoad) {
+          setIsLoadingPosts(true);
+          setIsInitialLoad(false);
+        } else {
+          setIsChangingPage(true);
+        }
+
+        const offset = (currentPage - 1) * POSTS_PER_PAGE;
+        const shuffle = sortOption === "random" ? "true" : "false";
+        const response = await fetch(
+          `/api/slideshow-library/posts?limit=${POSTS_PER_PAGE}&offset=${offset}&shuffle=${shuffle}`
+        );
         if (!response.ok) {
           throw new Error("Failed to load slideshow posts");
         }
-        const data = (await response.json()) as Array<SlideshowPostSummary>;
-        const sanitized = Array.isArray(data)
-          ? data.filter(
+        const data = await response.json();
+        const sanitized = Array.isArray(data.posts)
+          ? data.posts.filter(
               (post) => Array.isArray(post.slides) && post.slides.length > 0,
             )
           : [];
         setPosts(sanitized);
+
+        // For pagination, we need to get the actual total count of valid posts
+        // This is a temporary solution - ideally the backend should handle filtering
+        const totalValidPosts = data.totalCount || 0;
+        setTotalPosts(totalValidPosts);
+        setTotalPages(Math.ceil(totalValidPosts / POSTS_PER_PAGE) || 1);
       } catch (error) {
         console.error("Error loading slideshow posts:", error);
         setPosts([]);
+        setTotalPosts(0);
+        setTotalPages(0);
       } finally {
         setIsLoadingPosts(false);
+        setIsChangingPage(false);
       }
     };
 
     void loadPosts();
     const timer = setTimeout(() => setIsPageLoading(false), 600);
     return () => clearTimeout(timer);
-  }, []);
+  }, [currentPage, sortOption, isInitialLoad]);
   useEffect(() => {
     if (!isLoadingPosts) {
       setIsPageLoading(false);
     }
   }, [isLoadingPosts]);
+
+  useLayoutEffect(() => {
+    if (!hasPaginatedRef.current) {
+      hasPaginatedRef.current = true;
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const anchorTop = pageTopRef.current
+      ? window.scrollY + pageTopRef.current.getBoundingClientRect().top
+      : 0;
+
+    window.scrollTo({
+      top: Math.max(anchorTop, 0),
+      behavior: "auto",
+    });
+  }, [currentPage]);
 
   const postCards = useMemo(() => {
     const mapped = posts.map((post) => ({
@@ -154,6 +211,11 @@ export default function DashboardHome() {
       viewCount: post.viewCount,
       imageUrl: post.slides?.[0]?.imageUrl ?? null,
     }));
+
+    // If sortOption is "random", return posts as-is since they're already randomized by the database
+    if (sortOption === "random") {
+      return mapped;
+    }
 
     switch (sortOption) {
       case "views-asc":
@@ -167,6 +229,35 @@ export default function DashboardHome() {
         return [...mapped].sort((a, b) => b.viewCount - a.viewCount);
     }
   }, [posts, sortOption]);
+
+  // Fill up to POSTS_PER_PAGE with dummy posts
+  const postsWithDummies = useMemo(() => {
+    const realPostsCount = postCards.length;
+    const dummyCount = Math.max(0, POSTS_PER_PAGE - realPostsCount);
+
+    return [
+      ...postCards,
+      ...Array.from({ length: dummyCount }, (_, index) => ({
+        id: `dummy-${index}`,
+        isDummy: true,
+      }))
+    ];
+  }, [postCards]);
+
+  const handlePageChange = (page: number) => {
+    if (page === currentPage) {
+      return;
+    }
+
+    if (typeof document !== "undefined") {
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLElement) {
+        activeElement.blur();
+      }
+    }
+
+    setCurrentPage(page);
+  };
 
   useEffect(() => {
     if (selectedPost) {
@@ -473,7 +564,10 @@ export default function DashboardHome() {
   }
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center px-10 py-12">
+    <div
+      ref={pageTopRef}
+      className="flex h-full w-full flex-col items-center justify-center px-10 py-12"
+    >
       <AppLogo size={72} borderRadius={15} />
 
       <div className="text-center flex flex-col items-center gap-8 mt-4">
@@ -530,6 +624,15 @@ export default function DashboardHome() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
+                onClick={() => setSortOption("random")}
+                className={cn(
+                  sortOption === "random" &&
+                    "bg-primary/10 text-primary font-medium",
+                )}
+              >
+                Zufällig
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 onClick={() => setSortOption("views-desc")}
                 className={cn(
                   sortOption === "views-desc" &&
@@ -573,46 +676,68 @@ export default function DashboardHome() {
           <div className="flex justify-center py-12 text-muted-foreground">
             Lade Slideshow Library...
           </div>
+        ) : isChangingPage ? (
+          <PostSkeletonGrid />
         ) : postCards.length === 0 ? (
           <div className="flex justify-center py-12 text-muted-foreground">
             Keine Slideshow Posts gefunden.
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            {postCards.map((post) => (
-              <button
-                type="button"
-                key={post.id}
-                onClick={() => openPostModal(post.id)}
-                className="group relative block aspect-[2/3] w-full overflow-hidden rounded-xl border bg-muted/30 text-left transition hover:border-primary hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                aria-label="Slideshow ansehen"
-              >
-                {post.imageUrl ? (
-                  <img
-                    src={post.imageUrl}
-                    alt="Slideshow preview"
-                    className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center bg-muted text-sm text-muted-foreground">
-                    Keine Vorschau
-                  </div>
-                )}
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-3">
-                  <div className="flex flex-col items-start gap-1 text-base font-medium text-white">
-                    <span className="flex items-center gap-1">
-                      <PlayIcon size={18} />
-                      {formatCount(post.viewCount)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <HeartIcon size={18} />
-                      {formatCount(post.likeCount)}
-                    </span>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+              {postsWithDummies.map((post) => {
+                if ((post as any).isDummy) {
+                  // Render dummy post
+                  return <DummyPost key={post.id} />;
+                }
+
+                // Render real post
+                return (
+                  <button
+                    type="button"
+                    key={post.id}
+                    onClick={() => openPostModal(post.id)}
+                    className="group relative block aspect-[2/3] w-full overflow-hidden rounded-xl border bg-muted/30 text-left transition hover:border-primary hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    aria-label="Slideshow ansehen"
+                  >
+                    {post.imageUrl ? (
+                      <img
+                        src={post.imageUrl}
+                        alt="Slideshow preview"
+                        className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center bg-muted text-sm text-muted-foreground">
+                        Keine Vorschau
+                      </div>
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-3">
+                      <div className="flex flex-col items-start gap-1 text-base font-medium text-white">
+                        <span className="flex items-center gap-1">
+                          <PlayIcon size={18} />
+                          {formatCount(post.viewCount)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <HeartIcon size={18} />
+                          {formatCount(post.likeCount)}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {totalPages > 1 && (
+              <div className="mt-8 flex justify-center">
+                <SimplePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                />
+              </div>
+            )}
+          </>
         )}
       </section>
 

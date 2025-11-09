@@ -9,18 +9,22 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const limit = searchParams.get("limit");
+    const offset = searchParams.get("offset");
     const accountId = searchParams.get("accountId");
     const category = searchParams.get("category");
+    const shuffle = searchParams.get("shuffle");
 
     let url = `${API_BASE_URL}/slideshow-library/posts`;
     if (accountId) {
       url = `${API_BASE_URL}/slideshow-library/accounts/${accountId}/posts`;
     }
-    
+
     const params = new URLSearchParams();
     if (limit) params.set("limit", limit);
+    if (offset) params.set("offset", offset);
     if (category) params.set("category", category);
-    
+    if (shuffle) params.set("shuffle", shuffle);
+
     const paramString = params.toString();
     if (paramString) {
       url += `?${paramString}`;
