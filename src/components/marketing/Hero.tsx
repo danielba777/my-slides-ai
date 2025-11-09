@@ -53,7 +53,7 @@ export function MarketingHero({
         }
 
         const response = await fetch(
-          `/api/slideshow-library/posts?${params.toString()}`,
+          `/api/slideshow-library/hero-posts?${params.toString()}`,
           {
             cache: "no-store",
             signal: controller.signal,

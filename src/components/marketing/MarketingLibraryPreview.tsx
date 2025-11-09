@@ -118,12 +118,20 @@ export function MarketingLibraryPreview() {
           cache: "no-store",
         });
         if (!res.ok) throw new Error("Failed to load slideshow posts");
-        const data = (await res.json()) as PostSummary[];
-        const sanitized = Array.isArray(data)
-          ? data.filter(
-              (post) => Array.isArray(post.slides) && post.slides.length > 0,
-            )
-          : [];
+        const payload = (await res.json()) as
+          | PostSummary[]
+          | { posts?: PostSummary[] }
+          | null;
+
+        const postList = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.posts)
+            ? payload.posts ?? []
+            : [];
+
+        const sanitized = postList.filter(
+          (post) => Array.isArray(post.slides) && post.slides.length > 0,
+        );
         setPosts(sanitized);
       } catch (error) {
         console.error("Error loading slideshow posts:", error);
