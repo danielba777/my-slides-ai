@@ -598,6 +598,18 @@ export default function DashboardHome() {
               </span>
             </span>
           </Link>
+          <Link
+            href="/dashboard/ugc"
+            className="flex h-auto w-[220px] flex-col items-start gap-3 rounded-xl bg-white p-4 text-foreground transition hover:bg-accent/80 hover:text-accent-foreground shadow-md"
+          >
+            <PlayIcon className="h-7 w-7 text-blue-500" />
+            <span className="flex flex-col items-start leading-tight">
+              <span className="text-lg font-medium">Hook + Demo</span>
+              <span className="text-base text-muted-foreground text-left">
+                Create hook + demo videos
+              </span>
+            </span>
+          </Link>
         </div>
       </div>
 
@@ -630,7 +642,7 @@ export default function DashboardHome() {
                     "bg-primary/10 text-primary font-medium",
                 )}
               >
-                Zufällig
+                Random
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => setSortOption("views-desc")}
