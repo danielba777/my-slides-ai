@@ -67,6 +67,60 @@ function pickFirstString(sources: Array<unknown>) {
   return null;
 }
 
+function pickImageUrl(image: any): string | null {
+  if (!image || typeof image !== "object") {
+    return null;
+  }
+
+  const candidateLists: Array<unknown> = [
+    image.url_list,
+    image.urlList,
+    image.urls,
+    image.image_url_list,
+    image.download_url_list,
+    image.origin_url_list,
+    image.downloadAddr?.url_list,
+    image.origin_photo?.url_list,
+    image.display_image?.url_list,
+    image.owner_watermark_image?.url_list,
+    image.user_watermark_image?.url_list,
+  ];
+
+  for (const list of candidateLists) {
+    if (Array.isArray(list)) {
+      const url = pickFirstString(list);
+      if (url) {
+        return url;
+      }
+    }
+  }
+
+  if (typeof image.url === "string") {
+    return image.url;
+  }
+
+  return null;
+}
+
+function collectImageSources(awemeDetail: any): Array<any> {
+  const sources: Array<any> = [];
+  const maybeArrays: Array<unknown> = [
+    awemeDetail?.imagePost?.images,
+    awemeDetail?.image_post_info?.images,
+    awemeDetail?.imageInfos,
+    awemeDetail?.image_infos,
+    awemeDetail?.images,
+  ];
+
+  for (const maybe of maybeArrays) {
+    if (Array.isArray(maybe)) {
+      sources.push(...maybe);
+    }
+  }
+
+  return sources;
+}
+
 function extractSlidesFromAwemeDetail(awemeDetail: any): Array<{
   id: string;
   imageUrl: string;
@@ -88,18 +142,15 @@ function extractSlidesFromAwemeDetail(awemeDetail: any): Array<{
     fontSize?: number;
   }> = [];
 
-  // Try to extract slides from various possible structures in awemeDetail
-  const images = awemeDetail?.imagePost?.images || [];
+  const images = collectImageSources(awemeDetail);
 
   images.forEach((image: any, index: number) => {
-    if (
-      image?.url_list &&
-      Array.isArray(image.url_list) &&
-      image.url_list.length > 0
-    ) {
+    const resolvedImageUrl = pickImageUrl(image);
+
+    if (resolvedImageUrl) {
       slides.push({
         id: `slide-${index}`,
-        imageUrl: image.url_list[0],
+        imageUrl: resolvedImageUrl,
         slideIndex: index,
         textContent: awemeDetail?.desc || null,
         backgroundColor: image?.background_color || null,

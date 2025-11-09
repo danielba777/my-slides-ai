@@ -691,18 +691,21 @@ export default function DashboardHome() {
                   return <DummyPost key={post.id} />;
                 }
 
+                // Type guard to ensure this is a real post
+                const realPost = post as typeof postCards[0];
+
                 // Render real post
                 return (
                   <button
                     type="button"
-                    key={post.id}
-                    onClick={() => openPostModal(post.id)}
+                    key={realPost.id}
+                    onClick={() => openPostModal(realPost.id)}
                     className="group relative block aspect-[2/3] w-full overflow-hidden rounded-xl border bg-muted/30 text-left transition hover:border-primary hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label="Slideshow ansehen"
                   >
-                    {post.imageUrl ? (
+                    {realPost.imageUrl ? (
                       <img
-                        src={post.imageUrl}
+                        src={realPost.imageUrl}
                         alt="Slideshow preview"
                         className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
                       />
@@ -715,11 +718,11 @@ export default function DashboardHome() {
                       <div className="flex flex-col items-start gap-1 text-base font-medium text-white">
                         <span className="flex items-center gap-1">
                           <PlayIcon size={18} />
-                          {formatCount(post.viewCount)}
+                          {formatCount(realPost.viewCount)}
                         </span>
                         <span className="flex items-center gap-1">
                           <HeartIcon size={18} />
-                          {formatCount(post.likeCount)}
+                          {formatCount(realPost.likeCount)}
                         </span>
                       </div>
                     </div>

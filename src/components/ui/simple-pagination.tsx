@@ -17,7 +17,7 @@ export function SimplePagination({
   onPageChange,
   className
 }: SimplePaginationProps) {
-  const pages = [];
+  const pages: (number | string)[] = [];
   const maxVisiblePages = 7;
 
   // Calculate which pages to show
