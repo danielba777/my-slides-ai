@@ -558,7 +558,7 @@ export default function UgcDashboardPage() {
                           <Link
                             href="/dashboard/account/settings#demos"
                             className="relative aspect-[9/16] h-[120px] rounded-xl border border-dashed border-border/70 bg-background/60 hover:border-foreground/50 hover:bg-background/80 flex items-center justify-center"
-                            title="Demo hochladen"
+                            title="Upload demo"
                           >
                             <Plus className="h-6 w-6" />
                           </Link>
@@ -940,9 +940,6 @@ export default function UgcDashboardPage() {
                 />
               ))}
             </div>
-            <p className="mt-4 text-center text-sm text-muted-foreground">
-              No videos yet — generate your first UGC video above.
-            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">

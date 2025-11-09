@@ -61,7 +61,7 @@ export default function SettingsDemoVideos() {
 
   const uploadFileAndCreate = async (file: File) => {
     if (!file.type.startsWith("video/")) {
-      toast.error("Bitte wähle eine Videodatei");
+      toast.error("Please select a video file");
       return;
     }
     try {
@@ -69,9 +69,9 @@ export default function SettingsDemoVideos() {
       const result = await startUpload([file]);
       const uploadedUrl = result?.[0]?.url ?? result?.[0]?.ufsUrl;
       if (!uploadedUrl) {
-        throw new Error("Upload fehlgeschlagen");
+        throw new Error("Upload failed");
       }
-      // Direkt per-User als Demo speichern
+      // Save as user demo directly
       const response = await fetch("/api/ugc/demos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -79,21 +79,20 @@ export default function SettingsDemoVideos() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.error || "Demo konnte nicht gespeichert werden");
+        throw new Error(data?.error || "Failed to save demo");
       }
-      toast.success("Demo hochgeladen");
+      toast.success("Demo uploaded successfully");
       await loadDemos();
     } catch (error) {
       console.error("[SettingsDemoVideos] uploadFileAndCreate failed", error);
-      toast.error(
-        error instanceof Error ? error.message : "Upload fehlgeschlagen",
-      );
+      toast.error(error instanceof Error ? error.message : "Upload failed");
     } finally {
       setUploading(false);
     }
   };
+
   const handleDelete = async (demo: DemoVideo) => {
-    if (!window.confirm(`Demo "${demo.name || demo.id}" löschen?`)) return;
+    if (!window.confirm(`Delete demo "${demo.name || demo.id}"?`)) return;
     try {
       const response = await fetch(`/api/ugc/demos/${demo.id}`, {
         method: "DELETE",
@@ -113,8 +112,8 @@ export default function SettingsDemoVideos() {
   };
 
   const demoCountLabel = useMemo(() => {
-    if (state === "loading") return "Lade...";
-    if (demos.length === 0) return "Keine Demos vorhanden";
+    if (state === "loading") return "Loading...";
+    if (demos.length === 0) return "No demos";
     return `${demos.length} Demo${demos.length === 1 ? "" : "s"}`;
   }, [demos.length, state]);
 
@@ -131,7 +130,7 @@ export default function SettingsDemoVideos() {
             </Badge>
           </div>
 
-          {/* Kachel-Ansicht wie Hook+Demo (nur etwas größer) */}
+          {/* Tile view similar to Hook+Demo (slightly larger) */}
           {state === "loading" ? (
             <div className="flex h-28 items-center justify-center">
               <Spinner className="h-6 w-6" />
@@ -145,7 +144,7 @@ export default function SettingsDemoVideos() {
                     className="group relative aspect-[9/16] h-[180px] overflow-hidden rounded-xl border bg-black text-white"
                     title={demo.name || "Demo"}
                   >
-                    {/* Thumbnail falls vorhanden, sonst dunkle Fläche */}
+                    {/* Thumbnail if available, otherwise dark area */}
                     {"thumbnailUrl" in demo && (demo as any).thumbnailUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -159,7 +158,7 @@ export default function SettingsDemoVideos() {
                       </div>
                     )}
 
-                    {/* Hover-Overlay: Öffnen & Löschen */}
+                    {/* Hover overlay: open & delete */}
                     <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
                       <Button
                         type="button"
@@ -168,11 +167,15 @@ export default function SettingsDemoVideos() {
                         onClick={() => {
                           const target = demo.videoUrl?.startsWith("http")
                             ? demo.videoUrl
-                            : `${window.location.origin}${demo.videoUrl?.startsWith("/") ? demo.videoUrl : `/${demo.videoUrl}`}`;
+                            : `${window.location.origin}${
+                                demo.videoUrl?.startsWith("/")
+                                  ? demo.videoUrl
+                                  : `/${demo.videoUrl}`
+                              }`;
                           window.open(target, "_blank", "noopener,noreferrer");
                         }}
                         className="rounded-full"
-                        title="In neuem Tab ansehen"
+                        title="Open in new tab"
                       >
                         <ExternalLink className="h-4 w-4" />
                       </Button>
@@ -182,7 +185,7 @@ export default function SettingsDemoVideos() {
                         size="sm"
                         onClick={() => handleDelete(demo)}
                         className="rounded-full"
-                        title="Löschen"
+                        title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -190,12 +193,12 @@ export default function SettingsDemoVideos() {
                   </div>
                 ))}
 
-                {/* Upload-Platzhalterkachel */}
+                {/* Upload placeholder tile */}
                 <button
                   type="button"
                   onClick={handleSelectFile}
                   disabled={uploading}
-                  title="Demo hochladen"
+                  title="Upload demo"
                   className="relative aspect-[9/16] h-[180px] rounded-xl border border-dashed border-border/70 bg-background/60 hover:border-foreground/50 hover:bg-background/80 flex items-center justify-center"
                 >
                   {uploading ? (
@@ -210,7 +213,7 @@ export default function SettingsDemoVideos() {
         </CardContent>
       </Card>
 
-      {/* Unterhalb der Karte keine zweite Liste mehr nötig */}
+      {/* No second list below the card needed */}
       {state === "loading" ? (
         <div className="flex items-center justify-center py-10">
           <Spinner className="h-8 w-8" />
