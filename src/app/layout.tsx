@@ -110,10 +110,12 @@ export default function RootLayout({
         <Script
           type="module"
           src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"
+          crossOrigin="anonymous"
         />
         <Script
           noModule
           src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"
+          crossOrigin="anonymous"
         />
       </body>
     </html>

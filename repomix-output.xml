@@ -61987,6 +61987,16 @@ export default function TanstackQueryProvider({ children }: PropsWithChildren) {
 }
 </file>
 
+<file path="src/components/providers/ToasterProvider.tsx">
+"use client";
+
+import { Toaster } from "react-hot-toast";
+
+export function ToasterProvider() {
+  return <Toaster position="bottom-right" reverseOrder={false} />;
+}
+</file>
+
 <file path="src/components/ui/accordion.tsx">
 "use client";
 
@@ -74227,162 +74237,6 @@ export async function POST(req: Request) {
 }
 </file>
 
-<file path="src/app/api/ugc/videos/[id]/route.ts">
-import { NextResponse } from "next/server";
-import { z } from "zod";
-
-import { auth } from "@/server/auth";
-import { db } from "@/server/db";
-import { utapi } from "@/app/api/uploadthing/core";
-
-const updateSchema = z
-  .object({
-    title: z.string().trim().max(120).nullable().optional(),
-  })
-  .refine((value) => Object.keys(value).length > 0, {
-    message: "No fields provided",
-  });
-
-type RouteParams = {
-  params: Promise<{ id: string }>;
-};
-
-export async function GET(_: Request, { params }: RouteParams) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { id: videoId } = await params;
-  if (!videoId) {
-    return NextResponse.json({ error: "Missing video id" }, { status: 400 });
-  }
-
-  const video = await db.userUGCVideo.findFirst({
-    where: { id: videoId, userId: session.user.id },
-    include: {
-      reactionAvatar: {
-        select: { id: true, name: true, thumbnailUrl: true },
-      },
-      demoVideo: {
-        select: { id: true, name: true, thumbnailUrl: true, videoUrl: true },
-      },
-    },
-  });
-
-  if (!video) {
-    return NextResponse.json({ error: "Video not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({ video });
-}
-
-export async function PATCH(req: Request, { params }: RouteParams) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { id: videoId } = await params;
-  if (!videoId) {
-    return NextResponse.json({ error: "Missing video id" }, { status: 400 });
-  }
-
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  const parsed = updateSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.flatten().fieldErrors },
-      { status: 400 },
-    );
-  }
-
-  const existing = await db.userUGCVideo.findFirst({
-    where: { id: videoId, userId: session.user.id },
-  });
-  if (!existing) {
-    return NextResponse.json({ error: "Video not found" }, { status: 404 });
-  }
-
-  try {
-    const video = await db.userUGCVideo.update({
-      where: { id: videoId },
-      data: {
-        ...("title" in parsed.data
-          ? { title: parsed.data.title && parsed.data.title.length > 0 ? parsed.data.title : null }
-          : {}),
-      },
-      include: {
-        reactionAvatar: {
-          select: { id: true, name: true, thumbnailUrl: true },
-        },
-        demoVideo: {
-          select: { id: true, name: true, thumbnailUrl: true, videoUrl: true },
-        },
-      },
-    });
-    return NextResponse.json({ video });
-  } catch (error) {
-    console.error("[UGC][Videos][PATCH] Failed to update video", error);
-    return NextResponse.json(
-      { error: "Failed to update video" },
-      { status: 500 },
-    );
-  }
-}
-
-export async function DELETE(_: Request, { params }: RouteParams) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { id: videoId } = await params;
-
-  // Zuerst Video holen, um die URL zu haben
-  const existing = await db.userUGCVideo.findFirst({
-    where: { id: videoId, userId: session.user.id },
-    select: { id: true, compositeVideoUrl: true },
-  });
-  if (!existing) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  // File-Key aus UploadThing-URL extrahieren (letzter Pfadteil)
-  const fileKey = (() => {
-    const url = existing.compositeVideoUrl || "";
-    try {
-      const u = new URL(url);
-      const parts = u.pathname.split("/").filter(Boolean);
-      return parts[parts.length - 1] || null;
-    } catch {
-      return null;
-    }
-  })();
-
-  // Datei bei UploadThing löschen (best-effort)
-  if (fileKey) {
-    try {
-      await utapi.deleteFiles(fileKey);
-    } catch {
-      // kein Hard-Fail – wir löschen trotzdem den DB-Eintrag
-    }
-  }
-
-  const video = await db.userUGCVideo.delete({
-    where: { id: existing.id },
-  });
-
-  return NextResponse.json({ ok: true, video });
-}
-</file>
-
 <file path="src/app/api/ugc/videos/[id]/schedule/route.ts">
 export const runtime = "nodejs";
 
@@ -75087,6 +74941,265 @@ export function SidebarSettingsButton() {
         </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>
+  );
+}
+</file>
+
+<file path="src/components/app-sidebar-support.tsx">
+"use client";
+
+import { Ellipsis, LifeBuoy, X } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useState, type ReactNode } from "react";
+import toast from "react-hot-toast";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
+import { Textarea } from "@/components/ui/textarea";
+
+type SupportOption = "issue" | "idea" | "other";
+
+type SupportOptionConfig = {
+  value: SupportOption;
+  label: string;
+  title: string;
+  subject: string;
+  icon: ReactNode;
+};
+
+const SUPPORT_OPTIONS: SupportOptionConfig[] = [
+  {
+    value: "issue",
+    label: "Issue",
+    title: "Report an issue",
+    subject: "Report an issue",
+    icon: <span className="text-4xl leading-none">⚠️</span>,
+  },
+  {
+    value: "idea",
+    label: "Idea",
+    title: "Share an idea",
+    subject: "Share an idea",
+    icon: <span className="text-4xl leading-none">💡</span>,
+  },
+  {
+    value: "other",
+    label: "Other",
+    title: "Tell us anything!",
+    subject: "Tell us anything!",
+    icon: (
+      <span className="flex items-center justify-center rounded-full text-foreground">
+        <Ellipsis className="h-9 w-9" strokeWidth={2.8} />
+      </span>
+    ),
+  },
+];
+
+type FormStatus = {
+  loading: boolean;
+  success: boolean;
+  error: string | null;
+};
+
+const createInitialStatus = (): FormStatus => ({
+  loading: false,
+  success: false,
+  error: null,
+});
+
+export function SidebarSupportButton() {
+  const [selectedOption, setSelectedOption] = useState<SupportOption | null>(
+    null,
+  );
+  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState<FormStatus>(createInitialStatus);
+  const [isOpen, setIsOpen] = useState(false);
+  const { data: session } = useSession();
+
+  const selectedOptionConfig = selectedOption
+    ? SUPPORT_OPTIONS.find((option) => option.value === selectedOption)
+    : null;
+
+  const handleOptionSelect = (option: SupportOptionConfig) => {
+    setSelectedOption(option.value);
+    setMessage("");
+    setStatus(createInitialStatus());
+  };
+
+  const resetDialog = () => {
+    setSelectedOption(null);
+    setMessage("");
+    setStatus(createInitialStatus());
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!selectedOptionConfig) {
+      setStatus({
+        loading: false,
+        success: false,
+        error: "Please choose a support topic before sending.",
+      });
+      toast.error("Please choose a support topic before sending.");
+      return;
+    }
+
+    const userEmail = session?.user?.email;
+    const userName = session?.user?.name?.trim() || "SlidesCockpit User";
+
+    if (!userEmail) {
+      setStatus({
+        loading: false,
+        success: false,
+        error:
+          "We could not find your email address. Please contact support directly.",
+      });
+      toast.error(
+        "We could not find your email address. Please contact support directly.",
+      );
+      return;
+    }
+
+    const trimmedMessage = message.trim();
+    if (trimmedMessage.length === 0) {
+      setStatus({
+        loading: false,
+        success: false,
+        error: "Please enter a short description before sending.",
+      });
+      toast.error("Please enter a short description before sending.");
+      return;
+    }
+
+    setStatus({ loading: true, success: false, error: null });
+
+    try {
+      const response = await fetch("/api/support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: userName,
+          email: userEmail,
+          subject: selectedOptionConfig.subject,
+          message: trimmedMessage,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send support request");
+      }
+
+      setStatus(createInitialStatus());
+      setMessage("");
+      setIsOpen(false);
+      setTimeout(() => {
+        toast.success("Thanks for your message! We'll respond shortly.");
+      }, 150);
+    } catch (error) {
+      const messageText =
+        error instanceof Error
+          ? error.message
+          : "Failed to send support request";
+      setStatus({ loading: false, success: false, error: messageText });
+      toast.error(messageText);
+    }
+  };
+
+  const isSendDisabled = status.loading || message.trim().length === 0;
+
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        setIsOpen(open);
+        if (!open) {
+          resetDialog();
+        }
+      }}
+    >
+      <SidebarMenu className="text-muted-foreground/80">
+        <SidebarMenuItem>
+          <DialogTrigger asChild>
+            <SidebarMenuButton
+              type="button"
+              className="font-semibold text-muted-foreground/80 bg-transparent hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              tooltip="Support"
+              onClick={() => setIsOpen(true)}
+            >
+              <LifeBuoy className="h-5 w-5" />
+              <span className="font-semibold">Support</span>
+            </SidebarMenuButton>
+          </DialogTrigger>
+        </SidebarMenuItem>
+      </SidebarMenu>
+
+      <DialogContent
+        shouldHaveClose={false}
+        className="max-w-md space-y-5 bg-white"
+      >
+        <div className="flex items-start justify-between">
+          <DialogTitle>
+            {selectedOptionConfig?.title ?? "What's on your mind?"}
+          </DialogTitle>
+          <DialogClose
+            className="-mr-2 -mt-2 rounded-md p-1 text-muted-foreground transition hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </DialogClose>
+        </div>
+
+        {selectedOptionConfig === null ? (
+          <div className="grid gap-2 sm:grid-cols-3">
+            {SUPPORT_OPTIONS.map((option) => (
+              <Button
+                key={option.value}
+                variant="outline"
+                className="flex flex-col items-center gap-3 border-muted/40 bg-muted/30 py-12 text-foreground hover:bg-muted"
+                onClick={() => handleOptionSelect(option)}
+              >
+                {option.icon}
+                <span className="text-sm font-semibold">{option.label}</span>
+              </Button>
+            ))}
+          </div>
+        ) : (
+          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+            {status.error ? (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {status.error}
+              </div>
+            ) : null}
+
+            <Textarea
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              placeholder="Type your message here..."
+              className="min-h-[160px]"
+              required
+              disabled={status.loading}
+            />
+            <Button type="submit" className="w-full" disabled={isSendDisabled}>
+              {status.loading ? "Sending…" : "Send"}
+            </Button>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 </file>
@@ -78715,16 +78828,6 @@ export function ThemeCreator({ children }: { children?: ReactNode }) {
 }
 </file>
 
-<file path="src/components/providers/ToasterProvider.tsx">
-"use client";
-
-import { Toaster } from "react-hot-toast";
-
-export function ToasterProvider() {
-  return <Toaster position="bottom-right" reverseOrder={false} />;
-}
-</file>
-
 <file path="src/components/tiktok/TikTokScheduleForm.tsx">
 "use client";
 
@@ -81176,6 +81279,162 @@ export async function GET() {
 }
 </file>
 
+<file path="src/app/api/ugc/videos/[id]/route.ts">
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { auth } from "@/server/auth";
+import { db } from "@/server/db";
+import { utapi } from "@/app/api/uploadthing/core";
+
+const updateSchema = z
+  .object({
+    title: z.string().trim().max(120).nullable().optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "No fields provided",
+  });
+
+type RouteParams = {
+  params: Promise<{ id: string }>;
+};
+
+export async function GET(_: Request, { params }: RouteParams) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id: videoId } = await params;
+  if (!videoId) {
+    return NextResponse.json({ error: "Missing video id" }, { status: 400 });
+  }
+
+  const video = await db.userUGCVideo.findFirst({
+    where: { id: videoId, userId: session.user.id },
+    include: {
+      reactionAvatar: {
+        select: { id: true, name: true, thumbnailUrl: true },
+      },
+      demoVideo: {
+        select: { id: true, name: true, thumbnailUrl: true, videoUrl: true },
+      },
+    },
+  });
+
+  if (!video) {
+    return NextResponse.json({ error: "Video not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ video });
+}
+
+export async function PATCH(req: Request, { params }: RouteParams) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id: videoId } = await params;
+  if (!videoId) {
+    return NextResponse.json({ error: "Missing video id" }, { status: 400 });
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const parsed = updateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.flatten().fieldErrors },
+      { status: 400 },
+    );
+  }
+
+  const existing = await db.userUGCVideo.findFirst({
+    where: { id: videoId, userId: session.user.id },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Video not found" }, { status: 404 });
+  }
+
+  try {
+    const video = await db.userUGCVideo.update({
+      where: { id: videoId },
+      data: {
+        ...("title" in parsed.data
+          ? { title: parsed.data.title && parsed.data.title.length > 0 ? parsed.data.title : null }
+          : {}),
+      },
+      include: {
+        reactionAvatar: {
+          select: { id: true, name: true, thumbnailUrl: true },
+        },
+        demoVideo: {
+          select: { id: true, name: true, thumbnailUrl: true, videoUrl: true },
+        },
+      },
+    });
+    return NextResponse.json({ video });
+  } catch (error) {
+    console.error("[UGC][Videos][PATCH] Failed to update video", error);
+    return NextResponse.json(
+      { error: "Failed to update video" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(_: Request, { params }: RouteParams) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id: videoId } = await params;
+
+  // Zuerst Video holen, um die URL zu haben
+  const existing = await db.userUGCVideo.findFirst({
+    where: { id: videoId, userId: session.user.id },
+    select: { id: true, compositeVideoUrl: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // File-Key aus UploadThing-URL extrahieren (letzter Pfadteil)
+  const fileKey = (() => {
+    const url = existing.compositeVideoUrl || "";
+    try {
+      const u = new URL(url);
+      const parts = u.pathname.split("/").filter(Boolean);
+      return parts[parts.length - 1] || null;
+    } catch {
+      return null;
+    }
+  })();
+
+  // Datei bei UploadThing löschen (best-effort)
+  if (fileKey) {
+    try {
+      await utapi.deleteFiles(fileKey);
+    } catch {
+      // kein Hard-Fail – wir löschen trotzdem den DB-Eintrag
+    }
+  }
+
+  const video = await db.userUGCVideo.delete({
+    where: { id: existing.id },
+  });
+
+  return NextResponse.json({ ok: true, video });
+}
+</file>
+
 <file path="src/app/dashboard/image-collections/page.tsx">
 "use client";
 
@@ -81595,261 +81854,128 @@ export default async function PostCollectionsPage() {
 }
 </file>
 
-<file path="src/components/app-sidebar-support.tsx">
-"use client";
+<file path="src/app/layout.tsx">
+import TanstackQueryProvider from "@/components/providers/TanstackQueryProvider";
+import { ToasterProvider } from "@/components/providers/ToasterProvider";
+import NextAuthProvider from "@/provider/NextAuthProvider";
+import { ThemeProvider } from "@/provider/theme-provider";
+import "@/styles/globals.css";
+import { type Metadata } from "next";
+import localFont from "next/font/local";
+import Script from "next/script";
 
-import { Ellipsis, LifeBuoy, X } from "lucide-react";
-import { useSession } from "next-auth/react";
-import { useState, type ReactNode } from "react";
-import toast from "react-hot-toast";
-
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
-import { Textarea } from "@/components/ui/textarea";
-
-type SupportOption = "issue" | "idea" | "other";
-
-type SupportOptionConfig = {
-  value: SupportOption;
-  label: string;
-  title: string;
-  subject: string;
-  icon: ReactNode;
-};
-
-const SUPPORT_OPTIONS: SupportOptionConfig[] = [
-  {
-    value: "issue",
-    label: "Issue",
-    title: "Report an issue",
-    subject: "Report an issue",
-    icon: <span className="text-4xl leading-none">⚠️</span>,
-  },
-  {
-    value: "idea",
-    label: "Idea",
-    title: "Share an idea",
-    subject: "Share an idea",
-    icon: <span className="text-4xl leading-none">💡</span>,
-  },
-  {
-    value: "other",
-    label: "Other",
-    title: "Tell us anything!",
-    subject: "Tell us anything!",
-    icon: (
-      <span className="flex items-center justify-center rounded-full text-foreground">
-        <Ellipsis className="h-9 w-9" strokeWidth={2.8} />
-      </span>
-    ),
-  },
-];
-
-type FormStatus = {
-  loading: boolean;
-  success: boolean;
-  error: string | null;
-};
-
-const createInitialStatus = (): FormStatus => ({
-  loading: false,
-  success: false,
-  error: null,
+const tiktokSans = localFont({
+  variable: "--font-sans",
+  display: "swap",
+  src: [
+    {
+      path: "../fonts/tiktok/TikTokDisplayRegular.otf",
+      weight: "300",
+      style: "normal",
+    },
+    {
+      path: "../fonts/tiktok/TikTokTextRegular.otf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../fonts/tiktok/TikTokTextMedium.otf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../fonts/tiktok/TikTokDisplayMedium.otf",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "../fonts/tiktok/TikTokDisplayBold.otf",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "../fonts/tiktok/TikTokTextBold.otf",
+      weight: "800",
+      style: "normal",
+    },
+  ],
 });
 
-export function SidebarSupportButton() {
-  const [selectedOption, setSelectedOption] = useState<SupportOption | null>(
-    null,
-  );
-  const [message, setMessage] = useState("");
-  const [status, setStatus] = useState<FormStatus>(createInitialStatus);
-  const [isOpen, setIsOpen] = useState(false);
-  const { data: session } = useSession();
+export const metadata: Metadata = {
+  metadataBase: new URL("https://slidescockpit.com"),
+  title: "SlidesCockpit - Make TikTok Slides & Automate Marketing",
+  description:
+    "Automated slideshows that drive traffic to your website, app, or business. Generate AI TikToks and create your own gen z marketing team.",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: "https://slidescockpit.com/",
+    siteName: "SlidesCockpit",
+    title: "SlidesCockpit - Make TikTok Slides & Automate Marketing",
+    description:
+      "Automated slideshows that drive traffic to your website, app, or business. Generate AI TikToks and create your own gen z marketing team.",
+    /* Nutze die stabile dynamische OG-Route statt toter PNG-Referenzen */
+    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  icons: {
+    icon: "/favicon.ico",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SlidesCockpit - Make TikTok Slides & Automate Marketing",
+    description:
+      "Automated slideshows that drive traffic to your website, app, or business. Generate AI TikToks and create your own gen z marketing team.",
+    images: ["/opengraph-image"],
+  },
+};
 
-  const selectedOptionConfig = selectedOption
-    ? SUPPORT_OPTIONS.find((option) => option.value === selectedOption)
-    : null;
-
-  const handleOptionSelect = (option: SupportOptionConfig) => {
-    setSelectedOption(option.value);
-    setMessage("");
-    setStatus(createInitialStatus());
-  };
-
-  const resetDialog = () => {
-    setSelectedOption(null);
-    setMessage("");
-    setStatus(createInitialStatus());
-  };
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!selectedOptionConfig) {
-      setStatus({
-        loading: false,
-        success: false,
-        error: "Please choose a support topic before sending.",
-      });
-      toast.error("Please choose a support topic before sending.");
-      return;
-    }
-
-    const userEmail = session?.user?.email;
-    const userName = session?.user?.name?.trim() || "SlidesCockpit User";
-
-    if (!userEmail) {
-      setStatus({
-        loading: false,
-        success: false,
-        error:
-          "We could not find your email address. Please contact support directly.",
-      });
-      toast.error(
-        "We could not find your email address. Please contact support directly.",
-      );
-      return;
-    }
-
-    const trimmedMessage = message.trim();
-    if (trimmedMessage.length === 0) {
-      setStatus({
-        loading: false,
-        success: false,
-        error: "Please enter a short description before sending.",
-      });
-      toast.error("Please enter a short description before sending.");
-      return;
-    }
-
-    setStatus({ loading: true, success: false, error: null });
-
-    try {
-      const response = await fetch("/api/support", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: userName,
-          email: userEmail,
-          subject: selectedOptionConfig.subject,
-          message: trimmedMessage,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send support request");
-      }
-
-      setStatus(createInitialStatus());
-      setMessage("");
-      setIsOpen(false);
-      setTimeout(() => {
-        toast.success("Thanks for your message! We'll respond shortly.");
-      }, 150);
-    } catch (error) {
-      const messageText =
-        error instanceof Error
-          ? error.message
-          : "Failed to send support request";
-      setStatus({ loading: false, success: false, error: messageText });
-      toast.error(messageText);
-    }
-  };
-
-  const isSendDisabled = status.loading || message.trim().length === 0;
-
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={(open) => {
-        setIsOpen(open);
-        if (!open) {
-          resetDialog();
-        }
-      }}
-    >
-      <SidebarMenu className="text-muted-foreground/80">
-        <SidebarMenuItem>
-          <DialogTrigger asChild>
-            <SidebarMenuButton
-              type="button"
-              className="font-semibold text-muted-foreground/80 bg-transparent hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              tooltip="Support"
-              onClick={() => setIsOpen(true)}
-            >
-              <LifeBuoy className="h-5 w-5" />
-              <span className="font-semibold">Support</span>
-            </SidebarMenuButton>
-          </DialogTrigger>
-        </SidebarMenuItem>
-      </SidebarMenu>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta name="color-scheme" content="light dark" />
 
-      <DialogContent
-        shouldHaveClose={false}
-        className="max-w-md space-y-5 bg-white"
+        </head>
+      <body
+        className={`${tiktokSans.variable} font-sans antialiased bg-[#F3F4EF]`}
+        suppressHydrationWarning
       >
-        <div className="flex items-start justify-between">
-          <DialogTitle>
-            {selectedOptionConfig?.title ?? "What's on your mind?"}
-          </DialogTitle>
-          <DialogClose
-            className="-mr-2 -mt-2 rounded-md p-1 text-muted-foreground transition hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </DialogClose>
-        </div>
+        <TanstackQueryProvider>
+          <NextAuthProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="light"
+              disableTransitionOnChange
+            >
+              {children}
+              <ToasterProvider />
+            </ThemeProvider>
+          </NextAuthProvider>
+        </TanstackQueryProvider>
 
-        {selectedOptionConfig === null ? (
-          <div className="grid gap-2 sm:grid-cols-3">
-            {SUPPORT_OPTIONS.map((option) => (
-              <Button
-                key={option.value}
-                variant="outline"
-                className="flex flex-col items-center gap-3 border-muted/40 bg-muted/30 py-12 text-foreground hover:bg-muted"
-                onClick={() => handleOptionSelect(option)}
-              >
-                {option.icon}
-                <span className="text-sm font-semibold">{option.label}</span>
-              </Button>
-            ))}
-          </div>
-        ) : (
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-            {status.error ? (
-              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {status.error}
-              </div>
-            ) : null}
-
-            <Textarea
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              placeholder="Type your message here..."
-              className="min-h-[160px]"
-              required
-              disabled={status.loading}
-            />
-            <Button type="submit" className="w-full" disabled={isSendDisabled}>
-              {status.loading ? "Sending…" : "Send"}
-            </Button>
-          </form>
-        )}
-      </DialogContent>
-    </Dialog>
+        {/* ESM + Fallback */}
+        <Script
+          type="module"
+          src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"
+          crossOrigin="anonymous"
+        />
+        <Script
+          noModule
+          src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"
+          crossOrigin="anonymous"
+        />
+      </body>
+    </html>
   );
 }
 </file>
@@ -82008,230 +82134,6 @@ export default function SettingsConnections() {
           ))}
         </div>
       )}
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/dashboard/account/SettingsDemoVideos.tsx">
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
-
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Spinner } from "@/components/ui/spinner";
-import { useUploadThing } from "@/hooks/globals/useUploadthing";
-import type { DemoVideo } from "@/types/ugc";
-import { ExternalLink, Plus, Trash2, Video } from "lucide-react";
-
-type DemoState = "idle" | "loading";
-
-export default function SettingsDemoVideos() {
-  const [demos, setDemos] = useState<DemoVideo[]>([]);
-  const [state, setState] = useState<DemoState>("loading");
-  const [uploading, setUploading] = useState(false);
-
-  const { startUpload } = useUploadThing("editorUploader");
-
-  useEffect(() => {
-    void loadDemos();
-  }, []);
-
-  const loadDemos = async () => {
-    try {
-      setState("loading");
-      const response = await fetch("/api/ugc/demos");
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || "Failed to load demo videos");
-      }
-      const demosData: DemoVideo[] = Array.isArray(data?.demos)
-        ? data.demos
-        : [];
-      setDemos(demosData);
-    } catch (error) {
-      console.error("[SettingsDemoVideos] loadDemos failed", error);
-      toast.error(
-        error instanceof Error ? error.message : "Could not load demo videos",
-      );
-    } finally {
-      setState("idle");
-    }
-  };
-
-  const handleSelectFile = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "video/*";
-    input.onchange = (event) => {
-      const file = (event.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      void uploadFileAndCreate(file);
-    };
-    input.click();
-  };
-
-  const uploadFileAndCreate = async (file: File) => {
-    if (!file.type.startsWith("video/")) {
-      toast.error("Bitte wähle eine Videodatei");
-      return;
-    }
-    try {
-      setUploading(true);
-      const result = await startUpload([file]);
-      const uploadedUrl = result?.[0]?.url ?? result?.[0]?.ufsUrl;
-      if (!uploadedUrl) {
-        throw new Error("Upload fehlgeschlagen");
-      }
-      // Direkt per-User als Demo speichern
-      const response = await fetch("/api/ugc/demos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoUrl: uploadedUrl }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || "Demo konnte nicht gespeichert werden");
-      }
-      toast.success("Demo hochgeladen");
-      await loadDemos();
-    } catch (error) {
-      console.error("[SettingsDemoVideos] uploadFileAndCreate failed", error);
-      toast.error(
-        error instanceof Error ? error.message : "Upload fehlgeschlagen",
-      );
-    } finally {
-      setUploading(false);
-    }
-  };
-  const handleDelete = async (demo: DemoVideo) => {
-    if (!window.confirm(`Demo "${demo.name || demo.id}" löschen?`)) return;
-    try {
-      const response = await fetch(`/api/ugc/demos/${demo.id}`, {
-        method: "DELETE",
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || "Unable to delete demo");
-      }
-      toast.success("Demo deleted");
-      await loadDemos();
-    } catch (error) {
-      console.error("[SettingsDemoVideos] handleDelete failed", error);
-      toast.error(
-        error instanceof Error ? error.message : "Unable to delete demo",
-      );
-    }
-  };
-
-  const demoCountLabel = useMemo(() => {
-    if (state === "loading") return "Lade...";
-    if (demos.length === 0) return "Keine Demos vorhanden";
-    return `${demos.length} Demo${demos.length === 1 ? "" : "s"}`;
-  }, [demos.length, state]);
-
-  return (
-    <div className="space-y-6 px-1 sm:px-2 lg:px-0">
-      <Card className="rounded-2xl border bg-card shadow-sm">
-        <CardContent className="p-6 md:p-8">
-          <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <Badge className="border-[#304674]/20 bg-[#304674]/10 px-3 py-1 text-[#304674] cursor-default transition-none">
-              <span className="inline-flex items-center gap-2">
-                <Video className="h-4 w-4" />
-                {demoCountLabel}
-              </span>
-            </Badge>
-          </div>
-
-          {/* Kachel-Ansicht wie Hook+Demo (nur etwas größer) */}
-          {state === "loading" ? (
-            <div className="flex h-28 items-center justify-center">
-              <Spinner className="h-6 w-6" />
-            </div>
-          ) : (
-            <ScrollArea className="h-[340px] sm:h-[380px] rounded-2xl border border-border/50 bg-muted/40">
-              <div className="flex flex-wrap gap-3 p-3">
-                {demos.map((demo) => (
-                  <div
-                    key={demo.id}
-                    className="group relative aspect-[9/16] h-[180px] overflow-hidden rounded-xl border bg-black text-white"
-                    title={demo.name || "Demo"}
-                  >
-                    {/* Thumbnail falls vorhanden, sonst dunkle Fläche */}
-                    {"thumbnailUrl" in demo && (demo as any).thumbnailUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={(demo as any).thumbnailUrl}
-                        alt={demo.name || "Demo"}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-xs text-white/70">
-                        Demo
-                      </div>
-                    )}
-
-                    {/* Hover-Overlay: Öffnen & Löschen */}
-                    <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const target = demo.videoUrl?.startsWith("http")
-                            ? demo.videoUrl
-                            : `${window.location.origin}${demo.videoUrl?.startsWith("/") ? demo.videoUrl : `/${demo.videoUrl}`}`;
-                          window.open(target, "_blank", "noopener,noreferrer");
-                        }}
-                        className="rounded-full"
-                        title="In neuem Tab ansehen"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDelete(demo)}
-                        className="rounded-full"
-                        title="Löschen"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Upload-Platzhalterkachel */}
-                <button
-                  type="button"
-                  onClick={handleSelectFile}
-                  disabled={uploading}
-                  title="Demo hochladen"
-                  className="relative aspect-[9/16] h-[180px] rounded-xl border border-dashed border-border/70 bg-background/60 hover:border-foreground/50 hover:bg-background/80 flex items-center justify-center"
-                >
-                  {uploading ? (
-                    <Spinner className="h-6 w-6" />
-                  ) : (
-                    <Plus className="h-7 w-7" />
-                  )}
-                </button>
-              </div>
-            </ScrollArea>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Unterhalb der Karte keine zweite Liste mehr nötig */}
-      {state === "loading" ? (
-        <div className="flex items-center justify-center py-10">
-          <Spinner className="h-8 w-8" />
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -83264,6 +83166,239 @@ export function useTikTokPostAction(
 }
 </file>
 
+<file path="package.json">
+{
+  "name": "presentation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build --turbo",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "dev": "next dev --turbo",
+    "dev:noturbo": "cross-env NEXT_DISABLE_TURBOPACK=1 next dev",
+    "postinstall": "prisma generate",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "start": "next start",
+    "type": "tsc --noEmit",
+    "postbuild": "next-sitemap"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^1.3.23",
+    "@ai-sdk/openai-compatible": "^1.0.19",
+    "@ai-sdk/provider": "1.1.3",
+    "@ai-sdk/provider-utils": "2.2.8",
+    "@ai-sdk/react": "^1.2.12",
+    "@ariakit/react": "^0.4.17",
+    "@auth/prisma-adapter": "^1.6.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@emoji-mart/data": "^1.2.1",
+    "@fal-ai/client": "^1.7.2",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2",
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-brands-svg-icons": "^6.7.2",
+    "@fortawesome/free-regular-svg-icons": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
+    "@fortawesome/react-fontawesome": "^0.2.2",
+    "@hookform/resolvers": "^3.10.0",
+    "@platejs/ai": "^49.2.15",
+    "@platejs/autoformat": "^49.0.0",
+    "@platejs/basic-nodes": "^49.0.0",
+    "@platejs/basic-styles": "^49.0.0",
+    "@platejs/callout": "^49.0.0",
+    "@platejs/caption": "^49.0.0",
+    "@platejs/code-block": "^49.0.0",
+    "@platejs/combobox": "^49.0.0",
+    "@platejs/comment": "^49.0.0",
+    "@platejs/date": "^49.0.2",
+    "@platejs/dnd": "^49.2.10",
+    "@platejs/emoji": "^49.0.0",
+    "@platejs/excalidraw": "^49.0.0",
+    "@platejs/floating": "^49.0.0",
+    "@platejs/indent": "^49.0.0",
+    "@platejs/juice": "^49.0.0",
+    "@platejs/layout": "^49.2.1",
+    "@platejs/link": "^49.1.1",
+    "@platejs/list": "^49.2.0",
+    "@platejs/markdown": "^49.2.15",
+    "@platejs/math": "^49.0.0",
+    "@platejs/media": "^49.0.0",
+    "@platejs/mention": "^49.0.0",
+    "@platejs/resizable": "^49.0.0",
+    "@platejs/selection": "^50.2.0",
+    "@platejs/slash-command": "^49.0.0",
+    "@platejs/slate": "^49.2.4",
+    "@platejs/suggestion": "^50.3.3",
+    "@platejs/table": "^49.1.13",
+    "@platejs/toc": "^49.0.0",
+    "@platejs/toggle": "^49.0.0",
+    "@prisma/client": "^6.13.0",
+    "@radix-ui/react-accordion": "^1.2.12",
+    "@radix-ui/react-alert-dialog": "^1.1.14",
+    "@radix-ui/react-aspect-ratio": "^1.1.7",
+    "@radix-ui/react-avatar": "^1.1.10",
+    "@radix-ui/react-checkbox": "^1.3.2",
+    "@radix-ui/react-collapsible": "^1.1.12",
+    "@radix-ui/react-collection": "^1.1.7",
+    "@radix-ui/react-context-menu": "^2.2.15",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-hover-card": "^1.1.15",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-menubar": "^1.1.16",
+    "@radix-ui/react-navigation-menu": "^1.2.14",
+    "@radix-ui/react-popover": "^1.1.15",
+    "@radix-ui/react-primitive": "^2.1.3",
+    "@radix-ui/react-progress": "^1.1.7",
+    "@radix-ui/react-radio-group": "^1.3.7",
+    "@radix-ui/react-scroll-area": "^1.2.10",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-separator": "^1.1.7",
+    "@radix-ui/react-slider": "^1.3.6",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-switch": "^1.2.6",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@radix-ui/react-toast": "^1.2.15",
+    "@radix-ui/react-toggle": "^1.1.9",
+    "@radix-ui/react-toggle-group": "^1.1.10",
+    "@radix-ui/react-toolbar": "^1.1.10",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "@reacticons/ionicons": "^7.1.0",
+    "@t3-oss/env-nextjs": "^0.10.1",
+    "@tanstack/react-query": "^5.84.2",
+    "@tavily/core": "^0.5.12",
+    "@uploadthing/react": "^7.3.1",
+    "ai": "^4.3.19",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "date-fns": "^3.6.0",
+    "embla-carousel-react": "^8.6.0",
+    "execa": "^9.6.0",
+    "ffmpeg-static": "^5.2.0",
+    "fontfaceobserver": "^2.3.0",
+    "framer-motion": "^11.18.2",
+    "html2canvas-pro": "^1.5.11",
+    "input-otp": "^1.4.2",
+    "ionicons": "^8.0.13",
+    "jszip": "^3.10.1",
+    "konva": "^9.3.22",
+    "langchain": "^0.3.30",
+    "lodash.debounce": "^4.0.8",
+    "lowlight": "^3.3.0",
+    "lucide-react": "^0.525.0",
+    "nanoid": "^5.1.5",
+    "next": "15.5.4",
+    "next-auth": "5.0.0-beta.29",
+    "next-sitemap": "^4.2.3",
+    "next-themes": "^0.4.6",
+    "ollama-ai-provider": "^1.2.0",
+    "pdf-lib": "^1.17.1",
+    "platejs": "^49.2.21",
+    "pptxgenjs": "^4.0.1",
+    "prismjs": "^1.30.0",
+    "prosemirror-commands": "^1.7.1",
+    "prosemirror-history": "^1.4.1",
+    "prosemirror-keymap": "^1.2.3",
+    "prosemirror-markdown": "^1.13.2",
+    "prosemirror-model": "^1.25.1",
+    "prosemirror-schema-basic": "^1.2.4",
+    "prosemirror-schema-list": "^1.5.1",
+    "prosemirror-state": "^1.4.3",
+    "prosemirror-view": "^1.39.3",
+    "re-resizable": "^6.11.2",
+    "react": "18.3.1",
+    "react-calendar": "^6.0.0",
+    "react-colorful": "^5.6.1",
+    "react-day-picker": "^9.9.0",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-dom": "18.3.1",
+    "react-dropzone": "^14.3.8",
+    "react-fontpicker-ts": "^1.2.0",
+    "react-hook-form": "^7.56.4",
+    "react-hot-toast": "^2.6.0",
+    "react-icons": "^4.12.0",
+    "react-icons-picker": "^1.0.9",
+    "react-intersection-observer": "^9.16.0",
+    "react-konva": "^19.0.10",
+    "react-lite-youtube-embed": "^2.5.6",
+    "react-player": "^3.3.3",
+    "react-resizable-panels": "^2.1.9",
+    "react-textarea-autosize": "^8.5.9",
+    "react-tweet": "^3.2.2",
+    "recharts": "^2.15.4",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "resend": "^6.4.0",
+    "sonner": "^1.7.4",
+    "stripe": "^19.1.0",
+    "tailwind-merge": "^2.6.0",
+    "together-ai": "^0.7.0",
+    "uploadthing": "^7.7.2",
+    "use-file-picker": "^2.1.2",
+    "vaul": "^1.1.2",
+    "zod": "^3.25.76",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.5",
+    "@tailwindcss/container-queries": "^0.1.1",
+    "@tailwindcss/typography": "^0.5.16",
+    "@types/lodash.debounce": "^4.0.9",
+    "@types/node": "^20.17.47",
+    "@types/prismjs": "^1.26.5",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@types/webpack": "^5.28.5",
+    "cross-env": "^10.1.0",
+    "postcss": "^8.5.3",
+    "prettier": "^3.5.3",
+    "prettier-plugin-organize-imports": "^4.3.0",
+    "prettier-plugin-tailwindcss": "^0.5.14",
+    "prisma": "^6.13.0",
+    "tailwind-scrollbar": "^4.0.2",
+    "tailwind-scrollbar-hide": "^2.0.0",
+    "tailwindcss": "^3.4.17",
+    "tailwindcss-animate": "^1.0.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
+    "webpack": "^5.97.1"
+  },
+  "pnpm": {
+    "peerDependencyRules": {
+      "allowAny": [
+        "react",
+        "react-dom",
+        "@types/react"
+      ]
+    },
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "@swc/core",
+      "canvas",
+      "core-js",
+      "es5-ext",
+      "esbuild",
+      "msgpackr-extract",
+      "prisma",
+      "protobufjs",
+      "sharp",
+      "unrs-resolver"
+    ]
+  },
+  "packageManager": "pnpm@10.17.0"
+}
+</file>
+
 <file path="src/app/admin/ugc/reaction-avatars/page.tsx">
 "use client";
 
@@ -84002,280 +84137,228 @@ export async function POST(req: Request) {
 }
 </file>
 
-<file path="src/app/layout.tsx">
-import TanstackQueryProvider from "@/components/providers/TanstackQueryProvider";
-import { ToasterProvider } from "@/components/providers/ToasterProvider";
-import NextAuthProvider from "@/provider/NextAuthProvider";
-import { ThemeProvider } from "@/provider/theme-provider";
-import "@/styles/globals.css";
-import { type Metadata } from "next";
-import localFont from "next/font/local";
-import Script from "next/script";
-
-const tiktokSans = localFont({
-  variable: "--font-sans",
-  display: "swap",
-  src: [
-    {
-      path: "../fonts/tiktok/TikTokDisplayRegular.otf",
-      weight: "300",
-      style: "normal",
-    },
-    {
-      path: "../fonts/tiktok/TikTokTextRegular.otf",
-      weight: "400",
-      style: "normal",
-    },
-    {
-      path: "../fonts/tiktok/TikTokTextMedium.otf",
-      weight: "500",
-      style: "normal",
-    },
-    {
-      path: "../fonts/tiktok/TikTokDisplayMedium.otf",
-      weight: "600",
-      style: "normal",
-    },
-    {
-      path: "../fonts/tiktok/TikTokDisplayBold.otf",
-      weight: "700",
-      style: "normal",
-    },
-    {
-      path: "../fonts/tiktok/TikTokTextBold.otf",
-      weight: "800",
-      style: "normal",
-    },
-  ],
-});
-
-export const metadata: Metadata = {
-  metadataBase: new URL("https://slidescockpit.com"),
-  title: "SlidesCockpit - Make TikTok Slides & Automate Marketing",
-  description:
-    "Automated slideshows that drive traffic to your website, app, or business. Generate AI TikToks and create your own gen z marketing team.",
-  alternates: {
-    canonical: "/",
-  },
-  openGraph: {
-    type: "website",
-    url: "https://slidescockpit.com/",
-    siteName: "SlidesCockpit",
-    title: "SlidesCockpit - Make TikTok Slides & Automate Marketing",
-    description:
-      "Automated slideshows that drive traffic to your website, app, or business. Generate AI TikToks and create your own gen z marketing team.",
-    /* Nutze die stabile dynamische OG-Route statt toter PNG-Referenzen */
-    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
-  icons: {
-    icon: "/favicon.ico",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "SlidesCockpit - Make TikTok Slides & Automate Marketing",
-    description:
-      "Automated slideshows that drive traffic to your website, app, or business. Generate AI TikToks and create your own gen z marketing team.",
-    images: ["/opengraph-image"],
-  },
-};
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <meta name="color-scheme" content="light dark" />
-
-        </head>
-      <body
-        className={`${tiktokSans.variable} font-sans antialiased bg-[#F3F4EF]`}
-        suppressHydrationWarning
-      >
-        <TanstackQueryProvider>
-          <NextAuthProvider>
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="light"
-              disableTransitionOnChange
-            >
-              {children}
-              <ToasterProvider />
-            </ThemeProvider>
-          </NextAuthProvider>
-        </TanstackQueryProvider>
-
-        {/* ESM + Fallback */}
-        <Script
-          type="module"
-          src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"
-        />
-        <Script
-          noModule
-          src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"
-        />
-      </body>
-    </html>
-  );
-}
-</file>
-
-<file path="src/components/dashboard/admin/AdminSounds.tsx">
+<file path="src/components/dashboard/account/SettingsDemoVideos.tsx">
 "use client";
-import { useEffect, useState } from "react";
 
-type SoundItem = {
-  key: string;
-  name: string;
-  size: number;
-  ufsUrl?: string;
-  url?: string;
-  coverUrl?: string | null;
-};
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
-export default function AdminSounds() {
-  const [items, setItems] = useState<SoundItem[]>([]);
-  const [sound, setSound] = useState<File | null>(null);
-  const [cover, setCover] = useState<File | null>(null);
-  const [displayName, setDisplayName] = useState<string>("");
-  const [busy, setBusy] = useState(false);
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Spinner } from "@/components/ui/spinner";
+import { useUploadThing } from "@/hooks/globals/useUploadthing";
+import type { DemoVideo } from "@/types/ugc";
+import { ExternalLink, Plus, Trash2, Video } from "lucide-react";
 
-  async function load() {
-    const res = await fetch("/api/ugc/sounds", { cache: "no-store" });
-    const json = await res.json();
-    setItems(json.items ?? []);
-  }
+type DemoState = "idle" | "loading";
+
+export default function SettingsDemoVideos() {
+  const [demos, setDemos] = useState<DemoVideo[]>([]);
+  const [state, setState] = useState<DemoState>("loading");
+  const [uploading, setUploading] = useState(false);
+
+  const { startUpload } = useUploadThing("editorUploader");
+
   useEffect(() => {
-    load();
+    void loadDemos();
   }, []);
 
-  async function handleUpload(e: React.FormEvent) {
-    e.preventDefault();
-    if (!sound) return;
-    setBusy(true);
+  const loadDemos = async () => {
     try {
-      const fd = new FormData();
-      fd.append("sound", sound);
-      if (cover) fd.append("cover", cover);
-      if (displayName.trim()) fd.append("name", displayName.trim());
-      const res = await fetch("/api/admin/ugc/sounds", {
-        method: "POST",
-        body: fd,
-      });
-      if (!res.ok) {
-        let detail = "";
-        try { const j = await res.json(); detail = j?.upstreamBodySnippet || j?.detail || j?.error || ""; } catch {}
-        throw new Error(`Upload failed (${res.status}) ${detail}`.trim());
+      setState("loading");
+      const response = await fetch("/api/ugc/demos");
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to load demo videos");
       }
-      const data = await res.json().catch(() => ({}));
-      await load();
-      setSound(null);
-      setCover(null);
-      setDisplayName("");
-      (document.getElementById("sound-input") as HTMLInputElement | null)
-        ?.value &&
-        ((document.getElementById("sound-input") as HTMLInputElement).value =
-          "");
-      (document.getElementById("cover-input") as HTMLInputElement | null)
-        ?.value &&
-        ((document.getElementById("cover-input") as HTMLInputElement).value =
-          "");
-      alert("Sound (und ggf. Cover) hochgeladen.");
-    } catch (err) {
-      console.error("[AdminSounds] Upload error:", err);
-      alert(err?.message || "Upload failed");
+      const demosData: DemoVideo[] = Array.isArray(data?.demos)
+        ? data.demos
+        : [];
+      setDemos(demosData);
+    } catch (error) {
+      console.error("[SettingsDemoVideos] loadDemos failed", error);
+      toast.error(
+        error instanceof Error ? error.message : "Could not load demo videos",
+      );
     } finally {
-      setBusy(false);
+      setState("idle");
     }
-  }
+  };
+
+  const handleSelectFile = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "video/*";
+    input.onchange = (event) => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      void uploadFileAndCreate(file);
+    };
+    input.click();
+  };
+
+  const uploadFileAndCreate = async (file: File) => {
+    if (!file.type.startsWith("video/")) {
+      toast.error("Please select a video file");
+      return;
+    }
+    try {
+      setUploading(true);
+      const result = await startUpload([file]);
+      const uploadedUrl = result?.[0]?.url ?? result?.[0]?.ufsUrl;
+      if (!uploadedUrl) {
+        throw new Error("Upload failed");
+      }
+      // Save as user demo directly
+      const response = await fetch("/api/ugc/demos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoUrl: uploadedUrl }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to save demo");
+      }
+      toast.success("Demo uploaded successfully");
+      await loadDemos();
+    } catch (error) {
+      console.error("[SettingsDemoVideos] uploadFileAndCreate failed", error);
+      toast.error(error instanceof Error ? error.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (demo: DemoVideo) => {
+    if (!window.confirm(`Delete demo "${demo.name || demo.id}"?`)) return;
+    try {
+      const response = await fetch(`/api/ugc/demos/${demo.id}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "Unable to delete demo");
+      }
+      toast.success("Demo deleted");
+      await loadDemos();
+    } catch (error) {
+      console.error("[SettingsDemoVideos] handleDelete failed", error);
+      toast.error(
+        error instanceof Error ? error.message : "Unable to delete demo",
+      );
+    }
+  };
+
+  const demoCountLabel = useMemo(() => {
+    if (state === "loading") return "Loading...";
+    if (demos.length === 0) return "No demos";
+    return `${demos.length} Demo${demos.length === 1 ? "" : "s"}`;
+  }, [demos.length, state]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold">Sounds</h2>
-      </div>
+    <div className="space-y-6 px-1 sm:px-2 lg:px-0">
+      <Card className="rounded-2xl border bg-card shadow-sm">
+        <CardContent className="p-6 md:p-8">
+          <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <Badge className="border-[#304674]/20 bg-[#304674]/10 px-3 py-1 text-[#304674] cursor-default transition-none">
+              <span className="inline-flex items-center gap-2">
+                <Video className="h-4 w-4" />
+                {demoCountLabel}
+              </span>
+            </Badge>
+          </div>
 
-      <form
-        onSubmit={handleUpload}
-        className="grid gap-3 md:grid-cols-[1fr_auto] items-end"
-      >
-        <div className="grid gap-2">
-          <label className="text-sm font-medium">Name (Anzeige im Auswahl-Pop-up)</label>
-          <input
-            type="text"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="z. B. Chill Vibes 120bpm"
-            className="h-10 rounded-lg border px-3"
-          />
-          <label className="text-sm font-medium">Audio-Datei</label>
-          <input
-            id="sound-input"
-            type="file"
-            accept="audio/*"
-            onChange={(e) => setSound(e.target.files?.[0] ?? null)}
-          />
-          <label className="text-sm font-medium mt-3">
-            Cover-Bild (optional)
-          </label>
-          <input
-            id="cover-input"
-            type="file"
-            accept="image/*"
-            onChange={(e) => setCover(e.target.files?.[0] ?? null)}
-          />
-        </div>
-        <button
-          className="h-10 px-4 rounded-xl bg-primary text-primary-foreground disabled:opacity-60"
-          disabled={busy || !sound}
-        >
-          {busy ? "Lädt…" : "Hochladen"}
-        </button>
-      </form>
-
-      <div className="grid gap-3">
-        {items.map((it) => (
-          <div
-            key={it.key}
-            className="flex items-center justify-between rounded-2xl border p-3"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              {it.coverUrl ? (
-                <img
-                  src={it.coverUrl}
-                  alt=""
-                  className="h-10 w-10 rounded-lg object-cover"
-                />
-              ) : (
-                <div className="h-10 w-10 rounded-lg bg-muted" />
-              )}
-              <div className="min-w-0">
-                <div className="font-medium truncate">{it.name}</div>
-                {/* Größe ausgeblendet (KB-Anzeige entfernt) */}
-              </div>
+          {/* Tile view similar to Hook+Demo (slightly larger) */}
+          {state === "loading" ? (
+            <div className="flex h-28 items-center justify-center">
+              <Spinner className="h-6 w-6" />
             </div>
-            <a
-              href={it.ufsUrl || it.url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary text-sm underline"
-            >
-              Öffnen
-            </a>
-          </div>
-        ))}
-        {items.length === 0 && (
-          <div className="text-sm opacity-70">
-            Noch keine Sounds hochgeladen.
-          </div>
-        )}
-      </div>
+          ) : (
+            <ScrollArea className="h-[340px] sm:h-[380px] rounded-2xl border border-border/50 bg-muted/40">
+              <div className="flex flex-wrap gap-3 p-3">
+                {demos.map((demo) => (
+                  <div
+                    key={demo.id}
+                    className="group relative aspect-[9/16] h-[180px] overflow-hidden rounded-xl border bg-black text-white"
+                    title={demo.name || "Demo"}
+                  >
+                    {/* Thumbnail if available, otherwise dark area */}
+                    {"thumbnailUrl" in demo && (demo as any).thumbnailUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={(demo as any).thumbnailUrl}
+                        alt={demo.name || "Demo"}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xs text-white/70">
+                        Demo
+                      </div>
+                    )}
+
+                    {/* Hover overlay: open & delete */}
+                    <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const target = demo.videoUrl?.startsWith("http")
+                            ? demo.videoUrl
+                            : `${window.location.origin}${
+                                demo.videoUrl?.startsWith("/")
+                                  ? demo.videoUrl
+                                  : `/${demo.videoUrl}`
+                              }`;
+                          window.open(target, "_blank", "noopener,noreferrer");
+                        }}
+                        className="rounded-full"
+                        title="Open in new tab"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDelete(demo)}
+                        className="rounded-full"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Upload placeholder tile */}
+                <button
+                  type="button"
+                  onClick={handleSelectFile}
+                  disabled={uploading}
+                  title="Upload demo"
+                  className="relative aspect-[9/16] h-[180px] rounded-xl border border-dashed border-border/70 bg-background/60 hover:border-foreground/50 hover:bg-background/80 flex items-center justify-center"
+                >
+                  {uploading ? (
+                    <Spinner className="h-6 w-6" />
+                  ) : (
+                    <Plus className="h-7 w-7" />
+                  )}
+                </button>
+              </div>
+            </ScrollArea>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* No second list below the card needed */}
+      {state === "loading" ? (
+        <div className="flex items-center justify-center py-10">
+          <Spinner className="h-8 w-8" />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -85469,239 +85552,6 @@ export function useTikTokDirectPost(
 }
 </file>
 
-<file path="package.json">
-{
-  "name": "presentation",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "build": "next build --turbo",
-    "db:push": "prisma db push",
-    "db:studio": "prisma studio",
-    "dev": "next dev --turbo",
-    "dev:noturbo": "cross-env NEXT_DISABLE_TURBOPACK=1 next dev",
-    "postinstall": "prisma generate",
-    "lint": "biome lint .",
-    "lint:fix": "biome lint --write .",
-    "check": "biome check .",
-    "check:fix": "biome check --write .",
-    "start": "next start",
-    "type": "tsc --noEmit",
-    "postbuild": "next-sitemap"
-  },
-  "dependencies": {
-    "@ai-sdk/openai": "^1.3.23",
-    "@ai-sdk/openai-compatible": "^1.0.19",
-    "@ai-sdk/provider": "1.1.3",
-    "@ai-sdk/provider-utils": "2.2.8",
-    "@ai-sdk/react": "^1.2.12",
-    "@ariakit/react": "^0.4.17",
-    "@auth/prisma-adapter": "^1.6.0",
-    "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/sortable": "^10.0.0",
-    "@dnd-kit/utilities": "^3.2.2",
-    "@emoji-mart/data": "^1.2.1",
-    "@fal-ai/client": "^1.7.2",
-    "@ffmpeg-installer/ffmpeg": "^1.1.0",
-    "@ffprobe-installer/ffprobe": "^2.1.2",
-    "@fortawesome/fontawesome-svg-core": "^6.7.2",
-    "@fortawesome/free-brands-svg-icons": "^6.7.2",
-    "@fortawesome/free-regular-svg-icons": "^6.7.2",
-    "@fortawesome/free-solid-svg-icons": "^6.7.2",
-    "@fortawesome/react-fontawesome": "^0.2.2",
-    "@hookform/resolvers": "^3.10.0",
-    "@platejs/ai": "^49.2.15",
-    "@platejs/autoformat": "^49.0.0",
-    "@platejs/basic-nodes": "^49.0.0",
-    "@platejs/basic-styles": "^49.0.0",
-    "@platejs/callout": "^49.0.0",
-    "@platejs/caption": "^49.0.0",
-    "@platejs/code-block": "^49.0.0",
-    "@platejs/combobox": "^49.0.0",
-    "@platejs/comment": "^49.0.0",
-    "@platejs/date": "^49.0.2",
-    "@platejs/dnd": "^49.2.10",
-    "@platejs/emoji": "^49.0.0",
-    "@platejs/excalidraw": "^49.0.0",
-    "@platejs/floating": "^49.0.0",
-    "@platejs/indent": "^49.0.0",
-    "@platejs/juice": "^49.0.0",
-    "@platejs/layout": "^49.2.1",
-    "@platejs/link": "^49.1.1",
-    "@platejs/list": "^49.2.0",
-    "@platejs/markdown": "^49.2.15",
-    "@platejs/math": "^49.0.0",
-    "@platejs/media": "^49.0.0",
-    "@platejs/mention": "^49.0.0",
-    "@platejs/resizable": "^49.0.0",
-    "@platejs/selection": "^50.2.0",
-    "@platejs/slash-command": "^49.0.0",
-    "@platejs/slate": "^49.2.4",
-    "@platejs/suggestion": "^50.3.3",
-    "@platejs/table": "^49.1.13",
-    "@platejs/toc": "^49.0.0",
-    "@platejs/toggle": "^49.0.0",
-    "@prisma/client": "^6.13.0",
-    "@radix-ui/react-accordion": "^1.2.12",
-    "@radix-ui/react-alert-dialog": "^1.1.14",
-    "@radix-ui/react-aspect-ratio": "^1.1.7",
-    "@radix-ui/react-avatar": "^1.1.10",
-    "@radix-ui/react-checkbox": "^1.3.2",
-    "@radix-ui/react-collapsible": "^1.1.12",
-    "@radix-ui/react-collection": "^1.1.7",
-    "@radix-ui/react-context-menu": "^2.2.15",
-    "@radix-ui/react-dialog": "^1.1.15",
-    "@radix-ui/react-dropdown-menu": "^2.1.16",
-    "@radix-ui/react-hover-card": "^1.1.15",
-    "@radix-ui/react-label": "^2.1.7",
-    "@radix-ui/react-menubar": "^1.1.16",
-    "@radix-ui/react-navigation-menu": "^1.2.14",
-    "@radix-ui/react-popover": "^1.1.15",
-    "@radix-ui/react-primitive": "^2.1.3",
-    "@radix-ui/react-progress": "^1.1.7",
-    "@radix-ui/react-radio-group": "^1.3.7",
-    "@radix-ui/react-scroll-area": "^1.2.10",
-    "@radix-ui/react-select": "^2.2.6",
-    "@radix-ui/react-separator": "^1.1.7",
-    "@radix-ui/react-slider": "^1.3.6",
-    "@radix-ui/react-slot": "^1.2.3",
-    "@radix-ui/react-switch": "^1.2.6",
-    "@radix-ui/react-tabs": "^1.1.13",
-    "@radix-ui/react-toast": "^1.2.15",
-    "@radix-ui/react-toggle": "^1.1.9",
-    "@radix-ui/react-toggle-group": "^1.1.10",
-    "@radix-ui/react-toolbar": "^1.1.10",
-    "@radix-ui/react-tooltip": "^1.2.8",
-    "@reacticons/ionicons": "^7.1.0",
-    "@t3-oss/env-nextjs": "^0.10.1",
-    "@tanstack/react-query": "^5.84.2",
-    "@tavily/core": "^0.5.12",
-    "@uploadthing/react": "^7.3.1",
-    "ai": "^4.3.19",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "cmdk": "^1.1.1",
-    "date-fns": "^3.6.0",
-    "embla-carousel-react": "^8.6.0",
-    "execa": "^9.6.0",
-    "ffmpeg-static": "^5.2.0",
-    "fontfaceobserver": "^2.3.0",
-    "framer-motion": "^11.18.2",
-    "html2canvas-pro": "^1.5.11",
-    "input-otp": "^1.4.2",
-    "ionicons": "^8.0.13",
-    "jszip": "^3.10.1",
-    "konva": "^9.3.22",
-    "langchain": "^0.3.30",
-    "lodash.debounce": "^4.0.8",
-    "lowlight": "^3.3.0",
-    "lucide-react": "^0.525.0",
-    "nanoid": "^5.1.5",
-    "next": "15.5.4",
-    "next-auth": "5.0.0-beta.29",
-    "next-sitemap": "^4.2.3",
-    "next-themes": "^0.4.6",
-    "ollama-ai-provider": "^1.2.0",
-    "pdf-lib": "^1.17.1",
-    "platejs": "^49.2.21",
-    "pptxgenjs": "^4.0.1",
-    "prismjs": "^1.30.0",
-    "prosemirror-commands": "^1.7.1",
-    "prosemirror-history": "^1.4.1",
-    "prosemirror-keymap": "^1.2.3",
-    "prosemirror-markdown": "^1.13.2",
-    "prosemirror-model": "^1.25.1",
-    "prosemirror-schema-basic": "^1.2.4",
-    "prosemirror-schema-list": "^1.5.1",
-    "prosemirror-state": "^1.4.3",
-    "prosemirror-view": "^1.39.3",
-    "re-resizable": "^6.11.2",
-    "react": "18.3.1",
-    "react-calendar": "^6.0.0",
-    "react-colorful": "^5.6.1",
-    "react-day-picker": "^9.9.0",
-    "react-dnd": "^16.0.1",
-    "react-dnd-html5-backend": "^16.0.1",
-    "react-dom": "18.3.1",
-    "react-dropzone": "^14.3.8",
-    "react-fontpicker-ts": "^1.2.0",
-    "react-hook-form": "^7.56.4",
-    "react-hot-toast": "^2.6.0",
-    "react-icons": "^4.12.0",
-    "react-icons-picker": "^1.0.9",
-    "react-intersection-observer": "^9.16.0",
-    "react-konva": "^19.0.10",
-    "react-lite-youtube-embed": "^2.5.6",
-    "react-player": "^3.3.3",
-    "react-resizable-panels": "^2.1.9",
-    "react-textarea-autosize": "^8.5.9",
-    "react-tweet": "^3.2.2",
-    "recharts": "^2.15.4",
-    "remark-gfm": "^4.0.1",
-    "remark-math": "^6.0.0",
-    "resend": "^6.4.0",
-    "sonner": "^1.7.4",
-    "stripe": "^19.1.0",
-    "tailwind-merge": "^2.6.0",
-    "together-ai": "^0.7.0",
-    "uploadthing": "^7.7.2",
-    "use-file-picker": "^2.1.2",
-    "vaul": "^1.1.2",
-    "zod": "^3.25.76",
-    "zustand": "^4.5.7"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.2.5",
-    "@tailwindcss/container-queries": "^0.1.1",
-    "@tailwindcss/typography": "^0.5.16",
-    "@types/lodash.debounce": "^4.0.9",
-    "@types/node": "^20.17.47",
-    "@types/prismjs": "^1.26.5",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@types/webpack": "^5.28.5",
-    "cross-env": "^10.1.0",
-    "postcss": "^8.5.3",
-    "prettier": "^3.5.3",
-    "prettier-plugin-organize-imports": "^4.3.0",
-    "prettier-plugin-tailwindcss": "^0.5.14",
-    "prisma": "^6.13.0",
-    "tailwind-scrollbar": "^4.0.2",
-    "tailwind-scrollbar-hide": "^2.0.0",
-    "tailwindcss": "^3.4.17",
-    "tailwindcss-animate": "^1.0.7",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.2",
-    "webpack": "^5.97.1"
-  },
-  "pnpm": {
-    "peerDependencyRules": {
-      "allowAny": [
-        "react",
-        "react-dom",
-        "@types/react"
-      ]
-    },
-    "onlyBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
-      "@swc/core",
-      "canvas",
-      "core-js",
-      "es5-ext",
-      "esbuild",
-      "msgpackr-extract",
-      "prisma",
-      "protobufjs",
-      "sharp",
-      "unrs-resolver"
-    ]
-  },
-  "packageManager": "pnpm@10.17.0"
-}
-</file>
-
 <file path="src/app/api/tests/tiktok-post/route.ts">
 import { env } from "@/env";
 import { auth } from "@/server/auth";
@@ -86020,6 +85870,161 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+}
+</file>
+
+<file path="src/components/dashboard/admin/AdminSounds.tsx">
+"use client";
+import { useEffect, useState } from "react";
+
+type SoundItem = {
+  key: string;
+  name: string;
+  size: number;
+  ufsUrl?: string;
+  url?: string;
+  coverUrl?: string | null;
+};
+
+export default function AdminSounds() {
+  const [items, setItems] = useState<SoundItem[]>([]);
+  const [sound, setSound] = useState<File | null>(null);
+  const [cover, setCover] = useState<File | null>(null);
+  const [displayName, setDisplayName] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    const res = await fetch("/api/ugc/sounds", { cache: "no-store" });
+    const json = await res.json();
+    setItems(json.items ?? []);
+  }
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function handleUpload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!sound) return;
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("sound", sound);
+      if (cover) fd.append("cover", cover);
+      if (displayName.trim()) fd.append("name", displayName.trim());
+      const res = await fetch("/api/admin/ugc/sounds", {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) {
+        let detail = "";
+        try { const j = await res.json(); detail = j?.upstreamBodySnippet || j?.detail || j?.error || ""; } catch {}
+        throw new Error(`Upload failed (${res.status}) ${detail}`.trim());
+      }
+      const data = await res.json().catch(() => ({}));
+      await load();
+      setSound(null);
+      setCover(null);
+      setDisplayName("");
+      (document.getElementById("sound-input") as HTMLInputElement | null)
+        ?.value &&
+        ((document.getElementById("sound-input") as HTMLInputElement).value =
+          "");
+      (document.getElementById("cover-input") as HTMLInputElement | null)
+        ?.value &&
+        ((document.getElementById("cover-input") as HTMLInputElement).value =
+          "");
+      alert("Sound (und ggf. Cover) hochgeladen.");
+    } catch (err) {
+      console.error("[AdminSounds] Upload error:", err);
+      alert(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold">Sounds</h2>
+      </div>
+
+      <form
+        onSubmit={handleUpload}
+        className="grid gap-3 md:grid-cols-[1fr_auto] items-end"
+      >
+        <div className="grid gap-2">
+          <label className="text-sm font-medium">Name (Anzeige im Auswahl-Pop-up)</label>
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="z. B. Chill Vibes 120bpm"
+            className="h-10 rounded-lg border px-3"
+          />
+          <label className="text-sm font-medium">Audio-Datei</label>
+          <input
+            id="sound-input"
+            type="file"
+            accept="audio/*"
+            onChange={(e) => setSound(e.target.files?.[0] ?? null)}
+          />
+          <label className="text-sm font-medium mt-3">
+            Cover-Bild (optional)
+          </label>
+          <input
+            id="cover-input"
+            type="file"
+            accept="image/*"
+            onChange={(e) => setCover(e.target.files?.[0] ?? null)}
+          />
+        </div>
+        <button
+          className="h-10 px-4 rounded-xl bg-primary text-primary-foreground disabled:opacity-60"
+          disabled={busy || !sound}
+        >
+          {busy ? "Lädt…" : "Hochladen"}
+        </button>
+      </form>
+
+      <div className="grid gap-3">
+        {items.map((it) => (
+          <div
+            key={it.key}
+            className="flex items-center justify-between rounded-2xl border p-3"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              {it.coverUrl ? (
+                <img
+                  src={it.coverUrl}
+                  alt=""
+                  className="h-10 w-10 rounded-lg object-cover"
+                />
+              ) : (
+                <div className="h-10 w-10 rounded-lg bg-muted" />
+              )}
+              <div className="min-w-0">
+                <div className="font-medium truncate">{it.name}</div>
+                {/* Größe ausgeblendet (KB-Anzeige entfernt) */}
+              </div>
+            </div>
+            <a
+              href={it.ufsUrl || it.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary text-sm underline"
+            >
+              Öffnen
+            </a>
+          </div>
+        ))}
+        {items.length === 0 && (
+          <div className="text-sm opacity-70">
+            Noch keine Sounds hochgeladen.
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 </file>
 
@@ -87683,13 +87688,244 @@ export default function SettingsPage() {
 }
 </file>
 
+<file path="src/components/admin/AdminSidebar.tsx">
+"use client";
+
+import { SidebarAccountSection } from "@/components/app-sidebar-account";
+import { SidebarUsageSummary } from "@/components/app-sidebar-usage";
+import { AppLogo } from "@/components/logo/AppLogo";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
+import {
+  Download,
+  EclipseIcon,
+  FileText,
+  Home,
+  Image as ImageIcon,
+  Music,
+  Play,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+import { usePathname } from "next/navigation";
+
+interface SidebarItem {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+}
+
+const homeItems: SidebarItem[] = [
+  {
+    title: "Home",
+    url: "/admin/home",
+    icon: Home,
+  },
+];
+
+const slideshowItems: SidebarItem[] = [
+  {
+    title: "Imagesets",
+    url: "/admin/slideshows/imagesets",
+    icon: ImageIcon,
+  },
+  {
+    title: "Custom Imagesets",
+    url: "/admin/slideshows/custom-imagesets",
+    icon: ImageIcon,
+  },
+  {
+    title: "TikTok Accounts",
+    url: "/admin/slideshow-library/accounts",
+    icon: Users,
+  },
+  {
+    title: "Posts",
+    url: "/admin/slideshow-library/posts",
+    icon: FileText,
+  },
+  {
+    title: "Download",
+    url: "/admin/slideshows/download",
+    icon: Download,
+  },
+];
+
+const avatarItems: SidebarItem[] = [
+  {
+    title: "Templates",
+    url: "/admin/ai-avatars/templates",
+    icon: ImageIcon,
+  },
+];
+
+const ugcItems: SidebarItem[] = [
+  {
+    title: "Reaction Avatars",
+    url: "/admin/ugc/reaction-avatars",
+    icon: Play,
+  },
+  {
+    title: "Sounds",
+    url: "/admin/sounds",
+    icon: Music,
+  },
+];
+
+const landingpageItems: SidebarItem[] = [
+  {
+    title: "Themes",
+    url: "/admin/landing-page/themes",
+    icon: EclipseIcon,
+  },
+];
+
+export function AdminSidebar() {
+  const pathname = usePathname();
+
+  return (
+    <Sidebar>
+      <SidebarContent>
+        <div className="flex items-center justify-center gap-2 py-4">
+          <AppLogo size={32} />
+          <p className="text-lg font-bold">SlidesCockpit</p>
+        </div>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {homeItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname.startsWith(item.url)}
+                  >
+                    <a href={item.url}>
+                      <item.icon className="h-5 w-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Slideshows</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {slideshowItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname.startsWith(item.url)}
+                  >
+                    <a href={item.url}>
+                      <item.icon className="h-5 w-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>AI Avatars</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {avatarItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname.startsWith(item.url)}
+                  >
+                    <a href={item.url}>
+                      <item.icon className="h-5 w-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>UGC</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {ugcItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname === item.url}
+                  >
+                    <a href={item.url}>
+                      <item.icon className="h-5 w-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Landing Page</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {landingpageItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    className="font-semibold"
+                    isActive={pathname.startsWith(item.url)}
+                  >
+                    <a href={item.url}>
+                      <item.icon className="h-5 w-5" />
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter className="space-y-3">
+        <SidebarUsageSummary />
+        <SidebarAccountSection />
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
+</file>
+
 <file path="src/server/ugc/video-composer.ts">
 import { execFile } from "child_process";
 import { randomUUID } from "crypto";
 import fs from "fs";
 import { promises as fsAsync } from "fs";
 import { tmpdir } from "os";
-import { dirname, join } from "path";
+import { dirname, join, basename } from "path";
 import { promisify } from "util";
 
 import { UTFile } from "uploadthing/server";
@@ -87703,23 +87939,63 @@ const requireFromNode = <T>(moduleId: string): T => {
   return nodeRequire(moduleId) as T;
 };
 
+/**
+ * Some Linux images mount node_modules with noexec.
+ * We copy the packaged binary to a temp folder and chmod +x,
+ * then spawn from there.
+ */
+function ensureExecutable(tempKey: "ffmpeg" | "ffprobe", sourcePath: string): string {
+  try {
+    // If it already has execute permission, keep it.
+    fs.accessSync(sourcePath, fs.constants.X_OK);
+    return sourcePath;
+  } catch {
+    // Fall through to copy & chmod.
+  }
+  const fileName = `${tempKey}-${basename(sourcePath)}`;
+  const targetDir = join(tmpdir(), "slidescockpit-binaries");
+  const targetPath = join(targetDir, fileName);
+  try {
+    fs.mkdirSync(targetDir, { recursive: true });
+    // Only copy if not present or size differs
+    let needsCopy = true;
+    try {
+      const [srcStat, dstStat] = [fs.statSync(sourcePath), fs.statSync(targetPath)];
+      if (srcStat.size === dstStat.size) needsCopy = false;
+    } catch {
+      // copy
+    }
+    if (needsCopy) {
+      fs.copyFileSync(sourcePath, targetPath);
+    }
+    fs.chmodSync(targetPath, 0o755);
+    return targetPath;
+  } catch (err) {
+    // As a last resort, return source (may still fail on noexec)
+    console.warn(`[UGC][binaries] Failed to stage ${tempKey} to tmp:`, err);
+    return sourcePath;
+  }
+}
+
 let cachedFfmpegPath: string | null = null;
 let cachedFfprobePath: string | null = null;
 
 const getFfmpegPath = () => {
   if (!cachedFfmpegPath) {
-    cachedFfmpegPath = requireFromNode<{ path: string }>(
+    const pkgPath = requireFromNode<{ path: string }>(
       "@ffmpeg-installer/ffmpeg",
     ).path;
+    cachedFfmpegPath = ensureExecutable("ffmpeg", pkgPath);
   }
   return cachedFfmpegPath;
 };
 
 const getFfprobePath = () => {
   if (!cachedFfprobePath) {
-    cachedFfprobePath = requireFromNode<{ path: string }>(
+    const pkgPath = requireFromNode<{ path: string }>(
       "@ffprobe-installer/ffprobe",
     ).path;
+    cachedFfprobePath = ensureExecutable("ffprobe", pkgPath);
   }
   return cachedFfprobePath;
 };
@@ -88089,10 +88365,9 @@ const uploadBuffer = async (buf: Buffer, key: string, mimeType: string = "video/
   // Sprechender Dateiname + korrekter MIME-Type
   const extension = mimeType === "video/mp4" ? ".mp4" : ".jpg";
   const filename = `${key}${extension}`;
-  const utFile = new File([buf], filename, {
-    type: mimeType,
-    lastModified: Date.now(),
-  });
+  // In Node keine Web-File-API nutzen: UploadThing erwartet UTFile (server)
+  // Buffer -> Uint8Array, damit der Konstruktor sauber typisiert ist
+  const utFile = new UTFile([new Uint8Array(buf)], filename, { type: mimeType });
 
   // Retry mit Exponential Backoff bei Pool/Rate/Server-Fehlern
   const maxAttempts = 5;
@@ -88328,237 +88603,6 @@ export async function composeReactionDemoVideo({
     }
     await fsAsync.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
-}
-</file>
-
-<file path="src/components/admin/AdminSidebar.tsx">
-"use client";
-
-import { SidebarAccountSection } from "@/components/app-sidebar-account";
-import { SidebarUsageSummary } from "@/components/app-sidebar-usage";
-import { AppLogo } from "@/components/logo/AppLogo";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
-import {
-  Download,
-  EclipseIcon,
-  FileText,
-  Home,
-  Image as ImageIcon,
-  Music,
-  Play,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
-import { usePathname } from "next/navigation";
-
-interface SidebarItem {
-  title: string;
-  url: string;
-  icon: LucideIcon;
-}
-
-const homeItems: SidebarItem[] = [
-  {
-    title: "Home",
-    url: "/admin/home",
-    icon: Home,
-  },
-];
-
-const slideshowItems: SidebarItem[] = [
-  {
-    title: "Imagesets",
-    url: "/admin/slideshows/imagesets",
-    icon: ImageIcon,
-  },
-  {
-    title: "Custom Imagesets",
-    url: "/admin/slideshows/custom-imagesets",
-    icon: ImageIcon,
-  },
-  {
-    title: "TikTok Accounts",
-    url: "/admin/slideshow-library/accounts",
-    icon: Users,
-  },
-  {
-    title: "Posts",
-    url: "/admin/slideshow-library/posts",
-    icon: FileText,
-  },
-  {
-    title: "Download",
-    url: "/admin/slideshows/download",
-    icon: Download,
-  },
-];
-
-const avatarItems: SidebarItem[] = [
-  {
-    title: "Templates",
-    url: "/admin/ai-avatars/templates",
-    icon: ImageIcon,
-  },
-];
-
-const ugcItems: SidebarItem[] = [
-  {
-    title: "Reaction Avatars",
-    url: "/admin/ugc/reaction-avatars",
-    icon: Play,
-  },
-  {
-    title: "Sounds",
-    url: "/admin/sounds",
-    icon: Music,
-  },
-];
-
-const landingpageItems: SidebarItem[] = [
-  {
-    title: "Themes",
-    url: "/admin/landing-page/themes",
-    icon: EclipseIcon,
-  },
-];
-
-export function AdminSidebar() {
-  const pathname = usePathname();
-
-  return (
-    <Sidebar>
-      <SidebarContent>
-        <div className="flex items-center justify-center gap-2 py-4">
-          <AppLogo size={32} />
-          <p className="text-lg font-bold">SlidesCockpit</p>
-        </div>
-
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {homeItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname.startsWith(item.url)}
-                  >
-                    <a href={item.url}>
-                      <item.icon className="h-5 w-5" />
-                      <span className="font-semibold">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Slideshows</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {slideshowItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname.startsWith(item.url)}
-                  >
-                    <a href={item.url}>
-                      <item.icon className="h-5 w-5" />
-                      <span className="font-semibold">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>AI Avatars</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {avatarItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname.startsWith(item.url)}
-                  >
-                    <a href={item.url}>
-                      <item.icon className="h-5 w-5" />
-                      <span className="font-semibold">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>UGC</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {ugcItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname === item.url}
-                  >
-                    <a href={item.url}>
-                      <item.icon className="h-5 w-5" />
-                      <span className="font-semibold">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Landing Page</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {landingpageItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname.startsWith(item.url)}
-                  >
-                    <a href={item.url}>
-                      <item.icon className="h-5 w-5" />
-                      <span className="font-semibold">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-
-      <SidebarFooter className="space-y-3">
-        <SidebarUsageSummary />
-        <SidebarAccountSection />
-      </SidebarFooter>
-    </Sidebar>
-  );
 }
 </file>
 
@@ -89680,7 +89724,7 @@ export default function UgcDashboardPage() {
                           <Link
                             href="/dashboard/account/settings#demos"
                             className="relative aspect-[9/16] h-[120px] rounded-xl border border-dashed border-border/70 bg-background/60 hover:border-foreground/50 hover:bg-background/80 flex items-center justify-center"
-                            title="Demo hochladen"
+                            title="Upload demo"
                           >
                             <Plus className="h-6 w-6" />
                           </Link>
@@ -89785,10 +89829,10 @@ export default function UgcDashboardPage() {
                         )}
                       >
                         <span
-                          className="block text-center font-extrabold"
+                          className="block text-center"
                           style={{
-                            fontFamily:
-                              "TikTok Sans, var(--font-sans), sans-serif",
+                            fontFamily: "var(--font-sans), sans-serif",
+                            fontWeight: 800,
                             fontSize: "54px",
                             lineHeight: 1.1,
                             WebkitTextStroke: "3px black",
@@ -90062,9 +90106,6 @@ export default function UgcDashboardPage() {
                 />
               ))}
             </div>
-            <p className="mt-4 text-center text-sm text-muted-foreground">
-              No videos yet — generate your first UGC video above.
-            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">

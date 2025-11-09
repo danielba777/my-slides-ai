@@ -663,10 +663,10 @@ export default function UgcDashboardPage() {
                         )}
                       >
                         <span
-                          className="block text-center font-extrabold"
+                          className="block text-center"
                           style={{
-                            fontFamily:
-                              "TikTok Sans, var(--font-sans), sans-serif",
+                            fontFamily: "var(--font-sans), sans-serif",
+                            fontWeight: 800,
                             fontSize: "54px",
                             lineHeight: 1.1,
                             WebkitTextStroke: "3px black",

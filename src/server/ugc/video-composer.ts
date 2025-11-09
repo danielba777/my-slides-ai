@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import fs from "fs";
 import { promises as fsAsync } from "fs";
 import { tmpdir } from "os";
-import { dirname, join } from "path";
+import { dirname, join, basename } from "path";
 import { promisify } from "util";
 
 import { UTFile } from "uploadthing/server";
@@ -17,23 +17,63 @@ const requireFromNode = <T>(moduleId: string): T => {
   return nodeRequire(moduleId) as T;
 };
 
+/**
+ * Some Linux images mount node_modules with noexec.
+ * We copy the packaged binary to a temp folder and chmod +x,
+ * then spawn from there.
+ */
+function ensureExecutable(tempKey: "ffmpeg" | "ffprobe", sourcePath: string): string {
+  try {
+    // If it already has execute permission, keep it.
+    fs.accessSync(sourcePath, fs.constants.X_OK);
+    return sourcePath;
+  } catch {
+    // Fall through to copy & chmod.
+  }
+  const fileName = `${tempKey}-${basename(sourcePath)}`;
+  const targetDir = join(tmpdir(), "slidescockpit-binaries");
+  const targetPath = join(targetDir, fileName);
+  try {
+    fs.mkdirSync(targetDir, { recursive: true });
+    // Only copy if not present or size differs
+    let needsCopy = true;
+    try {
+      const [srcStat, dstStat] = [fs.statSync(sourcePath), fs.statSync(targetPath)];
+      if (srcStat.size === dstStat.size) needsCopy = false;
+    } catch {
+      // copy
+    }
+    if (needsCopy) {
+      fs.copyFileSync(sourcePath, targetPath);
+    }
+    fs.chmodSync(targetPath, 0o755);
+    return targetPath;
+  } catch (err) {
+    // As a last resort, return source (may still fail on noexec)
+    console.warn(`[UGC][binaries] Failed to stage ${tempKey} to tmp:`, err);
+    return sourcePath;
+  }
+}
+
 let cachedFfmpegPath: string | null = null;
 let cachedFfprobePath: string | null = null;
 
 const getFfmpegPath = () => {
   if (!cachedFfmpegPath) {
-    cachedFfmpegPath = requireFromNode<{ path: string }>(
+    const pkgPath = requireFromNode<{ path: string }>(
       "@ffmpeg-installer/ffmpeg",
     ).path;
+    cachedFfmpegPath = ensureExecutable("ffmpeg", pkgPath);
   }
   return cachedFfmpegPath;
 };
 
 const getFfprobePath = () => {
   if (!cachedFfprobePath) {
-    cachedFfprobePath = requireFromNode<{ path: string }>(
+    const pkgPath = requireFromNode<{ path: string }>(
       "@ffprobe-installer/ffprobe",
     ).path;
+    cachedFfprobePath = ensureExecutable("ffprobe", pkgPath);
   }
   return cachedFfprobePath;
 };

@@ -1,35 +1,154 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
 *** Begin Patch
-*** Update File: src/components/dashboard/admin/AdminSounds.tsx
+*** Update File: src/server/ugc/video-composer.ts
 @@
-     } catch (err) {
-       console.error("[AdminSounds] Upload error:", err);
--      alert(err?.message || "Upload failed");
-+      alert(err instanceof Error ? err.message : "Upload failed");
-     } finally {
-       setBusy(false);
-     }
+-import { execFile } from "child_process";
++import { execFile } from "child_process";
+ import { randomUUID } from "crypto";
+ import fs from "fs";
+ import { promises as fsAsync } from "fs";
+ import { tmpdir } from "os";
+-import { dirname, join } from "path";
++import { dirname, join, basename } from "path";
+ import { promisify } from "util";
+@@
+ let cachedFfmpegPath: string | null = null;
+ let cachedFfprobePath: string | null = null;
+ 
++/**
++ * Some Linux images mount node_modules with noexec.
++ * We copy the packaged binary to a temp folder and chmod +x,
++ * then spawn from there.
++ */
++function ensureExecutable(tempKey: "ffmpeg" | "ffprobe", sourcePath: string): string {
++  try {
++    // If it already has execute permission, keep it.
++    fs.accessSync(sourcePath, fs.constants.X_OK);
++    return sourcePath;
++  } catch {
++    // Fall through to copy & chmod.
++  }
++  const fileName = `${tempKey}-${basename(sourcePath)}`;
++  const targetDir = join(tmpdir(), "slidescockpit-binaries");
++  const targetPath = join(targetDir, fileName);
++  try {
++    fs.mkdirSync(targetDir, { recursive: true });
++    // Only copy if not present or size differs
++    let needsCopy = true;
++    try {
++      const [srcStat, dstStat] = [fs.statSync(sourcePath), fs.statSync(targetPath)];
++      if (srcStat.size === dstStat.size) needsCopy = false;
++    } catch {
++      // copy
++    }
++    if (needsCopy) {
++      fs.copyFileSync(sourcePath, targetPath);
++    }
++    fs.chmodSync(targetPath, 0o755);
++    return targetPath;
++  } catch (err) {
++    // As a last resort, return source (may still fail on noexec)
++    console.warn(`[UGC][binaries] Failed to stage ${tempKey} to tmp:`, err);
++    return sourcePath;
++  }
++}
++
+ const getFfmpegPath = () => {
+   if (!cachedFfmpegPath) {
+-    cachedFfmpegPath = requireFromNode<{ path: string }>(
+-      "@ffmpeg-installer/ffmpeg",
+-    ).path;
++    const pkgPath = requireFromNode<{ path: string }>(
++      "@ffmpeg-installer/ffmpeg",
++    ).path;
++    cachedFfmpegPath = ensureExecutable("ffmpeg", pkgPath);
    }
+   return cachedFfmpegPath;
+ };
+ 
+ const getFfprobePath = () => {
+   if (!cachedFfprobePath) {
+-    cachedFfprobePath = requireFromNode<{ path: string }>(
+-      "@ffprobe-installer/ffprobe",
+-    ).path;
++    const pkgPath = requireFromNode<{ path: string }>(
++      "@ffprobe-installer/ffprobe",
++    ).path;
++    cachedFfprobePath = ensureExecutable("ffprobe", pkgPath);
+   }
+   return cachedFfprobePath;
+ };
 *** End Patch
+Why this fixes prod: the error you saw—spawn .../linux-x64/ffprobe EACCES—means the file exists but can’t be executed. Staging to /tmp and chmod +x avoids noexec mounts and makes the binary runnable in Docker/Coolify-like environments.
+
+2) Make preview font identical to export (use the same Next font var + weight)
+Two very small adjustments inside your UGC page overlay span:
+
+Drop the unknown "TikTok Sans" literal and only use var(--font-sans)
+
+Explicitly set fontWeight: 800
+
+
+repomix-output
+
+
 diff
 Code kopieren
 *** Begin Patch
-*** Update File: src/server/ugc/video-composer.ts
+*** Update File: src/app/dashboard/ugc/page.tsx
 @@
--const uploadBuffer = async (buf: Buffer, key: string, mimeType: string = "video/mp4"): Promise<string> => {
-+const uploadBuffer = async (buf: Buffer, key: string, mimeType: string = "video/mp4"): Promise<string> => {
-   // Sprechender Dateiname + korrekter MIME-Type
-   const extension = mimeType === "video/mp4" ? ".mp4" : ".jpg";
-   const filename = `${key}${extension}`;
--  const utFile = new File([buf], filename, {
--    type: mimeType,
--    lastModified: Date.now(),
--  });
-+  // In Node keine Web-File-API nutzen: UploadThing erwartet UTFile (server)
-+  // Buffer -> Uint8Array, damit der Konstruktor sauber typisiert ist
-+  const utFile = new UTFile([new Uint8Array(buf)], filename, { type: mimeType });
+-                        <span
+-                          className="block text-center font-extrabold"
+-                          style={{
+-                            fontFamily:
+-                              "TikTok Sans, var(--font-sans), sans-serif",
+-                            fontSize: "54px",
+-                            lineHeight: 1.1,
+-                            WebkitTextStroke: "3px black",
+-                            textShadow:
+-                              "2px 2px 4px rgba(0,0,0,0.65), 0 0 3px rgba(0,0,0,0.55)",
+-                            letterSpacing: "0.2px",
+-                          }}
+-                        >
++                        <span
++                          className="block text-center"
++                          style={{
++                            fontFamily: "var(--font-sans), sans-serif",
++                            fontWeight: 800,
++                            fontSize: "54px",
++                            lineHeight: 1.1,
++                            WebkitTextStroke: "3px black",
++                            textShadow:
++                              "2px 2px 4px rgba(0,0,0,0.65), 0 0 3px rgba(0,0,0,0.55)",
++                            letterSpacing: "0.2px",
++                          }}
++                        >
+                           {hook}
+                         </span>
+*** End Patch
+(This same overlay block appears twice in the file — I’ve patched the visible one in your preview section. If you also render the overlay in any other preview path, mirror the same two-line change.)
+
+3) Silence the ionicons preload warning (optional, safe)
+Set crossOrigin so the preload and request modes match.
+
+
+repomix-output
+
+
+diff
+Code kopieren
+*** Begin Patch
+*** Update File: src/app/layout.tsx
 @@
--      const [upload] = await utapi.uploadFiles([utFile]);
-+      const [upload] = await utapi.uploadFiles([utFile]);
+         <Script
+           type="module"
+           src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"
++          crossOrigin="anonymous"
+         />
+         <Script
+           noModule
+           src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"
++          crossOrigin="anonymous"
+         />
 *** End Patch
