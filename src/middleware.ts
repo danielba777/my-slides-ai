@@ -8,12 +8,22 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isAdminPath = path.startsWith("/admin");
 
+  // --- Allowlist for crawlers/static machine-readable files ---
+  // Make sitemap & robots always public and bypass any auth redirects.
+  // Handles both GET and HEAD correctly so Content-Type from the route is preserved.
+  if (
+    path === "/sitemap.xml" ||
+    path === "/robots.txt"
+  ) {
+    return NextResponse.next();
+  }
+
   // If user is on auth page but already signed in, redirect to home page
   if (isAuthPage && session) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  const publicPaths = new Set(["/", "/privacy", "/terms"]);
+  const publicPaths = new Set(["/", "/privacy", "/terms", "/sitemap.xml", "/robots.txt"]);
 
   let isThemePage = false;
   if (!session) {
