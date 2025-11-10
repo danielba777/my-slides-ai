@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 
 import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
+import { DEFAULT_TIKTOK_POST_MODE } from "@/lib/tiktok-post-mode";
 
 export interface TikTokPostPayload {
   openId: string;
@@ -50,7 +51,7 @@ const DEFAULT_FORM_VALUES: TikTokPostPayload = {
   coverIndex: 0,
   photoImages: [],
   autoAddMusic: true,
-  postMode: "MEDIA_UPLOAD",
+  postMode: DEFAULT_TIKTOK_POST_MODE,
 };
 
 export interface UseTikTokPostActionOptions {

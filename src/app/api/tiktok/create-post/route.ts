@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 type TikTokPostMode = "MEDIA_UPLOAD" | "DIRECT_POST" | "INBOX" | "PUBLISH";
 type TikTokPrivacyLevel = "PUBLIC" | "FRIENDS" | "SELF_ONLY";
-type TikTokBrandOption = "YOUR_BRAND" | "BRANDED_CONTENT" | null;
+type TikTokBrandOption = "YOUR_BRAND" | "BRANDED_CONTENT" | "BOTH" | null;
 
 interface TikTokPostRequest {
   caption?: string;
@@ -121,8 +121,13 @@ export async function POST(request: Request) {
       settings.stitch = !body.disableStitch;
     }
     if (body.isCommercialContent) {
-      settings.brandContentToggle = body.brandOption === "BRANDED_CONTENT";
-      settings.brandOrganicToggle = body.brandOption === "YOUR_BRAND";
+      const brandOption = body.brandOption;
+      const brandedContentSelected =
+        brandOption === "BRANDED_CONTENT" || brandOption === "BOTH";
+      const yourBrandSelected =
+        brandOption === "YOUR_BRAND" || brandOption === "BOTH";
+      settings.brandContentToggle = brandedContentSelected;
+      settings.brandOrganicToggle = yourBrandSelected;
     }
 
     const payload = {

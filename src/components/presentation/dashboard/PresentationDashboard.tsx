@@ -2,7 +2,7 @@
 
 import { createEmptyPresentation } from "@/app/_actions/presentation/presentationActions";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -614,9 +614,9 @@ export function PresentationDashboard({
             >
               <div className="flex flex-col gap-4 pr-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4">
-                  <h2 className="text-2xl font-semibold">
+                  <DialogTitle className="text-2xl font-semibold">
                     SlidesCockpit TikTok Library
-                  </h2>
+                  </DialogTitle>
                   <TabsList className="grid w-full grid-cols-2 rounded-lg bg-muted p-1 sm:w-[320px]">
                     <TabsTrigger
                       value="community"

@@ -36,6 +36,11 @@ export const env = createEnv({
         : z.string().optional(),
     SLIDESCOCKPIT_API: z.string().url(),
   },
+  client: {
+    NEXT_PUBLIC_TIKTOK_POST_MODE: z
+      .enum(["inbox", "direct_post"])
+      .default("inbox"),
+  },
 
   runtimeEnv: {
     DATABASE_URL: process.env.DATABASE_URL,
@@ -60,6 +65,7 @@ export const env = createEnv({
     STRIPE_PRICE_UNLIMITED: process.env.STRIPE_PRICE_UNLIMITED,
     STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
     ADMIN_ALLOWED_EMAILS: process.env.ADMIN_ALLOWED_EMAILS,
+    NEXT_PUBLIC_TIKTOK_POST_MODE: process.env.NEXT_PUBLIC_TIKTOK_POST_MODE,
   },
 
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

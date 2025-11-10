@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import toast from "react-hot-toast";
 import { useTikTokAccounts } from "./use-tiktok-accounts";
+import { DEFAULT_TIKTOK_POST_MODE } from "@/lib/tiktok-post-mode";
 
 export interface TikTokDirectPostPayload {
   caption: string;
@@ -17,7 +18,7 @@ export interface TikTokDirectPostPayload {
   disableDuet?: boolean;
   disableStitch?: boolean;
   isCommercialContent?: boolean;
-  brandOption?: "YOUR_BRAND" | "BRANDED_CONTENT" | null;
+  brandOption?: "YOUR_BRAND" | "BRANDED_CONTENT" | "BOTH" | null;
 }
 
 export interface TikTokDirectPostResult {
@@ -58,7 +59,7 @@ const DEFAULT_VALUES: TikTokDirectPostPayload = {
   coverIndex: 0,
   photoImages: [],
   autoAddMusic: true,
-  postMode: "MEDIA_UPLOAD",
+  postMode: DEFAULT_TIKTOK_POST_MODE,
 };
 
 export function useTikTokDirectPost(
