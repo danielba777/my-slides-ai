@@ -9,7 +9,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DummyPost, PostSkeletonGrid } from "@/components/ui/post-skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SimplePagination } from "@/components/ui/simple-pagination";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePresentationState } from "@/states/presentation-state";
@@ -38,6 +40,10 @@ interface TemplatePost {
     slideIndex?: number;
   }>;
 }
+
+const TEMPLATES_PER_PAGE = 56;
+const TEMPLATE_GRID_CLASSNAMES =
+  "grid grid-cols-1 gap-4 content-start sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 3xl:grid-cols-10 pb-4";
 
 export function PresentationDashboard({
   sidebarSide,
@@ -87,11 +93,15 @@ export function PresentationDashboard({
   const [templatePersonalPosts, setTemplatePersonalPosts] = useState<
     TemplatePost[]
   >([]);
-  const [templatesLoaded, setTemplatesLoaded] = useState(false);
+  const [communityPage, setCommunityPage] = useState(1);
+  const [communityTotalPosts, setCommunityTotalPosts] = useState(0);
+  const [communityLoadingState, setCommunityLoadingState] = useState<
+    "idle" | "initial" | "page-change"
+  >("idle");
+  const [isPersonalLoading, setIsPersonalLoading] = useState(false);
   const [templateTab, setTemplateTab] = useState<"community" | "mine">(
     "community",
   );
-  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [generatingPromptForId, setGeneratingPromptForId] = useState<
     string | null
@@ -108,6 +118,29 @@ export function PresentationDashboard({
     [],
   );
   const formatCount = (value: number) => compactFormatter.format(value);
+  const hasLoadedCommunityRef = useRef(false);
+  const hasLoadedPersonalRef = useRef(false);
+  const scrollTemplateModalToTop = useCallback(() => {
+    requestAnimationFrame(() => {
+      if (templateModalBodyRef.current) {
+        templateModalBodyRef.current.scrollTo({
+          top: 0,
+          left: 0,
+          behavior: "auto",
+        });
+      }
+
+      const viewport =
+        templateTab === "community"
+          ? communityViewportRef.current
+          : personalViewportRef.current;
+
+      if (viewport) {
+        viewport.scrollTop = 0;
+        viewport.scrollLeft = 0;
+      }
+    });
+  }, [templateTab]);
 
   useEffect(() => {
     setCurrentPresentation("", "");
@@ -119,62 +152,134 @@ export function PresentationDashboard({
   useEffect(() => {
     if (showTemplates) {
       setTemplateTab("community");
-    }
-  }, [showTemplates]);
-
-  useEffect(() => {
-    if (!showTemplates || templatesLoaded || isLoadingTemplates) {
+      setCommunityPage(1);
       return;
     }
 
-    const fetchTemplates = async () => {
-      try {
-        setIsLoadingTemplates(true);
-        setTemplateError(null);
-        const [communityRes, personalRes] = await Promise.all([
-          fetch("/api/slideshow-library/posts?limit=60"),
-          fetch("/api/slideshow-library/user/posts?limit=120"),
-        ]);
+    hasLoadedCommunityRef.current = false;
+    hasLoadedPersonalRef.current = false;
+    setCommunityLoadingState("idle");
+    setIsPersonalLoading(false);
+    setTemplateError(null);
+  }, [showTemplates]);
 
-        if (!communityRes.ok) {
+  useEffect(() => {
+    if (!showTemplates) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const fetchCommunityPosts = async () => {
+      try {
+        setTemplateError(null);
+        setCommunityLoadingState(
+          hasLoadedCommunityRef.current ? "page-change" : "initial",
+        );
+
+        const params = new URLSearchParams({
+          limit: TEMPLATES_PER_PAGE.toString(),
+          offset: Math.max(
+            0,
+            (communityPage - 1) * TEMPLATES_PER_PAGE,
+          ).toString(),
+        });
+
+        const response = await fetch(
+          `/api/slideshow-library/posts?${params.toString()}`,
+          { cache: "no-store" },
+        );
+
+        if (!response.ok) {
           throw new Error("Prompts konnten nicht geladen werden");
         }
 
-        const communityData = (await communityRes.json()) as TemplatePost[];
-        setTemplateCommunityPosts(
-          Array.isArray(communityData) ? communityData : [],
-        );
+        const communityData = (await response.json()) as TemplateApiResponse;
+        if (isCancelled) return;
 
-        if (personalRes.ok) {
-          const personalData = (await personalRes.json()) as TemplatePost[];
-          setTemplatePersonalPosts(
-            Array.isArray(personalData) ? personalData : [],
-          );
-        } else if (personalRes.status === 401) {
-          setTemplatePersonalPosts([]);
-        } else {
-          const errorText = await personalRes
-            .json()
-            .catch(() => ({}) as { error?: string });
-          console.warn("Failed to load personal posts", errorText);
-          setTemplatePersonalPosts([]);
-        }
-        setTemplatesLoaded(true);
+        const normalized = normalizeTemplatePosts(communityData);
+        setTemplateCommunityPosts(normalized);
+        setCommunityTotalPosts(
+          extractTemplateTotalCount(communityData, normalized.length),
+        );
+        hasLoadedCommunityRef.current = true;
       } catch (error) {
-        console.error("Error fetching templates:", error);
+        if (isCancelled) return;
+        console.error("Error fetching community templates:", error);
         setTemplateError(
           error instanceof Error
             ? error.message
             : "Prompts konnten nicht geladen werden",
         );
-        setTemplatesLoaded(false);
       } finally {
-        setIsLoadingTemplates(false);
+        if (isCancelled) return;
+        setCommunityLoadingState("idle");
       }
     };
 
-    void fetchTemplates();
-  }, [showTemplates, templatesLoaded, isLoadingTemplates]);
+    void fetchCommunityPosts();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [showTemplates, communityPage]);
+
+  useEffect(() => {
+    if (!showTemplates || hasLoadedPersonalRef.current) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const fetchPersonalPosts = async () => {
+      try {
+        setIsPersonalLoading(true);
+        const personalRes = await fetch(
+          "/api/slideshow-library/user/posts?limit=120",
+          { cache: "no-store" },
+        );
+
+        if (!personalRes.ok) {
+          if (personalRes.status === 401) {
+            if (!isCancelled) {
+              setTemplatePersonalPosts([]);
+              hasLoadedPersonalRef.current = true;
+            }
+            return;
+          }
+
+          const errorText = await personalRes
+            .json()
+            .catch(() => ({}) as { error?: string });
+          console.warn("Failed to load personal posts", errorText);
+          throw new Error("Prompts konnten nicht geladen werden");
+        }
+
+        const personalData = (await personalRes.json()) as TemplateApiResponse;
+        if (isCancelled) return;
+
+        setTemplatePersonalPosts(normalizeTemplatePosts(personalData));
+        hasLoadedPersonalRef.current = true;
+      } catch (error) {
+        if (isCancelled) return;
+        console.error("Error fetching personal templates:", error);
+        setTemplateError(
+          error instanceof Error
+            ? error.message
+            : "Prompts konnten nicht geladen werden",
+        );
+      } finally {
+        if (isCancelled) return;
+        setIsPersonalLoading(false);
+      }
+    };
+
+    void fetchPersonalPosts();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [showTemplates]);
   const canGenerate =
     limits?.unlimited ||
     (typeof limits?.slidesLeft === "number" && limits.slidesLeft > 0);
@@ -287,6 +392,7 @@ export function PresentationDashboard({
 
   const communityViewportRef = useRef<HTMLDivElement | null>(null);
   const personalViewportRef = useRef<HTMLDivElement | null>(null);
+  const templateModalBodyRef = useRef<HTMLDivElement | null>(null);
 
   const sortedCommunityPosts = useMemo(
     () => sortPosts(templateCommunityPosts),
@@ -296,25 +402,54 @@ export function PresentationDashboard({
     () => sortPosts(templatePersonalPosts),
     [sortPosts, templatePersonalPosts],
   );
+  const communityPostsWithDummies = useMemo(
+    () =>
+      withDummyTemplates(
+        sortedCommunityPosts,
+        TEMPLATES_PER_PAGE,
+        `community-${communityPage}`,
+      ),
+    [sortedCommunityPosts, communityPage],
+  );
+  const personalPostsWithDummies = useMemo(
+    () => withDummyTemplates(sortedPersonalPosts, TEMPLATES_PER_PAGE, "mine"),
+    [sortedPersonalPosts],
+  );
+  const communityTotalPages = useMemo(() => {
+    const totalCount =
+      communityTotalPosts > 0
+        ? communityTotalPosts
+        : sortedCommunityPosts.length;
+    const pages = Math.ceil(totalCount / TEMPLATES_PER_PAGE);
+    return Math.max(1, pages || 1);
+  }, [communityTotalPosts, sortedCommunityPosts.length]);
+
+  const handleCommunityPageChange = (page: number) => {
+    if (
+      page < 1 ||
+      page > communityTotalPages ||
+      page === communityPage ||
+      communityLoadingState !== "idle"
+    ) {
+      return;
+    }
+    scrollTemplateModalToTop();
+    setCommunityPage(page);
+  };
 
   useEffect(() => {
     if (!showTemplates) return;
+    scrollTemplateModalToTop();
+  }, [
+    showTemplates,
+    templateTab,
+    sortedCommunityPosts,
+    sortedPersonalPosts,
+    scrollTemplateModalToTop,
+  ]);
 
-    const viewport =
-      templateTab === "community"
-        ? communityViewportRef.current
-        : personalViewportRef.current;
-
-    if (!viewport) return;
-
-    requestAnimationFrame(() => {
-      viewport.scrollTop = 0;
-      viewport.scrollLeft = 0;
-    });
-  }, [showTemplates, templateTab, sortedCommunityPosts, sortedPersonalPosts]);
-
-  const renderTemplateSection = (
-    posts: TemplatePost[],
+  const renderTemplateGrid = (
+    posts: TemplateGridItem[],
     emptyMessage: string,
     section: "community" | "mine",
   ) => {
@@ -333,10 +468,20 @@ export function PresentationDashboard({
         }
         className="h-full max-h-full pr-0 overscroll-contain scrollbar-hide"
       >
-        <div className="grid grid-cols-1 gap-4 content-start sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 3xl:grid-cols-10 pb-4">
+        <div className={TEMPLATE_GRID_CLASSNAMES}>
           {posts.map((post) => {
-            const primarySlide =
-              post.slides?.find((slide) => slide.imageUrl)?.imageUrl ?? null;
+            if ("isDummy" in post && post.isDummy) {
+              return (
+                <div key={post.id} className="flex flex-col gap-2">
+                  <DummyPost aspectClassName="aspect-[3/4]" />
+                  <div className="h-10 w-full rounded-lg border border-dashed border-muted-foreground/30 bg-muted/20" />
+                </div>
+              );
+            }
+
+            const primarySlide = isTemplatePost(post)
+              ? post.slides?.find((slide) => slide.imageUrl)?.imageUrl ?? null
+              : post.slides?.find((slide) => slide.imageUrl)?.imageUrl ?? null;
             const isGenerating = generatingPromptForId === post.id;
 
             return (
@@ -359,11 +504,11 @@ export function PresentationDashboard({
                         <div className="flex flex-col items-start gap-1 text-xs font-medium text-white">
                           <span className="flex items-center gap-1">
                             <PlayIcon className="h-3.5 w-3.5" />
-                            {formatCount(post.viewCount)} Views
+                            {formatCount(isTemplatePost(post) ? post.viewCount : (post.viewCount ?? 0))} Views
                           </span>
                           <span className="flex items-center gap-1">
                             <HeartIcon className="h-3.5 w-3.5" />
-                            {formatCount(post.likeCount)} Likes
+                            {formatCount(isTemplatePost(post) ? post.likeCount : (post.likeCount ?? 0))} Likes
                           </span>
                         </div>
                       </div>
@@ -375,7 +520,7 @@ export function PresentationDashboard({
                   type="button"
                   variant="outline"
                   className="w-full gap-2 border-2 border-zinc-900"
-                  onClick={() => handleGeneratePrompt(post.id, post.slides)}
+                  onClick={() => handleGeneratePrompt(post.id, isTemplatePost(post) ? post.slides : (post.slides ?? []))}
                   disabled={isGenerating}
                 >
                   {isGenerating ? (
@@ -440,7 +585,10 @@ export function PresentationDashboard({
 
       <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
         <DialogContent className="!max-w-none w-[98vw] h-[95vh] max-w-[98vw] max-h-[95vh] p-0 overflow-hidden flex flex-col m-auto rounded-xl shadow-xl border border-border/20">
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 overscroll-contain scrollbar-hide">
+          <div
+            ref={templateModalBodyRef}
+            className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 overscroll-contain scrollbar-hide"
+          >
             <Tabs
               value={templateTab}
               onValueChange={(value) =>
@@ -492,28 +640,59 @@ export function PresentationDashboard({
                 </DropdownMenu>
               </div>
 
-              {isLoadingTemplates ? (
-                <div className="flex flex-1 items-center justify-center">
-                  <Spinner className="h-8 w-8" />
-                </div>
-              ) : templateError ? (
+              {templateError ? (
                 <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
                   {templateError}
                 </div>
               ) : (
                 <>
                   <TabsContent value="community" className="mt-4 min-h-0">
-                    {renderTemplateSection(
-                      sortedCommunityPosts,
-                      "Keine Community-Posts vorhanden.",
-                      "community",
+                    {communityLoadingState !== "idle" ? (
+                      <PostSkeletonGrid
+                        gridClassName={TEMPLATE_GRID_CLASSNAMES}
+                        aspectClassName="aspect-[3/4]"
+                        count={TEMPLATES_PER_PAGE}
+                        showButton
+                      />
+                    ) : sortedCommunityPosts.length === 0 ? (
+                      <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                        Keine Community-Posts vorhanden.
+                      </div>
+                    ) : (
+                      <>
+                        {renderTemplateGrid(
+                          communityPostsWithDummies,
+                          "Keine Community-Posts vorhanden.",
+                          "community",
+                        )}
+                        {communityTotalPages > 1 && (
+                          <SimplePagination
+                            currentPage={communityPage}
+                            totalPages={communityTotalPages}
+                            onPageChange={handleCommunityPageChange}
+                            className="mt-6"
+                          />
+                        )}
+                      </>
                     )}
                   </TabsContent>
                   <TabsContent value="mine" className="mt-4 min-h-0">
-                    {renderTemplateSection(
-                      sortedPersonalPosts,
-                      "Du hast noch keine Posts gespeichert.",
-                      "mine",
+                    {isPersonalLoading ? (
+                      <PostSkeletonGrid
+                        gridClassName={TEMPLATE_GRID_CLASSNAMES}
+                        aspectClassName="aspect-[3/4]"
+                        count={TEMPLATES_PER_PAGE}
+                      />
+                    ) : sortedPersonalPosts.length === 0 ? (
+                      <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                        Du hast noch keine Posts gespeichert.
+                      </div>
+                    ) : (
+                      renderTemplateGrid(
+                        personalPostsWithDummies,
+                        "Du hast noch keine Posts gespeichert.",
+                        "mine",
+                      )
                     )}
                   </TabsContent>
                 </>
@@ -524,6 +703,93 @@ export function PresentationDashboard({
       </Dialog>
     </div>
   );
+}
+
+type TemplateApiResponse =
+  | TemplatePost[]
+  | {
+      posts?: TemplatePost[];
+      totalCount?: number;
+    };
+
+type DummyTemplatePost = {
+  id: string;
+  isDummy: true;
+  slides?: Array<{
+    id: string;
+    imageUrl: string;
+    slideIndex?: number;
+  }>;
+  viewCount?: number;
+  likeCount?: number;
+};
+
+type TemplateGridItem = TemplatePost | DummyTemplatePost;
+
+function isTemplatePost(post: TemplateGridItem): post is TemplatePost {
+  return !('isDummy' in post && post.isDummy);
+}
+
+function normalizeTemplatePosts(
+  data: TemplateApiResponse | null,
+): TemplatePost[] {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (data && Array.isArray(data.posts)) {
+    return data.posts;
+  }
+
+  return [];
+}
+
+function extractTemplateTotalCount(
+  data: TemplateApiResponse | null,
+  fallbackLength: number,
+): number {
+  if (!data) {
+    return fallbackLength;
+  }
+
+  if (Array.isArray(data)) {
+    return data.length || fallbackLength;
+  }
+
+  if (typeof data.totalCount === "number") {
+    return data.totalCount;
+  }
+
+  if (Array.isArray(data.posts)) {
+    return data.posts.length;
+  }
+
+  return fallbackLength;
+}
+
+function withDummyTemplates(
+  posts: TemplatePost[],
+  minimumCount: number,
+  seed: string,
+): TemplateGridItem[] {
+  if (posts.length === 0) {
+    return [];
+  }
+
+  if (posts.length >= minimumCount) {
+    return posts;
+  }
+
+  const dummyCount = minimumCount - posts.length;
+  const dummies: DummyTemplatePost[] = Array.from(
+    { length: dummyCount },
+    (_, index) => ({
+      id: `${seed}-dummy-${index}`,
+      isDummy: true,
+    }),
+  );
+
+  return [...posts, ...dummies];
 }
 
 function derivePresentationTitleFromPrompt(prompt: string): string {
