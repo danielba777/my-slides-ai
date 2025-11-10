@@ -120,8 +120,8 @@ export default function DashboardHome() {
   const [promptDraft, setPromptDraft] = useState("");
   const [isSavingPrompt, setIsSavingPrompt] = useState(false);
   const [sortOption, setSortOption] = useState<
-    "views-desc" | "views-asc" | "likes-desc" | "likes-asc" | "random"
-  >("random");
+    "views-desc" | "views-asc" | "likes-desc" | "likes-asc"
+  >("likes-desc");
   const pageTopRef = useRef<HTMLDivElement | null>(null);
   const hasPaginatedRef = useRef(false);
 
@@ -137,9 +137,8 @@ export default function DashboardHome() {
         }
 
         const offset = (currentPage - 1) * POSTS_PER_PAGE;
-        const shuffle = sortOption === "random" ? "true" : "false";
         const response = await fetch(
-          `/api/slideshow-library/posts?limit=${POSTS_PER_PAGE}&offset=${offset}&shuffle=${shuffle}`,
+          `/api/slideshow-library/posts?limit=${POSTS_PER_PAGE}&offset=${offset}`,
         );
         if (!response.ok) {
           throw new Error("Failed to load slideshow posts");
@@ -205,11 +204,6 @@ export default function DashboardHome() {
       viewCount: post.viewCount,
       imageUrl: post.slides?.[0]?.imageUrl ?? null,
     }));
-
-    // If sortOption is "random", return posts as-is since they're already randomized by the database
-    if (sortOption === "random") {
-      return mapped;
-    }
 
     switch (sortOption) {
       case "views-asc":
@@ -630,13 +624,22 @@ export default function DashboardHome() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
-                onClick={() => setSortOption("random")}
+                onClick={() => setSortOption("likes-desc")}
                 className={cn(
-                  sortOption === "random" &&
+                  sortOption === "likes-desc" &&
                     "bg-primary/10 text-primary font-medium",
                 )}
               >
-                Random
+                Likes (Most)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setSortOption("likes-asc")}
+                className={cn(
+                  sortOption === "likes-asc" &&
+                    "bg-primary/10 text-primary font-medium",
+                )}
+              >
+                Likes (Least)
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => setSortOption("views-desc")}
@@ -655,24 +658,6 @@ export default function DashboardHome() {
                 )}
               >
                 Views (Least)
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setSortOption("likes-desc")}
-                className={cn(
-                  sortOption === "likes-desc" &&
-                    "bg-primary/10 text-primary font-medium",
-                )}
-              >
-                Likes (Most)
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setSortOption("likes-asc")}
-                className={cn(
-                  sortOption === "likes-asc" &&
-                    "bg-primary/10 text-primary font-medium",
-                )}
-              >
-                Likes (Least)
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

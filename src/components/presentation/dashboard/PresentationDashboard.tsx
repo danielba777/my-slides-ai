@@ -108,7 +108,7 @@ export function PresentationDashboard({
   >(null);
   const [sortBy, setSortBy] = useState<
     "views-most" | "views-least" | "likes-most" | "likes-least"
-  >("views-most");
+  >("likes-most");
   const compactFormatter = useMemo(
     () =>
       new Intl.NumberFormat("en", {
@@ -480,8 +480,9 @@ export function PresentationDashboard({
             }
 
             const primarySlide = isTemplatePost(post)
-              ? post.slides?.find((slide) => slide.imageUrl)?.imageUrl ?? null
-              : post.slides?.find((slide) => slide.imageUrl)?.imageUrl ?? null;
+              ? (post.slides?.find((slide) => slide.imageUrl)?.imageUrl ?? null)
+              : (post.slides?.find((slide) => slide.imageUrl)?.imageUrl ??
+                null);
             const isGenerating = generatingPromptForId === post.id;
 
             return (
@@ -504,11 +505,21 @@ export function PresentationDashboard({
                         <div className="flex flex-col items-start gap-1 text-xs font-medium text-white">
                           <span className="flex items-center gap-1">
                             <PlayIcon className="h-3.5 w-3.5" />
-                            {formatCount(isTemplatePost(post) ? post.viewCount : (post.viewCount ?? 0))} Views
+                            {formatCount(
+                              isTemplatePost(post)
+                                ? post.viewCount
+                                : (post.viewCount ?? 0),
+                            )}{" "}
+                            Views
                           </span>
                           <span className="flex items-center gap-1">
                             <HeartIcon className="h-3.5 w-3.5" />
-                            {formatCount(isTemplatePost(post) ? post.likeCount : (post.likeCount ?? 0))} Likes
+                            {formatCount(
+                              isTemplatePost(post)
+                                ? post.likeCount
+                                : (post.likeCount ?? 0),
+                            )}{" "}
+                            Likes
                           </span>
                         </div>
                       </div>
@@ -520,7 +531,12 @@ export function PresentationDashboard({
                   type="button"
                   variant="outline"
                   className="w-full gap-2 border-2 border-zinc-900"
-                  onClick={() => handleGeneratePrompt(post.id, isTemplatePost(post) ? post.slides : (post.slides ?? []))}
+                  onClick={() =>
+                    handleGeneratePrompt(
+                      post.id,
+                      isTemplatePost(post) ? post.slides : (post.slides ?? []),
+                    )
+                  }
                   disabled={isGenerating}
                 >
                   {isGenerating ? (
@@ -584,7 +600,7 @@ export function PresentationDashboard({
       </div>
 
       <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
-        <DialogContent className="!max-w-none w-[98vw] h-[95vh] max-w-[98vw] max-h-[95vh] p-0 overflow-hidden flex flex-col m-auto rounded-xl shadow-xl border border-border/20">
+        <DialogContent className="!max-w-none w-[98vw] h-[95vh] max-h-[95vh] p-0 overflow-hidden flex flex-col m-auto rounded-xl shadow-xl border border-border/20">
           <div
             ref={templateModalBodyRef}
             className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 overscroll-contain scrollbar-hide"
@@ -624,17 +640,17 @@ export function PresentationDashboard({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setSortBy("views-most")}>
-                      Views (Most)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setSortBy("views-least")}>
-                      Views (Least)
-                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setSortBy("likes-most")}>
                       Likes (Most)
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setSortBy("likes-least")}>
                       Likes (Least)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy("views-most")}>
+                      Views (Most)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy("views-least")}>
+                      Views (Least)
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -727,7 +743,7 @@ type DummyTemplatePost = {
 type TemplateGridItem = TemplatePost | DummyTemplatePost;
 
 function isTemplatePost(post: TemplateGridItem): post is TemplatePost {
-  return !('isDummy' in post && post.isDummy);
+  return !("isDummy" in post && post.isDummy);
 }
 
 function normalizeTemplatePosts(
