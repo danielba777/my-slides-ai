@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ComponentProps } from "react";
+import { useEffect, type ChangeEvent, type ComponentProps } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -12,6 +12,8 @@ import { type UseTikTokPostActionResult } from "@/hooks/use-tiktok-post-action";
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
 import toast from "react-hot-toast";
+
+const CAPTION_LIMIT = 4000;
 
 interface TikTokPostFormProps {
   action: UseTikTokPostActionResult;
@@ -94,6 +96,13 @@ export function TikTokPostForm({
       toast.error(`Posting restricted: ${postLimitReason}`);
     }
   }, [postLimitReason]);
+
+  const captionCharCount = form.caption.length;
+
+  const handleCaptionChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    const limitedValue = event.target.value.slice(0, CAPTION_LIMIT);
+    updateField("caption", limitedValue);
+  };
 
   return (
     <Card
@@ -189,21 +198,27 @@ export function TikTokPostForm({
             id="caption"
             placeholder="Write the TikTok caption…"
             value={form.caption}
-            onChange={(event) => updateField("caption", event.target.value)}
+            onChange={handleCaptionChange}
             rows={10}
             className="bg-white"
           />
+          <p
+            className={cn(
+              "text-xs text-right",
+              captionCharCount > CAPTION_LIMIT ? "text-destructive" : "text-muted-foreground",
+            )}
+          >
+            {captionCharCount}/{CAPTION_LIMIT}
+          </p>
         </div>
 
         {/* TikTok Config Section */}
         <TikTokConfig
           title={form.title || ""}
           autoAddMusic={form.autoAddMusic ?? true}
-          postMode={form.postMode === "DIRECT_POST" ? "direct_post" : "inbox"}
           openId={form.openId}
           onTitleChange={(title) => updateField("title", title)}
           onAutoAddMusicChange={(autoAddMusic) => updateField("autoAddMusic", autoAddMusic)}
-          onPostModeChange={(postMode) => updateField("postMode", postMode === "direct_post" ? "DIRECT_POST" : "MEDIA_UPLOAD")}
           onMetadataChange={(metadata) => {
             // Store metadata in a global state for later use in submission
             // This will be accessed by the parent component during post submission

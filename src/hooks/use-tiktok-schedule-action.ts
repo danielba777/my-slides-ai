@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 
 import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
+import { DEFAULT_TIKTOK_POST_MODE } from "@/lib/tiktok-post-mode";
 
 export interface TikTokSchedulePayload {
   openId: string;
@@ -68,7 +69,7 @@ const DEFAULT_SCHEDULE_VALUES: TikTokSchedulePayload = {
   publishAt: createDefaultPublishAt(),
   idempotencyKey: `schedule_${Date.now()}`,
   autoAddMusic: true,
-  postMode: "MEDIA_UPLOAD",
+  postMode: DEFAULT_TIKTOK_POST_MODE,
 };
 
 export function useTikTokScheduleAction(
@@ -207,7 +208,7 @@ export function useTikTokScheduleAction(
       idempotencyKey: form.idempotencyKey,
       post: {
         caption: form.caption,
-        postMode: "MEDIA_UPLOAD" as const,
+        postMode: DEFAULT_TIKTOK_POST_MODE,
         media: orderedImages.map((url) => ({ type: "photo" as const, url })),
         settings: {
           contentPostingMethod: "URL" as const,

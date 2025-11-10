@@ -100,7 +100,7 @@ export function PostCollectionsClient() {
     void loadPosts();
   }, [loadPosts]);
 
-  const [sortOption, setSortOption] = useState<SortOption>("views-desc");
+  const [sortOption, setSortOption] = useState<SortOption>("likes-desc");
 
   const cardItems = useMemo(
     () =>
@@ -205,24 +205,6 @@ export function PostCollectionsClient() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
-                onClick={() => setSortOption("views-desc")}
-                className={cn(
-                  sortOption === "views-desc" &&
-                    "bg-primary/10 text-primary font-medium",
-                )}
-              >
-                Views (Most)
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setSortOption("views-asc")}
-                className={cn(
-                  sortOption === "views-asc" &&
-                    "bg-primary/10 text-primary font-medium",
-                )}
-              >
-                Views (Least)
-              </DropdownMenuItem>
-              <DropdownMenuItem
                 onClick={() => setSortOption("likes-desc")}
                 className={cn(
                   sortOption === "likes-desc" &&
@@ -239,6 +221,24 @@ export function PostCollectionsClient() {
                 )}
               >
                 Likes (Least)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setSortOption("views-desc")}
+                className={cn(
+                  sortOption === "views-desc" &&
+                    "bg-primary/10 text-primary font-medium",
+                )}
+              >
+                Views (Most)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setSortOption("views-asc")}
+                className={cn(
+                  sortOption === "views-asc" &&
+                    "bg-primary/10 text-primary font-medium",
+                )}
+              >
+                Views (Least)
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

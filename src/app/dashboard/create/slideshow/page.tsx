@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { TikTokPostForm } from "@/components/tiktok/TikTokPostForm";
 import { TikTokScheduleForm } from "@/components/tiktok/TikTokScheduleForm";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTikTokDirectPost } from "@/hooks/use-tiktok-direct-post";
 import { useTikTokScheduleAction } from "@/hooks/use-tiktok-schedule-action";
 import { useSlideshowPostState } from "@/states/slideshow-post-state";
@@ -17,6 +18,9 @@ import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 import { TikTokPostingLoader } from "@/components/tiktok/TikTokPostingLoader";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
+
+const MUSIC_USAGE_URL = "https://www.tiktok.com/legal/page/global/music-usage-confirmation/en";
+const BRANDED_CONTENT_URL = "https://www.tiktok.com/legal/page/global/bc-policy/en";
 
 export default function CreateSlideshowPostPage() {
   const router = useRouter();
@@ -62,6 +66,8 @@ export default function CreateSlideshowPostPage() {
 
   // Check if metadata is valid (privacy level selected)
   const [isMetadataValid, setIsMetadataValid] = useState(true);
+  const [privacySelectionMissing, setPrivacySelectionMissing] = useState(true);
+  const [brandDisclosureMissing, setBrandDisclosureMissing] = useState(false);
 
   const missingPreparationToastShown = useRef(false);
   const noAccountsToastShown = useRef(false);
@@ -69,15 +75,27 @@ export default function CreateSlideshowPostPage() {
 
   // Update metadata validity when global state changes
   useEffect(() => {
-    const checkMetadataValid = () => {
-      const valid = typeof window !== 'undefined' ?
-        ((window as any).__tiktokMetadataValid !== false) : true;
-      setIsMetadataValid(valid);
+    const checkMetadataStatus = () => {
+      let privacyMissing = true;
+      let needsDisclosure = false;
+      let metadata: any = null;
+
+      if (typeof window !== "undefined") {
+        const globalWindow = window as any;
+        metadata = globalWindow.__tiktokMetadata ?? null;
+        privacyMissing = !(metadata && metadata.privacyLevel);
+        needsDisclosure = Boolean(metadata?.isCommercialContent && !metadata?.brandOption);
+      }
+
+      setTiktokMetadata(metadata);
+      setPrivacySelectionMissing(privacyMissing);
+      setBrandDisclosureMissing(needsDisclosure);
+      setIsMetadataValid(!privacyMissing && !needsDisclosure);
     };
 
-    checkMetadataValid();
+    checkMetadataStatus();
     // Set up interval to check for changes
-    const interval = setInterval(checkMetadataValid, 100);
+    const interval = setInterval(checkMetadataStatus, 100);
     return () => clearInterval(interval);
   }, []);
   useEffect(() => {
@@ -128,6 +146,81 @@ export default function CreateSlideshowPostPage() {
 
   const isPosting = directPostAction.submitting;
   const isScheduling = scheduleAction.submitting;
+  const captionMissing = !directPostAction.form.caption.trim();
+  const primaryActionLabel = scheduleEnabled
+    ? isScheduling
+      ? "Scheduling…"
+      : "Schedule Now"
+    : isPosting
+      ? "Posting…"
+      : "Post Now";
+  const primaryActionDisabledReason = (() => {
+    if (finalizing) return "Finishing up your previous action. Please wait.";
+    if (isPosting) return "Posting in progress…";
+    if (isScheduling) return "Scheduling in progress…";
+    if (accountsLoading) return "Loading TikTok accounts…";
+    if (accounts.length === 0) return "Connect at least one TikTok account.";
+    if (!directPostAction.form.openId) return "Select a TikTok account before posting.";
+    if (directPostAction.form.photoImages.length === 0) return "Add at least one slide image.";
+    if (captionMissing) return "Please enter a caption before posting.";
+    if (scheduleEnabled && !scheduledAt) return "Choose when to publish this scheduled post.";
+    if (privacySelectionMissing) return "Please select who can see this post.";
+    if (brandDisclosureMissing) {
+      return "You need to indicate if your content promotes yourself, a third party, or both.";
+    }
+    if (!isMetadataValid) return "Complete the TikTok configuration before posting.";
+    return null;
+  })();
+  const isPrimaryActionDisabled = Boolean(primaryActionDisabledReason);
+  const primaryActionTooltip = isPrimaryActionDisabled ? primaryActionDisabledReason : null;
+  const complianceMessage = useMemo(() => {
+    if (!tiktokMetadata || !tiktokMetadata.isCommercialContent) {
+      return null;
+    }
+    const brandOption = tiktokMetadata.brandOption;
+    if (brandOption === "BRANDED_CONTENT" || brandOption === "BOTH") {
+      return (
+        <>
+          By posting, you agree to TikTok&apos;s{" "}
+          <a
+            href={BRANDED_CONTENT_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sky-500 underline"
+          >
+            Branded Content Policy
+          </a>{" "}
+          and{" "}
+          <a
+            href={MUSIC_USAGE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sky-500 underline"
+          >
+            Music Usage Confirmation
+          </a>
+          .
+        </>
+      );
+    }
+    if (brandOption === "YOUR_BRAND") {
+      return (
+        <>
+          By posting, you agree to TikTok&apos;s{" "}
+          <a
+            href={MUSIC_USAGE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sky-500 underline"
+          >
+            Music Usage Confirmation
+          </a>
+          .
+        </>
+      );
+    }
+    return null;
+  }, [tiktokMetadata]);
 
   const handlePrimaryAction = async () => {
     if (scheduleEnabled && !scheduledAt) {
@@ -432,29 +525,42 @@ export default function CreateSlideshowPostPage() {
                 </div>
               )}
 
-              <Button
-                size="lg"
-                onClick={() => void handlePrimaryAction()}
-                disabled={
-                  isPosting ||
-                  isScheduling ||
-                  accountsLoading ||
-                  accounts.length === 0 ||
-                  !directPostAction.form.openId ||
-                  finalizing ||
-                  (scheduleEnabled && !scheduledAt) ||
-                  directPostAction.form.photoImages.length === 0 ||
-                  !isMetadataValid
-                }
-              >
-                {scheduleEnabled
-                  ? isScheduling
-                    ? "Scheduling…"
-                    : "Schedule Now"
-                  : isPosting
-                    ? "Posting…"
-                    : "Post Now"}
-              </Button>
+              {complianceMessage && (
+                <p className="text-xs text-muted-foreground">
+                  {complianceMessage}
+                </p>
+              )}
+
+              {primaryActionTooltip ? (
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="block w-full">
+                        <Button
+                          size="lg"
+                          className="w-full"
+                          onClick={() => void handlePrimaryAction()}
+                          disabled={isPrimaryActionDisabled}
+                        >
+                          {primaryActionLabel}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-center">
+                      {primaryActionTooltip}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <Button
+                  size="lg"
+                  className="w-full"
+                  onClick={() => void handlePrimaryAction()}
+                  disabled={isPrimaryActionDisabled}
+                >
+                  {primaryActionLabel}
+                </Button>
+              )}
             </div>
           </aside>
         </div>
