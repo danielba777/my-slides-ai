@@ -80,6 +80,8 @@ export default function PresentationGenerateWithIdPage() {
   const {
     setCurrentPresentation,
     setPresentationInput,
+    imageSource,
+    imageSetId: selectedImageSetId,
     isGeneratingPresentation,
     isGeneratingOutline,
     setOutline,
@@ -351,7 +353,7 @@ export default function PresentationGenerateWithIdPage() {
           ? applyBackgroundImageToCanvas(canvasDoc, imageUrl)
           : canvasDoc;
 
-        return {
+        const slideToPush = {
           id: nanoid(),
           content: [paragraph],
           bgColor: canvasWithBg.bg ?? undefined,
@@ -359,14 +361,30 @@ export default function PresentationGenerateWithIdPage() {
             ? { x: firstTextNode.x, y: firstTextNode.y }
             : undefined,
           canvas: canvasWithBg,
-          rootImage: query
+          // Wichtig: rootImage direkt beim Generieren setzen, wenn aus Imageset generiert wurde,
+          // damit der Shuffle-Button („Random image from current category") sofort aktiv ist.
+          rootImage: imageUrl
             ? {
-                query,
                 url: imageUrl,
-                layoutType: "background",
+                // Merke die Quelle (nur informativ, wird andernorts ggf. genutzt)
+                source:
+                  imageSource === "imageset"
+                    ? "imageset"
+                    : imageSource === "unsplash"
+                      ? "unsplash"
+                      : imageSource === "ai"
+                        ? "ai"
+                        : "unknown",
+                // Falls Imageset gewählt war, hänge die Kategorie an die Slide
+                imageSetId:
+                  imageSource === "imageset" && selectedImageSetId
+                    ? selectedImageSetId
+                    : undefined,
               }
             : undefined,
         };
+
+        return slideToPush;
       }),
     );
 
@@ -385,7 +403,20 @@ export default function PresentationGenerateWithIdPage() {
     try {
       await updatePresentation({
         id,
-        content: { slides, config: state.config ?? {} },
+        // WICHTIG: Das gewählte ImageSet (falls vorhanden) auf Content-Ebene persistieren,
+        // damit die Editor-Seite es beim Laden in den State übernehmen kann.
+        content: {
+          slides,
+          config: {
+            theme: state.theme,
+            // persist presentation-level imageSetId, damit Shuffle sofort weiß,
+            // aus welchem Set random Bilder gezogen werden dürfen
+            imageSetId:
+              imageSource === "imageset" && selectedImageSetId
+                ? selectedImageSetId
+                : undefined,
+          },
+        },
         outline: state.outline,
         prompt: state.presentationInput,
         title: presentationTitle,

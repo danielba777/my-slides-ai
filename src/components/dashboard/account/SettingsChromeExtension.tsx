@@ -1,14 +1,12 @@
 "use client";
 
-import { useCallback } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, RefreshCw } from "lucide-react";
+import { useCallback } from "react";
+import { toast } from "sonner";
 
 type TokenResponse = {
   token: string;
@@ -71,22 +69,15 @@ export default function SettingsChromeExtension() {
   const token = tokenQuery.data?.token ?? "";
 
   return (
-    <Card className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-      <CardHeader className="gap-2 md:flex md:items-center md:justify-between">
-        <div>
-          <CardTitle className="text-xl md:text-2xl">
-            Chrome Extension Token
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Use this token to connect the SlidesCockpit Chrome Extension with
-            your personal library.
-          </p>
-        </div>
-        <Badge className="border-[#304674]/20 bg-[#304674]/10 px-3 py-1 text-[#304674] cursor-default transition-none">
-          Secure · Private
-        </Badge>
-      </CardHeader>
-      <CardContent className="space-y-6 p-6 md:p-8">
+    <div className="space-y-6 p-0">
+      <div className="space-y-1">
+        <h2 className="text-2xl font-semibold">Chrome Extension</h2>
+        <p className="text-sm text-muted-foreground">
+          Install the SlidesCockpit Chrome Extension and connect it with your
+          account.
+        </p>
+      </div>
+      <div className="space-y-6">
         {tokenQuery.isLoading ? (
           <div className="flex items-center justify-center py-16">
             <Spinner className="h-8 w-8" />
@@ -151,7 +142,7 @@ export default function SettingsChromeExtension() {
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

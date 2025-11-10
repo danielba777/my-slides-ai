@@ -1,182 +1,134 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
 *** Begin Patch
-*** Update File: src/components/presentation/presentation-page/PresentationSlidesView.tsx
+*** Update File: src/components/dashboard/account/SettingsChromeExtension.tsx
 @@
-   const canvasRef = useRef<SlideCanvasAdapterHandle | null>(null);
-@@
--  const { editingSlideId, setEditingSlideId } = usePresentationState();
-+  const { editingSlideId, setEditingSlideId } = usePresentationState();
-   const { editingOverlaySlideId, setEditingOverlaySlideId } = usePresentationState();
-   const isEditingText = editingSlideId === slide.id;
-   const [isHovering, setIsHovering] = useState(false);
-   const [isImageSelectorOpen, setIsImageSelectorOpen] = useState(false);
-   const [isMultiImageSelectorOpen, setIsMultiImageSelectorOpen] =
-     useState(false);
-+  // ❗ Wenn ein anderer Slide im Text-Edit ist, sind diese Slide-Interaktionen read-only
-+  const disableInteractions = !!editingSlideId && editingSlideId !== slide.id;
-@@
--              onClick={() => {
--                // Wenn eine andere Slide im Edit-Modus ist, schließe diesen
--                if (editingSlideId && editingSlideId !== slide.id) {
--                  setEditingSlideId(null);
--                }
--              }}
-+              // Beim Klick in andere Slides NICHT mehr automatisch den Edit-Modus schließen
-+              onClick={() => {}}
-             >
-               {imageReady ? (
-                 <SlideCanvas
-                   ref={canvasRef}
-                   doc={docWithBg}
-                   showToolbar={isEditingText}
-+                  readOnly={disableInteractions}
-                   overlayContent={(() => {
-                     const showHover = !isPresenting && !isReadOnly && isHovering && !editingSlideId && editingOverlaySlideId !== slide.id;
-                     const inOverlayEdit = editingOverlaySlideId === slide.id;
-                     if (inOverlayEdit) {
-                       return (
-@@
-                 // Stabiles Placeholder, aber KEIN Entfernen/Neu-Erzeugen der Nodes
-                 <SlideCanvas
-                   doc={docWithBg}
-                   showToolbar={isEditingText}
-+                  readOnly={disableInteractions}
-                   overlayContent={
-                     !isPresenting &&
-                     !isReadOnly &&
-                     isHovering &&
-                     !editingSlideId ? (
-*** End Patch
-diff
-Code kopieren
-*** Begin Patch
-*** Update File: src/canvas/SlideCanvasAdapter.tsx
-@@
- export type SlideCanvasAdapterHandle = {
-   /** Liefert einen PNG-Blob der aktuellen Canvas in voller Auflösung */
-   exportPNG: () => Promise<Blob>;
-   /** Fokussiert den ersten Text im Canvas */
-   focusFirstText: () => void;
-   /** Entfernt den Fokus von allen Texten */
-   clearTextFocus: () => void;
- };
- 
- type Props = {
-   doc: CanvasDoc;
-   onChange: (next: CanvasDoc) => void;
-   showToolbar?: boolean;
-   overlayContent?: React.ReactNode;
-   onCloseToolbar?: () => void;
-+  /** Wenn true, sind Interaktionen (Klicken/Selektieren) deaktiviert */
-+  readOnly?: boolean;
- };
- 
- const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
--  (
--    { doc, onChange, showToolbar = true, overlayContent, onCloseToolbar },
--    ref,
--  ) => {
-+  (
-+    { doc, onChange, showToolbar = true, overlayContent, onCloseToolbar, readOnly = false },
-+    ref,
-+  ) => {
-@@
-     return (
-       <LegacySlideCanvas
-         ref={legacyRef}
-         imageUrl={imageUrl}
-         layout={layout}
-         overlays={overlayImages}
-         showToolbar={showToolbar}
-         overlayContent={overlayContent}
-         onCloseToolbar={onCloseToolbar}
-+        readOnly={readOnly}
-         onOverlaysChange={(nextOverlays) => {
-           const otherNodes = doc.nodes.filter(
-             (n) =>
-               !(
-                 n.type === "image" &&
-                 (n as any).id !== "canvas-background-image"
-               ),
-           );
-           onChange({
-             ...doc,
-             nodes: [...otherNodes, ...nextOverlays],
-           });
-         }}
-       />
-     );
-   },
- );
- 
- SlideCanvasAdapter.displayName = "SlideCanvasAdapter";
- export default SlideCanvasAdapter;
-*** End Patch
-diff
-Code kopieren
-*** Begin Patch
-*** Update File: src/canvas/legacy/SlideCanvasLegacy.tsx
-@@
--// apps/dashboard/src/app/(components)/SlideCanvas.tsx
- "use client";
-@@
--import React, {
-+import React, {
-   forwardRef,
-   useCallback,
-   useEffect,
-   useImperativeHandle,
-   useMemo,
-   useRef,
-   useState,
- } from "react";
-@@
--type TextBgMode = "block" | "blob";
-+type TextBgMode = "block" | "blob";
+-"use client";
+-
+-import { Badge } from "@/components/ui/badge";
+-import { Button } from "@/components/ui/button";
+-import {
+-  Card,
+-  CardContent,
+-  CardDescription,
+-  CardHeader,
+-  CardTitle,
+-} from "@/components/ui/card";
++"use client";
 +
-+type LegacyCanvasProps = {
-+  imageUrl?: string;
-+  layout: TextLayer[];
-+  overlays: CanvasImageNode[];
-+  showToolbar?: boolean;
-+  overlayContent?: React.ReactNode;
-+  onCloseToolbar?: () => void;
-+  onOverlaysChange?: (next: CanvasImageNode[]) => void;
-+  /** Wenn true, sind Interaktionen deaktiviert (nur Anzeige) */
-+  readOnly?: boolean;
-+};
- 
++import { Badge } from "@/components/ui/badge";
++import { Button } from "@/components/ui/button";
+ import { Input } from "@/components/ui/input";
+ import { Spinner } from "@/components/ui/spinner";
+ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+ import { Copy, RefreshCw } from "lucide-react";
+ import { useCallback } from "react";
+ import { toast } from "sonner";
+@@
+-export default function SettingsChromeExtension() {
++export default function SettingsChromeExtension() {
+   const qc = useQueryClient();
 @@
 -  return (
+-    <Card className="overflow-hidden rounded-2xl bg-card shadow-sm">
+-      <CardHeader className="p-0 space-y-1">
+-        <CardTitle className="text-2xl font-semibold">
+-          Chrome Extension
+-        </CardTitle>
+-        <CardDescription>
+-          Install the SlidesCockpit Chrome Extension and connect it with your
+-          account.
+-        </CardDescription>
+-        <Badge className="mt-2 w-fit border-[#304674]/20 bg[#304674]/10 px-3 py-1 text-[#304674] cursor-default transition-none">
+-          Secure · Private
+-        </Badge>
+-      </CardHeader>
+-      <CardContent className="space-y-6 p-6 md:p-8">
 +  return (
-     <Resizable
-@@
--      <div
-+      <div
-         className={cn(
-           "h-full overflow-hidden border bg-background/80 shadow-md backdrop-blur-sm",
-           isDragging && "opacity-50",
++    <div className="space-y-6 p-0">
++      {/* Header wie „Personal“ (ohne eigenen Card, da der äußere Card aus SettingsPage kommt) */}
++      <div className="space-y-1">
++        <h2 className="text-2xl font-semibold">Chrome Extension</h2>
++        <p className="text-sm text-muted-foreground">
++          Install the SlidesCockpit Chrome Extension and connect it with your account.
++        </p>
++        <Badge
++          className="mt-2 w-fit border-[#304674]/20 bg-[#304674]/10 px-3 py-1 text-[#304674] cursor-default transition-none hover:bg-[#304674]/10 hover:text-[#304674]"
++        >
++          Secure · Private
++        </Badge>
++      </div>
++
++      {/* Body */}
++      <div className="space-y-6">
+         {tokenQuery.isLoading ? (
+           <div className="flex items-center justify-center py-16">
+             <Spinner className="h-8 w-8" />
+           </div>
+         ) : tokenQuery.isError ? (
+           <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+             Could not load your extension token. Please refresh the page.
+           </div>
+         ) : (
+           <>
+             <div className="space-y-3">
+               <label className="text-sm font-medium text-muted-foreground">
+                 Your personal token
+               </label>
+               <div className="flex flex-col gap-2 sm:flex-row">
+                 <Input
+                   value={token}
+                   readOnly
+                   className="font-mono text-sm tracking-wide"
+                 />
+                 <div className="flex gap-2 sm:w-auto">
+                   <Button
+                     type="button"
+                     variant="outline"
+                     className="w-full sm:w-auto"
+                     onClick={handleCopy}
+                     disabled={!token}
+                   >
+                     <Copy className="mr-2 h-4 w-4" />
+                     Copy
+                   </Button>
+                   <Button
+                     type="button"
+                     variant="secondary"
+                     className="w-full sm:w-auto"
+                     onClick={() => rotate.mutate()}
+                     disabled={rotate.isPending}
+                   >
+                     {rotate.isPending ? (
+                       <Spinner className="mr-2 h-4 w-4" />
+                     ) : (
+                       <RefreshCw className="mr-2 h-4 w-4" />
+                     )}
+                     Regenerate
+                   </Button>
+                 </div>
+               </div>
+             </div>
+ 
+             <div className="rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">
+               <p className="font-medium text-foreground">
+                 How to use this token
+               </p>
+               <ol className="mt-2 list-decimal space-y-1 pl-5">
+                 <li>Install the SlidesCockpit Chrome Extension.</li>
+                 <li>Open the extension settings and paste this token.</li>
+                 <li>
+                   Keep the token private. Use “Regenerate” to revoke old
+                   extensions.
+                 </li>
+               </ol>
+             </div>
+           </>
          )}
-       >
-@@
--      <div
-+      <div
-         ref={wrapRef}
-         className="slide-shell relative mx-auto overflow-hidden border shadow-lg select-none bg-[#00B140]"
-         style={{
-           backgroundColor: "#00B140",
-           width: previewSize.w,
-           height: previewSize.h,
-           aspectRatio: "9 / 16",
-           touchAction: "none",
-           userSelect: "none",
-+          // ❗ Harte Sperre aller Pointer-Events, wenn readOnly=true
-+          pointerEvents: (props as LegacyCanvasProps)?.readOnly ? "none" : "auto",
-         }}
-         onPointerDown={onBGPointerDown}
-         onPointerMove={onPointerMove}
-         onPointerUp={onPointerUp}
-         onPointerLeave={onPointerUp}
-       >
+-      </CardContent>
+-    </Card>
++      </div>
++    </div>
+   );
+ }
 *** End Patch

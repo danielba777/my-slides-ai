@@ -49,6 +49,7 @@ export default function PresentationPage() {
   );
   const currentSlideIndex = usePresentationState((s) => s.currentSlideIndex);
   const setLanguage = usePresentationState((s) => s.setLanguage);
+  const setImageSetId = usePresentationState((s) => s.setImageSetId);
   const theme = usePresentationState((s) => s.theme);
   // Track the theme value as it exists in the database to avoid redundant saves on hydration
   const dbThemeRef = useRef<string | null>(null);
@@ -118,6 +119,14 @@ export default function PresentationPage() {
 
       // Set slides
       setSlides(ensureSlidesHaveCanvas(presentationContent?.slides ?? []));
+
+      // Falls bei der Generierung eine Kategorie gewählt und in content.config.imageSetId persistiert wurde,
+      // direkt in den globalen State übernehmen, damit „Random image from current category" sofort aktiv ist.
+      const persistedImageSetId =
+        (presentationContent?.config as any)?.imageSetId ?? null;
+      if (persistedImageSetId && typeof persistedImageSetId === "string") {
+        setImageSetId(persistedImageSetId);
+      }
 
       // If there's no thumbnail yet, derive from first available rootImage or first img element
       const currentThumb = presentationData.thumbnailUrl;
@@ -240,6 +249,7 @@ export default function PresentationPage() {
     setImageModel,
     setPresentationStyle,
     setLanguage,
+    setImageSetId,
   ]);
 
   // Update theme when it changes (but not on initial hydration)

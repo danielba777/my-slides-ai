@@ -15,12 +15,12 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import {
+  Clapperboard,
   Download,
   EclipseIcon,
   FileText,
   Home,
   Image as ImageIcon,
-  Music,
   Play,
   Users,
   type LucideIcon,
@@ -79,14 +79,9 @@ const avatarItems: SidebarItem[] = [
 
 const ugcItems: SidebarItem[] = [
   {
-    title: "Reaction Avatars",
-    url: "/admin/ugc/reaction-avatars",
-    icon: Play,
-  },
-  {
-    title: "Sounds",
-    url: "/admin/sounds",
-    icon: Music,
+    title: "Hook + Demo",
+    url: "/dashboard/ugc",
+    icon: Clapperboard,
   },
 ];
 

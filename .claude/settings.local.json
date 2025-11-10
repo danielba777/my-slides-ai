@@ -5,7 +5,8 @@
       "Bash(find:*)",
       "Bash(echo:*)",
       "Bash(curl:*)",
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

@@ -9,14 +9,17 @@ import {
 } from "@/hooks/use-tiktok-accounts";
 import IonIcon from "@reacticons/ionicons";
 import { defineCustomElements } from "ionicons/loader";
+import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { X } from "lucide-react";
 type ConnectionState = "idle" | "loading";
 export default function SettingsConnections() {
   const [state, setState] = useState<ConnectionState>("idle");
-  const { accounts, loading, error, disconnect } = useTikTokAccounts();
-  const [disconnectingOpenId, setDisconnectingOpenId] = useState<string | null>(null);
+  const [disconnectingOpenId, setDisconnectingOpenId] = useState<string | null>(
+    null,
+  );
+  // loading + error + disconnect mit aus dem Hook holen
+  const { accounts, loading, error, refresh, disconnect } = useTikTokAccounts();
 
   useEffect(() => {
     if (typeof window !== "undefined") defineCustomElements(window);
@@ -26,14 +29,13 @@ export default function SettingsConnections() {
     if (error) toast.error(error);
   }, [error]);
 
-  const sorted = useMemo(
-    () =>
-      [...accounts].sort(
-        (a, b) =>
-          new Date(b.connectedAt).getTime() - new Date(a.connectedAt).getTime(),
-      ),
-    [accounts],
-  );
+  const sorted = useMemo(() => {
+    const list = [...(accounts ?? [])];
+    return list.sort(
+      (a, b) =>
+        new Date(b.connectedAt).getTime() - new Date(a.connectedAt).getTime(),
+    );
+  }, [accounts]);
 
   const connect = useCallback(async () => {
     setState("loading");
@@ -49,30 +51,37 @@ export default function SettingsConnections() {
     }
   }, []);
 
-  const handleDisconnect = useCallback(async (account: ConnectedTikTokAccount) => {
-    if (disconnectingOpenId === account.openId) return;
+  const handleDisconnect = useCallback(
+    async (account: ConnectedTikTokAccount) => {
+      if (disconnectingOpenId === account.openId) return;
 
-    const accountLabel = labelFor(account);
+      const accountLabel = labelFor(account);
 
-    if (!window.confirm(`Are you sure you want to disconnect "${accountLabel}" from SlidesCockpit?`)) {
-      return;
-    }
-
-    setDisconnectingOpenId(account.openId);
-
-    try {
-      const success = await disconnect(account.openId);
-      if (success) {
-        toast.success(`Disconnected "${accountLabel}" from SlidesCockpit`);
-      } else {
-        toast.error(`Failed to disconnect "${accountLabel}"`);
+      if (
+        !window.confirm(
+          `Are you sure you want to disconnect "${accountLabel}" from SlidesCockpit?`,
+        )
+      ) {
+        return;
       }
-    } catch (error) {
-      toast.error(`Failed to disconnect "${accountLabel}"`);
-    } finally {
-      setDisconnectingOpenId(null);
-    }
-  }, [disconnect, disconnectingOpenId]);
+
+      setDisconnectingOpenId(account.openId);
+
+      try {
+        const success = await disconnect(account.openId);
+        if (success) {
+          toast.success(`Disconnected "${accountLabel}" from SlidesCockpit`);
+        } else {
+          toast.error(`Failed to disconnect "${accountLabel}"`);
+        }
+      } catch (error) {
+        toast.error(`Failed to disconnect "${accountLabel}"`);
+      } finally {
+        setDisconnectingOpenId(null);
+      }
+    },
+    [disconnect, disconnectingOpenId],
+  );
 
   const labelFor = (a: ConnectedTikTokAccount) =>
     a.username ??
@@ -88,13 +97,19 @@ export default function SettingsConnections() {
   };
 
   return (
-    <div className="px-1 sm:px-2 lg:px-0">
-      {/* Header row (match Profile & Billing composition) */}
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <Badge className="border-[#304674]/20 bg-[#304674]/10 px-3 py-1 text-[#304674] cursor-default transition-none">
+    <div className="px-1 md:px-2 py-1 md:py-2 space-y-4">
+      {/* Header wie „Personal" */}
+      <div className="mb-2">
+        <h2 className="text-xl md:text-2xl font-semibold">Connections</h2>
+        <p className="text-sm text-muted-foreground">
+          Link your TikTok account to publish and schedule.
+        </p>
+      </div>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Badge className="border-[#304674]/20 bg-[#304674]/10 px-3 py-1 text-[#304674] hover:bg-[#304674]/10 hover:text-[#304674] cursor-default transition-none">
           <span className="inline-flex items-center gap-2">
             <IonIcon name="logo-tiktok" />
-            TikTok connected: {sorted.length}
+            TikTok connected: {accounts?.length ?? 0}
           </span>
         </Badge>
         <div className="w-full max-w-xs md:w-auto">
@@ -120,35 +135,37 @@ export default function SettingsConnections() {
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">
-          {sorted.map((a) => (
-            <Badge
-              key={a.openId}
-              variant="secondary"
-              className="group relative flex items-center gap-2 pr-8 cursor-default transition-none hover:bg-red-50 hover:border-red-200"
-            >
-              <Avatar className="h-6 w-6">
-                <AvatarImage alt={labelFor(a)} src={a.avatarUrl ?? undefined} />
-                <AvatarFallback className="text-[10px]">
-                  {initialsFor(a)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-xs font-medium">{labelFor(a)}</span>
-
-              {/* Disconnect Button */}
-              <button
-                onClick={() => handleDisconnect(a)}
-                disabled={disconnectingOpenId === a.openId}
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-red-100 text-red-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                title={`Disconnect ${labelFor(a)}`}
+          {[...(accounts || [])]
+            .slice()
+            .sort((a, b) => labelFor(a).localeCompare(labelFor(b)))
+            .map((a) => (
+              <Badge
+                key={a.openId}
+                className="relative inline-flex items-center gap-2 border px-2 py-1 pr-6 cursor-default transition-none"
               >
-                {disconnectingOpenId === a.openId ? (
-                  <Spinner className="h-2 w-2" />
-                ) : (
-                  <X className="h-3 w-3" />
-                )}
-              </button>
-            </Badge>
-          ))}
+                <Avatar className="h-5 w-5 border">
+                  <AvatarImage src={a.profileImageUrl ?? undefined} />
+                  <AvatarFallback className="text-[10px]">
+                    {initialsFor(a)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-xs font-medium">{labelFor(a)}</span>
+
+                {/* Disconnect Button (ständig sichtbar; keine Label-Hover-Effekte) */}
+                <button
+                  onClick={() => handleDisconnect(a)}
+                  disabled={disconnectingOpenId === a.openId}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-red-100 text-red-600 opacity-100 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={`Disconnect ${labelFor(a)}`}
+                >
+                  {disconnectingOpenId === a.openId ? (
+                    <Spinner className="h-2 w-2" />
+                  ) : (
+                    <X className="h-3 w-3" />
+                  )}
+                </button>
+              </Badge>
+            ))}
         </div>
       )}
     </div>

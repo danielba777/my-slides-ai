@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
@@ -18,12 +17,78 @@ export default function SettingsDemoVideos() {
   const [demos, setDemos] = useState<DemoVideo[]>([]);
   const [state, setState] = useState<DemoState>("loading");
   const [uploading, setUploading] = useState(false);
+  // Client-seitig generierte Poster (erstes Frame)
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
 
   const { startUpload } = useUploadThing("editorUploader");
 
   useEffect(() => {
     void loadDemos();
   }, []);
+
+  // Hilfsfunktion: erstes Frame als DataURL erzeugen
+  const generateFirstFrame = async (url: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      try {
+        const video = document.createElement("video");
+        video.crossOrigin = "anonymous";
+        video.preload = "metadata";
+        video.src = url;
+        video.muted = true;
+        video.playsInline = true;
+        const onLoaded = async () => {
+          try {
+            // auf 0s seeken; manche Browser feuern erst nach ready
+            video.currentTime = 0;
+          } catch {
+            /* noop */
+          }
+        };
+        const onSeeked = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = video.videoWidth || 720;
+          canvas.height = video.videoHeight || 1280;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return reject(new Error("No canvas context"));
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", 0.8));
+          video.removeEventListener("loadeddata", onLoaded);
+          video.removeEventListener("seeked", onSeeked);
+          // Aufräumen
+          video.src = "";
+        };
+        video.addEventListener("loadeddata", onLoaded, { once: true });
+        video.addEventListener("seeked", onSeeked, { once: true });
+        // Fallback: falls 'seeked' nicht kommt
+        setTimeout(() => {
+          if (video.readyState >= 2) {
+            onSeeked();
+          }
+        }, 1500);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  };
+
+  // Für Demos ohne thumbnailUrl ein Poster generieren
+  useEffect(() => {
+    const run = async () => {
+      const items = demos.filter(
+        (d) => !d.thumbnailUrl && d.videoUrl && !thumbs[d.id],
+      );
+      for (const d of items) {
+        try {
+          const dataUrl = await generateFirstFrame(d.videoUrl!);
+          setThumbs((prev) => ({ ...prev, [d.id]: dataUrl }));
+        } catch {
+          // Ignorieren – dann bleibt der Platzhalter
+        }
+      }
+    };
+    if (demos.length > 0) void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demos]);
 
   const loadDemos = async () => {
     try {
@@ -121,8 +186,15 @@ export default function SettingsDemoVideos() {
     <div className="space-y-6 px-1 sm:px-2 lg:px-0">
       <Card className="rounded-2xl border bg-card shadow-sm">
         <CardContent className="p-6 md:p-8">
+          {/* Header wie „Personal" */}
+          <div className="mb-2">
+            <h2 className="text-xl md:text-2xl font-semibold">Demo Videos</h2>
+            <p className="text-sm text-muted-foreground">
+              Upload short clips and pick them when composing UGC videos.
+            </p>
+          </div>
           <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <Badge className="border-[#304674]/20 bg-[#304674]/10 px-3 py-1 text-[#304674] cursor-default transition-none">
+            <Badge className="border-[#304674]/20 bg-[#304674]/10 px-3 py-1 text-[#304674] hover:bg-[#304674]/10 hover:text-[#304674] cursor-default transition-none">
               <span className="inline-flex items-center gap-2">
                 <Video className="h-4 w-4" />
                 {demoCountLabel}
@@ -144,51 +216,37 @@ export default function SettingsDemoVideos() {
                     className="group relative aspect-[9/16] h-[180px] overflow-hidden rounded-xl border bg-black text-white"
                     title={demo.name || "Demo"}
                   >
-                    {/* Thumbnail if available, otherwise dark area */}
-                    {"thumbnailUrl" in demo && (demo as any).thumbnailUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
+                    {/* Immer ein Thumbnail zeigen: DB-Thumbnail oder clientseitig generiertes erstes Frame */}
+                    {(demo as any).thumbnailUrl || thumbs[demo.id] ? (
                       <img
-                        src={(demo as any).thumbnailUrl}
+                        src={(demo as any).thumbnailUrl || thumbs[demo.id]}
                         alt={demo.name || "Demo"}
                         className="h-full w-full object-cover"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-xs text-white/70">
-                        Demo
+                        Loading…
                       </div>
                     )}
-
-                    {/* Hover overlay: open & delete */}
-                    <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const target = demo.videoUrl?.startsWith("http")
-                            ? demo.videoUrl
-                            : `${window.location.origin}${
-                                demo.videoUrl?.startsWith("/")
-                                  ? demo.videoUrl
-                                  : `/${demo.videoUrl}`
-                              }`;
-                          window.open(target, "_blank", "noopener,noreferrer");
-                        }}
-                        className="rounded-full"
+                    {/* Delete & External Link */}
+                    <div className="absolute inset-x-2 bottom-2 flex items-center justify-between gap-2">
+                      <a
+                        href={demo.videoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-full bg-white/20 p-2 hover:bg-white/30 transition-colors"
                         title="Open in new tab"
                       >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                      <Button
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                      <button
                         type="button"
-                        variant="destructive"
-                        size="sm"
                         onClick={() => handleDelete(demo)}
-                        className="rounded-full"
+                        className="rounded-full bg-white/20 p-2 hover:bg-white/30 transition-colors"
                         title="Delete"
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                        <Trash2 className="h-3 w-3" />
+                      </button>
                     </div>
                   </div>
                 ))}
