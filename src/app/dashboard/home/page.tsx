@@ -9,7 +9,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DummyPost, PostSkeletonGrid } from "@/components/ui/post-skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SimplePagination } from "@/components/ui/simple-pagination";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import {
@@ -22,16 +24,8 @@ import {
   User,
 } from "lucide-react";
 import Link from "next/link";
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { SimplePagination } from "@/components/ui/simple-pagination";
-import { PostSkeletonGrid, DummyPost } from "@/components/ui/post-skeleton";
 
 interface SlideshowPostSummary {
   id: string;
@@ -145,7 +139,7 @@ export default function DashboardHome() {
         const offset = (currentPage - 1) * POSTS_PER_PAGE;
         const shuffle = sortOption === "random" ? "true" : "false";
         const response = await fetch(
-          `/api/slideshow-library/posts?limit=${POSTS_PER_PAGE}&offset=${offset}&shuffle=${shuffle}`
+          `/api/slideshow-library/posts?limit=${POSTS_PER_PAGE}&offset=${offset}&shuffle=${shuffle}`,
         );
         if (!response.ok) {
           throw new Error("Failed to load slideshow posts");
@@ -240,7 +234,7 @@ export default function DashboardHome() {
       ...Array.from({ length: dummyCount }, (_, index) => ({
         id: `dummy-${index}`,
         isDummy: true,
-      }))
+      })),
     ];
   }, [postCards]);
 
@@ -576,36 +570,36 @@ export default function DashboardHome() {
         <div className="flex gap-4">
           <Link
             href="/dashboard/slideshows"
-            className="flex h-auto w-[220px] flex-col items-start gap-3 rounded-xl bg-white p-4 text-foreground transition hover:bg-accent/80 hover:text-accent-foreground shadow-md"
+            className="flex h-auto w-[225px] flex-col items-start gap-3 rounded-xl bg-white p-4 text-foreground transition hover:bg-accent/80 hover:text-accent-foreground shadow-md"
           >
             <Images className="h-7 w-7 text-blue-500" />
             <span className="flex flex-col items-start leading-tight">
               <span className="text-lg font-medium">Slideshows</span>
-              <span className="text-base text-muted-foreground">
+              <span className="text-sm text-muted-foreground">
                 Create slideshows
               </span>
             </span>
           </Link>
           <Link
             href="/dashboard/ai-avatars"
-            className="flex h-auto w-[220px] flex-col items-start gap-3 rounded-xl bg-white p-4 text-foreground transition hover:bg-accent/80 hover:text-accent-foreground shadow-md"
+            className="flex h-auto w-[225px] flex-col items-start gap-3 rounded-xl bg-white p-4 text-foreground transition hover:bg-accent/80 hover:text-accent-foreground shadow-md"
           >
             <User className="h-7 w-7 text-blue-500" />
             <span className="flex flex-col items-start leading-tight">
               <span className="text-lg font-medium">AI Avatars</span>
-              <span className="text-base text-muted-foreground">
+              <span className="text-sm text-muted-foreground">
                 Custom AI UGC Avatars
               </span>
             </span>
           </Link>
           <Link
             href="/dashboard/ugc"
-            className="flex h-auto w-[220px] flex-col items-start gap-3 rounded-xl bg-white p-4 text-foreground transition hover:bg-accent/80 hover:text-accent-foreground shadow-md"
+            className="flex h-auto w-[225px] flex-col items-start gap-3 rounded-xl bg-white p-4 text-foreground transition hover:bg-accent/80 hover:text-accent-foreground shadow-md"
           >
             <PlayIcon className="h-7 w-7 text-blue-500" />
             <span className="flex flex-col items-start leading-tight">
               <span className="text-lg font-medium">Hook + Demo</span>
-              <span className="text-base text-muted-foreground text-left">
+              <span className="text-sm text-muted-foreground text-left">
                 Create hook + demo videos
               </span>
             </span>
@@ -704,7 +698,7 @@ export default function DashboardHome() {
                 }
 
                 // Type guard to ensure this is a real post
-                const realPost = post as typeof postCards[0];
+                const realPost = post as (typeof postCards)[0];
 
                 // Render real post
                 return (
