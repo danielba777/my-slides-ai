@@ -97,17 +97,20 @@ model Subscription {
   currentPeriodEnd     DateTime
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
+  @@index([userId], map: "idx_subscription_user")
 }
 
 model CreditBalance {
-  userId        String   @id
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  credits       Int      @default(0)   // verbleibende Slides-Credits in der aktuellen Periode
-  aiCredits     Int      @default(0)   // verbleibende AI-Credits in der aktuellen Periode
-  usedCredits   Int      @default(0)   // in der Periode verbrauchte Slides-Credits
-  usedAiCredits Int      @default(0)   // in der Periode verbrauchte AI-Credits
-  resetsAt      DateTime?
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  userId       String   @unique(map: "uniq_creditbalance_user")
+  credits      Int
+  aiCredits    Int
+  usedCredits  Int      @default(0)
+  usedAiCredits Int     @default(0)
+  resetsAt     DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model BaseDocument {
@@ -268,4 +271,10 @@ model UserUGCVideo {
   @@index([userId])
   @@index([reactionAvatarId])
   @@index([demoVideoId])
+}
+
+model ProcessedWebhook {
+  id        String   @id
+  type      String
+  createdAt DateTime @default(now())
 }

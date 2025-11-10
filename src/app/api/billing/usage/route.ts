@@ -3,6 +3,20 @@ import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { normalizeCreditBalance } from "@/server/billing";
 
+import { revalidateTag } from "next/cache";
+
+// ✅ New route for triggering live updates (called from server)
+export async function POST(req: Request) {
+  try {
+    const { userId } = await req.json();
+    if (!userId) return NextResponse.json({ success: false }, { status: 400 });
+    revalidateTag(`usage-${userId}`);
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    return NextResponse.json({ success: false }, { status: 500 });
+  }
+}
+
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {

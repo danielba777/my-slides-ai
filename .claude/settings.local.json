@@ -4,7 +4,8 @@
       "Bash(pnpm list:*)",
       "Bash(find:*)",
       "Bash(echo:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(pnpm add:*)"
     ],
     "deny": [],
     "ask": []

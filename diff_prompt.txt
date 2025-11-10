@@ -1,154 +1,91 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
 *** Begin Patch
-*** Update File: src/server/ugc/video-composer.ts
+*** Update File: src/app/api/stripe/webhook/route.ts
 @@
--import { execFile } from "child_process";
-+import { execFile } from "child_process";
- import { randomUUID } from "crypto";
- import fs from "fs";
- import { promises as fsAsync } from "fs";
- import { tmpdir } from "os";
--import { dirname, join } from "path";
-+import { dirname, join, basename } from "path";
- import { promisify } from "util";
+       case "invoice.payment_succeeded": {
 @@
- let cachedFfmpegPath: string | null = null;
- let cachedFfprobePath: string | null = null;
+-        const invoice = event.data.object as Stripe.Invoice;
++        const invoice = event.data.object as Stripe.Invoice;
+         const customerId = invoice.customer as string;
+-        const priceId = invoice.lines?.data?.[0]?.price?.id ?? null;
+-        const mappedPlan = planFromPrice(priceId);
++        // Stripe-Typen für InvoiceLineItem haben nicht immer 'price' getypt → defensiv über 'any'
++        const firstLine: any = invoice.lines?.data?.[0] ?? null;
++        const priceId: string | null =
++          firstLine?.price?.id ??
++          (typeof firstLine?.price === "string" ? firstLine.price : null);
++        const mappedPlan = planFromPrice(priceId ?? undefined);
++        if (!mappedPlan) {
++          console.warn("[webhook] ⚠️ invoice.payment_succeeded ohne zuordenbaren Plan", { priceId });
++          await markProcessed(event.id, event.type);
++          return new NextResponse("OK", { status: 200 });
++        }
+         const nextResetAt = addMonths(new Date(), 1);
+@@
+         await db.$transaction(async (tx) => {
+           // 1) User-Plan & planRenewsAt konsistent setzen
+           await tx.user.update({
+             where: { id: user.id },
+             data: {
+               plan: mappedPlan,
+               planRenewsAt: nextResetAt,
+             },
+           });
  
-+/**
-+ * Some Linux images mount node_modules with noexec.
-+ * We copy the packaged binary to a temp folder and chmod +x,
-+ * then spawn from there.
-+ */
-+function ensureExecutable(tempKey: "ffmpeg" | "ffprobe", sourcePath: string): string {
-+  try {
-+    // If it already has execute permission, keep it.
-+    fs.accessSync(sourcePath, fs.constants.X_OK);
-+    return sourcePath;
-+  } catch {
-+    // Fall through to copy & chmod.
-+  }
-+  const fileName = `${tempKey}-${basename(sourcePath)}`;
-+  const targetDir = join(tmpdir(), "slidescockpit-binaries");
-+  const targetPath = join(targetDir, fileName);
-+  try {
-+    fs.mkdirSync(targetDir, { recursive: true });
-+    // Only copy if not present or size differs
-+    let needsCopy = true;
-+    try {
-+      const [srcStat, dstStat] = [fs.statSync(sourcePath), fs.statSync(targetPath)];
-+      if (srcStat.size === dstStat.size) needsCopy = false;
-+    } catch {
-+      // copy
-+    }
-+    if (needsCopy) {
-+      fs.copyFileSync(sourcePath, targetPath);
-+    }
-+    fs.chmodSync(targetPath, 0o755);
-+    return targetPath;
-+  } catch (err) {
-+    // As a last resort, return source (may still fail on noexec)
-+    console.warn(`[UGC][binaries] Failed to stage ${tempKey} to tmp:`, err);
-+    return sourcePath;
-+  }
-+}
-+
- const getFfmpegPath = () => {
-   if (!cachedFfmpegPath) {
--    cachedFfmpegPath = requireFromNode<{ path: string }>(
--      "@ffmpeg-installer/ffmpeg",
--    ).path;
-+    const pkgPath = requireFromNode<{ path: string }>(
-+      "@ffmpeg-installer/ffmpeg",
-+    ).path;
-+    cachedFfmpegPath = ensureExecutable("ffmpeg", pkgPath);
-   }
-   return cachedFfmpegPath;
- };
+           // 2) Credits intelligent neu berechnen (Carry-Over statt Hard-Reset)
+           const prevUser = await tx.user.findUnique({
+             where: { id: user.id },
+             select: { plan: true },
+           });
+-          await carryOverCreditsOnPlanChange(tx, user.id, prevUser?.plan ?? null, mappedPlan, nextResetAt);
++          await carryOverCreditsOnPlanChange(
++            tx,
++            user.id,
++            prevUser?.plan ?? null,
++            mappedPlan,
++            nextResetAt
++          );
+         });
+@@
+       case "customer.subscription.updated": {
+         try {
+           const sub = event.data.object as Stripe.Subscription;
+           const customerId =
+             typeof sub.customer === "string" ? sub.customer : undefined;
+@@
+           const mappedPlan = planFromPrice(priceId);
+           if (!mappedPlan) {
+             console.warn("[webhook] ⚠️ keine Zuordnung für priceId", priceId);
+             return new NextResponse("OK", { status: 200 });
+           }
  
- const getFfprobePath = () => {
-   if (!cachedFfprobePath) {
--    cachedFfprobePath = requireFromNode<{ path: string }>(
--      "@ffprobe-installer/ffprobe",
--    ).path;
-+    const pkgPath = requireFromNode<{ path: string }>(
-+      "@ffprobe-installer/ffprobe",
-+    ).path;
-+    cachedFfprobePath = ensureExecutable("ffprobe", pkgPath);
-   }
-   return cachedFfprobePath;
- };
-*** End Patch
-Why this fixes prod: the error you saw—spawn .../linux-x64/ffprobe EACCES—means the file exists but can’t be executed. Staging to /tmp and chmod +x avoids noexec mounts and makes the binary runnable in Docker/Coolify-like environments.
-
-2) Make preview font identical to export (use the same Next font var + weight)
-Two very small adjustments inside your UGC page overlay span:
-
-Drop the unknown "TikTok Sans" literal and only use var(--font-sans)
-
-Explicitly set fontWeight: 800
-
-
-repomix-output
-
-
-diff
-Code kopieren
-*** Begin Patch
-*** Update File: src/app/dashboard/ugc/page.tsx
+-          const nextPeriodEnd =
+-            firstItem?.current_period_end ??
+-            sub.current_period_end ??
+-            Math.floor(Date.now() / 1000);
++          // Einige Stripe-Typdefinitionen expose'n 'current_period_end' nicht explizit → schmaler Cast
++          const subAny = sub as Stripe.Subscription & { current_period_end?: number };
++          const nextPeriodEnd =
++            subAny.current_period_end ?? Math.floor(Date.now() / 1000);
+ 
+           const nextResetAt = new Date(nextPeriodEnd * 1000);
+           if (isNaN(nextResetAt.getTime())) {
+             console.warn("[webhook] ⚠️ ungültiges Datum:", nextPeriodEnd);
+             return new NextResponse("OK", { status: 200 });
+           }
 @@
--                        <span
--                          className="block text-center font-extrabold"
--                          style={{
--                            fontFamily:
--                              "TikTok Sans, var(--font-sans), sans-serif",
--                            fontSize: "54px",
--                            lineHeight: 1.1,
--                            WebkitTextStroke: "3px black",
--                            textShadow:
--                              "2px 2px 4px rgba(0,0,0,0.65), 0 0 3px rgba(0,0,0,0.55)",
--                            letterSpacing: "0.2px",
--                          }}
--                        >
-+                        <span
-+                          className="block text-center"
-+                          style={{
-+                            fontFamily: "var(--font-sans), sans-serif",
-+                            fontWeight: 800,
-+                            fontSize: "54px",
-+                            lineHeight: 1.1,
-+                            WebkitTextStroke: "3px black",
-+                            textShadow:
-+                              "2px 2px 4px rgba(0,0,0,0.65), 0 0 3px rgba(0,0,0,0.55)",
-+                            letterSpacing: "0.2px",
-+                          }}
-+                        >
-                           {hook}
-                         </span>
-*** End Patch
-(This same overlay block appears twice in the file — I’ve patched the visible one in your preview section. If you also render the overlay in any other preview path, mirror the same two-line change.)
-
-3) Silence the ionicons preload warning (optional, safe)
-Set crossOrigin so the preload and request modes match.
-
-
-repomix-output
-
-
-diff
-Code kopieren
-*** Begin Patch
-*** Update File: src/app/layout.tsx
-@@
-         <Script
-           type="module"
-           src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"
-+          crossOrigin="anonymous"
-         />
-         <Script
-           noModule
-           src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"
-+          crossOrigin="anonymous"
-         />
+     // 🧩 optional: Logging zu Sentry
+     if (process.env.SENTRY_DSN) {
+       try {
+-        const S = await import("@sentry/nextjs");
+-        S.captureException(err, { extra: { eventId: event?.id, type: event?.type } });
++        // String-Literal vermeiden, damit TS keine Typauflösung des Moduls verlangt
++        const mod = "@sentry/nextjs";
++        const S: any = await import(mod as any);
++        S.captureException(err, {
++          extra: { eventId: event?.id, type: event?.type },
++        });
+       } catch {}
+     }
 *** End Patch

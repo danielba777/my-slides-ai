@@ -10,6 +10,7 @@ import type {
 } from "@prisma/client";
 import type Stripe from "stripe";
 import { PLAN_CREDITS, FREE_SLIDESHOW_QUOTA } from "@/lib/billing";
+import { redis } from "@/server/redis";
 
 type BillingTransactionClient = Prisma.TransactionClient;
 
@@ -120,7 +121,38 @@ type ConsumeArgs =
 export async function ensureAndConsumeCredits(userId: string, args: ConsumeArgs) {
   const cost = Math.max(1, args.cost ?? (args.kind === "ai" ? 2 : 1));
   console.debug("[billing] ensureAndConsumeCredits:start", { userId, args, cost });
-  return await db.$transaction(async (tx) => {
+  // 🧩 Verbesserter Redis-Lock (auto-refresh + safe release)
+  const redis = globalThis.redis;
+  const redisKey = `creditlock:${userId}`;
+  const lockTTL = 5000; // 5 Sekunden Sicherheitsfenster
+
+  // Versuche Lock mehrfach, falls er hängt
+  let acquired = false;
+  try {
+    // Wenn Redis nicht verbunden ist, nicht versuchen
+    // (node-redis v4 hat isOpen / isReady; wir nutzen das defensiv)
+    const canUseRedis = !!redis && (redis as any).isOpen !== false;
+    if (canUseRedis) {
+      for (let i = 0; i < 5; i++) {
+        const ok = await redis?.set(redisKey, "1", { NX: true, PX: lockTTL });
+        if (ok) { acquired = true; break; }
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    }
+
+    if (!acquired) {
+      // ❗ Kein Hard-Fail mehr – wir verlassen uns auf den DB-Row-Lock (SELECT … FOR UPDATE)
+      console.warn(`[billing] ⚠️ Proceeding without Redis lock for user ${userId} (falling back to DB row lock)`);
+    }
+  } catch (e) {
+    // Ebenfalls kein Hard-Fail – Redis kann fehlen, DB-Sperre bleibt robust
+    console.warn(`[billing] ⚠️ Redis lock attempt failed for user ${userId}, using DB row lock`, e);
+  }
+
+  try {
+    const result = await db.$transaction(async (tx) => {
+      // 🔒 Row-Lock gegen Race-Conditions (SELECT FOR UPDATE)
+      await tx.$executeRawUnsafe(`SELECT * FROM "CreditBalance" WHERE "userId" = $1 FOR UPDATE`, userId);
     const [sub, userRecord] = await Promise.all([
       tx.subscription.findFirst({
         where: { userId, status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] } },
@@ -196,6 +228,19 @@ export async function ensureAndConsumeCredits(userId: string, args: ConsumeArgs)
         err.code = "INSUFFICIENT_SLIDE_CREDITS";
         throw err;
       }
+
+    // 🔄 Notify frontend to update sidebar usage (credits live refresh)
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/billing/usage/revalidate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!res.ok) console.warn("Usage revalidate failed");
+    } catch (e) {
+      console.warn("Usage refresh call failed", e);
+    }
+
       return { ok: true as const };
     }
 
@@ -214,9 +259,35 @@ export async function ensureAndConsumeCredits(userId: string, args: ConsumeArgs)
       err.code = "INSUFFICIENT_AI_CREDITS";
       throw err;
     }
+
+    // 🔄 Notify frontend to update sidebar usage (credits live refresh)
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/billing/usage/revalidate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!res.ok) console.warn("Usage revalidate failed");
+    } catch (e) {
+      console.warn("Usage refresh call failed", e);
+    }
+
     console.debug("[billing] ensureAndConsumeCredits:success", { userId, kind: args.kind, cost });
     return { ok: true as const };
-  });
+    });
+
+    return result;
+  } finally {
+    // Nur freigeben, wenn auch wirklich erworben
+    if (acquired) {
+      try {
+        await redis?.del(redisKey);
+        console.debug(`[billing] 🔓 Lock released for user ${userId}`);
+      } catch (err) {
+        console.warn(`[billing] ⚠️ Failed to release lock for user ${userId}`, err);
+      }
+    }
+  }
 }
 
 /**
@@ -364,4 +435,35 @@ export function isActiveStripeSubscriptionStatus(
   status: Stripe.Subscription.Status,
 ): boolean {
   return ACTIVE_STRIPE_STATUSES.has(status);
+}
+
+export async function resetAllCredits(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  plan: Plan,
+  nextResetAt: Date
+) {
+  const limits = PLAN_CREDITS?.[plan] ?? { credits: 0, ai: 0 };
+  const slides = Number.isFinite(limits.credits) ? limits.credits : 0;
+  const ai = Number.isFinite(limits.ai) ? limits.ai : 0;
+
+  if (!PLAN_CREDITS?.[plan]) {
+    console.warn("[resetAllCredits] ⚠️ unknown plan:", plan, "→ using defaults");
+  }
+
+  await tx.creditBalance.deleteMany({ where: { userId } });
+  await tx.creditBalance.create({
+    data: {
+      userId,
+      credits: slides,
+      aiCredits: ai,
+      usedCredits: 0,
+      usedAiCredits: 0,
+      resetsAt: nextResetAt,
+    },
+  });
+
+  console.log(
+    `[resetAllCredits] ✅ balance reset for ${plan} → slides=${slides}, ai=${ai}`
+  );
 }

@@ -2,10 +2,16 @@
 
 import { useEffect, useState } from "react";
 
+import { use } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+
+import useSWR from "swr";
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface UsageResponse {
   aiLeft?: number;
@@ -23,83 +29,68 @@ type UsageState = {
 };
 
 export function SidebarUsageSummary() {
-  const [usage, setUsage] = useState<UsageState | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
   const [isBillingRedirecting, setIsBillingRedirecting] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
+  // Get user ID from localStorage for cache tagging
+  const getUserId = () => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("uid") ?? "anon";
+    }
+    return "anon";
+  };
 
-    const load = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch("/api/billing/limits", {
-          cache: "no-store",
-        });
-        if (!response.ok) {
-          throw new Error("Failed to load usage limits");
-        }
-        const data: UsageResponse = await response.json();
-        if (!isMounted) return;
+  const { data: usageData, isLoading, error, mutate } = useSWR(
+    "/api/billing/usage",
+    fetcher,
+    {
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      refreshInterval: 30000,
+      tags: [`usage-${getUserId()}`],
+    }
+  );
 
-        setUsage({
-          aiLeft:
-            typeof data.aiLeft === "number"
-              ? data.aiLeft
-              : Number.isFinite(data.aiLeft)
-                ? Number(data.aiLeft)
-                : data.aiLeft === Infinity
-                  ? Number.POSITIVE_INFINITY
-                  : null,
-          slidesLeft:
-            typeof data.slidesLeft === "number"
-              ? data.slidesLeft
-              : data.slidesLeft === Infinity
-                ? Number.POSITIVE_INFINITY
-                : null,
-          plan: data.plan ?? null,
-          unlimitedSlides: Boolean(data.unlimited),
-          hasActiveSubscription: Boolean(data.plan),
-        });
-        setIsError(false);
-      } catch (error) {
-        console.error("Failed to fetch usage limits", error);
-        if (!isMounted) return;
-        setIsError(true);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
+  const usage = usageData ? {
+    aiLeft:
+      typeof usageData.aiCredits === "number"
+        ? usageData.aiCredits
+        : Number.isFinite(usageData.aiCredits)
+          ? Number(usageData.aiCredits)
+          : usageData.aiCredits === Infinity
+            ? Number.POSITIVE_INFINITY
+            : null,
+    slidesLeft:
+      typeof usageData.credits === "number"
+        ? usageData.credits
+        : usageData.credits === Infinity
+          ? Number.POSITIVE_INFINITY
+          : null,
+    plan: usageData.plan ?? null,
+    unlimitedSlides: usageData.credits < 0 || usageData.credits === Infinity,
+    hasActiveSubscription: Boolean(usageData.plan),
+  } : null;
 
-    void load();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const isError = !!error;
 
   const renderInfinite = (value: number | null) =>
     value !== null && !Number.isFinite(value);
 
   const renderSlides = () => {
-    if (!usage) return "– slides";
+    if (!usage) return "– credits";
     if (usage.unlimitedSlides || renderInfinite(usage.slidesLeft)) {
-      return "∞ slides";
+      return "∞ credits";
     }
     const count = Math.max(0, Math.floor(usage.slidesLeft ?? 0));
-    return `${count} ${count === 1 ? "slide" : "slides"}`;
+    return `${count} ${count === 1 ? "credit" : "credits"}`;
   };
 
   const renderAiCredits = () => {
-    if (!usage) return "– credits";
+    if (!usage) return "– ai credits";
     if (renderInfinite(usage.aiLeft)) {
-      return "∞ credits";
+      return "∞ ai credits";
     }
     const count = Math.max(0, Math.floor(usage.aiLeft ?? 0));
-    return `${count} ${count === 1 ? "credit" : "credits"}`;
+    return `${count} ${count === 1 ? "ai credit" : "ai credits"}`;
   };
 
   if (isError) {
@@ -184,4 +175,17 @@ export function SidebarUsageSummary() {
       </div>
     </div>
   );
+}
+
+// Export a function to manually refresh usage data
+export function refreshUsageData() {
+  if (typeof window !== "undefined") {
+    // Trigger revalidation by calling the revalidate endpoint
+    const userId = localStorage.getItem("uid") ?? "anon";
+    fetch("/api/billing/usage/revalidate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    }).catch(console.warn);
+  }
 }
