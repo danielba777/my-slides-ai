@@ -185,6 +185,7 @@ src/app/opengraph-image.tsx
 src/app/page.tsx
 src/app/privacy/page.tsx
 src/app/robots.ts
+src/app/sitemap.ts
 src/app/terms/page.tsx
 src/canvas/CanvasToolbar.tsx
 src/canvas/commands.ts
@@ -7778,85 +7779,6 @@ export async function POST() {
 }
 </file>
 
-<file path="src/app/api/billing/usage/route.ts">
-import { NextResponse } from "next/server";
-import { auth } from "@/server/auth";
-import { db } from "@/server/db";
-import { normalizeCreditBalance } from "@/server/billing";
-
-import { revalidateTag } from "next/cache";
-
-// ✅ New route for triggering live updates (called from server)
-export async function POST(req: Request) {
-  try {
-    const { userId } = await req.json();
-    if (!userId) return NextResponse.json({ success: false }, { status: 400 });
-    revalidateTag(`usage-${userId}`);
-    return NextResponse.json({ success: true });
-  } catch (e) {
-    return NextResponse.json({ success: false }, { status: 500 });
-  }
-}
-
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
-  console.debug("[api][billing/usage] session", { userId: session.user.id });
-  const { user, balance } = await db.$transaction(async (tx) => {
-    const [userRecord, bal] = await Promise.all([
-      tx.user.findUnique({
-        where: { id: session.user.id },
-        select: {
-          plan: true, // kann null sein = Free
-          planRenewsAt: true,
-          stripeCustomerId: true,
-          subscriptions: {
-            select: { status: true, currentPeriodEnd: true, stripeSubscriptionId: true, stripePriceId: true },
-            orderBy: { updatedAt: "desc" },
-            take: 1,
-          },
-        },
-      }),
-      normalizeCreditBalance(tx, session.user.id),
-    ]);
-    console.debug("[api][billing/usage] tx result", { userId: session.user.id, hasUser: !!userRecord, balance: bal });
-    return { user: userRecord, balance: bal };
-  });
-
-  if (!user) {
-    console.warn("[api][billing/usage] user missing", { userId: session.user?.id });
-    return new NextResponse("User not found", { status: 404 });
-  }
-
-  const latestSub = user?.subscriptions?.[0] ?? null;
-  const hasPlan = !!user?.plan;
-  console.debug("[api][billing/usage] computed", { userId: session.user.id, hasPlan, plan: user.plan, latestStatus: latestSub?.status, balance });
-  // Bei Free-Plan keine "0 left"-Falle durch alte Balance:
-  // Falls kein Plan und keine Balance vorhanden -> 5/0 zurueckgeben (UI zeigt dann korrekt 0/5 verwendet)
-  const freeCredits = !hasPlan ? (balance?.credits ?? 5) : null;
-  const freeAi = !hasPlan ? (balance?.aiCredits ?? 0) : null;
-  const freeUsedCredits = !hasPlan ? (balance?.usedCredits ?? 0) : null;
-  const freeUsedAi = !hasPlan ? (balance?.usedAiCredits ?? 0) : null;
-  const payload = {
-    plan: hasPlan ? user.plan : null,
-    status: latestSub?.status ?? null,
-    credits: hasPlan ? (balance?.credits ?? 0) : freeCredits,
-    aiCredits: hasPlan ? (balance?.aiCredits ?? 0) : freeAi,
-    usedCredits: hasPlan ? (balance?.usedCredits ?? 0) : freeUsedCredits,
-    usedAiCredits: hasPlan ? (balance?.usedAiCredits ?? 0) : freeUsedAi,
-    resetsAt: hasPlan ? (balance?.resetsAt ?? user?.planRenewsAt ?? null) : null,
-    stripePriceId: latestSub?.stripePriceId ?? null,
-    stripeSubscriptionId: latestSub?.stripeSubscriptionId ?? null,
-    hasCustomer: !!user?.stripeCustomerId,
-    hasSubscription: !!latestSub?.stripeSubscriptionId,
-  };
-  console.debug("[api][billing/usage] response", { userId: session.user.id, payload });
-  return NextResponse.json(payload);
-}
-</file>
-
 <file path="src/app/api/files/[...path]/route.ts">
 import { NextRequest, NextResponse } from "next/server";
 
@@ -9698,205 +9620,6 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ url: portal.url });
-}
-</file>
-
-<file path="src/app/api/stripe/webhook/route.ts">
-import { NextResponse } from "next/server";
-import { stripe } from "@/server/stripe";
-import { db } from "@/server/db";
-import { planFromPrice, resetAllCredits } from "@/server/billing";
-import { carryOverCreditsOnPlanChange } from "@/server/billing";
-
-// 🧩 Idempotenz-Tabelle prüfen und markieren
-async function isAlreadyProcessed(eventId: string) {
-  const found = await db.processedWebhook.findUnique({ where: { id: eventId } });
-  return !!found;
-}
-
-async function markProcessed(eventId: string, type: string) {
-  await db.processedWebhook.create({ data: { id: eventId, type } });
-}
-
-import type Stripe from "stripe";
-import { addMonths } from "date-fns";
-
-export async function POST(req: Request) {
-  const sig = req.headers.get("stripe-signature");
-  if (!sig) return new NextResponse("No signature", { status: 400 });
-
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(
-      await req.text(),
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    );
-  } catch (err) {
-    console.error("Webhook signature verification failed:", err);
-    return new NextResponse("Invalid signature", { status: 400 });
-  }
-
-  try {
-    // Handle only relevant events
-    switch (event.type) {
-      case "invoice.payment_succeeded": {
-        // 🧩 Doppel-Events vermeiden (Stripe Retries)
-        if (await isAlreadyProcessed(event.id)) {
-          console.log(`[webhook] Skipping duplicate event ${event.id}`);
-          return new NextResponse("OK", { status: 200 });
-        }
-
-        const invoice = event.data.object as Stripe.Invoice;
-        const customerId = invoice.customer as string;
-        // Stripe-Typen für InvoiceLineItem haben nicht immer 'price' getypt → defensiv über 'any'
-        const firstLine: any = invoice.lines?.data?.[0] ?? null;
-        const priceId: string | null =
-          firstLine?.price?.id ??
-          (typeof firstLine?.price === "string" ? firstLine.price : null);
-        const mappedPlan = planFromPrice(priceId ?? undefined);
-        if (!mappedPlan) {
-          console.warn("[webhook] ⚠️ invoice.payment_succeeded ohne zuordenbaren Plan", { priceId });
-          await markProcessed(event.id, event.type);
-          return new NextResponse("OK", { status: 200 });
-        }
-        const nextResetAt = addMonths(new Date(), 1);
-
-        const user = await db.user.findFirst({
-          where: { stripeCustomerId: customerId },
-          select: { id: true },
-        });
-        // 🧩 Fallback: Customer unbekannt → Sync anstoßen
-        if (!user?.id) {
-          console.warn(`[webhook] ⚠️ Unknown Stripe customer ${customerId}, triggering resync job`);
-          fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/billing/sync?customerId=${customerId}`, { method: "POST" })
-            .catch((err) => console.error("[webhook] Failed to trigger resync:", err));
-          return new NextResponse("OK", { status: 200 });
-        }
-
-        await db.$transaction(async (tx) => {
-          // 1) User-Plan & planRenewsAt konsistent setzen
-          await tx.user.update({
-            where: { id: user.id },
-            data: {
-              plan: mappedPlan,
-              planRenewsAt: nextResetAt,
-            },
-          });
-
-          // 2) Credits intelligent neu berechnen (Carry-Over statt Hard-Reset)
-          const prevUser = await tx.user.findUnique({
-            where: { id: user.id },
-            select: { plan: true },
-          });
-          await carryOverCreditsOnPlanChange(
-            tx,
-            user.id,
-            prevUser?.plan ?? null,
-            mappedPlan,
-            nextResetAt
-          );
-        });
-
-        await markProcessed(event.id, event.type);
-
-        return new NextResponse("OK", { status: 200 });
-      }
-
-      case "customer.subscription.updated": {
-        try {
-          const sub = event.data.object as Stripe.Subscription;
-          const customerId =
-            typeof sub.customer === "string" ? sub.customer : undefined;
-
-          if (!customerId) {
-            console.warn("[webhook] ⚠️ subscription.updated ohne customerId");
-            return new NextResponse("OK", { status: 200 });
-          }
-
-          const user = await db.user.findFirst({
-            where: { stripeCustomerId: customerId },
-            select: { id: true },
-          });
-          if (!user?.id) {
-            console.warn("[webhook] ⚠️ kein User gefunden zu", customerId);
-            return new NextResponse("OK", { status: 200 });
-          }
-
-          const firstItem = sub.items?.data?.[0];
-          const priceId =
-            typeof firstItem?.price === "string"
-              ? firstItem.price
-              : firstItem?.price?.id ?? null;
-
-          if (!priceId) {
-            console.warn("[webhook] ⚠️ kein priceId in subscription.updated");
-            return new NextResponse("OK", { status: 200 });
-          }
-
-          const mappedPlan = planFromPrice(priceId);
-          if (!mappedPlan) {
-            console.warn("[webhook] ⚠️ keine Zuordnung für priceId", priceId);
-            return new NextResponse("OK", { status: 200 });
-          }
-
-          // Einige Stripe-Typdefinitionen expose'n 'current_period_end' nicht explizit → schmaler Cast
-          const subAny = sub as Stripe.Subscription & { current_period_end?: number };
-          const nextPeriodEnd =
-            subAny.current_period_end ?? Math.floor(Date.now() / 1000);
-
-          const nextResetAt = new Date(nextPeriodEnd * 1000);
-          if (isNaN(nextResetAt.getTime())) {
-            console.warn("[webhook] ⚠️ ungültiges Datum:", nextPeriodEnd);
-            return new NextResponse("OK", { status: 200 });
-          }
-
-          await db.$transaction(async (tx) => {
-            await tx.user.update({
-              where: { id: user.id },
-              data: { plan: mappedPlan, planRenewsAt: nextResetAt },
-            });
-            await resetAllCredits(tx, user.id, mappedPlan, nextResetAt);
-          });
-
-          console.log(
-            `[webhook] ✅ subscription.updated OK: plan=${mappedPlan}, renewsAt=${nextResetAt.toISOString()}`
-          );
-        } catch (err) {
-          console.error(
-            "[webhook] ❌ subscription.updated – unexpected error:",
-            err
-          );
-        }
-
-        return new NextResponse("OK", { status: 200 });
-      }
-
-      default:
-        return new NextResponse("OK", { status: 200 });
-    }
-  } catch (err) {
-    console.error("[STRIPE][WEBHOOK] handler error:", {
-      eventId: event?.id,
-      type: event?.type,
-      message: (err as Error)?.message,
-      stack: (err as Error)?.stack,
-    });
-
-    // 🧩 optional: Logging zu Sentry
-    if (process.env.SENTRY_DSN) {
-      try {
-        // String-Literal vermeiden, damit TS keine Typauflösung des Moduls verlangt
-        const mod = "@sentry/nextjs";
-        const S: any = await import(mod as any);
-        S.captureException(err, {
-          extra: { eventId: event?.id, type: event?.type },
-        });
-      } catch {}
-    }
-
-    return NextResponse.json({ ok: false, error: "Webhook handler error" }, { status: 500 });
-  }
 }
 </file>
 
@@ -12127,6 +11850,24 @@ export default function PrivacyPolicyPage() {
       </div>
     </main>
   );
+}
+</file>
+
+<file path="src/app/sitemap.ts">
+import type { MetadataRoute } from "next";
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  const base =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://slidescockpit.com");
+
+  const lastMod = new Date();
+  return [
+    { url: `${base}/`, lastModified: lastMod, changeFrequency: "weekly", priority: 1 },
+    { url: `${base}/pricing`, lastModified: lastMod, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${base}/privacy`, lastModified: lastMod, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${base}/terms`, lastModified: lastMod, changeFrequency: "yearly", priority: 0.3 },
+  ];
 }
 </file>
 
@@ -17175,200 +16916,6 @@ export function SidebarSupportButton() {
       </DialogContent>
     </Dialog>
   );
-}
-</file>
-
-<file path="src/components/app-sidebar-usage.tsx">
-"use client";
-
-import { useEffect, useState } from "react";
-
-import { use } from "react";
-
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
-
-import useSWR from "swr";
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
-interface UsageResponse {
-  aiLeft?: number;
-  slidesLeft?: number;
-  plan?: string | null;
-  unlimited?: boolean;
-}
-
-type UsageState = {
-  aiLeft: number | null;
-  slidesLeft: number | null;
-  plan: string | null;
-  unlimitedSlides: boolean;
-  hasActiveSubscription: boolean;
-};
-
-export function SidebarUsageSummary() {
-  const [isBillingRedirecting, setIsBillingRedirecting] = useState(false);
-
-  // Get user ID from localStorage for cache tagging
-  const getUserId = () => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("uid") ?? "anon";
-    }
-    return "anon";
-  };
-
-  const { data: usageData, isLoading, error, mutate } = useSWR(
-    "/api/billing/usage",
-    fetcher,
-    {
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
-      refreshInterval: 30000,
-      tags: [`usage-${getUserId()}`],
-    }
-  );
-
-  const usage = usageData ? {
-    aiLeft:
-      typeof usageData.aiCredits === "number"
-        ? usageData.aiCredits
-        : Number.isFinite(usageData.aiCredits)
-          ? Number(usageData.aiCredits)
-          : usageData.aiCredits === Infinity
-            ? Number.POSITIVE_INFINITY
-            : null,
-    slidesLeft:
-      typeof usageData.credits === "number"
-        ? usageData.credits
-        : usageData.credits === Infinity
-          ? Number.POSITIVE_INFINITY
-          : null,
-    plan: usageData.plan ?? null,
-    unlimitedSlides: usageData.credits < 0 || usageData.credits === Infinity,
-    hasActiveSubscription: Boolean(usageData.plan),
-  } : null;
-
-  const isError = !!error;
-
-  const renderInfinite = (value: number | null) =>
-    value !== null && !Number.isFinite(value);
-
-  const renderSlides = () => {
-    if (!usage) return "– credits";
-    if (usage.unlimitedSlides || renderInfinite(usage.slidesLeft)) {
-      return "∞ credits";
-    }
-    const count = Math.max(0, Math.floor(usage.slidesLeft ?? 0));
-    return `${count} ${count === 1 ? "credit" : "credits"}`;
-  };
-
-  const renderAiCredits = () => {
-    if (!usage) return "– ai credits";
-    if (renderInfinite(usage.aiLeft)) {
-      return "∞ ai credits";
-    }
-    const count = Math.max(0, Math.floor(usage.aiLeft ?? 0));
-    return `${count} ${count === 1 ? "ai credit" : "ai credits"}`;
-  };
-
-  if (isError) {
-    return (
-      <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-        Unable to load usage
-      </div>
-    );
-  }
-
-  if (isLoading || !usage) {
-    return (
-      <div
-        className={cn(
-          "rounded-xl border-zinc-300 border px-3 py-3 text-xs flex flex-col gap-2",
-          "bg-[#F1F2ED]",
-        )}
-      >
-        <Skeleton className="h-4 w-32 mx-auto" />
-        <Skeleton className="h-3 w-28 mx-auto" />
-        <Skeleton className="h-8 w-full rounded-sm" />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        "rounded-xl border-zinc-300 border px-3 py-2 text-xs flex flex-col gap-1",
-        "bg-[#F1F2ED] text-sidebar-foreground/90",
-      )}
-    >
-      <div className="text-sm text-center font-medium text-sidebar-foreground">
-        <span>{renderSlides()}</span>
-        <span className="mx-2 text-sidebar-foreground/60">|</span>
-        <span>{renderAiCredits()}</span>
-      </div>
-      <div className="flex items-center justify-center text-sidebar-foreground text-center">
-        {usage.plan ? (
-          <span className="text-[11px] uppercase tracking-wide text-sidebar-foreground/60">
-            {usage.plan} Plan
-          </span>
-        ) : (
-          <span className="text-[11px] uppercase tracking-wide text-sidebar-foreground/60">
-            No active subscription
-          </span>
-        )}
-      </div>
-      <div className="">
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full rounded-sm border-sidebar-border/80 bg-[#F7F8F3]/60 text-sidebar-foreground hover:bg-sidebar/70 disabled:opacity-40"
-          disabled={!usage.hasActiveSubscription || isBillingRedirecting}
-          onClick={async () => {
-            if (!usage.hasActiveSubscription) {
-              return;
-            }
-            try {
-              setIsBillingRedirecting(true);
-              const response = await fetch("/api/billing/portal", {
-                method: "POST",
-              });
-              if (!response.ok) {
-                throw new Error("Failed to open billing portal");
-              }
-              const data = (await response.json()) as { url?: string };
-              if (!data.url) {
-                throw new Error("Missing billing portal URL");
-              }
-              window.location.assign(data.url);
-            } catch (error) {
-              console.error(error);
-              toast.error("Could not open billing portal");
-            } finally {
-              setIsBillingRedirecting(false);
-            }
-          }}
-        >
-          Manage Plan
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// Export a function to manually refresh usage data
-export function refreshUsageData() {
-  if (typeof window !== "undefined") {
-    // Trigger revalidation by calling the revalidate endpoint
-    const userId = localStorage.getItem("uid") ?? "anon";
-    fetch("/api/billing/usage/revalidate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId }),
-    }).catch(console.warn);
-  }
 }
 </file>
 
@@ -52443,15 +51990,18 @@ export function MultiSlideImageSelector({
 
   // Drill-down navigation state
   const [drillDownParent, setDrillDownParent] = useState<ImageSet | null>(null);
+  // Alle von irgendeinem User "owned" (private Kollektionen) für Community-Filter
+  const [allOwned, setAllOwned] = useState<Set<string>>(new Set());
 
   const IMAGES_PER_PAGE = 27; // 9 columns x 3 rows
 
   const loadImageSets = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [setsRes, ownedRes] = await Promise.all([
+      const [setsRes, ownedRes, allRes] = await Promise.all([
         fetch("/api/imagesets", { cache: "no-store" }),
         fetch("/api/user-image-collections", { cache: "no-store" }),
+        fetch("/api/user-image-collections/all", { cache: "no-store" }),
       ]);
 
       if (!setsRes.ok) {
@@ -52463,6 +52013,9 @@ export function MultiSlideImageSelector({
         ? ((await ownedRes.json()) as { ownedIds?: string[] })
         : null;
       const ownedIds = new Set<string>(ownedPayload?.ownedIds ?? []);
+      const allPayload = allRes.ok ? await allRes.json() : null;
+      const allOwnedIds = new Set<string>(allPayload?.allOwnedIds ?? []);
+      setAllOwned(allOwnedIds);
 
       if (Array.isArray(data)) {
         const normalized = data.map((set: ImageSet) =>
@@ -52510,55 +52063,46 @@ export function MultiSlideImageSelector({
     );
   }, []);
 
-  const looksPersonal = useCallback(
-    (set: ImageSet) =>
+  const looksPersonal = useCallback((set: ImageSet) => {
+    return (
       hasPersonalCategoryTag(set.category) ||
       hasPersonalCategoryTag(set.slug) ||
-      hasPersonalCategoryTag(set.name),
-    [],
-  );
+      hasPersonalCategoryTag(set.name)
+    );
+  }, []);
 
+  // "Mine" = nur echte Ownership ODER AI-Avatar-Kollektionen
   const belongsToUser = useCallback(
     (set: ImageSet) =>
-      checkOwnership(set, userId ?? null) ||
-      looksPersonal(set) ||
-      isAiAvatarCollection(set),
-    [isAiAvatarCollection, looksPersonal, userId],
+      checkOwnership(set, userId ?? null) || isAiAvatarCollection(set),
+    [isAiAvatarCollection, userId],
   );
 
   const { communitySets, mySets } = useMemo(() => {
-    // If drilling down, show only children of selected parent
+    // Drilldown: Kinder des Parents
     if (drillDownParent) {
       const children = drillDownParent.children || [];
-      const community: ImageSet[] = [];
-      const mine: ImageSet[] = [];
-
-      children.forEach((set) => {
-        if (belongsToUser(set)) {
-          mine.push(set);
-        } else {
-          community.push(set);
-        }
-      });
-
+      const mine = children.filter(belongsToUser);
+      const community = children.filter(
+        (s) =>
+          !allOwned.has(s.id) && // keine User-Collections (von irgendwem)
+          !looksPersonal(s) &&   // keine "personal" getaggten
+          !isAiAvatarCollection(s), // keine AI-Avatars in Community
+      );
       return { communitySets: community, mySets: mine };
     }
 
-    // Otherwise show top-level sets
-    const community: ImageSet[] = [];
-    const mine: ImageSet[] = [];
-    const topLevelSets = imageSets.filter((set) => !set.parentId);
-
-    topLevelSets.forEach((set) => {
-      if (belongsToUser(set)) {
-        mine.push(set);
-      } else {
-        community.push(set);
-      }
-    });
-
+    // Top-Level
+    const topLevel = imageSets.filter((s) => !s.parentId);
+    const mine = topLevel.filter(belongsToUser);
+    const community = topLevel.filter(
+      (s) =>
+        !allOwned.has(s.id) &&
+        !looksPersonal(s) &&
+        !isAiAvatarCollection(s),
+    );
     return { communitySets: community, mySets: mine };
-  }, [belongsToUser, imageSets, drillDownParent]);
+  }, [belongsToUser, drillDownParent, imageSets, allOwned, looksPersonal, isAiAvatarCollection]);
 
   const handleSelectImage = (imageUrl: string) => {
     setPendingImageUrls((prev) => {
@@ -54363,15 +53907,18 @@ export function SingleSlideImageSelector({
 
   // Drill-down navigation state
   const [drillDownParent, setDrillDownParent] = useState<ImageSet | null>(null);
+  // Alle von irgendeinem User "owned" (private Kollektionen) für Community-Filter
+  const [allOwned, setAllOwned] = useState<Set<string>>(new Set());
 
   const IMAGES_PER_PAGE = 27; // 9 columns x 3 rows
 
   const loadImageSets = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [setsRes, ownedRes] = await Promise.all([
+      const [setsRes, ownedRes, allRes] = await Promise.all([
         fetch("/api/imagesets", { cache: "no-store" }),
         fetch("/api/user-image-collections", { cache: "no-store" }),
+        fetch("/api/user-image-collections/all", { cache: "no-store" }),
       ]);
 
       if (!setsRes.ok) {
@@ -54383,6 +53930,9 @@ export function SingleSlideImageSelector({
         ? ((await ownedRes.json()) as { ownedIds?: string[] })
         : null;
       const ownedIds = new Set<string>(ownedPayload?.ownedIds ?? []);
+      const allPayload = allRes.ok ? await allRes.json() : null;
+      const allOwnedIds = new Set<string>(allPayload?.allOwnedIds ?? []);
+      setAllOwned(allOwnedIds);
 
       if (Array.isArray(data)) {
         const normalized = data.map((set: ImageSet) =>
@@ -54430,55 +53980,46 @@ export function SingleSlideImageSelector({
     );
   }, []);
 
-  const looksPersonal = useCallback(
-    (set: ImageSet) =>
+  const looksPersonal = useCallback((set: ImageSet) => {
+    return (
       hasPersonalCategoryTag(set.category) ||
       hasPersonalCategoryTag(set.slug) ||
-      hasPersonalCategoryTag(set.name),
-    [],
-  );
+      hasPersonalCategoryTag(set.name)
+    );
+  }, []);
 
+  // "Mine" = nur echte Ownership ODER AI-Avatar-Kollektionen
   const belongsToUser = useCallback(
     (set: ImageSet) =>
-      checkOwnership(set, userId ?? null) ||
-      looksPersonal(set) ||
-      isAiAvatarCollection(set),
-    [isAiAvatarCollection, looksPersonal, userId],
+      checkOwnership(set, userId ?? null) || isAiAvatarCollection(set),
+    [isAiAvatarCollection, userId],
   );
 
   const { communitySets, mySets } = useMemo(() => {
-    // If drilling down, show only children of selected parent
+    // Drilldown: Kinder des Parents
     if (drillDownParent) {
       const children = drillDownParent.children || [];
-      const community: ImageSet[] = [];
-      const mine: ImageSet[] = [];
-
-      children.forEach((set) => {
-        if (belongsToUser(set)) {
-          mine.push(set);
-        } else {
-          community.push(set);
-        }
-      });
-
+      const mine = children.filter(belongsToUser);
+      const community = children.filter(
+        (s) =>
+          !allOwned.has(s.id) && // keine User-Collections (von irgendwem)
+          !looksPersonal(s) &&   // keine "personal" getaggten
+          !isAiAvatarCollection(s), // keine AI-Avatars in Community
+      );
       return { communitySets: community, mySets: mine };
     }
 
-    // Otherwise show top-level sets
-    const community: ImageSet[] = [];
-    const mine: ImageSet[] = [];
-    const topLevelSets = imageSets.filter((set) => !set.parentId);
-
-    topLevelSets.forEach((set) => {
-      if (belongsToUser(set)) {
-        mine.push(set);
-      } else {
-        community.push(set);
-      }
-    });
-
+    // Top-Level
+    const topLevel = imageSets.filter((s) => !s.parentId);
+    const mine = topLevel.filter(belongsToUser);
+    const community = topLevel.filter(
+      (s) =>
+        !allOwned.has(s.id) &&
+        !looksPersonal(s) &&
+        !isAiAvatarCollection(s),
+    );
     return { communitySets: community, mySets: mine };
-  }, [belongsToUser, imageSets, drillDownParent]);
+  }, [belongsToUser, drillDownParent, imageSets, allOwned, looksPersonal, isAiAvatarCollection]);
 
   const handleSelectImage = (imageUrl: string) => {
     const effectiveParent =
@@ -72178,478 +71719,6 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
 });
 </file>
 
-<file path="src/server/billing.ts">
-// server-only Funktionen rund um Billing/Credits
-import "server-only";
-import { db } from "@/server/db";
-import { env } from "@/env";
-import type {
-  CreditBalance,
-  Plan,
-  Prisma,
-  SubscriptionStatus,
-} from "@prisma/client";
-import type Stripe from "stripe";
-import { PLAN_CREDITS, FREE_SLIDESHOW_QUOTA } from "@/lib/billing";
-import { redis } from "@/server/redis";
-
-type BillingTransactionClient = Prisma.TransactionClient;
-
-export function planFromPrice(priceId?: string): Plan | undefined {
-  if (!priceId) return undefined;
-  if (priceId === env.STRIPE_PRICE_STARTER) return "STARTER";
-  if (priceId === env.STRIPE_PRICE_GROWTH) return "GROWTH";
-  if (priceId === env.STRIPE_PRICE_SCALE) return "SCALE";
-  if (priceId === env.STRIPE_PRICE_UNLIMITED) return "UNLIMITED";
-  return undefined;
-}
-
-export async function normalizeCreditBalance(
-  tx: BillingTransactionClient,
-  userId: string,
-): Promise<CreditBalance | null> {
-  const records = await tx.creditBalance.findMany({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
-  });
-  if (records.length === 0) return null;
-  if (records.length === 1) return records[0]!;
-
-  const latest = records[0]!;
-  await tx.creditBalance.deleteMany({ where: { userId } });
-  const normalized = await tx.creditBalance.create({
-    data: {
-      userId,
-      credits: latest.credits,
-      aiCredits: latest.aiCredits,
-      usedCredits: latest.usedCredits,
-      usedAiCredits: latest.usedAiCredits,
-      resetsAt: latest.resetsAt,
-    },
-  });
-  return normalized;
-}
-
-export async function getUsageLimits(userId: string) {
-  return await db.$transaction(async (tx) => {
-    const [userRecord, rawBal] = await Promise.all([
-      tx.user.findUnique({
-        where: { id: userId },
-        select: { plan: true },
-      }),
-      normalizeCreditBalance(tx, userId),
-    ]);
-    let bal = rawBal;
-
-    const plan = userRecord?.plan ?? null;
-    const allowances = plan ? PLAN_CREDITS[plan] : null;
-    const unlimitedSlides = !!allowances && allowances.credits < 0;
-    const unlimitedAi = !!allowances && allowances.ai < 0;
-
-    if (bal && allowances) {
-      const updates: Record<string, number> = {};
-      if (allowances.credits < 0 && bal.credits !== -1) {
-        updates.credits = -1;
-      } else if (allowances.credits >= 0 && bal.credits < 0) {
-        updates.credits = allowances.credits;
-      }
-      if (allowances.ai < 0 && bal.aiCredits !== -1) {
-        updates.aiCredits = -1;
-      } else if (allowances.ai >= 0 && bal.aiCredits < 0) {
-        updates.aiCredits = allowances.ai;
-      }
-      if (Object.keys(updates).length > 0) {
-        bal = await tx.creditBalance.update({
-          where: { userId },
-          data: updates,
-        });
-      }
-    }
-
-    const storedSlides = bal?.credits ?? null;
-    const storedAi = bal?.aiCredits ?? null;
-
-    let slidesLeft: number;
-    if (!plan) {
-      const freeCredits = storedSlides ?? FREE_SLIDESHOW_QUOTA;
-      slidesLeft = Math.max(0, freeCredits);
-    } else if (unlimitedSlides || (storedSlides ?? 0) < 0) {
-      slidesLeft = Number.POSITIVE_INFINITY;
-    } else {
-      const fallback = allowances?.credits ?? 0;
-      slidesLeft = Math.max(0, storedSlides ?? fallback);
-    }
-
-    let aiLeft: number;
-    if (!plan) {
-      aiLeft = Math.max(0, storedAi ?? 0);
-    } else if (unlimitedAi || (storedAi ?? 0) < 0) {
-      aiLeft = Number.POSITIVE_INFINITY;
-    } else {
-      const fallback = allowances?.ai ?? 0;
-      aiLeft = Math.max(0, storedAi ?? fallback);
-    }
-
-    const result = { plan, unlimited: unlimitedSlides, slidesLeft, aiLeft };
-    return result;
-  });
-}
-
-type ConsumeArgs =
-  | { kind: "slide"; cost?: number }
-  | { kind: "ai"; cost?: number };
-
-export async function ensureAndConsumeCredits(userId: string, args: ConsumeArgs) {
-  const cost = Math.max(1, args.cost ?? (args.kind === "ai" ? 2 : 1));
-  console.debug("[billing] ensureAndConsumeCredits:start", { userId, args, cost });
-  // 🧩 Verbesserter Redis-Lock (auto-refresh + safe release)
-  const redis = globalThis.redis;
-  const redisKey = `creditlock:${userId}`;
-  const lockTTL = 5000; // 5 Sekunden Sicherheitsfenster
-
-  // Versuche Lock mehrfach, falls er hängt
-  let acquired = false;
-  try {
-    // Wenn Redis nicht verbunden ist, nicht versuchen
-    // (node-redis v4 hat isOpen / isReady; wir nutzen das defensiv)
-    const canUseRedis = !!redis && (redis as any).isOpen !== false;
-    if (canUseRedis) {
-      for (let i = 0; i < 5; i++) {
-        const ok = await redis?.set(redisKey, "1", { NX: true, PX: lockTTL });
-        if (ok) { acquired = true; break; }
-        await new Promise((r) => setTimeout(r, 500));
-      }
-    }
-
-    if (!acquired) {
-      // ❗ Kein Hard-Fail mehr – wir verlassen uns auf den DB-Row-Lock (SELECT … FOR UPDATE)
-      console.warn(`[billing] ⚠️ Proceeding without Redis lock for user ${userId} (falling back to DB row lock)`);
-    }
-  } catch (e) {
-    // Ebenfalls kein Hard-Fail – Redis kann fehlen, DB-Sperre bleibt robust
-    console.warn(`[billing] ⚠️ Redis lock attempt failed for user ${userId}, using DB row lock`, e);
-  }
-
-  try {
-    const result = await db.$transaction(async (tx) => {
-      // 🔒 Row-Lock gegen Race-Conditions (SELECT FOR UPDATE)
-      await tx.$executeRawUnsafe(`SELECT * FROM "CreditBalance" WHERE "userId" = $1 FOR UPDATE`, userId);
-    const [sub, userRecord] = await Promise.all([
-      tx.subscription.findFirst({
-        where: { userId, status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] } },
-        orderBy: { updatedAt: "desc" },
-      }),
-      tx.user.findUnique({ where: { id: userId }, select: { plan: true } }),
-    ]);
-    const plan = userRecord?.plan ?? null;
-    const allowances = plan ? PLAN_CREDITS[plan] : null;
-    const unlimitedSlides = !!allowances && allowances.credits < 0;
-    const unlimitedAi = !!allowances && allowances.ai < 0;
-
-    let bal = await normalizeCreditBalance(tx, userId);
-    console.debug("[billing] ensureAndConsumeCredits:balanceLoaded", { userId, plan, bal });
-    if (!bal) {
-      const defaultCredits =
-        !plan
-          ? FREE_SLIDESHOW_QUOTA
-          : allowances
-            ? allowances.credits < 0
-              ? -1
-              : allowances.credits
-            : 0;
-      const defaultAi =
-        !plan
-          ? 0
-          : allowances
-            ? allowances.ai < 0
-              ? -1
-              : allowances.ai
-            : 0;
-      bal = await tx.creditBalance.create({
-        data: {
-          userId,
-          credits: defaultCredits,
-          aiCredits: defaultAi,
-          usedCredits: 0,
-          usedAiCredits: 0,
-          resetsAt: sub?.currentPeriodEnd ?? null,
-        },
-      });
-      console.debug("[billing] ensureAndConsumeCredits:createBalance", { userId, plan, bal });
-    } else if (allowances) {
-      const updates: Record<string, number> = {};
-      if (allowances.credits < 0 && bal.credits !== -1) {
-        updates.credits = -1;
-      } else if (allowances.credits >= 0 && bal.credits < 0) {
-        updates.credits = allowances.credits;
-      }
-      if (allowances.ai < 0 && bal.aiCredits !== -1) {
-        updates.aiCredits = -1;
-      } else if (allowances.ai >= 0 && bal.aiCredits < 0) {
-        updates.aiCredits = allowances.ai;
-      }
-      if (Object.keys(updates).length > 0) {
-        bal = await tx.creditBalance.update({
-          where: { userId },
-          data: updates,
-        });
-        console.debug("[billing] ensureAndConsumeCredits:updateSentinels", { userId, updates, bal });
-      }
-    }
-
-    if (args.kind === "slide") {
-      if (unlimitedSlides) return { ok: true as const };
-      const updated = await tx.creditBalance.updateMany({
-        where: { userId, credits: { gte: cost } },
-        data: { credits: { decrement: cost }, usedCredits: { increment: cost } },
-      });
-      if (updated.count === 0) {
-        console.warn("[billing] ensureAndConsumeCredits:slideInsufficient", { userId, cost, credits: bal?.credits });
-        const err: any = new Error("INSUFFICIENT_SLIDE_CREDITS");
-        err.code = "INSUFFICIENT_SLIDE_CREDITS";
-        throw err;
-      }
-
-    // 🔄 Notify frontend to update sidebar usage (credits live refresh)
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/billing/usage/revalidate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-      if (!res.ok) console.warn("Usage revalidate failed");
-    } catch (e) {
-      console.warn("Usage refresh call failed", e);
-    }
-
-      return { ok: true as const };
-    }
-
-    const updated = await tx.creditBalance.updateMany({
-      where: {
-        userId,
-        ...(unlimitedAi ? {} : { aiCredits: { gte: cost } }),
-      },
-      data: unlimitedAi
-        ? { usedAiCredits: { increment: cost } }
-        : { aiCredits: { decrement: cost }, usedAiCredits: { increment: cost } },
-    });
-    if (updated.count === 0) {
-      console.warn("[billing] ensureAndConsumeCredits:aiInsufficient", { userId, cost, aiCredits: bal?.aiCredits });
-      const err: any = new Error("INSUFFICIENT_AI_CREDITS");
-      err.code = "INSUFFICIENT_AI_CREDITS";
-      throw err;
-    }
-
-    // 🔄 Notify frontend to update sidebar usage (credits live refresh)
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/billing/usage/revalidate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-      if (!res.ok) console.warn("Usage revalidate failed");
-    } catch (e) {
-      console.warn("Usage refresh call failed", e);
-    }
-
-    console.debug("[billing] ensureAndConsumeCredits:success", { userId, kind: args.kind, cost });
-    return { ok: true as const };
-    });
-
-    return result;
-  } finally {
-    // Nur freigeben, wenn auch wirklich erworben
-    if (acquired) {
-      try {
-        await redis?.del(redisKey);
-        console.debug(`[billing] 🔓 Lock released for user ${userId}`);
-      } catch (err) {
-        console.warn(`[billing] ⚠️ Failed to release lock for user ${userId}`, err);
-      }
-    }
-  }
-}
-
-/**
- * Rewrites the credit balance for a target plan.
- * - Downgrade: usage reset to 0
- * - Upgrade:   usage carried over and remaining = new quota - used
- * - Unlimited: stored as sentinel -1 with usage reset
- */
-export async function carryOverCreditsOnPlanChange(
-  tx: BillingTransactionClient,
-  userId: string,
-  oldPlan: Plan | null,
-  newPlan: Plan,
-  newPeriodEnd: Date | null,
-) {
-  console.debug("[billing] carryOverCreditsOnPlanChange:start", { userId, oldPlan, newPlan, newPeriodEnd });
-  const prevEntries = await tx.creditBalance.findMany({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
-  });
-  const prev = prevEntries[0] ?? null;
-  console.debug("[billing] carryOverCreditsOnPlanChange:prevEntries", {
-    userId,
-    count: prevEntries.length,
-    prev,
-  });
-
-  await tx.creditBalance.deleteMany({ where: { userId } });
-
-  // Altdaten sichern
-  const prevUsedSlides   = prev?.usedCredits    ?? 0;
-  const prevUsedAi       = prev?.usedAiCredits  ?? 0;
-  const prevLeftSlides   = prev?.credits        ?? 0;
-  const prevLeftAi       = prev?.aiCredits      ?? 0;
-  const prevLeftSlidesFinite = prevLeftSlides < 0 ? null : prevLeftSlides;
-  const prevLeftAiFinite = prevLeftAi < 0 ? null : prevLeftAi;
-
-  // Neues Kontingent ermitteln
-  const target = PLAN_CREDITS[newPlan];
-  const newTotalSlides = target.credits < 0 ? Number.POSITIVE_INFINITY : target.credits;
-  const newTotalAi     = target.ai      < 0 ? Number.POSITIVE_INFINITY : target.ai;
-
-  const isUnlimited  = newPlan === "UNLIMITED";
-  const isDowngrade  =
-    !isUnlimited &&
-    (oldPlan && PLAN_CREDITS[oldPlan].credits > 0) &&
-    (PLAN_CREDITS[oldPlan].credits > PLAN_CREDITS[newPlan].credits);
-
-  // Determine used values in a robust way:
-  // a) Prefer stored used counters if present
-  // b) Otherwise derive from remaining credits when the old plan was finite
-  const inferredUsedSlides = Number.isFinite(newTotalSlides)
-    ? (prevUsedSlides || (oldPlan && oldPlan !== "UNLIMITED" && PLAN_CREDITS[oldPlan].credits >= 0 && prevLeftSlidesFinite != null
-        ? Math.max(0, PLAN_CREDITS[oldPlan].credits - prevLeftSlidesFinite)
-        : 0))
-    : 0;
-  const inferredUsedAi = Number.isFinite(newTotalAi)
-    ? (prevUsedAi || (oldPlan && PLAN_CREDITS[oldPlan].ai >= 0 && prevLeftAiFinite != null
-        ? Math.max(0, (PLAN_CREDITS[oldPlan].ai) - prevLeftAiFinite)
-        : 0))
-    : 0;
-
-  const finiteSlideQuota = Number.isFinite(newTotalSlides) ? (newTotalSlides as number) : null;
-  const finiteAiQuota    = Number.isFinite(newTotalAi)     ? (newTotalAi as number)     : null;
-
-  let nextUsedSlides = Math.max(0, inferredUsedSlides);
-  if (finiteSlideQuota != null) {
-    nextUsedSlides = Math.min(finiteSlideQuota, nextUsedSlides);
-  }
-  let nextLeftSlides = finiteSlideQuota != null
-    ? Math.max(0, finiteSlideQuota - nextUsedSlides)
-    : Number.POSITIVE_INFINITY;
-
-  let nextUsedAi = Math.max(0, inferredUsedAi);
-  if (finiteAiQuota != null) {
-    nextUsedAi = Math.min(finiteAiQuota, nextUsedAi);
-  }
-  let nextLeftAi = finiteAiQuota != null
-    ? Math.max(0, finiteAiQuota - nextUsedAi)
-    : Number.POSITIVE_INFINITY;
-
-  if (isDowngrade) {
-    nextUsedSlides = 0;
-    nextLeftSlides = finiteSlideQuota != null ? finiteSlideQuota : Number.POSITIVE_INFINITY;
-    nextUsedAi = 0;
-    nextLeftAi = finiteAiQuota != null ? finiteAiQuota : Number.POSITIVE_INFINITY;
-  }
-
-  // Persist cleaned balance row
-  const storedCredits = finiteSlideQuota != null
-    ? Math.max(0, Math.trunc(nextLeftSlides))
-    : -1;
-  const storedAiCredits = finiteAiQuota != null
-    ? Math.max(0, Math.trunc(nextLeftAi))
-    : -1;
-
-  console.debug("[billing] carryOverCreditsOnPlanChange:computed", {
-    userId,
-    nextLeftSlides,
-    nextUsedSlides,
-    nextLeftAi,
-    nextUsedAi,
-    storedCredits,
-    storedAiCredits,
-  });
-  await tx.creditBalance.create({
-    data: {
-      userId,
-      credits: storedCredits,
-      aiCredits: storedAiCredits,
-      usedCredits: Math.max(0, Math.trunc(nextUsedSlides)),
-      usedAiCredits: Math.max(0, Math.trunc(nextUsedAi)),
-      resetsAt: newPeriodEnd,
-    },
-  });
-  console.debug("[billing] carryOverCreditsOnPlanChange:end", { userId, newPlan, storedCredits, storedAiCredits, newPeriodEnd });
-}
-
-const STRIPE_STATUS_MAP: Record<Stripe.Subscription.Status, SubscriptionStatus> =
-  {
-    active: "ACTIVE",
-    trialing: "TRIALING",
-    past_due: "PAST_DUE",
-    incomplete: "INCOMPLETE",
-    incomplete_expired: "INCOMPLETE_EXPIRED",
-    canceled: "CANCELED",
-    unpaid: "UNPAID",
-    paused: "PAST_DUE",
-  };
-
-const ACTIVE_STRIPE_STATUSES = new Set<Stripe.Subscription.Status>([
-  "active",
-  "trialing",
-  "past_due",
-  "incomplete",
-]);
-
-export function mapStripeSubscriptionStatus(
-  status: Stripe.Subscription.Status,
-): SubscriptionStatus {
-  return STRIPE_STATUS_MAP[status] ?? "INCOMPLETE";
-}
-
-export function isActiveStripeSubscriptionStatus(
-  status: Stripe.Subscription.Status,
-): boolean {
-  return ACTIVE_STRIPE_STATUSES.has(status);
-}
-
-export async function resetAllCredits(
-  tx: Prisma.TransactionClient,
-  userId: string,
-  plan: Plan,
-  nextResetAt: Date
-) {
-  const limits = PLAN_CREDITS?.[plan] ?? { credits: 0, ai: 0 };
-  const slides = Number.isFinite(limits.credits) ? limits.credits : 0;
-  const ai = Number.isFinite(limits.ai) ? limits.ai : 0;
-
-  if (!PLAN_CREDITS?.[plan]) {
-    console.warn("[resetAllCredits] ⚠️ unknown plan:", plan, "→ using defaults");
-  }
-
-  await tx.creditBalance.deleteMany({ where: { userId } });
-  await tx.creditBalance.create({
-    data: {
-      userId,
-      credits: slides,
-      aiCredits: ai,
-      usedCredits: 0,
-      usedAiCredits: 0,
-      resetsAt: nextResetAt,
-    },
-  });
-
-  console.log(
-    `[resetAllCredits] ✅ balance reset for ${plan} → slides=${slides}, ai=${ai}`
-  );
-}
-</file>
-
 <file path="src/server/db.ts">
 import { PrismaClient } from "@prisma/client";
 
@@ -72667,22 +71736,6 @@ const globalForPrisma = globalThis as unknown as {
 export const db = globalForPrisma.prisma ?? createPrismaClient();
 
 if (env.NODE_ENV !== "production") globalForPrisma.prisma = db;
-</file>
-
-<file path="src/server/redis.ts">
-import { createClient } from "redis";
-
-if (!globalThis.redis) {
-  const url = process.env.REDIS_URL ?? "redis://localhost:6379";
-  const client = createClient({ url });
-
-  client.on("error", (err) => console.error("[redis] Error:", err));
-  client.connect().then(() => console.log("[redis] Connected:", url));
-
-  globalThis.redis = client;
-}
-
-export const redis = globalThis.redis as ReturnType<typeof createClient>;
 </file>
 
 <file path="src/server/stripe.ts">
@@ -73997,6 +73050,85 @@ export async function GET() {
 }
 </file>
 
+<file path="src/app/api/billing/usage/route.ts">
+import { NextResponse } from "next/server";
+import { auth } from "@/server/auth";
+import { db } from "@/server/db";
+import { normalizeCreditBalance } from "@/server/billing";
+
+import { revalidateTag } from "next/cache";
+
+// ✅ New route for triggering live updates (called from server)
+export async function POST(req: Request) {
+  try {
+    const { userId } = await req.json();
+    if (!userId) return NextResponse.json({ success: false }, { status: 400 });
+    revalidateTag(`usage-${userId}`);
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    return NextResponse.json({ success: false }, { status: 500 });
+  }
+}
+
+export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+  console.debug("[api][billing/usage] session", { userId: session.user.id });
+  const { user, balance } = await db.$transaction(async (tx) => {
+    const [userRecord, bal] = await Promise.all([
+      tx.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          plan: true, // kann null sein = Free
+          planRenewsAt: true,
+          stripeCustomerId: true,
+          subscriptions: {
+            select: { status: true, currentPeriodEnd: true, stripeSubscriptionId: true, stripePriceId: true },
+            orderBy: { updatedAt: "desc" },
+            take: 1,
+          },
+        },
+      }),
+      normalizeCreditBalance(tx, session.user.id),
+    ]);
+    console.debug("[api][billing/usage] tx result", { userId: session.user.id, hasUser: !!userRecord, balance: bal });
+    return { user: userRecord, balance: bal };
+  });
+
+  if (!user) {
+    console.warn("[api][billing/usage] user missing", { userId: session.user?.id });
+    return new NextResponse("User not found", { status: 404 });
+  }
+
+  const latestSub = user?.subscriptions?.[0] ?? null;
+  const hasPlan = !!user?.plan;
+  console.debug("[api][billing/usage] computed", { userId: session.user.id, hasPlan, plan: user.plan, latestStatus: latestSub?.status, balance });
+  // Bei Free-Plan keine "0 left"-Falle durch alte Balance:
+  // Falls kein Plan und keine Balance vorhanden -> 5/0 zurueckgeben (UI zeigt dann korrekt 0/5 verwendet)
+  const freeCredits = !hasPlan ? (balance?.credits ?? 5) : null;
+  const freeAi = !hasPlan ? (balance?.aiCredits ?? 0) : null;
+  const freeUsedCredits = !hasPlan ? (balance?.usedCredits ?? 0) : null;
+  const freeUsedAi = !hasPlan ? (balance?.usedAiCredits ?? 0) : null;
+  const payload = {
+    plan: hasPlan ? user.plan : null,
+    status: latestSub?.status ?? null,
+    credits: hasPlan ? (balance?.credits ?? 0) : freeCredits,
+    aiCredits: hasPlan ? (balance?.aiCredits ?? 0) : freeAi,
+    usedCredits: hasPlan ? (balance?.usedCredits ?? 0) : freeUsedCredits,
+    usedAiCredits: hasPlan ? (balance?.usedAiCredits ?? 0) : freeUsedAi,
+    resetsAt: hasPlan ? (balance?.resetsAt ?? user?.planRenewsAt ?? null) : null,
+    stripePriceId: latestSub?.stripePriceId ?? null,
+    stripeSubscriptionId: latestSub?.stripeSubscriptionId ?? null,
+    hasCustomer: !!user?.stripeCustomerId,
+    hasSubscription: !!latestSub?.stripeSubscriptionId,
+  };
+  console.debug("[api][billing/usage] response", { userId: session.user.id, payload });
+  return NextResponse.json(payload);
+}
+</file>
+
 <file path="src/app/api/fal/pika-image-to-video/route.ts">
 // src/app/api/fal/pika-image-to-video/route.ts
 import { pikaImageToVideo } from "@/server/vendors/fal";
@@ -74230,6 +73362,205 @@ export async function GET(request: Request) {
       { error: "Failed to load user posts" },
       { status: 500 },
     );
+  }
+}
+</file>
+
+<file path="src/app/api/stripe/webhook/route.ts">
+import { NextResponse } from "next/server";
+import { stripe } from "@/server/stripe";
+import { db } from "@/server/db";
+import { planFromPrice, resetAllCredits } from "@/server/billing";
+import { carryOverCreditsOnPlanChange } from "@/server/billing";
+
+// 🧩 Idempotenz-Tabelle prüfen und markieren
+async function isAlreadyProcessed(eventId: string) {
+  const found = await db.processedWebhook.findUnique({ where: { id: eventId } });
+  return !!found;
+}
+
+async function markProcessed(eventId: string, type: string) {
+  await db.processedWebhook.create({ data: { id: eventId, type } });
+}
+
+import type Stripe from "stripe";
+import { addMonths } from "date-fns";
+
+export async function POST(req: Request) {
+  const sig = req.headers.get("stripe-signature");
+  if (!sig) return new NextResponse("No signature", { status: 400 });
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(
+      await req.text(),
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
+  } catch (err) {
+    console.error("Webhook signature verification failed:", err);
+    return new NextResponse("Invalid signature", { status: 400 });
+  }
+
+  try {
+    // Handle only relevant events
+    switch (event.type) {
+      case "invoice.payment_succeeded": {
+        // 🧩 Doppel-Events vermeiden (Stripe Retries)
+        if (await isAlreadyProcessed(event.id)) {
+          console.log(`[webhook] Skipping duplicate event ${event.id}`);
+          return new NextResponse("OK", { status: 200 });
+        }
+
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId = invoice.customer as string;
+        // Stripe-Typen für InvoiceLineItem haben nicht immer 'price' getypt → defensiv über 'any'
+        const firstLine: any = invoice.lines?.data?.[0] ?? null;
+        const priceId: string | null =
+          firstLine?.price?.id ??
+          (typeof firstLine?.price === "string" ? firstLine.price : null);
+        const mappedPlan = planFromPrice(priceId ?? undefined);
+        if (!mappedPlan) {
+          console.warn("[webhook] ⚠️ invoice.payment_succeeded ohne zuordenbaren Plan", { priceId });
+          await markProcessed(event.id, event.type);
+          return new NextResponse("OK", { status: 200 });
+        }
+        const nextResetAt = addMonths(new Date(), 1);
+
+        const user = await db.user.findFirst({
+          where: { stripeCustomerId: customerId },
+          select: { id: true },
+        });
+        // 🧩 Fallback: Customer unbekannt → Sync anstoßen
+        if (!user?.id) {
+          console.warn(`[webhook] ⚠️ Unknown Stripe customer ${customerId}, triggering resync job`);
+          fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/billing/sync?customerId=${customerId}`, { method: "POST" })
+            .catch((err) => console.error("[webhook] Failed to trigger resync:", err));
+          return new NextResponse("OK", { status: 200 });
+        }
+
+        await db.$transaction(async (tx) => {
+          // 1) User-Plan & planRenewsAt konsistent setzen
+          await tx.user.update({
+            where: { id: user.id },
+            data: {
+              plan: mappedPlan,
+              planRenewsAt: nextResetAt,
+            },
+          });
+
+          // 2) Credits intelligent neu berechnen (Carry-Over statt Hard-Reset)
+          const prevUser = await tx.user.findUnique({
+            where: { id: user.id },
+            select: { plan: true },
+          });
+          await carryOverCreditsOnPlanChange(
+            tx,
+            user.id,
+            prevUser?.plan ?? null,
+            mappedPlan,
+            nextResetAt
+          );
+        });
+
+        await markProcessed(event.id, event.type);
+
+        return new NextResponse("OK", { status: 200 });
+      }
+
+      case "customer.subscription.updated": {
+        try {
+          const sub = event.data.object as Stripe.Subscription;
+          const customerId =
+            typeof sub.customer === "string" ? sub.customer : undefined;
+
+          if (!customerId) {
+            console.warn("[webhook] ⚠️ subscription.updated ohne customerId");
+            return new NextResponse("OK", { status: 200 });
+          }
+
+          const user = await db.user.findFirst({
+            where: { stripeCustomerId: customerId },
+            select: { id: true },
+          });
+          if (!user?.id) {
+            console.warn("[webhook] ⚠️ kein User gefunden zu", customerId);
+            return new NextResponse("OK", { status: 200 });
+          }
+
+          const firstItem = sub.items?.data?.[0];
+          const priceId =
+            typeof firstItem?.price === "string"
+              ? firstItem.price
+              : firstItem?.price?.id ?? null;
+
+          if (!priceId) {
+            console.warn("[webhook] ⚠️ kein priceId in subscription.updated");
+            return new NextResponse("OK", { status: 200 });
+          }
+
+          const mappedPlan = planFromPrice(priceId);
+          if (!mappedPlan) {
+            console.warn("[webhook] ⚠️ keine Zuordnung für priceId", priceId);
+            return new NextResponse("OK", { status: 200 });
+          }
+
+          // Einige Stripe-Typdefinitionen expose'n 'current_period_end' nicht explizit → schmaler Cast
+          const subAny = sub as Stripe.Subscription & { current_period_end?: number };
+          const nextPeriodEnd =
+            subAny.current_period_end ?? Math.floor(Date.now() / 1000);
+
+          const nextResetAt = new Date(nextPeriodEnd * 1000);
+          if (isNaN(nextResetAt.getTime())) {
+            console.warn("[webhook] ⚠️ ungültiges Datum:", nextPeriodEnd);
+            return new NextResponse("OK", { status: 200 });
+          }
+
+          await db.$transaction(async (tx) => {
+            await tx.user.update({
+              where: { id: user.id },
+              data: { plan: mappedPlan, planRenewsAt: nextResetAt },
+            });
+            await resetAllCredits(tx, user.id, mappedPlan, nextResetAt);
+          });
+
+          console.log(
+            `[webhook] ✅ subscription.updated OK: plan=${mappedPlan}, renewsAt=${nextResetAt.toISOString()}`
+          );
+        } catch (err) {
+          console.error(
+            "[webhook] ❌ subscription.updated – unexpected error:",
+            err
+          );
+        }
+
+        return new NextResponse("OK", { status: 200 });
+      }
+
+      default:
+        return new NextResponse("OK", { status: 200 });
+    }
+  } catch (err) {
+    console.error("[STRIPE][WEBHOOK] handler error:", {
+      eventId: event?.id,
+      type: event?.type,
+      message: (err as Error)?.message,
+      stack: (err as Error)?.stack,
+    });
+
+    // 🧩 optional: Logging zu Sentry
+    if (process.env.SENTRY_DSN) {
+      try {
+        // String-Literal vermeiden, damit TS keine Typauflösung des Moduls verlangt
+        const mod = "@sentry/nextjs";
+        const S: any = await import(mod as any);
+        S.captureException(err, {
+          extra: { eventId: event?.id, type: event?.type },
+        });
+      } catch {}
+    }
+
+    return NextResponse.json({ ok: false, error: "Webhook handler error" }, { status: 500 });
   }
 }
 </file>
@@ -75548,6 +74879,200 @@ export default function robots(): MetadataRoute.Robots {
     sitemap: "https://slidescockpit.com/sitemap.xml",
     host: "https://slidescockpit.com",
   };
+}
+</file>
+
+<file path="src/components/app-sidebar-usage.tsx">
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { use } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+
+import useSWR from "swr";
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+interface UsageResponse {
+  aiLeft?: number;
+  slidesLeft?: number;
+  plan?: string | null;
+  unlimited?: boolean;
+}
+
+type UsageState = {
+  aiLeft: number | null;
+  slidesLeft: number | null;
+  plan: string | null;
+  unlimitedSlides: boolean;
+  hasActiveSubscription: boolean;
+};
+
+export function SidebarUsageSummary() {
+  const [isBillingRedirecting, setIsBillingRedirecting] = useState(false);
+
+  // Get user ID from localStorage for cache tagging
+  const getUserId = () => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("uid") ?? "anon";
+    }
+    return "anon";
+  };
+
+  const { data: usageData, isLoading, error, mutate } = useSWR(
+    "/api/billing/usage",
+    fetcher,
+    {
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      refreshInterval: 30000,
+      tags: [`usage-${getUserId()}`],
+    }
+  );
+
+  const usage = usageData ? {
+    aiLeft:
+      typeof usageData.aiCredits === "number"
+        ? usageData.aiCredits
+        : Number.isFinite(usageData.aiCredits)
+          ? Number(usageData.aiCredits)
+          : usageData.aiCredits === Infinity
+            ? Number.POSITIVE_INFINITY
+            : null,
+    slidesLeft:
+      typeof usageData.credits === "number"
+        ? usageData.credits
+        : usageData.credits === Infinity
+          ? Number.POSITIVE_INFINITY
+          : null,
+    plan: usageData.plan ?? null,
+    unlimitedSlides: usageData.credits < 0 || usageData.credits === Infinity,
+    hasActiveSubscription: Boolean(usageData.plan),
+  } : null;
+
+  const isError = !!error;
+
+  const renderInfinite = (value: number | null) =>
+    value !== null && !Number.isFinite(value);
+
+  const renderSlides = () => {
+    if (!usage) return "– credits";
+    if (usage.unlimitedSlides || renderInfinite(usage.slidesLeft)) {
+      return "∞ credits";
+    }
+    const count = Math.max(0, Math.floor(usage.slidesLeft ?? 0));
+    return `${count} ${count === 1 ? "credit" : "credits"}`;
+  };
+
+  const renderAiCredits = () => {
+    if (!usage) return "– ai credits";
+    if (renderInfinite(usage.aiLeft)) {
+      return "∞ ai credits";
+    }
+    const count = Math.max(0, Math.floor(usage.aiLeft ?? 0));
+    return `${count} ${count === 1 ? "ai credit" : "ai credits"}`;
+  };
+
+  if (isError) {
+    return (
+      <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        Unable to load usage
+      </div>
+    );
+  }
+
+  if (isLoading || !usage) {
+    return (
+      <div
+        className={cn(
+          "rounded-xl border-zinc-300 border px-3 py-3 text-xs flex flex-col gap-2",
+          "bg-[#F1F2ED]",
+        )}
+      >
+        <Skeleton className="h-4 w-32 mx-auto" />
+        <Skeleton className="h-3 w-28 mx-auto" />
+        <Skeleton className="h-8 w-full rounded-sm" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "rounded-xl border-zinc-300 border px-3 py-2 text-xs flex flex-col gap-1",
+        "bg-[#F1F2ED] text-sidebar-foreground/90",
+      )}
+    >
+      <div className="text-sm text-center font-medium text-sidebar-foreground">
+        <span>{renderSlides()}</span>
+        <span className="mx-2 text-sidebar-foreground/60">|</span>
+        <span>{renderAiCredits()}</span>
+      </div>
+      <div className="flex items-center justify-center text-sidebar-foreground text-center">
+        {usage.plan ? (
+          <span className="text-[11px] uppercase tracking-wide text-sidebar-foreground/60">
+            {usage.plan} Plan
+          </span>
+        ) : (
+          <span className="text-[11px] uppercase tracking-wide text-sidebar-foreground/60">
+            No active subscription
+          </span>
+        )}
+      </div>
+      <div className="">
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full rounded-sm border-sidebar-border/80 bg-[#F7F8F3]/60 text-sidebar-foreground hover:bg-sidebar/70 disabled:opacity-40"
+          disabled={!usage.hasActiveSubscription || isBillingRedirecting}
+          onClick={async () => {
+            if (!usage.hasActiveSubscription) {
+              return;
+            }
+            try {
+              setIsBillingRedirecting(true);
+              const response = await fetch("/api/billing/portal", {
+                method: "POST",
+              });
+              if (!response.ok) {
+                throw new Error("Failed to open billing portal");
+              }
+              const data = (await response.json()) as { url?: string };
+              if (!data.url) {
+                throw new Error("Missing billing portal URL");
+              }
+              window.location.assign(data.url);
+            } catch (error) {
+              console.error(error);
+              toast.error("Could not open billing portal");
+            } finally {
+              setIsBillingRedirecting(false);
+            }
+          }}
+        >
+          Manage Plan
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// Export a function to manually refresh usage data
+export function refreshUsageData() {
+  if (typeof window !== "undefined") {
+    // Trigger revalidation by calling the revalidate endpoint
+    const userId = localStorage.getItem("uid") ?? "anon";
+    fetch("/api/billing/usage/revalidate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    }).catch(console.warn);
+  }
 }
 </file>
 
@@ -79462,6 +78987,478 @@ export const config = {
 };
 </file>
 
+<file path="src/server/billing.ts">
+// server-only Funktionen rund um Billing/Credits
+import "server-only";
+import { db } from "@/server/db";
+import { env } from "@/env";
+import type {
+  CreditBalance,
+  Plan,
+  Prisma,
+  SubscriptionStatus,
+} from "@prisma/client";
+import type Stripe from "stripe";
+import { PLAN_CREDITS, FREE_SLIDESHOW_QUOTA } from "@/lib/billing";
+import { redis } from "@/server/redis";
+
+type BillingTransactionClient = Prisma.TransactionClient;
+
+export function planFromPrice(priceId?: string): Plan | undefined {
+  if (!priceId) return undefined;
+  if (priceId === env.STRIPE_PRICE_STARTER) return "STARTER";
+  if (priceId === env.STRIPE_PRICE_GROWTH) return "GROWTH";
+  if (priceId === env.STRIPE_PRICE_SCALE) return "SCALE";
+  if (priceId === env.STRIPE_PRICE_UNLIMITED) return "UNLIMITED";
+  return undefined;
+}
+
+export async function normalizeCreditBalance(
+  tx: BillingTransactionClient,
+  userId: string,
+): Promise<CreditBalance | null> {
+  const records = await tx.creditBalance.findMany({
+    where: { userId },
+    orderBy: { updatedAt: "desc" },
+  });
+  if (records.length === 0) return null;
+  if (records.length === 1) return records[0]!;
+
+  const latest = records[0]!;
+  await tx.creditBalance.deleteMany({ where: { userId } });
+  const normalized = await tx.creditBalance.create({
+    data: {
+      userId,
+      credits: latest.credits,
+      aiCredits: latest.aiCredits,
+      usedCredits: latest.usedCredits,
+      usedAiCredits: latest.usedAiCredits,
+      resetsAt: latest.resetsAt,
+    },
+  });
+  return normalized;
+}
+
+export async function getUsageLimits(userId: string) {
+  return await db.$transaction(async (tx) => {
+    const [userRecord, rawBal] = await Promise.all([
+      tx.user.findUnique({
+        where: { id: userId },
+        select: { plan: true },
+      }),
+      normalizeCreditBalance(tx, userId),
+    ]);
+    let bal = rawBal;
+
+    const plan = userRecord?.plan ?? null;
+    const allowances = plan ? PLAN_CREDITS[plan] : null;
+    const unlimitedSlides = !!allowances && allowances.credits < 0;
+    const unlimitedAi = !!allowances && allowances.ai < 0;
+
+    if (bal && allowances) {
+      const updates: Record<string, number> = {};
+      if (allowances.credits < 0 && bal.credits !== -1) {
+        updates.credits = -1;
+      } else if (allowances.credits >= 0 && bal.credits < 0) {
+        updates.credits = allowances.credits;
+      }
+      if (allowances.ai < 0 && bal.aiCredits !== -1) {
+        updates.aiCredits = -1;
+      } else if (allowances.ai >= 0 && bal.aiCredits < 0) {
+        updates.aiCredits = allowances.ai;
+      }
+      if (Object.keys(updates).length > 0) {
+        bal = await tx.creditBalance.update({
+          where: { userId },
+          data: updates,
+        });
+      }
+    }
+
+    const storedSlides = bal?.credits ?? null;
+    const storedAi = bal?.aiCredits ?? null;
+
+    let slidesLeft: number;
+    if (!plan) {
+      const freeCredits = storedSlides ?? FREE_SLIDESHOW_QUOTA;
+      slidesLeft = Math.max(0, freeCredits);
+    } else if (unlimitedSlides || (storedSlides ?? 0) < 0) {
+      slidesLeft = Number.POSITIVE_INFINITY;
+    } else {
+      const fallback = allowances?.credits ?? 0;
+      slidesLeft = Math.max(0, storedSlides ?? fallback);
+    }
+
+    let aiLeft: number;
+    if (!plan) {
+      aiLeft = Math.max(0, storedAi ?? 0);
+    } else if (unlimitedAi || (storedAi ?? 0) < 0) {
+      aiLeft = Number.POSITIVE_INFINITY;
+    } else {
+      const fallback = allowances?.ai ?? 0;
+      aiLeft = Math.max(0, storedAi ?? fallback);
+    }
+
+    const result = { plan, unlimited: unlimitedSlides, slidesLeft, aiLeft };
+    return result;
+  });
+}
+
+type ConsumeArgs =
+  | { kind: "slide"; cost?: number }
+  | { kind: "ai"; cost?: number };
+
+export async function ensureAndConsumeCredits(userId: string, args: ConsumeArgs) {
+  const cost = Math.max(1, args.cost ?? (args.kind === "ai" ? 2 : 1));
+  console.debug("[billing] ensureAndConsumeCredits:start", { userId, args, cost });
+  // 🧩 Verbesserter Redis-Lock (auto-refresh + safe release)
+  const redis = globalThis.redis;
+  const redisKey = `creditlock:${userId}`;
+  const lockTTL = 5000; // 5 Sekunden Sicherheitsfenster
+
+  // Versuche Lock mehrfach, falls er hängt
+  let acquired = false;
+  try {
+    // Wenn Redis nicht verbunden ist, nicht versuchen
+    // (node-redis v4 hat isOpen / isReady; wir nutzen das defensiv)
+    const canUseRedis = !!redis && (redis as any).isOpen !== false;
+    if (canUseRedis) {
+      for (let i = 0; i < 5; i++) {
+        const ok = await redis?.set(redisKey, "1", { NX: true, PX: lockTTL });
+        if (ok) { acquired = true; break; }
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    }
+
+    if (!acquired) {
+      // ❗ Kein Hard-Fail mehr – wir verlassen uns auf den DB-Row-Lock (SELECT … FOR UPDATE)
+      console.warn(`[billing] ⚠️ Proceeding without Redis lock for user ${userId} (falling back to DB row lock)`);
+    }
+  } catch (e) {
+    // Ebenfalls kein Hard-Fail – Redis kann fehlen, DB-Sperre bleibt robust
+    console.warn(`[billing] ⚠️ Redis lock attempt failed for user ${userId}, using DB row lock`, e);
+  }
+
+  try {
+    const result = await db.$transaction(async (tx) => {
+      // 🔒 Row-Lock gegen Race-Conditions (SELECT FOR UPDATE)
+      await tx.$executeRawUnsafe(`SELECT * FROM "CreditBalance" WHERE "userId" = $1 FOR UPDATE`, userId);
+    const [sub, userRecord] = await Promise.all([
+      tx.subscription.findFirst({
+        where: { userId, status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] } },
+        orderBy: { updatedAt: "desc" },
+      }),
+      tx.user.findUnique({ where: { id: userId }, select: { plan: true } }),
+    ]);
+    const plan = userRecord?.plan ?? null;
+    const allowances = plan ? PLAN_CREDITS[plan] : null;
+    const unlimitedSlides = !!allowances && allowances.credits < 0;
+    const unlimitedAi = !!allowances && allowances.ai < 0;
+
+    let bal = await normalizeCreditBalance(tx, userId);
+    console.debug("[billing] ensureAndConsumeCredits:balanceLoaded", { userId, plan, bal });
+    if (!bal) {
+      const defaultCredits =
+        !plan
+          ? FREE_SLIDESHOW_QUOTA
+          : allowances
+            ? allowances.credits < 0
+              ? -1
+              : allowances.credits
+            : 0;
+      const defaultAi =
+        !plan
+          ? 0
+          : allowances
+            ? allowances.ai < 0
+              ? -1
+              : allowances.ai
+            : 0;
+      bal = await tx.creditBalance.create({
+        data: {
+          userId,
+          credits: defaultCredits,
+          aiCredits: defaultAi,
+          usedCredits: 0,
+          usedAiCredits: 0,
+          resetsAt: sub?.currentPeriodEnd ?? null,
+        },
+      });
+      console.debug("[billing] ensureAndConsumeCredits:createBalance", { userId, plan, bal });
+    } else if (allowances) {
+      const updates: Record<string, number> = {};
+      if (allowances.credits < 0 && bal.credits !== -1) {
+        updates.credits = -1;
+      } else if (allowances.credits >= 0 && bal.credits < 0) {
+        updates.credits = allowances.credits;
+      }
+      if (allowances.ai < 0 && bal.aiCredits !== -1) {
+        updates.aiCredits = -1;
+      } else if (allowances.ai >= 0 && bal.aiCredits < 0) {
+        updates.aiCredits = allowances.ai;
+      }
+      if (Object.keys(updates).length > 0) {
+        bal = await tx.creditBalance.update({
+          where: { userId },
+          data: updates,
+        });
+        console.debug("[billing] ensureAndConsumeCredits:updateSentinels", { userId, updates, bal });
+      }
+    }
+
+    if (args.kind === "slide") {
+      if (unlimitedSlides) return { ok: true as const };
+      const updated = await tx.creditBalance.updateMany({
+        where: { userId, credits: { gte: cost } },
+        data: { credits: { decrement: cost }, usedCredits: { increment: cost } },
+      });
+      if (updated.count === 0) {
+        console.warn("[billing] ensureAndConsumeCredits:slideInsufficient", { userId, cost, credits: bal?.credits });
+        const err: any = new Error("INSUFFICIENT_SLIDE_CREDITS");
+        err.code = "INSUFFICIENT_SLIDE_CREDITS";
+        throw err;
+      }
+
+    // 🔄 Notify frontend to update sidebar usage (credits live refresh)
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/billing/usage/revalidate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!res.ok) console.warn("Usage revalidate failed");
+    } catch (e) {
+      console.warn("Usage refresh call failed", e);
+    }
+
+      return { ok: true as const };
+    }
+
+    const updated = await tx.creditBalance.updateMany({
+      where: {
+        userId,
+        ...(unlimitedAi ? {} : { aiCredits: { gte: cost } }),
+      },
+      data: unlimitedAi
+        ? { usedAiCredits: { increment: cost } }
+        : { aiCredits: { decrement: cost }, usedAiCredits: { increment: cost } },
+    });
+    if (updated.count === 0) {
+      console.warn("[billing] ensureAndConsumeCredits:aiInsufficient", { userId, cost, aiCredits: bal?.aiCredits });
+      const err: any = new Error("INSUFFICIENT_AI_CREDITS");
+      err.code = "INSUFFICIENT_AI_CREDITS";
+      throw err;
+    }
+
+    // 🔄 Notify frontend to update sidebar usage (credits live refresh)
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/billing/usage/revalidate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!res.ok) console.warn("Usage revalidate failed");
+    } catch (e) {
+      console.warn("Usage refresh call failed", e);
+    }
+
+    console.debug("[billing] ensureAndConsumeCredits:success", { userId, kind: args.kind, cost });
+    return { ok: true as const };
+    });
+
+    return result;
+  } finally {
+    // Nur freigeben, wenn auch wirklich erworben
+    if (acquired) {
+      try {
+        await redis?.del(redisKey);
+        console.debug(`[billing] 🔓 Lock released for user ${userId}`);
+      } catch (err) {
+        console.warn(`[billing] ⚠️ Failed to release lock for user ${userId}`, err);
+      }
+    }
+  }
+}
+
+/**
+ * Rewrites the credit balance for a target plan.
+ * - Downgrade: usage reset to 0
+ * - Upgrade:   usage carried over and remaining = new quota - used
+ * - Unlimited: stored as sentinel -1 with usage reset
+ */
+export async function carryOverCreditsOnPlanChange(
+  tx: BillingTransactionClient,
+  userId: string,
+  oldPlan: Plan | null,
+  newPlan: Plan,
+  newPeriodEnd: Date | null,
+) {
+  console.debug("[billing] carryOverCreditsOnPlanChange:start", { userId, oldPlan, newPlan, newPeriodEnd });
+  const prevEntries = await tx.creditBalance.findMany({
+    where: { userId },
+    orderBy: { updatedAt: "desc" },
+  });
+  const prev = prevEntries[0] ?? null;
+  console.debug("[billing] carryOverCreditsOnPlanChange:prevEntries", {
+    userId,
+    count: prevEntries.length,
+    prev,
+  });
+
+  await tx.creditBalance.deleteMany({ where: { userId } });
+
+  // Altdaten sichern
+  const prevUsedSlides   = prev?.usedCredits    ?? 0;
+  const prevUsedAi       = prev?.usedAiCredits  ?? 0;
+  const prevLeftSlides   = prev?.credits        ?? 0;
+  const prevLeftAi       = prev?.aiCredits      ?? 0;
+  const prevLeftSlidesFinite = prevLeftSlides < 0 ? null : prevLeftSlides;
+  const prevLeftAiFinite = prevLeftAi < 0 ? null : prevLeftAi;
+
+  // Neues Kontingent ermitteln
+  const target = PLAN_CREDITS[newPlan];
+  const newTotalSlides = target.credits < 0 ? Number.POSITIVE_INFINITY : target.credits;
+  const newTotalAi     = target.ai      < 0 ? Number.POSITIVE_INFINITY : target.ai;
+
+  const isUnlimited  = newPlan === "UNLIMITED";
+  const isDowngrade  =
+    !isUnlimited &&
+    (oldPlan && PLAN_CREDITS[oldPlan].credits > 0) &&
+    (PLAN_CREDITS[oldPlan].credits > PLAN_CREDITS[newPlan].credits);
+
+  // Determine used values in a robust way:
+  // a) Prefer stored used counters if present
+  // b) Otherwise derive from remaining credits when the old plan was finite
+  const inferredUsedSlides = Number.isFinite(newTotalSlides)
+    ? (prevUsedSlides || (oldPlan && oldPlan !== "UNLIMITED" && PLAN_CREDITS[oldPlan].credits >= 0 && prevLeftSlidesFinite != null
+        ? Math.max(0, PLAN_CREDITS[oldPlan].credits - prevLeftSlidesFinite)
+        : 0))
+    : 0;
+  const inferredUsedAi = Number.isFinite(newTotalAi)
+    ? (prevUsedAi || (oldPlan && PLAN_CREDITS[oldPlan].ai >= 0 && prevLeftAiFinite != null
+        ? Math.max(0, (PLAN_CREDITS[oldPlan].ai) - prevLeftAiFinite)
+        : 0))
+    : 0;
+
+  const finiteSlideQuota = Number.isFinite(newTotalSlides) ? (newTotalSlides as number) : null;
+  const finiteAiQuota    = Number.isFinite(newTotalAi)     ? (newTotalAi as number)     : null;
+
+  let nextUsedSlides = Math.max(0, inferredUsedSlides);
+  if (finiteSlideQuota != null) {
+    nextUsedSlides = Math.min(finiteSlideQuota, nextUsedSlides);
+  }
+  let nextLeftSlides = finiteSlideQuota != null
+    ? Math.max(0, finiteSlideQuota - nextUsedSlides)
+    : Number.POSITIVE_INFINITY;
+
+  let nextUsedAi = Math.max(0, inferredUsedAi);
+  if (finiteAiQuota != null) {
+    nextUsedAi = Math.min(finiteAiQuota, nextUsedAi);
+  }
+  let nextLeftAi = finiteAiQuota != null
+    ? Math.max(0, finiteAiQuota - nextUsedAi)
+    : Number.POSITIVE_INFINITY;
+
+  if (isDowngrade) {
+    nextUsedSlides = 0;
+    nextLeftSlides = finiteSlideQuota != null ? finiteSlideQuota : Number.POSITIVE_INFINITY;
+    nextUsedAi = 0;
+    nextLeftAi = finiteAiQuota != null ? finiteAiQuota : Number.POSITIVE_INFINITY;
+  }
+
+  // Persist cleaned balance row
+  const storedCredits = finiteSlideQuota != null
+    ? Math.max(0, Math.trunc(nextLeftSlides))
+    : -1;
+  const storedAiCredits = finiteAiQuota != null
+    ? Math.max(0, Math.trunc(nextLeftAi))
+    : -1;
+
+  console.debug("[billing] carryOverCreditsOnPlanChange:computed", {
+    userId,
+    nextLeftSlides,
+    nextUsedSlides,
+    nextLeftAi,
+    nextUsedAi,
+    storedCredits,
+    storedAiCredits,
+  });
+  await tx.creditBalance.create({
+    data: {
+      userId,
+      credits: storedCredits,
+      aiCredits: storedAiCredits,
+      usedCredits: Math.max(0, Math.trunc(nextUsedSlides)),
+      usedAiCredits: Math.max(0, Math.trunc(nextUsedAi)),
+      resetsAt: newPeriodEnd,
+    },
+  });
+  console.debug("[billing] carryOverCreditsOnPlanChange:end", { userId, newPlan, storedCredits, storedAiCredits, newPeriodEnd });
+}
+
+const STRIPE_STATUS_MAP: Record<Stripe.Subscription.Status, SubscriptionStatus> =
+  {
+    active: "ACTIVE",
+    trialing: "TRIALING",
+    past_due: "PAST_DUE",
+    incomplete: "INCOMPLETE",
+    incomplete_expired: "INCOMPLETE_EXPIRED",
+    canceled: "CANCELED",
+    unpaid: "UNPAID",
+    paused: "PAST_DUE",
+  };
+
+const ACTIVE_STRIPE_STATUSES = new Set<Stripe.Subscription.Status>([
+  "active",
+  "trialing",
+  "past_due",
+  "incomplete",
+]);
+
+export function mapStripeSubscriptionStatus(
+  status: Stripe.Subscription.Status,
+): SubscriptionStatus {
+  return STRIPE_STATUS_MAP[status] ?? "INCOMPLETE";
+}
+
+export function isActiveStripeSubscriptionStatus(
+  status: Stripe.Subscription.Status,
+): boolean {
+  return ACTIVE_STRIPE_STATUSES.has(status);
+}
+
+export async function resetAllCredits(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  plan: Plan,
+  nextResetAt: Date
+) {
+  const limits = PLAN_CREDITS?.[plan] ?? { credits: 0, ai: 0 };
+  const slides = Number.isFinite(limits.credits) ? limits.credits : 0;
+  const ai = Number.isFinite(limits.ai) ? limits.ai : 0;
+
+  if (!PLAN_CREDITS?.[plan]) {
+    console.warn("[resetAllCredits] ⚠️ unknown plan:", plan, "→ using defaults");
+  }
+
+  await tx.creditBalance.deleteMany({ where: { userId } });
+  await tx.creditBalance.create({
+    data: {
+      userId,
+      credits: slides,
+      aiCredits: ai,
+      usedCredits: 0,
+      usedAiCredits: 0,
+      resetsAt: nextResetAt,
+    },
+  });
+
+  console.log(
+    `[resetAllCredits] ✅ balance reset for ${plan} → slides=${slides}, ai=${ai}`
+  );
+}
+</file>
+
 <file path="src/server/image-collection-ownership.ts">
 import { db } from "@/server/db";
 import type { User } from "@prisma/client";
@@ -79545,6 +79542,22 @@ export function hasPersonalCategoryTag(val?: string | null) {
   const s = val.toLowerCase();
   return s.includes("personal") || s.includes("private") || s.includes("my");
 }
+</file>
+
+<file path="src/server/redis.ts">
+import { createClient } from "redis";
+
+if (!globalThis.redis) {
+  const url = process.env.REDIS_URL ?? "redis://localhost:6379";
+  const client = createClient({ url });
+
+  client.on("error", (err) => console.error("[redis] Error:", err));
+  client.connect().then(() => console.log("[redis] Connected:", url));
+
+  globalThis.redis = client;
+}
+
+export const redis = globalThis.redis as ReturnType<typeof createClient>;
 </file>
 
 <file path="src/server/vendors/fal.ts">
@@ -82030,6 +82043,556 @@ export default function SettingsSounds() {
 }
 </file>
 
+<file path="src/components/marketing/Hero.tsx">
+"use client";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion";
+import {
+  ArrowRightIcon,
+  BarChart3Icon,
+  CheckCircle2Icon,
+  StarIcon,
+  TrendingUpIcon,
+  ZapIcon,
+} from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { Section } from "./Section";
+
+const HERO_POSTER_ROWS = 8;
+const HERO_POSTERS_PER_ROW = 28;
+const HERO_FETCH_LIMIT = 300;
+
+type HeroSlide = {
+  imageUrl?: string | null;
+};
+
+type HeroPost = {
+  slides?: HeroSlide[];
+};
+
+export function MarketingHero({
+  session,
+  category,
+  heroTitle,
+  heroSubtitle,
+}: {
+  session: boolean;
+  category?: string;
+  heroTitle?: string;
+  heroSubtitle?: string;
+}) {
+  const [posterImages, setPosterImages] = useState<string[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchSlides = async () => {
+      try {
+        const params = new URLSearchParams({
+          limit: HERO_FETCH_LIMIT.toString(),
+        });
+        if (category) {
+          params.set("category", category);
+        }
+
+        const response = await fetch(
+          `/api/slideshow-library/hero-posts?${params.toString()}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to load hero slides: ${response.status}`);
+        }
+
+        const data = (await response.json()) as unknown;
+        if (!Array.isArray(data)) return;
+
+        const collected = new Set<string>();
+
+        for (const post of data as HeroPost[]) {
+          if (!post?.slides?.length) continue;
+
+          for (const slide of post.slides) {
+            if (!slide?.imageUrl) continue;
+            collected.add(slide.imageUrl);
+          }
+        }
+
+        if (!collected.size) return;
+
+        const deduped = Array.from(collected);
+        for (let index = deduped.length - 1; index > 0; index--) {
+          const swapIndex = Math.floor(Math.random() * (index + 1));
+          const current = deduped[index];
+          const swap = deduped[swapIndex];
+          if (current === undefined || swap === undefined) {
+            continue;
+          }
+          deduped[index] = swap;
+          deduped[swapIndex] = current;
+        }
+
+        setPosterImages(deduped);
+      } catch (error) {
+        if ((error as Error).name === "AbortError") {
+          return;
+        }
+        console.error("Error loading hero slide images", error);
+      }
+    };
+
+    void fetchSlides();
+
+    return () => {
+      controller.abort();
+    };
+  }, [category]);
+
+  const posterMatrix = useMemo(() => {
+    const perRow = HERO_POSTERS_PER_ROW;
+    const totalRows = HERO_POSTER_ROWS;
+
+     // Until we have real images, render nothing (no placeholders).
+     if (!posterImages.length) return [];
+
+     const rows: string[][] = [];
+     for (let r = 0; r < totalRows; r++) {
+       const start = r * perRow;
+       const end = start + perRow;
+       rows.push(posterImages.slice(start, end));
+     }
+     return rows;
+
+}, [posterImages]);
+
+  // TikTok-Bilder NICHT über next/image rendern (Host-Whitelist von Next schlägt oft zu).
+  // Alles andere weiter mit next/image (Optimierung bleibt erhalten).
+  const isTikTokCdn = (urlStr: string) => {
+    try {
+      const u = new URL(urlStr);
+      // Beispiele: p16-pu-sign-no.tiktokcdn-eu.com, p19-common-sign-useastred.tiktokcdn-eu.com, ...
+      return /(^|\.)tiktokcdn(?:-eu)?\.com$/i.test(u.hostname);
+    } catch {
+      return false;
+    }
+  };
+
+  return (
+    <Section className="relative min-h-[85vh] overflow-hidden bg-[#111] py-0">
+      {/* Netflix Background - Fixed z-index hierarchy */}
+      {posterMatrix.length > 0 && (
+        <div className="hero-background-container">
+          {/* Gradient Overlay */}
+          <div className="hero-gradient-overlay" />
+
+          {/* Animated Background */}
+          <div className="hero-perspective-wrapper">
+            <div className="hero-animated-grid">
+              {posterMatrix.map((row, rowIndex) => (
+                <div key={`hero-row-${rowIndex}`} className="hero-image-row">
+                  {row.map((imageUrl, itemIndex) => (
+                    <div
+                      key={`hero-row-${rowIndex}-item-${itemIndex}`}
+                      className="hero-image-card"
+                    >
+                      {isTikTokCdn(imageUrl) ? (
+                        // Fallback auf <img> für TikTok-CDNs → keine Next-Whitelist nötig
+                        <img
+                          src={imageUrl}
+                          alt=""
+                          loading={rowIndex < 2 ? "eager" : "lazy"}
+                          className="h-full w-full object-cover"
+                          decoding="async"
+                        />
+                      ) : (
+                        <Image
+                          src={imageUrl}
+                          alt=""
+                          fill
+                          /* Nur für die kleinen Kacheln: extrem klein halten */
+                          sizes="125px"
+                          /* Next darf optimieren -> erzeugt AVIF/WebP automatisch */
+                          quality={60}
+                          // Avoid Next.js runtime error: can't set both priority and loading
+                          // Use priority for first 2 rows, lazy for the rest
+                          priority={rowIndex < 2}
+                          loading={rowIndex < 2 ? undefined : "lazy"}
+                          style={{ objectFit: "cover", objectPosition: "center" }}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Foreground Content - Isolated stacking context */}
+      <div className="hero-content-wrapper">
+        <div className="mx-auto max-w-5xl text-center">
+          {/* Status badge */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="inline-flex items-center gap-3 rounded-full border border-indigo-300/20 bg-indigo-500/40 backdrop-blur-sm px-4 py-2 text-xs sm:text-sm font-medium text-indigo-100 shadow-lg mb-2 sm:mb-4 lg:mb-6 mt-[-0.5rem] sm:mt-[-1rem]"
+          >
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
+              <span>10M+ views generated with SlidesCockpit</span>
+            </div>
+            <div className="hidden sm:block h-4 w-px bg-indigo-300/30"></div>
+            <div className="flex items-center gap-1">
+              <TrendingUpIcon className="w-4 h-4" />
+              <span>2025</span>
+            </div>
+          </motion.div>
+
+          {/* Main headline */}
+          <motion.h1
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08, duration: 0.7 }}
+            className="py-2 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight text-white"
+          >
+            {heroTitle ? (
+              (() => {
+                // Teile den Title in Wörter auf
+                const words = heroTitle.split(" ");
+
+                // Wenn weniger als 3 Wörter, zeige alles normal
+                if (words.length < 3) {
+                  return <span className="block">{heroTitle}</span>;
+                }
+
+                // Nimm die letzten 2 Wörter für den Gradient
+                const lastTwoWords = words.slice(-2).join(" ");
+                const restOfTitle = words.slice(0, -2).join(" ");
+
+                return (
+                  <>
+                    <span className="block sm:inline">{restOfTitle}&nbsp;</span>
+                    <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
+                      {lastTwoWords}
+                    </span>
+                  </>
+                );
+              })()
+            ) : (
+              <>
+                <span className="block">Automate TikTok slides</span>
+                {/* Mobile ≈3 Zeilen, ab sm → 2 Zeilen */}
+                <span className="block sm:inline sm:whitespace-nowrap">
+                  that actually&nbsp;
+                </span>
+                <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
+                  drive traffic
+                </span>
+              </>
+            )}
+          </motion.h1>
+
+          {/* Subheadline */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15, duration: 0.6 }}
+            className="mt-2 pb-4 text-lg sm:text-xl lg:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed font-light"
+          >
+            {heroSubtitle ||
+              "Create viral TikTok slides in seconds. Visually stunning, authentic, and built to perform."}
+          </motion.p>
+
+          {/* CTA buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-5"
+          >
+            {session ? (
+              <Link href="/dashboard/home" className="w-full sm:w-auto">
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
+                >
+                  Go to the app
+                  <ArrowRightIcon className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
+                </Button>
+              </Link>
+            ) : (
+              <div className="w-full sm:w-auto">
+                <GoogleSignInButton />
+              </div>
+            )}
+
+            <a
+              href="#library"
+              className="inline-flex items-center gap-2 text-white/80 hover:text-white text-sm sm:text-base font-medium underline-offset-4 hover:underline transition-all duration-200 px-2 py-1"
+            >
+              <StarIcon className="w-4 h-4 text-yellow-400" />
+              Browse examples
+            </a>
+          </motion.div>
+
+          {/* Feature highlights */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 text-left"
+          >
+            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
+                  <ZapIcon className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-white font-semibold">Live in seconds</h2>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                From idea to finished slides instantly. No setup, no hassle.
+              </p>
+            </div>
+
+            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
+                  <BarChart3Icon className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-white font-semibold">
+                  Templates that convert
+                </h2>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                Battle-tested winners. More reach, more followers.
+              </p>
+            </div>
+
+            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
+                  <CheckCircle2Icon className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-white font-semibold">Looks handcrafted</h2>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                Creator aesthetic instead of AI vibe. Natural and trustworthy.
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Social proof stats */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+            className="mt-14 px-4"
+          >
+            <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-indigo-500/40 hover:bg-indigo-500/50 duration-300 backdrop-blur-sm p-5 sm:p-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 mb-1">
+                    10M+
+                  </div>
+                  <div className="text-sm text-gray-300/90">TikTok Views</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
+                    100+
+                  </div>
+                  <div className="text-sm text-gray-300/90">Happy creators</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
+                    20K+
+                  </div>
+                  <div className="text-sm text-gray-300/90">
+                    Slides produced
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
+                    100%
+                  </div>
+                  <div className="text-sm text-gray-300/90">Success rate</div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Optimized Styles - Fixed z-index hierarchy and GPU acceleration */}
+      <style jsx global>{`
+        /* Background Container - Lowest layer */
+        .hero-background-container {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          background-color: #111;
+          z-index: 1;
+          pointer-events: none;
+          /* Create isolated stacking context */
+          isolation: isolate;
+          /* Promote to own layer */
+          will-change: transform;
+          transform: translateZ(0);
+        }
+
+        /* Gradient Overlay - Above background */
+        .hero-gradient-overlay {
+          position: absolute;
+          inset: 0;
+          z-index: 2;
+          background: linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.8) 15%,
+            rgba(0, 0, 0, 0.8) 50%,
+            rgba(0, 0, 0, 0.95) 70%,
+            rgba(0, 0, 0, 0.6) 95%,
+            rgba(0, 0, 0, 1) 100%
+          );
+          opacity: 0.65;
+          pointer-events: none;
+          /* Fixed property for better performance */
+          will-change: opacity;
+        }
+
+        /* Perspective Wrapper */
+        .hero-perspective-wrapper {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          perspective: 500px;
+          perspective-origin: center center;
+          z-index: 1;
+          /* Contain layout and paint for performance */
+          contain: layout style paint;
+        }
+
+        /* Animated Grid */
+        .hero-animated-grid {
+          width: 100%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-start;
+          transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
+            translateX(1300px) translateZ(0);
+          transform-style: preserve-3d;
+          animation: heroBackgroundMove 180s linear infinite alternate;
+          /* Force GPU acceleration */
+          will-change: transform;
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
+          -webkit-transform-style: preserve-3d;
+        }
+
+        /* Image Rows */
+        .hero-image-row {
+          margin: 0;
+          display: flex;
+          justify-content: flex-end;
+          width: 100%;
+          flex-wrap: nowrap;
+          flex-grow: 1;
+          transform: translateX(100px) translateY(-120px) translateZ(0);
+          /* Prevent layout thrashing */
+          contain: layout style;
+        }
+
+        /* Individual Image Cards */
+        .hero-image-card {
+          position: relative;
+          transform-style: preserve-3d;
+          transform: rotateX(20deg) rotateY(0deg) skewX(335deg) translateZ(0);
+          min-width: 125px;
+          min-height: 187px;
+          display: inline-block;
+          margin: 7px;
+          border-radius: 12px;
+          box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
+          opacity: 0.9;
+          overflow: hidden;
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
+          /* Performance optimization */
+          will-change: transform;
+        }
+
+        /* Content Wrapper - keep it BELOW the fixed navbar (navbar is z-50) */
+        .hero-content-wrapper {
+          position: relative;
+          /* Navbar has z-50 — set hero below it to avoid overlapping while scrolling */
+          z-index: 20;
+          /* Create new stacking context isolated from background */
+          isolation: isolate;
+          /* Promote to own layer */
+          will-change: transform;
+          transform: translateZ(0);
+          min-height: 89vh;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          padding: 5rem 1.25rem 2.5rem;
+        }
+
+        @media (min-width: 640px) {
+          .hero-content-wrapper {
+            padding: 5rem 1.5rem 2.5rem;
+          }
+        }
+
+        @media (min-width: 1024px) {
+          .hero-content-wrapper {
+            padding-top: 5rem;
+          }
+        }
+
+        /* Optimized Animation */
+        @keyframes heroBackgroundMove {
+          from {
+            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
+              translateX(1300px) translateZ(0);
+          }
+          to {
+            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
+              translateX(-190px) translateZ(0);
+          }
+        }
+
+        /* Force hardware acceleration for smooth animation */
+        @media (prefers-reduced-motion: no-preference) {
+          .hero-animated-grid {
+            animation-play-state: running;
+          }
+        }
+
+        /* Pause animation if user prefers reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+          .hero-animated-grid {
+            animation-play-state: paused;
+          }
+        }
+      `}</style>
+    </Section>
+  );
+}
+</file>
+
 <file path="src/components/marketing/MarketingLibraryPreview.tsx">
 "use client";
 
@@ -82827,243 +83390,6 @@ export function useTikTokPostAction(
     accountsLoading,
     refreshAccounts,
   };
-}
-</file>
-
-<file path="package.json">
-{
-  "name": "presentation",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "build": "next build --turbo",
-    "db:push": "prisma db push",
-    "db:studio": "prisma studio",
-    "dev": "next dev --turbo",
-    "dev:noturbo": "cross-env NEXT_DISABLE_TURBOPACK=1 next dev",
-    "postinstall": "prisma generate",
-    "lint": "biome lint .",
-    "lint:fix": "biome lint --write .",
-    "check": "biome check .",
-    "check:fix": "biome check --write .",
-    "reconcile:credits": "node scripts/cleanup-and-reconcile.mjs",
-    "start": "next start",
-    "type": "tsc --noEmit",
-    "postbuild": "next-sitemap"
-  },
-  "dependencies": {
-    "@ai-sdk/openai": "^1.3.23",
-    "@ai-sdk/openai-compatible": "^1.0.19",
-    "@ai-sdk/provider": "1.1.3",
-    "@ai-sdk/provider-utils": "2.2.8",
-    "@ai-sdk/react": "^1.2.12",
-    "@ariakit/react": "^0.4.17",
-    "@auth/prisma-adapter": "^1.6.0",
-    "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/sortable": "^10.0.0",
-    "@dnd-kit/utilities": "^3.2.2",
-    "@emoji-mart/data": "^1.2.1",
-    "@fal-ai/client": "^1.7.2",
-    "@ffmpeg-installer/ffmpeg": "^1.1.0",
-    "@ffprobe-installer/ffprobe": "^2.1.2",
-    "@fortawesome/fontawesome-svg-core": "^6.7.2",
-    "@fortawesome/free-brands-svg-icons": "^6.7.2",
-    "@fortawesome/free-regular-svg-icons": "^6.7.2",
-    "@fortawesome/free-solid-svg-icons": "^6.7.2",
-    "@fortawesome/react-fontawesome": "^0.2.2",
-    "@hookform/resolvers": "^3.10.0",
-    "@platejs/ai": "^49.2.15",
-    "@platejs/autoformat": "^49.0.0",
-    "@platejs/basic-nodes": "^49.0.0",
-    "@platejs/basic-styles": "^49.0.0",
-    "@platejs/callout": "^49.0.0",
-    "@platejs/caption": "^49.0.0",
-    "@platejs/code-block": "^49.0.0",
-    "@platejs/combobox": "^49.0.0",
-    "@platejs/comment": "^49.0.0",
-    "@platejs/date": "^49.0.2",
-    "@platejs/dnd": "^49.2.10",
-    "@platejs/emoji": "^49.0.0",
-    "@platejs/excalidraw": "^49.0.0",
-    "@platejs/floating": "^49.0.0",
-    "@platejs/indent": "^49.0.0",
-    "@platejs/juice": "^49.0.0",
-    "@platejs/layout": "^49.2.1",
-    "@platejs/link": "^49.1.1",
-    "@platejs/list": "^49.2.0",
-    "@platejs/markdown": "^49.2.15",
-    "@platejs/math": "^49.0.0",
-    "@platejs/media": "^49.0.0",
-    "@platejs/mention": "^49.0.0",
-    "@platejs/resizable": "^49.0.0",
-    "@platejs/selection": "^50.2.0",
-    "@platejs/slash-command": "^49.0.0",
-    "@platejs/slate": "^49.2.4",
-    "@platejs/suggestion": "^50.3.3",
-    "@platejs/table": "^49.1.13",
-    "@platejs/toc": "^49.0.0",
-    "@platejs/toggle": "^49.0.0",
-    "@prisma/client": "^6.13.0",
-    "@radix-ui/react-accordion": "^1.2.12",
-    "@radix-ui/react-alert-dialog": "^1.1.14",
-    "@radix-ui/react-aspect-ratio": "^1.1.7",
-    "@radix-ui/react-avatar": "^1.1.10",
-    "@radix-ui/react-checkbox": "^1.3.2",
-    "@radix-ui/react-collapsible": "^1.1.12",
-    "@radix-ui/react-collection": "^1.1.7",
-    "@radix-ui/react-context-menu": "^2.2.15",
-    "@radix-ui/react-dialog": "^1.1.15",
-    "@radix-ui/react-dropdown-menu": "^2.1.16",
-    "@radix-ui/react-hover-card": "^1.1.15",
-    "@radix-ui/react-label": "^2.1.7",
-    "@radix-ui/react-menubar": "^1.1.16",
-    "@radix-ui/react-navigation-menu": "^1.2.14",
-    "@radix-ui/react-popover": "^1.1.15",
-    "@radix-ui/react-primitive": "^2.1.3",
-    "@radix-ui/react-progress": "^1.1.7",
-    "@radix-ui/react-radio-group": "^1.3.7",
-    "@radix-ui/react-scroll-area": "^1.2.10",
-    "@radix-ui/react-select": "^2.2.6",
-    "@radix-ui/react-separator": "^1.1.7",
-    "@radix-ui/react-slider": "^1.3.6",
-    "@radix-ui/react-slot": "^1.2.3",
-    "@radix-ui/react-switch": "^1.2.6",
-    "@radix-ui/react-tabs": "^1.1.13",
-    "@radix-ui/react-toast": "^1.2.15",
-    "@radix-ui/react-toggle": "^1.1.9",
-    "@radix-ui/react-toggle-group": "^1.1.10",
-    "@radix-ui/react-toolbar": "^1.1.10",
-    "@radix-ui/react-tooltip": "^1.2.8",
-    "@reacticons/ionicons": "^7.1.0",
-    "@t3-oss/env-nextjs": "^0.10.1",
-    "@tanstack/react-query": "^5.84.2",
-    "@tavily/core": "^0.5.12",
-    "@uploadthing/react": "^7.3.1",
-    "ai": "^4.3.19",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "cmdk": "^1.1.1",
-    "date-fns": "^3.6.0",
-    "embla-carousel-react": "^8.6.0",
-    "execa": "^9.6.0",
-    "ffmpeg-static": "^5.2.0",
-    "fontfaceobserver": "^2.3.0",
-    "framer-motion": "^11.18.2",
-    "html2canvas-pro": "^1.5.11",
-    "input-otp": "^1.4.2",
-    "ionicons": "^8.0.13",
-    "jszip": "^3.10.1",
-    "konva": "^9.3.22",
-    "langchain": "^0.3.30",
-    "lodash.debounce": "^4.0.8",
-    "lowlight": "^3.3.0",
-    "lucide-react": "^0.525.0",
-    "nanoid": "^5.1.5",
-    "next": "15.5.4",
-    "next-auth": "5.0.0-beta.29",
-    "next-sitemap": "^4.2.3",
-    "next-themes": "^0.4.6",
-    "ollama-ai-provider": "^1.2.0",
-    "pdf-lib": "^1.17.1",
-    "platejs": "^49.2.21",
-    "pptxgenjs": "^4.0.1",
-    "prismjs": "^1.30.0",
-    "prosemirror-commands": "^1.7.1",
-    "prosemirror-history": "^1.4.1",
-    "prosemirror-keymap": "^1.2.3",
-    "prosemirror-markdown": "^1.13.2",
-    "prosemirror-model": "^1.25.1",
-    "prosemirror-schema-basic": "^1.2.4",
-    "prosemirror-schema-list": "^1.5.1",
-    "prosemirror-state": "^1.4.3",
-    "prosemirror-view": "^1.39.3",
-    "re-resizable": "^6.11.2",
-    "react": "18.3.1",
-    "react-calendar": "^6.0.0",
-    "react-colorful": "^5.6.1",
-    "react-day-picker": "^9.9.0",
-    "react-dnd": "^16.0.1",
-    "react-dnd-html5-backend": "^16.0.1",
-    "react-dom": "18.3.1",
-    "react-dropzone": "^14.3.8",
-    "react-fontpicker-ts": "^1.2.0",
-    "react-hook-form": "^7.56.4",
-    "react-hot-toast": "^2.6.0",
-    "react-icons": "^4.12.0",
-    "react-icons-picker": "^1.0.9",
-    "react-intersection-observer": "^9.16.0",
-    "react-konva": "^19.0.10",
-    "react-lite-youtube-embed": "^2.5.6",
-    "react-player": "^3.3.3",
-    "react-resizable-panels": "^2.1.9",
-    "react-textarea-autosize": "^8.5.9",
-    "react-tweet": "^3.2.2",
-    "recharts": "^2.15.4",
-    "redis": "^5.9.0",
-    "remark-gfm": "^4.0.1",
-    "remark-math": "^6.0.0",
-    "resend": "^6.4.0",
-    "sonner": "^1.7.4",
-    "stripe": "^19.1.0",
-    "swr": "^2.3.6",
-    "tailwind-merge": "^2.6.0",
-    "together-ai": "^0.7.0",
-    "uploadthing": "^7.7.2",
-    "use-file-picker": "^2.1.2",
-    "vaul": "^1.1.2",
-    "zod": "^3.25.76",
-    "zustand": "^4.5.7"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.2.5",
-    "@tailwindcss/container-queries": "^0.1.1",
-    "@tailwindcss/typography": "^0.5.16",
-    "@types/lodash.debounce": "^4.0.9",
-    "@types/node": "^20.17.47",
-    "@types/prismjs": "^1.26.5",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@types/webpack": "^5.28.5",
-    "cross-env": "^10.1.0",
-    "postcss": "^8.5.3",
-    "prettier": "^3.5.3",
-    "prettier-plugin-organize-imports": "^4.3.0",
-    "prettier-plugin-tailwindcss": "^0.5.14",
-    "prisma": "^6.13.0",
-    "tailwind-scrollbar": "^4.0.2",
-    "tailwind-scrollbar-hide": "^2.0.0",
-    "tailwindcss": "^3.4.17",
-    "tailwindcss-animate": "^1.0.7",
-    "ts-node": "^10.9.2",
-    "tsx": "^4.20.6",
-    "typescript": "^5.9.2",
-    "webpack": "^5.97.1"
-  },
-  "pnpm": {
-    "peerDependencyRules": {
-      "allowAny": [
-        "react",
-        "react-dom",
-        "@types/react"
-      ]
-    },
-    "onlyBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
-      "@swc/core",
-      "canvas",
-      "core-js",
-      "es5-ext",
-      "esbuild",
-      "msgpackr-extract",
-      "prisma",
-      "protobufjs",
-      "sharp",
-      "unrs-resolver"
-    ]
-  },
-  "packageManager": "pnpm@10.17.0"
 }
 </file>
 
@@ -84446,556 +84772,6 @@ export function PostCollectionsClient() {
 }
 </file>
 
-<file path="src/components/marketing/Hero.tsx">
-"use client";
-import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
-import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
-import {
-  ArrowRightIcon,
-  BarChart3Icon,
-  CheckCircle2Icon,
-  StarIcon,
-  TrendingUpIcon,
-  ZapIcon,
-} from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { Section } from "./Section";
-
-const HERO_POSTER_ROWS = 8;
-const HERO_POSTERS_PER_ROW = 28;
-const HERO_FETCH_LIMIT = 300;
-
-type HeroSlide = {
-  imageUrl?: string | null;
-};
-
-type HeroPost = {
-  slides?: HeroSlide[];
-};
-
-export function MarketingHero({
-  session,
-  category,
-  heroTitle,
-  heroSubtitle,
-}: {
-  session: boolean;
-  category?: string;
-  heroTitle?: string;
-  heroSubtitle?: string;
-}) {
-  const [posterImages, setPosterImages] = useState<string[]>([]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchSlides = async () => {
-      try {
-        const params = new URLSearchParams({
-          limit: HERO_FETCH_LIMIT.toString(),
-        });
-        if (category) {
-          params.set("category", category);
-        }
-
-        const response = await fetch(
-          `/api/slideshow-library/hero-posts?${params.toString()}`,
-          {
-            cache: "no-store",
-            signal: controller.signal,
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to load hero slides: ${response.status}`);
-        }
-
-        const data = (await response.json()) as unknown;
-        if (!Array.isArray(data)) return;
-
-        const collected = new Set<string>();
-
-        for (const post of data as HeroPost[]) {
-          if (!post?.slides?.length) continue;
-
-          for (const slide of post.slides) {
-            if (!slide?.imageUrl) continue;
-            collected.add(slide.imageUrl);
-          }
-        }
-
-        if (!collected.size) return;
-
-        const deduped = Array.from(collected);
-        for (let index = deduped.length - 1; index > 0; index--) {
-          const swapIndex = Math.floor(Math.random() * (index + 1));
-          const current = deduped[index];
-          const swap = deduped[swapIndex];
-          if (current === undefined || swap === undefined) {
-            continue;
-          }
-          deduped[index] = swap;
-          deduped[swapIndex] = current;
-        }
-
-        setPosterImages(deduped);
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          return;
-        }
-        console.error("Error loading hero slide images", error);
-      }
-    };
-
-    void fetchSlides();
-
-    return () => {
-      controller.abort();
-    };
-  }, [category]);
-
-  const posterMatrix = useMemo(() => {
-    const perRow = HERO_POSTERS_PER_ROW;
-    const totalRows = HERO_POSTER_ROWS;
-
-     // Until we have real images, render nothing (no placeholders).
-     if (!posterImages.length) return [];
-
-     const rows: string[][] = [];
-     for (let r = 0; r < totalRows; r++) {
-       const start = r * perRow;
-       const end = start + perRow;
-       rows.push(posterImages.slice(start, end));
-     }
-     return rows;
-
-}, [posterImages]);
-
-  // TikTok-Bilder NICHT über next/image rendern (Host-Whitelist von Next schlägt oft zu).
-  // Alles andere weiter mit next/image (Optimierung bleibt erhalten).
-  const isTikTokCdn = (urlStr: string) => {
-    try {
-      const u = new URL(urlStr);
-      // Beispiele: p16-pu-sign-no.tiktokcdn-eu.com, p19-common-sign-useastred.tiktokcdn-eu.com, ...
-      return /(^|\.)tiktokcdn(?:-eu)?\.com$/i.test(u.hostname);
-    } catch {
-      return false;
-    }
-  };
-
-  return (
-    <Section className="relative min-h-[85vh] overflow-hidden bg-[#111] py-0">
-      {/* Netflix Background - Fixed z-index hierarchy */}
-      {posterMatrix.length > 0 && (
-        <div className="hero-background-container">
-          {/* Gradient Overlay */}
-          <div className="hero-gradient-overlay" />
-
-          {/* Animated Background */}
-          <div className="hero-perspective-wrapper">
-            <div className="hero-animated-grid">
-              {posterMatrix.map((row, rowIndex) => (
-                <div key={`hero-row-${rowIndex}`} className="hero-image-row">
-                  {row.map((imageUrl, itemIndex) => (
-                    <div
-                      key={`hero-row-${rowIndex}-item-${itemIndex}`}
-                      className="hero-image-card"
-                    >
-                      {isTikTokCdn(imageUrl) ? (
-                        // Fallback auf <img> für TikTok-CDNs → keine Next-Whitelist nötig
-                        <img
-                          src={imageUrl}
-                          alt=""
-                          loading={rowIndex < 2 ? "eager" : "lazy"}
-                          className="h-full w-full object-cover"
-                          decoding="async"
-                        />
-                      ) : (
-                        <Image
-                          src={imageUrl}
-                          alt=""
-                          fill
-                          /* Nur für die kleinen Kacheln: extrem klein halten */
-                          sizes="125px"
-                          /* Next darf optimieren -> erzeugt AVIF/WebP automatisch */
-                          quality={60}
-                          // Avoid Next.js runtime error: can't set both priority and loading
-                          // Use priority for first 2 rows, lazy for the rest
-                          priority={rowIndex < 2}
-                          loading={rowIndex < 2 ? undefined : "lazy"}
-                          style={{ objectFit: "cover", objectPosition: "center" }}
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Foreground Content - Isolated stacking context */}
-      <div className="hero-content-wrapper">
-        <div className="mx-auto max-w-5xl text-center">
-          {/* Status badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-3 rounded-full border border-indigo-300/20 bg-indigo-500/40 backdrop-blur-sm px-4 py-2 text-xs sm:text-sm font-medium text-indigo-100 shadow-lg mb-2 sm:mb-4 lg:mb-6 mt-[-0.5rem] sm:mt-[-1rem]"
-          >
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
-              <span>10M+ views generated with SlidesCockpit</span>
-            </div>
-            <div className="hidden sm:block h-4 w-px bg-indigo-300/30"></div>
-            <div className="flex items-center gap-1">
-              <TrendingUpIcon className="w-4 h-4" />
-              <span>2025</span>
-            </div>
-          </motion.div>
-
-          {/* Main headline */}
-          <motion.h1
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08, duration: 0.7 }}
-            className="py-2 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight text-white"
-          >
-            {heroTitle ? (
-              (() => {
-                // Teile den Title in Wörter auf
-                const words = heroTitle.split(" ");
-
-                // Wenn weniger als 3 Wörter, zeige alles normal
-                if (words.length < 3) {
-                  return <span className="block">{heroTitle}</span>;
-                }
-
-                // Nimm die letzten 2 Wörter für den Gradient
-                const lastTwoWords = words.slice(-2).join(" ");
-                const restOfTitle = words.slice(0, -2).join(" ");
-
-                return (
-                  <>
-                    <span className="block sm:inline">{restOfTitle}&nbsp;</span>
-                    <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
-                      {lastTwoWords}
-                    </span>
-                  </>
-                );
-              })()
-            ) : (
-              <>
-                <span className="block">Automate TikTok slides</span>
-                {/* Mobile ≈3 Zeilen, ab sm → 2 Zeilen */}
-                <span className="block sm:inline sm:whitespace-nowrap">
-                  that actually&nbsp;
-                </span>
-                <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
-                  drive traffic
-                </span>
-              </>
-            )}
-          </motion.h1>
-
-          {/* Subheadline */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.15, duration: 0.6 }}
-            className="mt-2 pb-4 text-lg sm:text-xl lg:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed font-light"
-          >
-            {heroSubtitle ||
-              "Create viral TikTok slides in seconds. Visually stunning, authentic, and built to perform."}
-          </motion.p>
-
-          {/* CTA buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-5"
-          >
-            {session ? (
-              <Link href="/dashboard/home" className="w-full sm:w-auto">
-                <Button
-                  size="lg"
-                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
-                >
-                  Go to the app
-                  <ArrowRightIcon className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
-                </Button>
-              </Link>
-            ) : (
-              <div className="w-full sm:w-auto">
-                <GoogleSignInButton />
-              </div>
-            )}
-
-            <a
-              href="#library"
-              className="inline-flex items-center gap-2 text-white/80 hover:text-white text-sm sm:text-base font-medium underline-offset-4 hover:underline transition-all duration-200 px-2 py-1"
-            >
-              <StarIcon className="w-4 h-4 text-yellow-400" />
-              Browse examples
-            </a>
-          </motion.div>
-
-          {/* Feature highlights */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 text-left"
-          >
-            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
-                  <ZapIcon className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-white font-semibold">Live in seconds</h2>
-              </div>
-              <p className="text-gray-300 text-sm leading-relaxed">
-                From idea to finished slides instantly. No setup, no hassle.
-              </p>
-            </div>
-
-            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
-                  <BarChart3Icon className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-white font-semibold">
-                  Templates that convert
-                </h2>
-              </div>
-              <p className="text-gray-300 text-sm leading-relaxed">
-                Battle-tested winners. More reach, more followers.
-              </p>
-            </div>
-
-            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
-                  <CheckCircle2Icon className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-white font-semibold">Looks handcrafted</h2>
-              </div>
-              <p className="text-gray-300 text-sm leading-relaxed">
-                Creator aesthetic instead of AI vibe. Natural and trustworthy.
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Social proof stats */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4, duration: 0.6 }}
-            className="mt-14 px-4"
-          >
-            <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-indigo-500/40 hover:bg-indigo-500/50 duration-300 backdrop-blur-sm p-5 sm:p-6">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 mb-1">
-                    10M+
-                  </div>
-                  <div className="text-sm text-gray-300/90">TikTok Views</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-                    100+
-                  </div>
-                  <div className="text-sm text-gray-300/90">Happy creators</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-                    20K+
-                  </div>
-                  <div className="text-sm text-gray-300/90">
-                    Slides produced
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-                    100%
-                  </div>
-                  <div className="text-sm text-gray-300/90">Success rate</div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-
-      {/* Optimized Styles - Fixed z-index hierarchy and GPU acceleration */}
-      <style jsx global>{`
-        /* Background Container - Lowest layer */
-        .hero-background-container {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-          background-color: #111;
-          z-index: 1;
-          pointer-events: none;
-          /* Create isolated stacking context */
-          isolation: isolate;
-          /* Promote to own layer */
-          will-change: transform;
-          transform: translateZ(0);
-        }
-
-        /* Gradient Overlay - Above background */
-        .hero-gradient-overlay {
-          position: absolute;
-          inset: 0;
-          z-index: 2;
-          background: linear-gradient(
-            to bottom,
-            rgba(0, 0, 0, 0.8) 15%,
-            rgba(0, 0, 0, 0.8) 50%,
-            rgba(0, 0, 0, 0.95) 70%,
-            rgba(0, 0, 0, 0.6) 95%,
-            rgba(0, 0, 0, 1) 100%
-          );
-          opacity: 0.65;
-          pointer-events: none;
-          /* Fixed property for better performance */
-          will-change: opacity;
-        }
-
-        /* Perspective Wrapper */
-        .hero-perspective-wrapper {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          perspective: 500px;
-          perspective-origin: center center;
-          z-index: 1;
-          /* Contain layout and paint for performance */
-          contain: layout style paint;
-        }
-
-        /* Animated Grid */
-        .hero-animated-grid {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: flex-start;
-          transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
-            translateX(1300px) translateZ(0);
-          transform-style: preserve-3d;
-          animation: heroBackgroundMove 180s linear infinite alternate;
-          /* Force GPU acceleration */
-          will-change: transform;
-          backface-visibility: hidden;
-          -webkit-backface-visibility: hidden;
-          -webkit-transform-style: preserve-3d;
-        }
-
-        /* Image Rows */
-        .hero-image-row {
-          margin: 0;
-          display: flex;
-          justify-content: flex-end;
-          width: 100%;
-          flex-wrap: nowrap;
-          flex-grow: 1;
-          transform: translateX(100px) translateY(-120px) translateZ(0);
-          /* Prevent layout thrashing */
-          contain: layout style;
-        }
-
-        /* Individual Image Cards */
-        .hero-image-card {
-          position: relative;
-          transform-style: preserve-3d;
-          transform: rotateX(20deg) rotateY(0deg) skewX(335deg) translateZ(0);
-          min-width: 125px;
-          min-height: 187px;
-          display: inline-block;
-          margin: 7px;
-          border-radius: 12px;
-          box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
-          opacity: 0.9;
-          overflow: hidden;
-          backface-visibility: hidden;
-          -webkit-backface-visibility: hidden;
-          /* Performance optimization */
-          will-change: transform;
-        }
-
-        /* Content Wrapper - keep it BELOW the fixed navbar (navbar is z-50) */
-        .hero-content-wrapper {
-          position: relative;
-          /* Navbar has z-50 — set hero below it to avoid overlapping while scrolling */
-          z-index: 20;
-          /* Create new stacking context isolated from background */
-          isolation: isolate;
-          /* Promote to own layer */
-          will-change: transform;
-          transform: translateZ(0);
-          min-height: 89vh;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          padding: 5rem 1.25rem 2.5rem;
-        }
-
-        @media (min-width: 640px) {
-          .hero-content-wrapper {
-            padding: 5rem 1.5rem 2.5rem;
-          }
-        }
-
-        @media (min-width: 1024px) {
-          .hero-content-wrapper {
-            padding-top: 5rem;
-          }
-        }
-
-        /* Optimized Animation */
-        @keyframes heroBackgroundMove {
-          from {
-            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
-              translateX(1300px) translateZ(0);
-          }
-          to {
-            transform: rotateX(5deg) rotateY(-8deg) rotateZ(10deg)
-              translateX(-190px) translateZ(0);
-          }
-        }
-
-        /* Force hardware acceleration for smooth animation */
-        @media (prefers-reduced-motion: no-preference) {
-          .hero-animated-grid {
-            animation-play-state: running;
-          }
-        }
-
-        /* Pause animation if user prefers reduced motion */
-        @media (prefers-reduced-motion: reduce) {
-          .hero-animated-grid {
-            animation-play-state: paused;
-          }
-        }
-      `}</style>
-    </Section>
-  );
-}
-</file>
-
 <file path="src/components/tiktok/TikTokConfig.tsx">
 "use client";
 
@@ -85893,6 +85669,243 @@ export function useTikTokDirectPost(
     accountsLoading,
     refreshAccounts,
   };
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "presentation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build --turbo",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "dev": "next dev --turbo",
+    "dev:noturbo": "cross-env NEXT_DISABLE_TURBOPACK=1 next dev",
+    "postinstall": "prisma generate",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "reconcile:credits": "node scripts/cleanup-and-reconcile.mjs",
+    "start": "next start",
+    "type": "tsc --noEmit",
+    "postbuild": "next-sitemap"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^1.3.23",
+    "@ai-sdk/openai-compatible": "^1.0.19",
+    "@ai-sdk/provider": "1.1.3",
+    "@ai-sdk/provider-utils": "2.2.8",
+    "@ai-sdk/react": "^1.2.12",
+    "@ariakit/react": "^0.4.17",
+    "@auth/prisma-adapter": "^1.6.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@emoji-mart/data": "^1.2.1",
+    "@fal-ai/client": "^1.7.2",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2",
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-brands-svg-icons": "^6.7.2",
+    "@fortawesome/free-regular-svg-icons": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
+    "@fortawesome/react-fontawesome": "^0.2.2",
+    "@hookform/resolvers": "^3.10.0",
+    "@platejs/ai": "^49.2.15",
+    "@platejs/autoformat": "^49.0.0",
+    "@platejs/basic-nodes": "^49.0.0",
+    "@platejs/basic-styles": "^49.0.0",
+    "@platejs/callout": "^49.0.0",
+    "@platejs/caption": "^49.0.0",
+    "@platejs/code-block": "^49.0.0",
+    "@platejs/combobox": "^49.0.0",
+    "@platejs/comment": "^49.0.0",
+    "@platejs/date": "^49.0.2",
+    "@platejs/dnd": "^49.2.10",
+    "@platejs/emoji": "^49.0.0",
+    "@platejs/excalidraw": "^49.0.0",
+    "@platejs/floating": "^49.0.0",
+    "@platejs/indent": "^49.0.0",
+    "@platejs/juice": "^49.0.0",
+    "@platejs/layout": "^49.2.1",
+    "@platejs/link": "^49.1.1",
+    "@platejs/list": "^49.2.0",
+    "@platejs/markdown": "^49.2.15",
+    "@platejs/math": "^49.0.0",
+    "@platejs/media": "^49.0.0",
+    "@platejs/mention": "^49.0.0",
+    "@platejs/resizable": "^49.0.0",
+    "@platejs/selection": "^50.2.0",
+    "@platejs/slash-command": "^49.0.0",
+    "@platejs/slate": "^49.2.4",
+    "@platejs/suggestion": "^50.3.3",
+    "@platejs/table": "^49.1.13",
+    "@platejs/toc": "^49.0.0",
+    "@platejs/toggle": "^49.0.0",
+    "@prisma/client": "^6.13.0",
+    "@radix-ui/react-accordion": "^1.2.12",
+    "@radix-ui/react-alert-dialog": "^1.1.14",
+    "@radix-ui/react-aspect-ratio": "^1.1.7",
+    "@radix-ui/react-avatar": "^1.1.10",
+    "@radix-ui/react-checkbox": "^1.3.2",
+    "@radix-ui/react-collapsible": "^1.1.12",
+    "@radix-ui/react-collection": "^1.1.7",
+    "@radix-ui/react-context-menu": "^2.2.15",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-hover-card": "^1.1.15",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-menubar": "^1.1.16",
+    "@radix-ui/react-navigation-menu": "^1.2.14",
+    "@radix-ui/react-popover": "^1.1.15",
+    "@radix-ui/react-primitive": "^2.1.3",
+    "@radix-ui/react-progress": "^1.1.7",
+    "@radix-ui/react-radio-group": "^1.3.7",
+    "@radix-ui/react-scroll-area": "^1.2.10",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-separator": "^1.1.7",
+    "@radix-ui/react-slider": "^1.3.6",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-switch": "^1.2.6",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@radix-ui/react-toast": "^1.2.15",
+    "@radix-ui/react-toggle": "^1.1.9",
+    "@radix-ui/react-toggle-group": "^1.1.10",
+    "@radix-ui/react-toolbar": "^1.1.10",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "@reacticons/ionicons": "^7.1.0",
+    "@t3-oss/env-nextjs": "^0.10.1",
+    "@tanstack/react-query": "^5.84.2",
+    "@tavily/core": "^0.5.12",
+    "@uploadthing/react": "^7.3.1",
+    "ai": "^4.3.19",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "date-fns": "^3.6.0",
+    "embla-carousel-react": "^8.6.0",
+    "execa": "^9.6.0",
+    "ffmpeg-static": "^5.2.0",
+    "fontfaceobserver": "^2.3.0",
+    "framer-motion": "^11.18.2",
+    "html2canvas-pro": "^1.5.11",
+    "input-otp": "^1.4.2",
+    "ionicons": "^8.0.13",
+    "jszip": "^3.10.1",
+    "konva": "^9.3.22",
+    "langchain": "^0.3.30",
+    "lodash.debounce": "^4.0.8",
+    "lowlight": "^3.3.0",
+    "lucide-react": "^0.525.0",
+    "nanoid": "^5.1.5",
+    "next": "15.5.4",
+    "next-auth": "5.0.0-beta.29",
+    "next-sitemap": "^4.2.3",
+    "next-themes": "^0.4.6",
+    "ollama-ai-provider": "^1.2.0",
+    "pdf-lib": "^1.17.1",
+    "platejs": "^49.2.21",
+    "pptxgenjs": "^4.0.1",
+    "prismjs": "^1.30.0",
+    "prosemirror-commands": "^1.7.1",
+    "prosemirror-history": "^1.4.1",
+    "prosemirror-keymap": "^1.2.3",
+    "prosemirror-markdown": "^1.13.2",
+    "prosemirror-model": "^1.25.1",
+    "prosemirror-schema-basic": "^1.2.4",
+    "prosemirror-schema-list": "^1.5.1",
+    "prosemirror-state": "^1.4.3",
+    "prosemirror-view": "^1.39.3",
+    "re-resizable": "^6.11.2",
+    "react": "18.3.1",
+    "react-calendar": "^6.0.0",
+    "react-colorful": "^5.6.1",
+    "react-day-picker": "^9.9.0",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-dom": "18.3.1",
+    "react-dropzone": "^14.3.8",
+    "react-fontpicker-ts": "^1.2.0",
+    "react-hook-form": "^7.56.4",
+    "react-hot-toast": "^2.6.0",
+    "react-icons": "^4.12.0",
+    "react-icons-picker": "^1.0.9",
+    "react-intersection-observer": "^9.16.0",
+    "react-konva": "^19.0.10",
+    "react-lite-youtube-embed": "^2.5.6",
+    "react-player": "^3.3.3",
+    "react-resizable-panels": "^2.1.9",
+    "react-textarea-autosize": "^8.5.9",
+    "react-tweet": "^3.2.2",
+    "recharts": "^2.15.4",
+    "redis": "^5.9.0",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "resend": "^6.4.0",
+    "sonner": "^1.7.4",
+    "stripe": "^19.1.0",
+    "swr": "^2.3.6",
+    "tailwind-merge": "^2.6.0",
+    "together-ai": "^0.7.0",
+    "uploadthing": "^7.7.2",
+    "use-file-picker": "^2.1.2",
+    "vaul": "^1.1.2",
+    "zod": "^3.25.76",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.5",
+    "@tailwindcss/container-queries": "^0.1.1",
+    "@tailwindcss/typography": "^0.5.16",
+    "@types/lodash.debounce": "^4.0.9",
+    "@types/node": "^20.17.47",
+    "@types/prismjs": "^1.26.5",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@types/webpack": "^5.28.5",
+    "cross-env": "^10.1.0",
+    "postcss": "^8.5.3",
+    "prettier": "^3.5.3",
+    "prettier-plugin-organize-imports": "^4.3.0",
+    "prettier-plugin-tailwindcss": "^0.5.14",
+    "prisma": "^6.13.0",
+    "tailwind-scrollbar": "^4.0.2",
+    "tailwind-scrollbar-hide": "^2.0.0",
+    "tailwindcss": "^3.4.17",
+    "tailwindcss-animate": "^1.0.7",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2",
+    "webpack": "^5.97.1"
+  },
+  "pnpm": {
+    "peerDependencyRules": {
+      "allowAny": [
+        "react",
+        "react-dom",
+        "@types/react"
+      ]
+    },
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "@swc/core",
+      "canvas",
+      "core-js",
+      "es5-ext",
+      "esbuild",
+      "msgpackr-extract",
+      "prisma",
+      "protobufjs",
+      "sharp",
+      "unrs-resolver"
+    ]
+  },
+  "packageManager": "pnpm@10.17.0"
 }
 </file>
 

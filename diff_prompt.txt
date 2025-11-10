@@ -1,91 +1,10 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
-*** Begin Patch
-*** Update File: src/app/api/stripe/webhook/route.ts
+*** a/package.json
+--- b/package.json
 @@
-       case "invoice.payment_succeeded": {
+   "scripts": {
+-    "postbuild": "next-sitemap"
+   },
 @@
--        const invoice = event.data.object as Stripe.Invoice;
-+        const invoice = event.data.object as Stripe.Invoice;
-         const customerId = invoice.customer as string;
--        const priceId = invoice.lines?.data?.[0]?.price?.id ?? null;
--        const mappedPlan = planFromPrice(priceId);
-+        // Stripe-Typen für InvoiceLineItem haben nicht immer 'price' getypt → defensiv über 'any'
-+        const firstLine: any = invoice.lines?.data?.[0] ?? null;
-+        const priceId: string | null =
-+          firstLine?.price?.id ??
-+          (typeof firstLine?.price === "string" ? firstLine.price : null);
-+        const mappedPlan = planFromPrice(priceId ?? undefined);
-+        if (!mappedPlan) {
-+          console.warn("[webhook] ⚠️ invoice.payment_succeeded ohne zuordenbaren Plan", { priceId });
-+          await markProcessed(event.id, event.type);
-+          return new NextResponse("OK", { status: 200 });
-+        }
-         const nextResetAt = addMonths(new Date(), 1);
-@@
-         await db.$transaction(async (tx) => {
-           // 1) User-Plan & planRenewsAt konsistent setzen
-           await tx.user.update({
-             where: { id: user.id },
-             data: {
-               plan: mappedPlan,
-               planRenewsAt: nextResetAt,
-             },
-           });
- 
-           // 2) Credits intelligent neu berechnen (Carry-Over statt Hard-Reset)
-           const prevUser = await tx.user.findUnique({
-             where: { id: user.id },
-             select: { plan: true },
-           });
--          await carryOverCreditsOnPlanChange(tx, user.id, prevUser?.plan ?? null, mappedPlan, nextResetAt);
-+          await carryOverCreditsOnPlanChange(
-+            tx,
-+            user.id,
-+            prevUser?.plan ?? null,
-+            mappedPlan,
-+            nextResetAt
-+          );
-         });
-@@
-       case "customer.subscription.updated": {
-         try {
-           const sub = event.data.object as Stripe.Subscription;
-           const customerId =
-             typeof sub.customer === "string" ? sub.customer : undefined;
-@@
-           const mappedPlan = planFromPrice(priceId);
-           if (!mappedPlan) {
-             console.warn("[webhook] ⚠️ keine Zuordnung für priceId", priceId);
-             return new NextResponse("OK", { status: 200 });
-           }
- 
--          const nextPeriodEnd =
--            firstItem?.current_period_end ??
--            sub.current_period_end ??
--            Math.floor(Date.now() / 1000);
-+          // Einige Stripe-Typdefinitionen expose'n 'current_period_end' nicht explizit → schmaler Cast
-+          const subAny = sub as Stripe.Subscription & { current_period_end?: number };
-+          const nextPeriodEnd =
-+            subAny.current_period_end ?? Math.floor(Date.now() / 1000);
- 
-           const nextResetAt = new Date(nextPeriodEnd * 1000);
-           if (isNaN(nextResetAt.getTime())) {
-             console.warn("[webhook] ⚠️ ungültiges Datum:", nextPeriodEnd);
-             return new NextResponse("OK", { status: 200 });
-           }
-@@
-     // 🧩 optional: Logging zu Sentry
-     if (process.env.SENTRY_DSN) {
-       try {
--        const S = await import("@sentry/nextjs");
--        S.captureException(err, { extra: { eventId: event?.id, type: event?.type } });
-+        // String-Literal vermeiden, damit TS keine Typauflösung des Moduls verlangt
-+        const mod = "@sentry/nextjs";
-+        const S: any = await import(mod as any);
-+        S.captureException(err, {
-+          extra: { eventId: event?.id, type: event?.type },
-+        });
-       } catch {}
-     }
-*** End Patch
+-    "next-sitemap": "^4.2.3",

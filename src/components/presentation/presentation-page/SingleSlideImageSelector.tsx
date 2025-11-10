@@ -72,15 +72,18 @@ export function SingleSlideImageSelector({
 
   // Drill-down navigation state
   const [drillDownParent, setDrillDownParent] = useState<ImageSet | null>(null);
+  // Alle von irgendeinem User "owned" (private Kollektionen) für Community-Filter
+  const [allOwned, setAllOwned] = useState<Set<string>>(new Set());
 
   const IMAGES_PER_PAGE = 27; // 9 columns x 3 rows
 
   const loadImageSets = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [setsRes, ownedRes] = await Promise.all([
+      const [setsRes, ownedRes, allRes] = await Promise.all([
         fetch("/api/imagesets", { cache: "no-store" }),
         fetch("/api/user-image-collections", { cache: "no-store" }),
+        fetch("/api/user-image-collections/all", { cache: "no-store" }),
       ]);
 
       if (!setsRes.ok) {
@@ -92,6 +95,9 @@ export function SingleSlideImageSelector({
         ? ((await ownedRes.json()) as { ownedIds?: string[] })
         : null;
       const ownedIds = new Set<string>(ownedPayload?.ownedIds ?? []);
+      const allPayload = allRes.ok ? await allRes.json() : null;
+      const allOwnedIds = new Set<string>(allPayload?.allOwnedIds ?? []);
+      setAllOwned(allOwnedIds);
 
       if (Array.isArray(data)) {
         const normalized = data.map((set: ImageSet) =>
@@ -139,55 +145,46 @@ export function SingleSlideImageSelector({
     );
   }, []);
 
-  const looksPersonal = useCallback(
-    (set: ImageSet) =>
+  const looksPersonal = useCallback((set: ImageSet) => {
+    return (
       hasPersonalCategoryTag(set.category) ||
       hasPersonalCategoryTag(set.slug) ||
-      hasPersonalCategoryTag(set.name),
-    [],
-  );
+      hasPersonalCategoryTag(set.name)
+    );
+  }, []);
 
+  // "Mine" = nur echte Ownership ODER AI-Avatar-Kollektionen
   const belongsToUser = useCallback(
     (set: ImageSet) =>
-      checkOwnership(set, userId ?? null) ||
-      looksPersonal(set) ||
-      isAiAvatarCollection(set),
-    [isAiAvatarCollection, looksPersonal, userId],
+      checkOwnership(set, userId ?? null) || isAiAvatarCollection(set),
+    [isAiAvatarCollection, userId],
   );
 
   const { communitySets, mySets } = useMemo(() => {
-    // If drilling down, show only children of selected parent
+    // Drilldown: Kinder des Parents
     if (drillDownParent) {
       const children = drillDownParent.children || [];
-      const community: ImageSet[] = [];
-      const mine: ImageSet[] = [];
-
-      children.forEach((set) => {
-        if (belongsToUser(set)) {
-          mine.push(set);
-        } else {
-          community.push(set);
-        }
-      });
-
+      const mine = children.filter(belongsToUser);
+      const community = children.filter(
+        (s) =>
+          !allOwned.has(s.id) && // keine User-Collections (von irgendwem)
+          !looksPersonal(s) &&   // keine "personal" getaggten
+          !isAiAvatarCollection(s), // keine AI-Avatars in Community
+      );
       return { communitySets: community, mySets: mine };
     }
 
-    // Otherwise show top-level sets
-    const community: ImageSet[] = [];
-    const mine: ImageSet[] = [];
-    const topLevelSets = imageSets.filter((set) => !set.parentId);
-
-    topLevelSets.forEach((set) => {
-      if (belongsToUser(set)) {
-        mine.push(set);
-      } else {
-        community.push(set);
-      }
-    });
-
+    // Top-Level
+    const topLevel = imageSets.filter((s) => !s.parentId);
+    const mine = topLevel.filter(belongsToUser);
+    const community = topLevel.filter(
+      (s) =>
+        !allOwned.has(s.id) &&
+        !looksPersonal(s) &&
+        !isAiAvatarCollection(s),
+    );
     return { communitySets: community, mySets: mine };
-  }, [belongsToUser, imageSets, drillDownParent]);
+  }, [belongsToUser, drillDownParent, imageSets, allOwned, looksPersonal, isAiAvatarCollection]);
 
   const handleSelectImage = (imageUrl: string) => {
     const effectiveParent =
