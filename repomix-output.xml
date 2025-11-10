@@ -12445,56 +12445,6 @@ export default function PrivacyPolicyPage() {
 }
 </file>
 
-<file path="src/app/sitemap.xml/route.ts">
-import { NextResponse } from "next/server";
-
-/**
- * Force-correct XML sitemap with proper Content-Type.
- * This overrides any fallback that might return text/html on HEAD.
- */
-export async function GET() {
-  const base =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://slidescockpit.com");
-
-  const now = new Date().toISOString();
-
-  const urls = [
-    { loc: `${base}/`,          changefreq: "weekly",  priority: "1.0", lastmod: now },
-    { loc: `${base}/pricing`,   changefreq: "monthly", priority: "0.8", lastmod: now },
-    { loc: `${base}/privacy`,   changefreq: "yearly",  priority: "0.3", lastmod: now },
-    { loc: `${base}/terms`,     changefreq: "yearly",  priority: "0.3", lastmod: now },
-  ];
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls
-  .map(
-    (u) => `  <url>
-    <loc>${u.loc}</loc>
-    <lastmod>${u.lastmod}</lastmod>
-    <changefreq>${u.changefreq}</changefreq>
-    <priority>${u.priority}</priority>
-  </url>`
-  )
-  .join("\n")}
-</urlset>`;
-
-  return new NextResponse(xml, {
-    status: 200,
-    headers: { "Content-Type": "application/xml; charset=utf-8" },
-  });
-}
-
-export async function HEAD() {
-  // Return only headers with the correct MIME type for Search Console
-  return new NextResponse(null, {
-    status: 200,
-    headers: { "Content-Type": "application/xml; charset=utf-8" },
-  });
-}
-</file>
-
 <file path="src/app/terms/page.tsx">
 import Link from "next/link";
 
@@ -74078,20 +74028,53 @@ export default async function Home() {
 }
 </file>
 
-<file path="src/app/robots.ts">
-import type { MetadataRoute } from "next";
+<file path="src/app/sitemap.xml/route.ts">
+import { NextResponse } from "next/server";
 
-export default function robots(): MetadataRoute.Robots {
-  return {
-    rules: [
-      {
-        userAgent: "*",
-        allow: "/",
-      },
-    ],
-    sitemap: "https://slidescockpit.com/sitemap.xml",
-    host: "https://slidescockpit.com",
-  };
+/**
+ * Force-correct XML sitemap with proper Content-Type.
+ * This overrides any fallback that might return text/html on HEAD.
+ */
+export async function GET() {
+  const base =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://slidescockpit.com");
+
+  const now = new Date().toISOString();
+
+  const urls = [
+    { loc: `${base}/`,          changefreq: "weekly",  priority: "1.0", lastmod: now },
+    { loc: `${base}/pricing`,   changefreq: "monthly", priority: "0.8", lastmod: now },
+    { loc: `${base}/privacy`,   changefreq: "yearly",  priority: "0.3", lastmod: now },
+    { loc: `${base}/terms`,     changefreq: "yearly",  priority: "0.3", lastmod: now },
+  ];
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls
+  .map(
+    (u) => `  <url>
+    <loc>${u.loc}</loc>
+    <lastmod>${u.lastmod}</lastmod>
+    <changefreq>${u.changefreq}</changefreq>
+    <priority>${u.priority}</priority>
+  </url>`
+  )
+  .join("\n")}
+</urlset>`;
+
+  return new NextResponse(xml, {
+    status: 200,
+    headers: { "Content-Type": "application/xml; charset=utf-8" },
+  });
+}
+
+export async function HEAD() {
+  // Return only headers with the correct MIME type for Search Console
+  return new NextResponse(null, {
+    status: 200,
+    headers: { "Content-Type": "application/xml; charset=utf-8" },
+  });
 }
 </file>
 
@@ -79298,94 +79281,6 @@ export function useTikTokAccounts(): UseTikTokAccountsResult {
 }
 </file>
 
-<file path="src/middleware.ts">
-import { auth } from "@/server/auth";
-import { env } from "@/env";
-import { NextResponse, type NextRequest } from "next/server";
-
-export async function middleware(request: NextRequest) {
-  const session = await auth();
-  const isAuthPage = request.nextUrl.pathname.startsWith("/auth");
-  const path = request.nextUrl.pathname;
-  const isAdminPath = path.startsWith("/admin");
-
-  // If user is on auth page but already signed in, redirect to home page
-  if (isAuthPage && session) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  const publicPaths = new Set(["/", "/privacy", "/terms"]);
-
-  let isThemePage = false;
-  if (!session) {
-    const segments = path.split("/").filter(Boolean);
-    if (segments.length === 1) {
-      try {
-        const themeCheckUrl = new URL(
-          `/api/landing-page-themes/category/${segments[0]}`,
-          request.url,
-        );
-        const themeResponse = await fetch(themeCheckUrl, { cache: "no-store" });
-        if (themeResponse.ok) {
-          const theme = await themeResponse.json();
-          if (theme && theme.isActive !== false) {
-            isThemePage = true;
-          }
-        }
-      } catch (error) {
-        console.error("Theme lookup failed in middleware", error);
-      }
-    }
-  }
-
-  const isPublicPath =
-    publicPaths.has(path) ||
-    path.startsWith("/integrations/social/tiktok") ||
-    isThemePage;
-
-  // If user is not authenticated and trying to access a protected route, redirect to sign-in
-  if (
-    !session &&
-    !isAuthPage &&
-    !isPublicPath &&
-    !request.nextUrl.pathname.startsWith("/api")
-  ) {
-    return NextResponse.redirect(
-      new URL(
-        `/auth/signin?callbackUrl=${encodeURIComponent(request.url)}`,
-        request.url,
-      ),
-    );
-  }
-
-  if (isAdminPath) {
-    // First check isAdmin property (preferred method)
-    if (session?.user?.isAdmin) {
-      return NextResponse.next();
-    }
-
-    // Fallback to email-based check for backward compatibility
-    const allowedEmails = env.ADMIN_ALLOWED_EMAILS
-      ? env.ADMIN_ALLOWED_EMAILS.split(",")
-          .map((email) => email.trim().toLowerCase())
-          .filter(Boolean)
-      : [];
-
-    const userEmail = session?.user?.email?.toLowerCase();
-    if (!userEmail || !allowedEmails.includes(userEmail)) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
-  }
-
-  return NextResponse.next();
-}
-
-// Add routes that should be protected by authentication
-export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
-};
-</file>
-
 <file path="src/server/billing.ts">
 // server-only Funktionen rund um Billing/Credits
 import "server-only";
@@ -80979,6 +80874,23 @@ export default function RootLayout({
       </body>
     </html>
   );
+}
+</file>
+
+<file path="src/app/robots.ts">
+import type { MetadataRoute } from "next";
+
+export default function robots(): MetadataRoute.Robots {
+  return {
+    rules: [
+      {
+        userAgent: "*",
+        allow: "/",
+      },
+    ],
+    sitemap: "https://slidescockpit.com/sitemap.xml",
+    host: "https://slidescockpit.com",
+  };
 }
 </file>
 
@@ -82637,6 +82549,104 @@ export function useTikTokPostAction(
     refreshAccounts,
   };
 }
+</file>
+
+<file path="src/middleware.ts">
+import { auth } from "@/server/auth";
+import { env } from "@/env";
+import { NextResponse, type NextRequest } from "next/server";
+
+export async function middleware(request: NextRequest) {
+  const session = await auth();
+  const isAuthPage = request.nextUrl.pathname.startsWith("/auth");
+  const path = request.nextUrl.pathname;
+  const isAdminPath = path.startsWith("/admin");
+
+  // --- Allowlist for crawlers/static machine-readable files ---
+  // Make sitemap & robots always public and bypass any auth redirects.
+  // Handles both GET and HEAD correctly so Content-Type from the route is preserved.
+  if (
+    path === "/sitemap.xml" ||
+    path === "/robots.txt"
+  ) {
+    return NextResponse.next();
+  }
+
+  // If user is on auth page but already signed in, redirect to home page
+  if (isAuthPage && session) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  const publicPaths = new Set(["/", "/privacy", "/terms", "/sitemap.xml", "/robots.txt"]);
+
+  let isThemePage = false;
+  if (!session) {
+    const segments = path.split("/").filter(Boolean);
+    if (segments.length === 1) {
+      try {
+        const themeCheckUrl = new URL(
+          `/api/landing-page-themes/category/${segments[0]}`,
+          request.url,
+        );
+        const themeResponse = await fetch(themeCheckUrl, { cache: "no-store" });
+        if (themeResponse.ok) {
+          const theme = await themeResponse.json();
+          if (theme && theme.isActive !== false) {
+            isThemePage = true;
+          }
+        }
+      } catch (error) {
+        console.error("Theme lookup failed in middleware", error);
+      }
+    }
+  }
+
+  const isPublicPath =
+    publicPaths.has(path) ||
+    path.startsWith("/integrations/social/tiktok") ||
+    isThemePage;
+
+  // If user is not authenticated and trying to access a protected route, redirect to sign-in
+  if (
+    !session &&
+    !isAuthPage &&
+    !isPublicPath &&
+    !request.nextUrl.pathname.startsWith("/api")
+  ) {
+    return NextResponse.redirect(
+      new URL(
+        `/auth/signin?callbackUrl=${encodeURIComponent(request.url)}`,
+        request.url,
+      ),
+    );
+  }
+
+  if (isAdminPath) {
+    // First check isAdmin property (preferred method)
+    if (session?.user?.isAdmin) {
+      return NextResponse.next();
+    }
+
+    // Fallback to email-based check for backward compatibility
+    const allowedEmails = env.ADMIN_ALLOWED_EMAILS
+      ? env.ADMIN_ALLOWED_EMAILS.split(",")
+          .map((email) => email.trim().toLowerCase())
+          .filter(Boolean)
+      : [];
+
+    const userEmail = session?.user?.email?.toLowerCase();
+    if (!userEmail || !allowedEmails.includes(userEmail)) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+  }
+
+  return NextResponse.next();
+}
+
+// Add routes that should be protected by authentication
+export const config = {
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+};
 </file>
 
 <file path="src/app/admin/ugc/reaction-avatars/page.tsx">

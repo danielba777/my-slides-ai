@@ -132,6 +132,8 @@ const SlideFrame = memo(function SlideFrame({
   const [isImageSelectorOpen, setIsImageSelectorOpen] = useState(false);
   const [isMultiImageSelectorOpen, setIsMultiImageSelectorOpen] =
     useState(false);
+  // ❗ Wenn ein anderer Slide im Text-Edit ist, sind diese Slide-Interaktionen read-only
+  const disableInteractions = !!editingSlideId && editingSlideId !== slide.id;
 
   // Registriere pro Slide einen Exporter in einer globalen Map, damit der Header
   // zentral in der aktuellen Reihenfolge exportieren kann.
@@ -306,18 +308,15 @@ const SlideFrame = memo(function SlideFrame({
               onMouseLeave={() =>
                 !isPresenting && !isReadOnly && setIsHovering(false)
               }
-              onClick={() => {
-                // Wenn eine andere Slide im Edit-Modus ist, schließe diesen
-                if (editingSlideId && editingSlideId !== slide.id) {
-                  setEditingSlideId(null);
-                }
-              }}
+              // Beim Klick in andere Slides NICHT mehr automatisch den Edit-Modus schließen
+              onClick={() => {}}
             >
               {imageReady ? (
                 <SlideCanvas
                   ref={canvasRef}
                   doc={docWithBg}
                   showToolbar={isEditingText}
+                  readOnly={disableInteractions}
                   overlayContent={(() => {
                     const showHover = !isPresenting && !isReadOnly && isHovering && !editingSlideId && editingOverlaySlideId !== slide.id;
                     const inOverlayEdit = editingOverlaySlideId === slide.id;
@@ -499,6 +498,7 @@ const SlideFrame = memo(function SlideFrame({
                 <SlideCanvas
                   doc={docWithBg}
                   showToolbar={isEditingText}
+                  readOnly={disableInteractions}
                   overlayContent={
                     !isPresenting &&
                     !isReadOnly &&

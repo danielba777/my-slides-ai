@@ -76,11 +76,13 @@ type Props = {
   showToolbar?: boolean;
   overlayContent?: React.ReactNode;
   onCloseToolbar?: () => void;
+  /** Wenn true, sind Interaktionen (Klicken/Selektieren) deaktiviert */
+  readOnly?: boolean;
 };
 
 const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
   (
-    { doc, onChange, showToolbar = true, overlayContent, onCloseToolbar },
+    { doc, onChange, showToolbar = true, overlayContent, onCloseToolbar, readOnly = false },
     ref,
   ) => {
     // LegacyCanvas kann bereits PNG exportieren – wir reichen dessen Ref durch
@@ -340,6 +342,7 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
         showToolbar={showToolbar}
         overlayContent={overlayContent}
         onCloseToolbar={onCloseToolbar}
+        readOnly={readOnly}
         onOverlaysChange={(nextOverlays) => {
           const otherNodes = doc.nodes.filter(
             (n) =>

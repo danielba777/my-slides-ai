@@ -73,6 +73,8 @@ type Props = {
   overlayContent?: React.ReactNode;
   /* ➕ neu: Callback zum Schließen der Toolbar */
   onCloseToolbar?: () => void;
+  /** Wenn true, sind Interaktionen deaktiviert (nur Anzeige) */
+  readOnly?: boolean;
 };
 
 const W = 1080;
@@ -435,6 +437,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     showToolbar = true,
     overlayContent,
     onCloseToolbar,
+    readOnly,
   },
   ref,
 ) {
@@ -2293,6 +2296,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           aspectRatio: "9 / 16",
           touchAction: "none",
           userSelect: "none",
+          // ❗ Harte Sperre aller Pointer-Events, wenn readOnly=true
+          pointerEvents: readOnly ? "none" : "auto",
         }}
         onPointerDown={onBGPointerDown}
         onPointerMove={onPointerMove}
