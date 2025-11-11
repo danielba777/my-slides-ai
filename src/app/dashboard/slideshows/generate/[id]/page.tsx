@@ -365,12 +365,13 @@ export default function PresentationGenerateWithIdPage() {
           // damit der Shuffle-Button („Random image from current category") sofort aktiv ist.
           rootImage: imageUrl
             ? {
+                query: query,
                 url: imageUrl,
                 // Merke die Quelle (nur informativ, wird andernorts ggf. genutzt)
                 source:
                   imageSource === "imageset"
                     ? "imageset"
-                    : imageSource === "unsplash"
+                    : imageSource === "stock"
                       ? "unsplash"
                       : imageSource === "ai"
                         ? "ai"
