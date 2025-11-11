@@ -13,8 +13,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp, InfoIcon, Settings } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 interface TikTokConfigProps {
   title?: string;
@@ -46,15 +47,15 @@ export function TikTokConfig({
   onPostLimitChange,
   openId,
 }: TikTokConfigProps) {
-const TITLE_LIMIT = 90;
-const DEFAULT_PRIVACY_OPTIONS = [
-  "PUBLIC_TO_EVERYONE",
-  "MUTUAL_FOLLOW_FRIENDS",
-  "FOLLOWER_OF_CREATOR",
-  "SELF_ONLY",
-] as const;
+  const TITLE_LIMIT = 90;
+  const DEFAULT_PRIVACY_OPTIONS = [
+    "PUBLIC_TO_EVERYONE",
+    "MUTUAL_FOLLOW_FRIENDS",
+    "FOLLOWER_OF_CREATOR",
+    "SELF_ONLY",
+  ] as const;
 
-const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Metadata state
   const [metadata, setMetadata] = useState({
@@ -217,7 +218,8 @@ const [isExpanded, setIsExpanded] = useState(false);
   const yourBrandSelected =
     metadata.brandOption === "YOUR_BRAND" || metadata.brandOption === "BOTH";
   const brandedContentSelected =
-    metadata.brandOption === "BRANDED_CONTENT" || metadata.brandOption === "BOTH";
+    metadata.brandOption === "BRANDED_CONTENT" ||
+    metadata.brandOption === "BOTH";
 
   const resolveBrandOption = (
     yourBrand: boolean,
@@ -280,7 +282,9 @@ const [isExpanded, setIsExpanded] = useState(false);
             <p
               className={cn(
                 "text-xs text-right",
-                title.length > TITLE_LIMIT ? "text-destructive" : "text-muted-foreground",
+                title.length > TITLE_LIMIT
+                  ? "text-destructive"
+                  : "text-muted-foreground",
               )}
             >
               {title.length}/{TITLE_LIMIT}
@@ -385,13 +389,12 @@ const [isExpanded, setIsExpanded] = useState(false);
             {metadata.isCommercialContent && (
               <div className="space-y-4">
                 {metadata.brandOption && (
-                  <Alert className="flex items-center gap-3 [&>svg]:static [&>svg]:relative [&>svg]:top-0 [&>svg]:left-0 [&>svg~*]:pl-0 [&>svg+div]:translate-y-0">
+                  <Alert className="flex items-center gap-3 [&>svg]:relative [&>svg]:top-0 [&>svg]:left-0 [&>svg~*]:pl-0 [&>svg+div]:translate-y-0">
                     <InfoIcon className="h-4 w-4" />
                     <AlertDescription>
                       {metadata.brandOption === "YOUR_BRAND"
                         ? `Your photo will be labeled as "Promotional content".`
-                        : `Your photo will be labeled as "Paid partnership".`}
-                      {" "}
+                        : `Your photo will be labeled as "Paid partnership".`}{" "}
                       This cannot be changed once your post is posted.
                     </AlertDescription>
                   </Alert>
@@ -412,7 +415,10 @@ const [isExpanded, setIsExpanded] = useState(false);
                       onCheckedChange={(checked) =>
                         updateMetadata(
                           "brandOption",
-                          resolveBrandOption(checked === true, brandedContentSelected),
+                          resolveBrandOption(
+                            checked === true,
+                            brandedContentSelected,
+                          ),
                         )
                       }
                     />
@@ -432,7 +438,10 @@ const [isExpanded, setIsExpanded] = useState(false);
                       onCheckedChange={(checked) =>
                         updateMetadata(
                           "brandOption",
-                          resolveBrandOption(yourBrandSelected, checked === true),
+                          resolveBrandOption(
+                            yourBrandSelected,
+                            checked === true,
+                          ),
                         )
                       }
                     />
