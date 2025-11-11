@@ -144,7 +144,7 @@ export default function SettingsConnections() {
                 className="relative inline-flex items-center gap-2 border px-2 py-1 pr-6 cursor-default transition-none"
               >
                 <Avatar className="h-5 w-5 border">
-                  <AvatarImage src={a.profileImageUrl ?? undefined} />
+                  <AvatarImage src={a.avatarUrl ?? undefined} />
                   <AvatarFallback className="text-[10px]">
                     {initialsFor(a)}
                   </AvatarFallback>
