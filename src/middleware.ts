@@ -28,7 +28,23 @@ export async function middleware(request: NextRequest) {
   let isThemePage = false;
   if (!session) {
     const segments = path.split("/").filter(Boolean);
-    if (segments.length === 1) {
+    const reservedPrefixes = [
+      "/dashboard",
+      "/admin",
+      "/api",
+      "/auth",
+      "/integrations",
+      "/support",
+      "/landing-page-themes",
+      "/posts",
+      "/presentation",
+    ];
+    const isSingleSegment = segments.length === 1;
+    const isReservedPath = reservedPrefixes.some((prefix) =>
+      path.startsWith(prefix),
+    );
+
+    if (isSingleSegment && !isReservedPath) {
       try {
         const themeCheckUrl = new URL(
           `/api/landing-page-themes/category/${segments[0]}`,

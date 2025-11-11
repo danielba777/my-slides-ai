@@ -204,15 +204,26 @@ async function processGenerationJob({
         continue;
       }
 
-      const saved = await persistGeneratedImage({
-        prompt,
-        sourceUrl,
-        rawImageUrl: image.rawUrl ?? null,
-        userId,
-        jobId,
-      });
-      if (saved?.id) {
-        persistedCount += 1;
+      try {
+        const saved = await persistGeneratedImage({
+          prompt,
+          sourceUrl,
+          fallbackUrl:
+            image.rawUrl && image.minUrl && image.rawUrl !== image.minUrl
+              ? image.minUrl
+              : null,
+          rawImageUrl: image.rawUrl ?? null,
+          userId,
+          jobId,
+        });
+        if (saved?.id) {
+          persistedCount += 1;
+        }
+      } catch (error) {
+        console.error("[AI Avatar] Failed to persist image", {
+          sourceUrl,
+          error,
+        });
       }
     }
 
@@ -424,18 +435,36 @@ async function downloadImageWithRetry(url: string, maxRetries = 3): Promise<Arra
 async function persistGeneratedImage({
   prompt,
   sourceUrl,
+  fallbackUrl,
   rawImageUrl,
   userId,
   jobId,
 }: {
   prompt: string;
   sourceUrl: string;
+  fallbackUrl: string | null;
   rawImageUrl: string | null;
   userId: string;
   jobId: string;
 }): Promise<PersistedImage> {
   // Download the image first with retry logic
-  const imageBuffer = await downloadImageWithRetry(sourceUrl);
+  let imageBuffer: ArrayBuffer;
+  try {
+    imageBuffer = await downloadImageWithRetry(sourceUrl);
+  } catch (primaryError) {
+    if (fallbackUrl && fallbackUrl !== sourceUrl) {
+      console.warn(
+        "[AI Avatar] Primary download failed, trying fallback URL",
+        {
+          sourceUrl,
+          fallbackUrl,
+        },
+      );
+      imageBuffer = await downloadImageWithRetry(fallbackUrl);
+    } else {
+      throw primaryError;
+    }
+  }
 
   // Send to API with image buffer
   const formData = new FormData();
