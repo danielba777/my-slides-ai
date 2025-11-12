@@ -192,10 +192,8 @@ export function MarketingHero({
         </div>
       )}
 
-      {/* Foreground Content - Isolated stacking context */}
       <div className="hero-content-wrapper">
         <div className="mx-auto max-w-5xl text-center">
-          {/* Status badge */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -213,7 +211,6 @@ export function MarketingHero({
             </div>
           </motion.div>
 
-          {/* Main headline */}
           <motion.h1
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
@@ -222,15 +219,12 @@ export function MarketingHero({
           >
             {heroTitle ? (
               (() => {
-                // Teile den Title in Wörter auf
                 const words = heroTitle.split(" ");
 
-                // Wenn weniger als 3 Wörter, zeige alles normal
                 if (words.length < 3) {
                   return <span className="block">{heroTitle}</span>;
                 }
 
-                // Nimm die letzten 2 Wörter für den Gradient
                 const lastTwoWords = words.slice(-2).join(" ");
                 const restOfTitle = words.slice(0, -2).join(" ");
 
@@ -246,7 +240,6 @@ export function MarketingHero({
             ) : (
               <>
                 <span className="block">Automate TikToks that</span>
-                {/* Mobile ≈3 Zeilen, ab sm → 2 Zeilen */}
                 <span className="block sm:inline sm:whitespace-nowrap">
                   drive traffic to your website{" "}
                 </span>
@@ -254,7 +247,6 @@ export function MarketingHero({
             )}
           </motion.h1>
 
-          {/* Subheadline */}
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -264,7 +256,6 @@ export function MarketingHero({
             {heroSubtitle || "use AI to generate posts that don't feel like AI"}
           </motion.p>
 
-          {/* CTA buttons */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -332,7 +323,6 @@ export function MarketingHero({
             </Dialog>
           </motion.div>
 
-          {/* Demo GIF */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -370,7 +360,6 @@ export function MarketingHero({
         </div>
       </div>
 
-      {/* Optimized Styles - Fixed z-index hierarchy and GPU acceleration */}
       <style jsx global>{`
         /* Background Container - Lowest layer */
         .hero-background-container {
