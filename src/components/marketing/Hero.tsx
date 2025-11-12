@@ -1,8 +1,14 @@
 "use client";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { motion } from "framer-motion";
-import { ArrowRightIcon, PlayIcon, TrendingUpIcon } from "lucide-react";
+import { ArrowRightIcon, PlayIcon, TrendingUpIcon, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -32,6 +38,7 @@ export function MarketingHero({
   heroSubtitle?: string;
 }) {
   const [posterImages, setPosterImages] = useState<string[]>([]);
+  const [isDemoOpen, setIsDemoOpen] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -65,10 +72,11 @@ export function MarketingHero({
         for (const post of data as HeroPost[]) {
           if (!post?.slides?.length) continue;
 
-          for (const slide of post.slides) {
-            if (!slide?.imageUrl) continue;
-            collected.add(slide.imageUrl);
-          }
+          const firstSlideWithImage = post.slides.find(
+            (slide) => !!slide?.imageUrl,
+          );
+          if (!firstSlideWithImage?.imageUrl) continue;
+          collected.add(firstSlideWithImage.imageUrl);
         }
 
         if (!collected.size) return;
@@ -279,16 +287,49 @@ export function MarketingHero({
               </div>
             )}
 
-            <Button
-              asChild
-              size="lg"
-              className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-slate-900 bg-gray-100 hover:bg-gray-200 shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
-            >
-              <a href="#library">
-                Watch demo
-                <ArrowRightIcon className="w-5 h-5 ml-2 inline-block align-middle transition-transform duration-200 group-hover:translate-x-1" />
-              </a>
-            </Button>
+            <Dialog open={isDemoOpen} onOpenChange={setIsDemoOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-slate-900 bg-gray-100 hover:bg-gray-200 shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
+                >
+                  Watch demo
+                  <ArrowRightIcon className="w-5 h-5 ml-2 inline-block align-middle transition-transform duration-200 group-hover:translate-x-1" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent
+                className="w-full max-w-4xl border-none bg-white p-4 sm:p-6 sm:rounded-3xl space-y-4"
+                shouldHaveClose={false}
+                ariaLabel="SlidesCockpit demo video"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-lg font-semibold text-slate-900">
+                    Watch demo
+                  </p>
+                  <DialogClose className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400">
+                    <X className="h-5 w-5" />
+                    <span className="sr-only">Close demo</span>
+                  </DialogClose>
+                </div>
+                <div
+                  className="relative w-full overflow-hidden rounded-2xl bg-black"
+                  style={{ paddingBottom: "56.25%" }}
+                >
+                  <iframe
+                    className="absolute inset-0 h-full w-full"
+                    src={
+                      isDemoOpen
+                        ? "https://www.youtube.com/embed/qOBM-NEeFqQ?autoplay=1&rel=0"
+                        : "about:blank"
+                    }
+                    title="SlidesCockpit demo"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                    loading="lazy"
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
           </motion.div>
 
           {/* Demo GIF */}
