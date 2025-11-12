@@ -2,14 +2,7 @@
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import {
-  ArrowRightIcon,
-  BarChart3Icon,
-  CheckCircle2Icon,
-  StarIcon,
-  TrendingUpIcon,
-  ZapIcon,
-} from "lucide-react";
+import { ArrowRightIcon, PlayIcon, TrendingUpIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -112,18 +105,17 @@ export function MarketingHero({
     const perRow = HERO_POSTERS_PER_ROW;
     const totalRows = HERO_POSTER_ROWS;
 
-     // Until we have real images, render nothing (no placeholders).
-     if (!posterImages.length) return [];
+    // Until we have real images, render nothing (no placeholders).
+    if (!posterImages.length) return [];
 
-     const rows: string[][] = [];
-     for (let r = 0; r < totalRows; r++) {
-       const start = r * perRow;
-       const end = start + perRow;
-       rows.push(posterImages.slice(start, end));
-     }
-     return rows;
-
-}, [posterImages]);
+    const rows: string[][] = [];
+    for (let r = 0; r < totalRows; r++) {
+      const start = r * perRow;
+      const end = start + perRow;
+      rows.push(posterImages.slice(start, end));
+    }
+    return rows;
+  }, [posterImages]);
 
   // TikTok-Bilder NICHT über next/image rendern (Host-Whitelist von Next schlägt oft zu).
   // Alles andere weiter mit next/image (Optimierung bleibt erhalten).
@@ -138,7 +130,7 @@ export function MarketingHero({
   };
 
   return (
-    <Section className="relative min-h-[85vh] overflow-hidden bg-[#111] py-0">
+    <Section className="relative min-h-[55vh] overflow-hidden bg-[#111] py-0">
       {/* Netflix Background - Fixed z-index hierarchy */}
       {posterMatrix.length > 0 && (
         <div className="hero-background-container">
@@ -177,7 +169,10 @@ export function MarketingHero({
                           // Use priority for first 2 rows, lazy for the rest
                           priority={rowIndex < 2}
                           loading={rowIndex < 2 ? undefined : "lazy"}
-                          style={{ objectFit: "cover", objectPosition: "center" }}
+                          style={{
+                            objectFit: "cover",
+                            objectPosition: "center",
+                          }}
                         />
                       )}
                     </div>
@@ -197,13 +192,13 @@ export function MarketingHero({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-3 rounded-full border border-indigo-300/20 bg-indigo-500/40 backdrop-blur-sm px-4 py-2 text-xs sm:text-sm font-medium text-indigo-100 shadow-lg mb-2 sm:mb-4 lg:mb-6 mt-[-0.5rem] sm:mt-[-1rem]"
+            className="inline-flex items-center gap-3 rounded-full border border-[#2A8AEC4D] bg-[#2A8AEC33] backdrop-blur-xl px-4 py-2 text-xs sm:text-sm font-medium text-[#E5F1FF] shadow-lg mb-2 sm:mb-4 lg:mb-6 mt-[-0.5rem] sm:mt-[-1rem]"
           >
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
               <span>10M+ views generated with SlidesCockpit</span>
             </div>
-            <div className="hidden sm:block h-4 w-px bg-indigo-300/30"></div>
+            <div className="hidden sm:block h-4 w-px bg-[#2A8AEC40]"></div>
             <div className="flex items-center gap-1">
               <TrendingUpIcon className="w-4 h-4" />
               <span>2025</span>
@@ -242,13 +237,10 @@ export function MarketingHero({
               })()
             ) : (
               <>
-                <span className="block">Automate TikTok slides</span>
+                <span className="block">Automate TikToks that</span>
                 {/* Mobile ≈3 Zeilen, ab sm → 2 Zeilen */}
                 <span className="block sm:inline sm:whitespace-nowrap">
-                  that actually&nbsp;
-                </span>
-                <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
-                  drive traffic
+                  drive traffic to your website{" "}
                 </span>
               </>
             )}
@@ -259,10 +251,9 @@ export function MarketingHero({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.15, duration: 0.6 }}
-            className="mt-2 pb-4 text-lg sm:text-xl lg:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed font-light"
+            className="mt-2 pb-4 text-lg sm:text-xl lg:text-3xl text-gray-300 max-w-4xl mx-auto leading-relaxed font-semibold"
           >
-            {heroSubtitle ||
-              "Create viral TikTok slides in seconds. Visually stunning, authentic, and built to perform."}
+            {heroSubtitle || "use AI to generate posts that don't feel like AI"}
           </motion.p>
 
           {/* CTA buttons */}
@@ -276,9 +267,9 @@ export function MarketingHero({
               <Link href="/dashboard/home" className="w-full sm:w-auto">
                 <Button
                   size="lg"
-                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
+                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-white bg-[#2A8AEC] hover:bg-[#1f74c3] shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
                 >
-                  Go to the app
+                  Go to app
                   <ArrowRightIcon className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
                 </Button>
               </Link>
@@ -288,97 +279,51 @@ export function MarketingHero({
               </div>
             )}
 
-            <a
-              href="#library"
-              className="inline-flex items-center gap-2 text-white/80 hover:text-white text-sm sm:text-base font-medium underline-offset-4 hover:underline transition-all duration-200 px-2 py-1"
+            <Button
+              asChild
+              size="lg"
+              className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-slate-900 bg-gray-100 hover:bg-gray-200 shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
             >
-              <StarIcon className="w-4 h-4 text-yellow-400" />
-              Browse examples
-            </a>
+              <a href="#library">
+                Watch demo
+                <ArrowRightIcon className="w-5 h-5 ml-2 inline-block align-middle transition-transform duration-200 group-hover:translate-x-1" />
+              </a>
+            </Button>
           </motion.div>
 
-          {/* Feature highlights */}
+          {/* Demo GIF */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 text-left"
+            transition={{ delay: 0.3, duration: 0.6 }}
+            className="mt-12 flex justify-center"
           >
-            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
-                  <ZapIcon className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-white font-semibold">Live in seconds</h2>
-              </div>
-              <p className="text-gray-300 text-sm leading-relaxed">
-                From idea to finished slides instantly. No setup, no hassle.
-              </p>
-            </div>
-
-            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
-                  <BarChart3Icon className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-white font-semibold">
-                  Templates that convert
-                </h2>
-              </div>
-              <p className="text-gray-300 text-sm leading-relaxed">
-                Battle-tested winners. More reach, more followers.
-              </p>
-            </div>
-
-            <div className="bg-indigo-500/40 backdrop-blur-sm rounded-xl p-5 border border-white/10 hover:bg-indigo-500/50 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#304674] to-[#5676b9] flex items-center justify-center">
-                  <CheckCircle2Icon className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-white font-semibold">Looks handcrafted</h2>
-              </div>
-              <p className="text-gray-300 text-sm leading-relaxed">
-                Creator aesthetic instead of AI vibe. Natural and trustworthy.
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Social proof stats */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4, duration: 0.6 }}
-            className="mt-14 px-4"
-          >
-            <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-indigo-500/40 hover:bg-indigo-500/50 duration-300 backdrop-blur-sm p-5 sm:p-6">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 mb-1">
-                    10M+
-                  </div>
-                  <div className="text-sm text-gray-300/90">TikTok Views</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-                    100+
-                  </div>
-                  <div className="text-sm text-gray-300/90">Happy creators</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-                    20K+
-                  </div>
-                  <div className="text-sm text-gray-300/90">
-                    Slides produced
+            <div className="relative w-full max-w-5xl rounded-[20px] bg-blue-200/95 border border-white/20 shadow-2xl shadow-indigo-900/20 p-2 sm:p-1">
+              <a
+                href="https://www.youtube.com/watch?v=qOBM-NEeFqQ&t=7s"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Watch the SlidesCockpit product demo on YouTube"
+                className="group relative block overflow-hidden rounded-2xl"
+              >
+                <div
+                  className="relative w-full overflow-hidden rounded-2xl bg-black"
+                  style={{ paddingBottom: "56.25%" }}
+                >
+                  <img
+                    src="/hero-demo.gif"
+                    alt="SlidesCockpit demo preview"
+                    className="absolute inset-0 h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-slate-900/10 to-transparent" />
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 text-[#2A8AEC] shadow-2xl transition-transform duration-300 group-hover:scale-110">
+                      <PlayIcon className="h-7 w-7 translate-x-[1px]" />
+                    </div>
                   </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-                    100%
-                  </div>
-                  <div className="text-sm text-gray-300/90">Success rate</div>
-                </div>
-              </div>
+              </a>
             </div>
           </motion.div>
         </div>

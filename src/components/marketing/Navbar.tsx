@@ -57,7 +57,7 @@ export function MarketingNavbar({ session }: { session: boolean }) {
               <Link href="/dashboard/home">
                 <Button
                   size="sm"
-                  className="rounded-full bg-[#304674] text-white hover:opacity-90"
+                  className="rounded-full bg-[#2A8AEC] text-white hover:bg-[#1f74c3]"
                 >
                   Go to app
                 </Button>
