@@ -46,18 +46,24 @@ export function MarketingNavbar({ session }: { session: boolean }) {
           </Link>
 
           {/* Right: Pricing + Auth */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-3 sm:gap-6">
             <a
               href="#pricing"
               className="hidden sm:inline-flex text-sm font-medium text-foreground/80 hover:text-foreground"
             >
               Pricing
             </a>
+            <a
+              href="#faq"
+              className="hidden sm:inline-flex text-sm font-medium text-foreground/80 hover:text-foreground"
+            >
+              FAQ
+            </a>
             {session ? (
               <Link href="/dashboard/home">
                 <Button
                   size="sm"
-                  className="rounded-full bg-[#304674] text-white hover:opacity-90"
+                  className="rounded-full bg-[#2A8AEC] text-white hover:bg-[#1f74c3]"
                 >
                   Go to app
                 </Button>
