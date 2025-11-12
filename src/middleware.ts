@@ -2,10 +2,19 @@ import { auth } from "@/server/auth";
 import { env } from "@/env";
 import { NextResponse, type NextRequest } from "next/server";
 
+const PUBLIC_FILE = /\.[^/]+$/;
+
 export async function middleware(request: NextRequest) {
-  const session = await auth();
-  const isAuthPage = request.nextUrl.pathname.startsWith("/auth");
   const path = request.nextUrl.pathname;
+
+  // Allow any request that clearly targets a static asset (e.g. /hero-demo.gif, /assets/..)
+  // so marketing media can load without triggering auth redirects.
+  if (PUBLIC_FILE.test(path)) {
+    return NextResponse.next();
+  }
+
+  const session = await auth();
+  const isAuthPage = path.startsWith("/auth");
   const isAdminPath = path.startsWith("/admin");
 
   // --- Allowlist for crawlers/static machine-readable files ---
