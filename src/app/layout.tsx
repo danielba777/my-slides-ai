@@ -7,6 +7,23 @@ import { type Metadata } from "next";
 import localFont from "next/font/local";
 import Script from "next/script";
 
+const amplitudeKey = "6569015954af69307c3c5738b20f8673";
+const amplitudeConfig = {
+  fetchRemoteConfig: true,
+  serverZone: "EU",
+  autocapture: {
+    attribution: true,
+    fileDownloads: true,
+    formInteractions: true,
+    pageViews: true,
+    sessions: true,
+    elementInteractions: true,
+    networkTracking: true,
+    webVitals: true,
+    frustrationInteractions: true,
+  },
+};
+
 const tiktokSans = localFont({
   variable: "--font-sans",
   display: "swap",
@@ -87,8 +104,21 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="color-scheme" content="light dark" />
-
-        </head>
+        <Script
+          src={`https://cdn.eu.amplitude.com/script/${amplitudeKey}.js`}
+          strategy="afterInteractive"
+        />
+        <Script
+          id="amplitude-init"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.amplitude.add(window.sessionReplay.plugin({ sampleRate: 1 }));
+              window.amplitude.init('${amplitudeKey}', ${JSON.stringify(amplitudeConfig)});
+            `,
+          }}
+        />
+      </head>
       <body
         className={`${tiktokSans.variable} font-sans antialiased bg-[#F3F4EF]`}
         suppressHydrationWarning
