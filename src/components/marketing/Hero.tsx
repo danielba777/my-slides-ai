@@ -1,5 +1,6 @@
 "use client";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { AppLogo } from "@/components/logo/AppLogo";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -8,7 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
-import { ArrowRightIcon, PlayIcon, TrendingUpIcon, X } from "lucide-react";
+import { Menu, PlayIcon, TrendingUpIcon, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -39,6 +40,7 @@ export function MarketingHero({
 }) {
   const [posterImages, setPosterImages] = useState<string[]>([]);
   const [isDemoOpen, setIsDemoOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -109,6 +111,20 @@ export function MarketingHero({
     };
   }, [category]);
 
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = previousOverflow;
+      };
+    }
+    document.body.style.overflow = "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobileMenuOpen]);
+
   const posterMatrix = useMemo(() => {
     const perRow = HERO_POSTERS_PER_ROW;
     const totalRows = HERO_POSTER_ROWS;
@@ -138,7 +154,26 @@ export function MarketingHero({
   };
 
   return (
-    <Section className="relative min-h-[55vh] overflow-hidden bg-[#111] py-0">
+    <Section className="relative sm:min-h-[55vh] overflow-hidden bg-[#111] py-0">
+      {/* Mobile Header rendered directly in hero */}
+      <div className="md:hidden absolute inset-x-0 top-0 z-30 px-4 pt-6">
+        <div className="flex items-center justify-between text-white">
+          <Link href="/" className="flex items-center gap-2">
+            <AppLogo size={34} />
+            <span className="text-lg font-semibold tracking-tight">
+              SlidesCockpit
+            </span>
+          </Link>
+          <button
+            type="button"
+            aria-label="Open navigation menu"
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="rounded-full p-2 text-white/90 transition hover:bg-white/10"
+          >
+            <Menu className="h-7 w-7" />
+          </button>
+        </div>
+      </div>
       {/* Netflix Background - Fixed z-index hierarchy */}
       {posterMatrix.length > 0 && (
         <div className="hero-background-container">
@@ -202,7 +237,7 @@ export function MarketingHero({
           >
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
-              <span>10M+ views generated with SlidesCockpit</span>
+              <span>10M+ views generated</span>
             </div>
             <div className="hidden sm:block h-4 w-px bg-[#2A8AEC40]"></div>
             <div className="flex items-center gap-1">
@@ -239,9 +274,8 @@ export function MarketingHero({
               })()
             ) : (
               <>
-                <span className="block">Automate TikToks that</span>
-                <span className="block sm:inline sm:whitespace-nowrap">
-                  drive traffic to your website{" "}
+                <span className="block">
+                  Automate TikToks that drive traffic to your website
                 </span>
               </>
             )}
@@ -251,7 +285,7 @@ export function MarketingHero({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.15, duration: 0.6 }}
-            className="mt-2 pb-4 text-lg sm:text-xl lg:text-3xl text-gray-300 max-w-4xl mx-auto leading-relaxed font-semibold"
+            className="mt-2 pb-4 max-w-[15rem] text-lg sm:text-xl lg:text-3xl text-gray-300 sm:max-w-4xl mx-auto leading-snug sm:leading-relaxed font-semibold"
           >
             {heroSubtitle || "use AI to generate posts that don't feel like AI"}
           </motion.p>
@@ -266,10 +300,9 @@ export function MarketingHero({
               <Link href="/dashboard/home" className="w-full sm:w-auto">
                 <Button
                   size="lg"
-                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-white bg-[#2A8AEC] hover:bg-[#1f74c3] shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
+                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-white bg-[#2A8AEC] hover:bg-[#1f74c3] shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300"
                 >
                   Go to app
-                  <ArrowRightIcon className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
                 </Button>
               </Link>
             ) : (
@@ -282,10 +315,9 @@ export function MarketingHero({
               <DialogTrigger asChild>
                 <Button
                   size="lg"
-                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-slate-900 bg-gray-100 hover:bg-gray-200 shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
+                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-slate-900 bg-gray-100 hover:bg-gray-200 shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300"
                 >
                   Watch demo
-                  <ArrowRightIcon className="w-5 h-5 ml-2 inline-block align-middle transition-transform duration-200 group-hover:translate-x-1" />
                 </Button>
               </DialogTrigger>
               <DialogContent
@@ -327,7 +359,7 @@ export function MarketingHero({
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.6 }}
-            className="mt-12 flex justify-center"
+            className="mt-12 hidden md:flex justify-center"
           >
             <div className="relative w-full max-w-5xl rounded-[20px] bg-blue-200/95 border border-white/20 shadow-2xl shadow-indigo-900/20 p-2 sm:p-1">
               <a
@@ -359,6 +391,43 @@ export function MarketingHero({
           </motion.div>
         </div>
       </div>
+
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/95 text-white">
+          <div className="flex h-full flex-col px-6 py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AppLogo size={36} />
+                <span className="text-xl font-semibold">SlidesCockpit</span>
+              </div>
+              <button
+                type="button"
+                aria-label="Close navigation menu"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="rounded-full p-2 text-white/80 transition hover:bg-white/10"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <nav className="mt-12 flex flex-col gap-6 text-2xl font-semibold">
+              <a
+                href="#pricing"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="transition hover:text-blue-200"
+              >
+                Pricing
+              </a>
+              <a
+                href="#faq"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="transition hover:text-blue-200"
+              >
+                FAQ
+              </a>
+            </nav>
+          </div>
+        </div>
+      )}
 
       <style jsx global>{`
         /* Background Container - Lowest layer */
@@ -472,7 +541,7 @@ export function MarketingHero({
           /* Promote to own layer */
           will-change: transform;
           transform: translateZ(0);
-          min-height: 89vh;
+          min-height: 75vh;
           display: flex;
           flex-direction: column;
           justify-content: center;
