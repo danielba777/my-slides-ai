@@ -330,51 +330,6 @@ export function MarketingHero({
             className="mt-12 flex justify-center"
           >
             <div className="relative w-full max-w-5xl rounded-[20px] bg-blue-200/95 border border-white/20 shadow-2xl shadow-indigo-900/20 p-2 sm:p-1">
-              <div className="pointer-events-none absolute inset-0 -z-10 svg-deco">
-                <svg
-                  className="absolute -top-32 -left-32 h-[700px] w-[700px] [filter:blur(70px)_saturate(180%)_brightness(110%)]"
-                  viewBox="0 0 100 100"
-                  fill="none"
-                >
-                  <polygon
-                    points="50,0 61,35 98,35 68,57 79,91 50,70 21,91 32,57 2,35 39,35"
-                    fill="#D7E5FF"
-                  />
-                </svg>
-
-                <svg
-                  className="absolute -top-32 -right-32 h-[700px] w-[700px] [filter:blur(70px)_saturate(180%)_brightness(110%)]"
-                  viewBox="0 0 100 100"
-                  fill="none"
-                >
-                  <polygon
-                    points="50,0 61,35 98,35 68,57 79,91 50,70 21,91 32,57 2,35 39,35"
-                    fill="#FFD8D8"
-                  />
-                </svg>
-
-                <svg
-                  className="absolute -bottom-32 -left-32 h-[700px] w-[700px] [filter:blur(70px)_saturate(180%)_brightness(110%)]"
-                  viewBox="0 0 100 100"
-                  fill="none"
-                >
-                  <polygon
-                    points="50,0 61,35 98,35 68,57 79,91 50,70 21,91 32,57 2,35 39,35"
-                    fill="#F6FFCC"
-                  />
-                </svg>
-
-                <svg
-                  className="absolute -bottom-32 -right-32 h-[700px] w-[700px] [filter:blur(70px)_saturate(180%)_brightness(110%)]"
-                  viewBox="0 0 100 100"
-                  fill="none"
-                >
-                  <polygon
-                    points="50,0 61,35 98,35 68,57 79,91 50,70 21,91 32,57 2,35 39,35"
-                    fill="#D8FFE6"
-                  />
-                </svg>
-              </div>
               <a
                 href="https://www.youtube.com/watch?v=qOBM-NEeFqQ&t=7s"
                 target="_blank"
