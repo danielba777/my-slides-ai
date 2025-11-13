@@ -8,7 +8,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
-import { ArrowRightIcon, PlayIcon, TrendingUpIcon, X } from "lucide-react";
+import { PlayIcon, TrendingUpIcon, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -266,10 +266,9 @@ export function MarketingHero({
               <Link href="/dashboard/home" className="w-full sm:w-auto">
                 <Button
                   size="lg"
-                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-white bg-[#2A8AEC] hover:bg-[#1f74c3] shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
+                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-white bg-[#2A8AEC] hover:bg-[#1f74c3] shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300"
                 >
                   Go to app
-                  <ArrowRightIcon className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
                 </Button>
               </Link>
             ) : (
@@ -282,10 +281,9 @@ export function MarketingHero({
               <DialogTrigger asChild>
                 <Button
                   size="lg"
-                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-slate-900 bg-gray-100 hover:bg-gray-200 shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 group"
+                  className="w-full sm:w-auto rounded-full px-10 py-5 text-lg font-semibold text-slate-900 bg-gray-100 hover:bg-gray-200 shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300"
                 >
                   Watch demo
-                  <ArrowRightIcon className="w-5 h-5 ml-2 inline-block align-middle transition-transform duration-200 group-hover:translate-x-1" />
                 </Button>
               </DialogTrigger>
               <DialogContent

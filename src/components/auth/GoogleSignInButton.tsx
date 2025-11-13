@@ -20,7 +20,7 @@ export function GoogleSignInButton({
       type="button"
       size="lg"
       onClick={handleClick}
-      className="group w-full rounded-full px-5 py-5 text-lg font-semibold text-white bg-[#2A8AEC] hover:bg-[#1f74c3] shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 hover:scale-105 focus:ring-[#1f74c3] sm:w-auto"
+      className="w-full rounded-full p-5 text-lg font-semibold text-white bg-[#2A8AEC] hover:bg-[#1f74c3] shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 focus:ring-[#1f74c3] sm:w-auto"
     >
       <span className="inline-flex h-5 w-5 items-center justify-center">
         <svg

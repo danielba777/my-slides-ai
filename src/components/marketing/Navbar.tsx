@@ -49,13 +49,13 @@ export function MarketingNavbar({ session }: { session: boolean }) {
           <div className="flex items-center gap-3 sm:gap-6">
             <a
               href="#pricing"
-              className="hidden sm:inline-flex text-sm font-medium text-foreground/80 hover:text-foreground"
+              className="hidden sm:inline-flex text-base font-medium text-foreground/80 hover:text-foreground"
             >
               Pricing
             </a>
             <a
               href="#faq"
-              className="hidden sm:inline-flex text-sm font-medium text-foreground/80 hover:text-foreground"
+              className="hidden sm:inline-flex text-base font-medium text-foreground/80 hover:text-foreground"
             >
               FAQ
             </a>
