@@ -19,7 +19,7 @@ const CSP = [
   // Schriften
   "font-src 'self' https: data:",
   // API/SSR/HMR/Realtime
-  "connect-src 'self' https: wss: ws:",
+  "connect-src 'self' https: wss: ws: https://*.amplitude.com https://*.amplitude.eu https://cdn.eu.amplitude.com https://api.eu.amplitude.com https://api-sr.eu.amplitude.com",
   // Frames nur von sicheren Quellen (z.B. eigene Seiten, evtl. externe UIs)
   "frame-src 'self' https:",
   // Worker (Next/Image, Offscreen etc.)
