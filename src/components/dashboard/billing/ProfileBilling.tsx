@@ -3,12 +3,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { MarketingPricing } from "@/components/marketing/Pricing";
 import { PLAN_CREDITS } from "@/lib/billing";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Infinity as InfinityIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 type Usage = {
@@ -29,6 +31,7 @@ export default function ProfileBilling() {
   const router = useRouter();
   const { data: session } = useSession();
   const qc = useQueryClient();
+  const [isPricingOpen, setIsPricingOpen] = useState(false);
   const usage = useQuery<Usage>({
     queryKey: ["billing-usage"],
     queryFn: async () => {
@@ -166,12 +169,21 @@ export default function ProfileBilling() {
               Manage subscription
             </Button>
           ) : (
-            <Button
-              className="w-full rounded-xl"
-              onClick={() => router.push("/#pricing")}
-            >
-              Choose a plan
-            </Button>
+            <>
+              <Button
+                className="w-full rounded-xl"
+                onClick={() => setIsPricingOpen(true)}
+              >
+                Choose a plan
+              </Button>
+              <Dialog open={isPricingOpen} onOpenChange={setIsPricingOpen}>
+                <DialogContent className="max-w-7xl w-[98vw]">
+                  <DialogTitle className="sr-only">Choose a plan</DialogTitle>
+                  {/* Gleiches Card-Design & Checkout-Flow wie Landing */}
+                  <MarketingPricing session={!!session} compact />
+                </DialogContent>
+              </Dialog>
+            </>
           )}
         </div>
       </div>

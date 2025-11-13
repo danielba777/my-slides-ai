@@ -10,6 +10,12 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 import useSWR from "swr";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { MarketingPricing } from "@/components/marketing/Pricing";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -30,6 +36,7 @@ type UsageState = {
 
 export function SidebarUsageSummary() {
   const [isBillingRedirecting, setIsBillingRedirecting] = useState(false);
+  const [isPricingOpen, setIsPricingOpen] = useState(false);
 
   // Get user ID from localStorage for cache tagging
   const getUserId = () => {
@@ -139,39 +146,56 @@ export function SidebarUsageSummary() {
           </span>
         )}
       </div>
-      <div className="">
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full rounded-sm border-sidebar-border/80 bg-[#F7F8F3]/60 text-sidebar-foreground hover:bg-sidebar/70 disabled:opacity-40"
-          disabled={!usage.hasActiveSubscription || isBillingRedirecting}
-          onClick={async () => {
-            if (!usage.hasActiveSubscription) {
-              return;
-            }
-            try {
-              setIsBillingRedirecting(true);
-              const response = await fetch("/api/billing/portal", {
-                method: "POST",
-              });
-              if (!response.ok) {
-                throw new Error("Failed to open billing portal");
+      <div>
+        {usage.hasActiveSubscription ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full rounded-sm border-sidebar-border/80 bg-[#F7F8F3]/60 text-sidebar-foreground hover:bg-sidebar/70 disabled:opacity-40"
+            disabled={isBillingRedirecting}
+            onClick={async () => {
+              try {
+                setIsBillingRedirecting(true);
+                const response = await fetch("/api/billing/portal", {
+                  method: "POST",
+                });
+                if (!response.ok) {
+                  throw new Error("Failed to open billing portal");
+                }
+                const data = (await response.json()) as { url?: string };
+                if (!data.url) {
+                  throw new Error("Missing billing portal URL");
+                }
+                window.location.assign(data.url);
+              } catch (error) {
+                console.error(error);
+                toast.error("Could not open billing portal");
+              } finally {
+                setIsBillingRedirecting(false);
               }
-              const data = (await response.json()) as { url?: string };
-              if (!data.url) {
-                throw new Error("Missing billing portal URL");
-              }
-              window.location.assign(data.url);
-            } catch (error) {
-              console.error(error);
-              toast.error("Could not open billing portal");
-            } finally {
-              setIsBillingRedirecting(false);
-            }
-          }}
-        >
-          Manage Plan
-        </Button>
+            }}
+          >
+            Manage Plan
+          </Button>
+        ) : (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full rounded-sm border-sidebar-border/80 bg-[#F7F8F3]/60 text-sidebar-foreground hover:bg-sidebar/70"
+              onClick={() => setIsPricingOpen(true)}
+            >
+              Choose plan
+            </Button>
+            <Dialog open={isPricingOpen} onOpenChange={setIsPricingOpen}>
+              <DialogContent className="max-w-7xl w-[98vw]">
+                <DialogTitle className="sr-only">Choose a plan</DialogTitle>
+                {/* Marketing Pricing (identisches Design, im Modal) */}
+                <MarketingPricing session={true} compact />
+              </DialogContent>
+            </Dialog>
+          </>
+        )}
       </div>
     </div>
   );

@@ -184,6 +184,7 @@ function MediaThumb({ media }: MediaThumbProps) {
           src={url}
           alt="Post media"
           loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover"
           referrerPolicy="no-referrer"
         />

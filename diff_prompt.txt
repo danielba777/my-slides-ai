@@ -1,134 +1,264 @@
 Bitte ändere nur die diffs, so wie ich sie dir unten hinschreibe. Ändere sonst nichts mehr und fasse keine anderen Dateien oder Codestellen an. Bitte strikt nach meinem diff File gehen:
 
 *** Begin Patch
-*** Update File: src/components/dashboard/account/SettingsChromeExtension.tsx
+*** Update File: src/components/presentation/dashboard/ImageCollectionSelector.tsx
+@@
+-                        >
+-                          <Image
+-                            src={image.url}
+-                            alt={`All images preview ${index + 1}`}
+-                            width={160}
+-                            height={160}
+-                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+-                            quality={30}
+-                            loading="lazy"
+-                            sizes="160px"
+-                          />
++                        >
++                          <Image
++                            src={image.url}
++                            alt={`All images preview ${index + 1}`}
++                            width={320}
++                            height={320}
++                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
++                            quality={50}
++                            loading="lazy"
++                            sizes="(max-width: 640px) 120px, (max-width: 1024px) 160px, 200px"
++                          />
+@@
+-                        >
+-                          <Image
+-                            src={image.url}
+-                            alt={`${set.name} preview ${index + 1}`}
+-                            width={160}
+-                            height={160}
+-                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+-                            quality={30}
+-                            loading="lazy"
+-                            sizes="160px"
+-                          />
++                        >
++                          <Image
++                            src={image.url}
++                            alt={`${set.name} preview ${index + 1}`}
++                            width={320}
++                            height={320}
++                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
++                            quality={50}
++                            loading="lazy"
++                            sizes="(max-width: 640px) 120px, (max-width: 1024px) 160px, 200px"
++                          />
+@@
+-                        >
+-                          <Image
+-                            src={image.url}
+-                            alt={`${selectedImageSet.name} preview ${index + 1}`}
+-                            width={160}
+-                            height={160}
+-                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+-                            quality={30}
+-                            loading="lazy"
+-                            sizes="160px"
+-                          />
++                        >
++                          <Image
++                            src={image.url}
++                            alt={`${selectedImageSet.name} preview ${index + 1}`}
++                            width={320}
++                            height={320}
++                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
++                            quality={50}
++                            loading="lazy"
++                            sizes="(max-width: 640px) 120px, (max-width: 1024px) 160px, 200px"
++                          />
+*** End File
+*** Update File: src/app/dashboard/image-collections/page.tsx
+@@
+-import { useEffect, useMemo, useState } from "react";
+-import { useSession } from "next-auth/react";
+-import { useRouter } from "next/navigation";
+-import { Plus, Trash2 } from "lucide-react";
+-import { toast } from "sonner";
++import { useEffect, useMemo, useState } from "react";
++import { useSession } from "next-auth/react";
++import { useRouter } from "next/navigation";
++import { Plus, Trash2 } from "lucide-react";
++import { toast } from "sonner";
++import Image from "next/image";
+@@
+-                        <div
+-                          key={image.id ?? `${set.id}-${index}`}
+-                          className={cn(
+-                            "relative h-24 overflow-hidden md:h-32 lg:h-40",
+-                            index === 0 && "rounded-l-lg",
+-                            index === previewImages.length - 1 &&
+-                              "rounded-r-lg",
+-                          )}
+-                        >
+-                          <img
+-                            src={image.url}
+-                            alt={`${set.name} preview ${index + 1}`}
+-                            className="block h-full w-full object-cover transition-opacity group-hover:opacity-80"
+-                            loading="lazy"
+-                          />
+-                        </div>
++                        <div
++                          key={image.id ?? `${set.id}-${index}`}
++                          className={cn(
++                            "relative h-24 overflow-hidden md:h-32 lg:h-40",
++                            index === 0 && "rounded-l-lg",
++                            index === previewImages.length - 1 &&
++                              "rounded-r-lg",
++                          )}
++                        >
++                          <Image
++                            src={image.url}
++                            alt={`${set.name} preview ${index + 1}`}
++                            fill
++                            className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
++                            quality={50}
++                            loading="lazy"
++                            sizes="(max-width: 640px) 120px, (max-width: 1024px) 160px, 200px"
++                          />
++                        </div>
+*** End File
+*** Update File: src/app/dashboard/ai-avatars/page.tsx
 @@
 -"use client";
 -
--import { Badge } from "@/components/ui/badge";
--import { Button } from "@/components/ui/button";
--import {
--  Card,
--  CardContent,
--  CardDescription,
--  CardHeader,
--  CardTitle,
--} from "@/components/ui/card";
+-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+-import { toast } from "sonner";
+-
 +"use client";
 +
-+import { Badge } from "@/components/ui/badge";
-+import { Button } from "@/components/ui/button";
- import { Input } from "@/components/ui/input";
- import { Spinner } from "@/components/ui/spinner";
- import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
- import { Copy, RefreshCw } from "lucide-react";
- import { useCallback } from "react";
- import { toast } from "sonner";
-@@
--export default function SettingsChromeExtension() {
-+export default function SettingsChromeExtension() {
-   const qc = useQueryClient();
-@@
--  return (
--    <Card className="overflow-hidden rounded-2xl bg-card shadow-sm">
--      <CardHeader className="p-0 space-y-1">
--        <CardTitle className="text-2xl font-semibold">
--          Chrome Extension
--        </CardTitle>
--        <CardDescription>
--          Install the SlidesCockpit Chrome Extension and connect it with your
--          account.
--        </CardDescription>
--        <Badge className="mt-2 w-fit border-[#304674]/20 bg[#304674]/10 px-3 py-1 text-[#304674] cursor-default transition-none">
--          Secure · Private
--        </Badge>
--      </CardHeader>
--      <CardContent className="space-y-6 p-6 md:p-8">
-+  return (
-+    <div className="space-y-6 p-0">
-+      {/* Header wie „Personal“ (ohne eigenen Card, da der äußere Card aus SettingsPage kommt) */}
-+      <div className="space-y-1">
-+        <h2 className="text-2xl font-semibold">Chrome Extension</h2>
-+        <p className="text-sm text-muted-foreground">
-+          Install the SlidesCockpit Chrome Extension and connect it with your account.
-+        </p>
-+        <Badge
-+          className="mt-2 w-fit border-[#304674]/20 bg-[#304674]/10 px-3 py-1 text-[#304674] cursor-default transition-none hover:bg-[#304674]/10 hover:text-[#304674]"
-+        >
-+          Secure · Private
-+        </Badge>
-+      </div>
++import { useCallback, useEffect, useMemo, useRef, useState } from "react";
++import { toast } from "sonner";
++import Image from "next/image";
 +
-+      {/* Body */}
-+      <div className="space-y-6">
-         {tokenQuery.isLoading ? (
-           <div className="flex items-center justify-center py-16">
-             <Spinner className="h-8 w-8" />
-           </div>
-         ) : tokenQuery.isError ? (
-           <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-             Could not load your extension token. Please refresh the page.
-           </div>
-         ) : (
-           <>
-             <div className="space-y-3">
-               <label className="text-sm font-medium text-muted-foreground">
-                 Your personal token
-               </label>
-               <div className="flex flex-col gap-2 sm:flex-row">
-                 <Input
-                   value={token}
-                   readOnly
-                   className="font-mono text-sm tracking-wide"
-                 />
-                 <div className="flex gap-2 sm:w-auto">
-                   <Button
-                     type="button"
-                     variant="outline"
-                     className="w-full sm:w-auto"
-                     onClick={handleCopy}
-                     disabled={!token}
-                   >
-                     <Copy className="mr-2 h-4 w-4" />
-                     Copy
-                   </Button>
-                   <Button
-                     type="button"
-                     variant="secondary"
-                     className="w-full sm:w-auto"
-                     onClick={() => rotate.mutate()}
-                     disabled={rotate.isPending}
-                   >
-                     {rotate.isPending ? (
-                       <Spinner className="mr-2 h-4 w-4" />
-                     ) : (
-                       <RefreshCw className="mr-2 h-4 w-4" />
-                     )}
-                     Regenerate
-                   </Button>
-                 </div>
-               </div>
-             </div>
- 
-             <div className="rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">
-               <p className="font-medium text-foreground">
-                 How to use this token
-               </p>
-               <ol className="mt-2 list-decimal space-y-1 pl-5">
-                 <li>Install the SlidesCockpit Chrome Extension.</li>
-                 <li>Open the extension settings and paste this token.</li>
-                 <li>
-                   Keep the token private. Use “Regenerate” to revoke old
-                   extensions.
-                 </li>
-               </ol>
-             </div>
-           </>
-         )}
--      </CardContent>
--    </Card>
-+      </div>
-+    </div>
-   );
- }
+@@
+-                        <div
+-                          key={path}
+-                          className="relative h-32 w-24 overflow-hidden rounded-xl border border-white/10"
+-                        >
+-                          <img
+-                            src={path}
+-                            alt={`${theme.name} preview`}
+-                            className="h-full w-full object-cover transition group-hover:opacity-95"
+-                            loading="lazy"
+-                          />
+-                        </div>
++                        <div
++                          key={path}
++                          className="relative h-32 w-24 overflow-hidden rounded-xl border border-white/10"
++                        >
++                          <Image
++                            src={path}
++                            alt={`${theme.name} preview`}
++                            width={320}
++                            height={320}
++                            className="h-full w-full object-cover transition group-hover:opacity-95"
++                            quality={60}
++                            loading="lazy"
++                            sizes="(max-width: 640px) 96px, (max-width: 1024px) 120px, 128px"
++                          />
++                        </div>
+*** End File
+*** Update File: src/components/dashboard/ai-avatars/TemplateGrid.tsx
+@@
+-"use client";
+-
+-import { Button } from "@/components/ui/button";
+-import { Spinner } from "@/components/ui/spinner";
+-import type { AiAvatarTemplate } from "@/types/ai-avatars";
+-import { useEffect, useState } from "react";
+-
++"use client";
++
++import { Button } from "@/components/ui/button";
++import { Spinner } from "@/components/ui/spinner";
++import type { AiAvatarTemplate } from "@/types/ai-avatars";
++import { useEffect, useState } from "react";
++import Image from "next/image";
++
+@@
+-            <img
+-              src={item.template.imageUrl || item.template.rawImageUrl || ""}
+-              alt="AI avatar template preview"
+-              className="h-full w-full object-cover transition duration-500 hover:scale-105"
+-            />
++            <Image
++              src={item.template.imageUrl || item.template.rawImageUrl || ""}
++              alt="AI avatar template preview"
++              width={320}
++              height={320}
++              className="h-full w-full object-cover transition duration-500 hover:scale-105"
++              quality={60}
++              loading="lazy"
++              sizes="(max-width: 640px) 120px, (max-width: 1024px) 160px, 200px"
++            />
+*** End File
+*** Update File: src/components/presentation/dashboard/RecentPresentations.tsx
+@@
+-              {presentation.thumbnailUrl ? (
+-                <Image
+-                  height={200}
+-                  width={300}
+-                  src={presentation.thumbnailUrl}
+-                  alt={presentation.title || "Presentation thumbnail"}
+-                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+-                />
++              {presentation.thumbnailUrl ? (
++                <Image
++                  height={200}
++                  width={300}
++                  src={presentation.thumbnailUrl}
++                  alt={presentation.title || "Presentation thumbnail"}
++                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
++                  quality={60}
++                  loading="lazy"
++                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
++                />
+*** End File
+*** Update File: src/components/presentation/dashboard/PresentationItem.tsx
+@@
+-              {presentation.thumbnailUrl ? (
+-                <Image
+-                  src={presentation.thumbnailUrl}
+-                  alt="Presentation thumbnail"
+-                  height={100}
+-                  width={100}
+-                  className="h-10 w-10 object-cover"
+-                />
++              {presentation.thumbnailUrl ? (
++                <Image
++                  src={presentation.thumbnailUrl}
++                  alt="Presentation thumbnail"
++                  height={80}
++                  width={80}
++                  className="h-10 w-10 object-cover"
++                  quality={60}
++                  loading="lazy"
++                  sizes="40px"
++                />
+*** End File
+*** Update File: src/components/posts/TikTokPostsGrid.tsx
+@@
+-      {isImage && (
+-        <img
+-          src={url}
+-          alt="Post media"
+-          loading="lazy"
+-          className="h-full w-full object-cover"
+-          referrerPolicy="no-referrer"
+-        />
++      {isImage && (
++        <img
++          src={url}
++          alt="Post media"
++          loading="lazy"
++          decoding="async"
++          className="h-full w-full object-cover"
++          referrerPolicy="no-referrer"
++        />
+*** End File
 *** End Patch

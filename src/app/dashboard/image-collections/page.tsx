@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -334,11 +335,14 @@ export default function ImageCollectionsPage() {
                                 "rounded-r-lg",
                             )}
                           >
-                            <img
+                            <Image
                               src={image.url}
                               alt={`${set.name} preview ${index + 1}`}
-                              className="block h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                              fill
+                              className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                              quality={50}
                               loading="lazy"
+                              sizes="(max-width: 640px) 120px, (max-width: 1024px) 160px, 200px"
                             />
                           </div>
                         ))}

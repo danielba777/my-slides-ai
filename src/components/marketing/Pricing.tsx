@@ -1,12 +1,91 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Section } from "./Section";
+
+// PlanButton component for the pricing cards
+function PlanButton({
+  plan,
+  session,
+  variant = "default",
+  label,
+}: {
+  plan: string;
+  session?: boolean;
+  variant?: "default" | "primary";
+  label?: string;
+}) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  const PLAN_MAP: Record<string, "STARTER" | "GROWTH" | "SCALE" | "UNLIMITED"> =
+    {
+      starter: "STARTER",
+      growth: "GROWTH",
+      scale: "SCALE",
+      unlimited: "UNLIMITED",
+    };
+
+  async function startCheckout() {
+    const serverPlan = PLAN_MAP[plan];
+    if (!serverPlan) return;
+
+    if (!session) {
+      router.push(`/auth/signin?callbackUrl=/checkout?plan=${serverPlan}`);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: serverPlan }),
+      });
+
+      let data: any = null;
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("application/json")) {
+        try {
+          data = await res.json();
+        } catch {
+          data = null;
+        }
+      } else {
+        const text = await res.text().catch(() => "");
+        console.error("Checkout non-JSON response:", text);
+      }
+
+      if (!res.ok || !data?.url) {
+        console.error("Checkout error", { status: res.status, data });
+        toast.error(
+          data?.error
+            ? `Checkout failed: ${data.error}`
+            : `Checkout failed (${res.status}). Please try again.`,
+        );
+        return;
+      }
+      window.location.href = data.url as string;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={startCheckout}
+      disabled={loading}
+      className={`w-full rounded-lg px-4 py-2 font-medium transition ${
+        variant === "primary"
+          ? "bg-[#304674] text-white hover:opacity-90"
+          : "bg-[#f5f6fa] text-[#304674] hover:bg-[#e8eefc]"
+      } disabled:opacity-50`}
+    >
+      {loading ? "Redirecting…" : label || "Choose plan"}
+    </button>
+  );
+}
 
 const tiers = [
   {
@@ -55,141 +134,141 @@ const tiers = [
   },
 ];
 
-export function MarketingPricing({ session }: { session: boolean }) {
-  const router = useRouter();
-  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+type Props = {
+  session?: boolean;
+  /** Compact variant for in-app modal (less top spacing, tighter header) */
+  compact?: boolean;
+};
 
-  // Mapping der sichtbaren Namen zu den Server-Plan-Keys
-  const PLAN_MAP: Record<string, "STARTER" | "GROWTH" | "SCALE" | "UNLIMITED"> =
-    {
-      Starter: "STARTER",
-      Growth: "GROWTH",
-      Scale: "SCALE",
-      Unlimited: "UNLIMITED",
-    };
-
-  async function startCheckout(name: string) {
-    // Wenn nicht eingeloggt → zur Sign-in-Seite mit Rücksprung zu gewünschtem Plan
-    const plan = PLAN_MAP[name];
-    if (!session) {
-      router.push(`/auth/signin?callbackUrl=/checkout?plan=${plan}`);
-      return;
-    }
-    if (!plan) return;
-    try {
-      setLoadingPlan(plan);
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
-      });
-
-      // Robust gegen Non-JSON / leeren Body
-      let data: any = null;
-      const ct = res.headers.get("content-type") || "";
-      if (ct.includes("application/json")) {
-        try {
-          data = await res.json();
-        } catch {
-          // JSON kaputt/leer
-          data = null;
-        }
-      } else {
-        // Fallback: Text lesen für Logging
-        const text = await res.text().catch(() => "");
-        console.error("Checkout non-JSON response:", text);
-      }
-
-      if (!res.ok || !data?.url) {
-        console.error("Checkout error", { status: res.status, data });
-        toast.error(
-          data?.error
-            ? `Checkout failed: ${data.error}`
-            : `Checkout failed (${res.status}). Please try again.`,
-        );
-        return;
-      }
-      window.location.href = data.url as string;
-    } finally {
-      setLoadingPlan(null);
-    }
-  }
+export function MarketingPricing({ session, compact }: Props) {
   return (
-    <Section id="pricing">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className="text-center space-y-5 mb-8"
+    <section className="w-full">
+      <div
+        className={`mx-auto ${compact ? "max-w-7xl" : "max-w-6xl"} px-4 md:px-8`}
       >
-        <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 leading-tight">
+        <h2
+          className={[
+            "font-extrabold tracking-tight text-[#0F172A] text-center",
+            compact
+              ? "text-4xl md:text-5xl mt-2 md:mt-3"
+              : "text-4xl md:text-6xl mt-4 md:mt-6",
+          ].join(" ")}
+        >
           Pricing
         </h2>
-        <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+        <p
+          className={[
+            "text-center text-slate-600",
+            compact ? "mt-2 mb-6 md:mb-8" : "mt-3 md:mt-4 mb-10 md:mb-16",
+          ].join(" ")}
+        >
           Pick the plan that matches your next growth stage.
         </p>
-      </motion.div>
-      <motion.div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {tiers.map((t) => (
-          <Card
-            key={t.name}
-            className={`
-              relative flex flex-col justify-between
-              bg-white rounded-2xl border border-[#304674]/25
-              shadow-md hover:shadow-lg transition
-              overflow-hidden h-full
-              ${t.highlight ? "ring-1 ring-[#304674]/40" : ""}
-            `}
-          >
-            {/* Akzentlinie */}
-            <div className="absolute inset-x-0 top-0 h-[3px] bg-[#304674]" />
-            <CardHeader className="pt-6 pb-3">
-              <CardTitle className="flex items-center justify-between text-base">
-                <span className="text-[#304674] text-xl font-bold">
-                  {t.name}
-                </span>
-                {t.badge && (
-                  <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#e8eefc] rounded-full text-sm font-medium text-[#304674]">
-                    {t.badge}
-                  </div>
-                )}
-              </CardTitle>
-              <div className="mt-1 text-3xl font-semibold text-[#304674]">
-                {t.price}
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-col justify-between flex-1 pb-6">
-              <ul className="mt-2 space-y-2 text-sm text-gray-700 flex-1">
-                {t.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2">
-                    <span className="mt-[2px]">•</span>
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
+        <div
+          className={[
+            "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4",
+            "gap-5 md:gap-6",
+          ].join(" ")}
+        >
+          {/* Starter */}
+          <div className="relative rounded-2xl border border-slate-200 bg-white shadow-sm p-6 md:p-8">
+            <div className="flex items-start justify-between">
+              <h3 className="text-xl font-bold">Starter</h3>
+              {/* badge top */}
+              {/* (keine) */}
+            </div>
+            <p className="mt-1 text-3xl font-extrabold">€19</p>
+            <ul className="mt-4 space-y-2 text-slate-700">
+              <li>25 monthly credits</li>
+              <li>50 monthly AI credits</li>
+              <li>Create slideshows</li>
+              <li>AI avatars</li>
+            </ul>
+            <div className="mt-6">
+              <PlanButton plan="starter" session={session} />
+            </div>
+          </div>
 
-              <div className="mt-8">
-                <Button
-                  onClick={() => startCheckout(t.name)}
-                  disabled={loadingPlan !== null}
-                  className={`w-full rounded-full text-sm font-medium transition ${
-                    t.highlight
-                      ? "bg-[#304674] text-white hover:opacity-90"
-                      : "bg-[#f5f6fa] text-[#304674] hover:bg-[#e8eefc]"
-                  }`}
-                  data-price={t.priceId}
-                >
-                  {loadingPlan === PLAN_MAP[t.name]
-                    ? "Redirecting…"
-                    : t.highlight
-                      ? "Start with Growth"
-                      : "Choose plan"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </motion.div>
-    </Section>
+          {/* Growth */}
+          <div className="relative rounded-2xl border border-slate-200 bg-white shadow-sm p-6 md:p-8">
+            <div className="flex items-start justify-between">
+              <h3 className="text-xl font-bold">Growth</h3>
+              <span
+                className={[
+                  "absolute top-4 right-4",
+                  "inline-flex items-center justify-center rounded-full",
+                  "bg-indigo-50 text-indigo-700",
+                  "text-[13px] font-medium leading-none",
+                  "px-3.5 py-2 whitespace-nowrap text-center",
+                ].join(" ")}
+              >
+                Most popular
+              </span>
+            </div>
+            <p className="mt-1 text-3xl font-extrabold">€49</p>
+            <ul className="mt-4 space-y-2 text-slate-700">
+              <li>100 monthly credits</li>
+              <li>150 monthly AI credits</li>
+              <li>Everything from Starter</li>
+              <li>Priority queue</li>
+            </ul>
+            <div className="mt-6">
+              <PlanButton
+                plan="growth"
+                session={session}
+                variant="primary"
+                label="Start with Growth"
+              />
+            </div>
+          </div>
+
+          {/* Scale */}
+          <div className="relative rounded-2xl border border-slate-200 bg-white shadow-sm p-6 md:p-8">
+            <div className="flex items-start justify-between">
+              <h3 className="text-xl font-bold">Scale</h3>
+              {/* badge none */}
+            </div>
+            <p className="mt-1 text-3xl font-extrabold">€95</p>
+            <ul className="mt-4 space-y-2 text-slate-700">
+              <li>250 monthly credits</li>
+              <li>300 monthly AI credits</li>
+              <li>Everything from Growth</li>
+              <li>Priority support</li>
+            </ul>
+            <div className="mt-6">
+              <PlanButton plan="scale" session={session} />
+            </div>
+          </div>
+
+          {/* Unlimited */}
+          <div className="relative rounded-2xl border border-slate-200 bg-white shadow-sm p-6 md:p-8">
+            <div className="flex items-start justify-between">
+              <h3 className="text-xl font-bold">Unlimited</h3>
+              <span
+                className={[
+                  "absolute top-4 right-4",
+                  "inline-flex items-center justify-center rounded-full",
+                  "bg-slate-100 text-slate-700",
+                  "text-[13px] font-medium leading-none",
+                  "px-3.5 py-2 whitespace-nowrap text-center",
+                ].join(" ")}
+              >
+                Premium
+              </span>
+            </div>
+            <p className="mt-1 text-3xl font-extrabold">€195</p>
+            <ul className="mt-4 space-y-2 text-slate-700">
+              <li>Unlimited credits</li>
+              <li>1,000 monthly AI credits</li>
+              <li>Everything from Scale</li>
+              <li>White-glove support</li>
+            </ul>
+            <div className="mt-6">
+              <PlanButton plan="unlimited" session={session} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import Image from "next/image";
 
 import { AiAvatarPromptInput } from "@/components/dashboard/ai-avatars/PromptInput";
 import {
@@ -465,13 +466,17 @@ export default function AiAvatarDashboardPage() {
                       {theme.imagePaths.map((path) => (
                         <div
                           key={path}
-                          className="aspect-[2/3] overflow-hidden"
+                          className="relative h-32 w-24 overflow-hidden rounded-xl border border-white/10"
                         >
-                          <img
+                          <Image
                             src={path}
                             alt={`${theme.name} preview`}
+                            width={320}
+                            height={320}
                             className="h-full w-full object-cover transition group-hover:opacity-95"
+                            quality={60}
                             loading="lazy"
+                            sizes="(max-width: 640px) 96px, (max-width: 1024px) 120px, 128px"
                           />
                         </div>
                       ))}

@@ -245,13 +245,16 @@ export function RecentPresentations() {
               className="relative aspect-video bg-muted"
               onClick={() => handlePresentationClick(presentation)}
             >
-              {presentation.thumbnailUrl || presentation.thumbnailUrl ? (
+              {presentation.thumbnailUrl ? (
                 <Image
                   height={200}
                   width={300}
                   src={presentation.thumbnailUrl}
                   alt={presentation.title || "Presentation thumbnail"}
                   className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  quality={60}
+                  loading="lazy"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-primary/10">
