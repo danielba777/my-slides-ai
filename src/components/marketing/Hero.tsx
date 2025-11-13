@@ -154,7 +154,7 @@ export function MarketingHero({
   };
 
   return (
-    <Section className="relative min-h-[55vh] overflow-hidden bg-[#111] py-0">
+    <Section className="relative sm:min-h-[55vh] overflow-hidden bg-[#111] py-0">
       {/* Mobile Header rendered directly in hero */}
       <div className="md:hidden absolute inset-x-0 top-0 z-30 px-4 pt-6">
         <div className="flex items-center justify-between text-white">
@@ -274,9 +274,8 @@ export function MarketingHero({
               })()
             ) : (
               <>
-                <span className="block">Automate TikToks that</span>
-                <span className="block sm:inline sm:whitespace-nowrap">
-                  drive traffic to your website{" "}
+                <span className="block">
+                  Automate TikToks that drive traffic to your website
                 </span>
               </>
             )}
@@ -286,7 +285,7 @@ export function MarketingHero({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.15, duration: 0.6 }}
-            className="mt-2 pb-4 text-lg sm:text-xl lg:text-3xl text-gray-300 max-w-4xl mx-auto leading-relaxed font-semibold"
+            className="mt-2 pb-4 max-w-[15rem] text-lg sm:text-xl lg:text-3xl text-gray-300 sm:max-w-4xl mx-auto leading-snug sm:leading-relaxed font-semibold"
           >
             {heroSubtitle || "use AI to generate posts that don't feel like AI"}
           </motion.p>
@@ -360,7 +359,7 @@ export function MarketingHero({
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.6 }}
-            className="mt-12 flex justify-center"
+            className="mt-12 hidden md:flex justify-center"
           >
             <div className="relative w-full max-w-5xl rounded-[20px] bg-blue-200/95 border border-white/20 shadow-2xl shadow-indigo-900/20 p-2 sm:p-1">
               <a
@@ -542,7 +541,7 @@ export function MarketingHero({
           /* Promote to own layer */
           will-change: transform;
           transform: translateZ(0);
-          min-height: 89vh;
+          min-height: 75vh;
           display: flex;
           flex-direction: column;
           justify-content: center;
