@@ -2,6 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -11,7 +13,8 @@ const tiers = [
   {
     name: "Starter",
     monthlyPrice: "$19",
-    yearlyPrice: "$190",
+    yearlyPrice: "$15",
+    billedAnnually: "$180",
     priceIds: {
       monthly: "price_starter_monthly",
       yearly: "price_starter_yearly",
@@ -20,13 +23,14 @@ const tiers = [
       "25 monthly credits",
       "50 monthly AI credits",
       "Create slideshows",
-      "AI avatars",
+      "Create hook + demo videos",
     ],
   },
   {
     name: "Growth",
     monthlyPrice: "$49",
-    yearlyPrice: "$490",
+    yearlyPrice: "$39",
+    billedAnnually: "$468",
     priceIds: {
       monthly: "price_growth_monthly",
       yearly: "price_growth_yearly",
@@ -34,14 +38,17 @@ const tiers = [
     features: [
       "100 monthly credits",
       "150 monthly AI credits",
-      "Everything from Starter",
-      "Priority queue",
+      "3 TikTok automations",
+      "Schedule posts",
+      "Add unlimited TikTok accounts",
+      "Add unlimited team members",
     ],
   },
   {
     name: "Scale",
     monthlyPrice: "$95",
-    yearlyPrice: "$950",
+    yearlyPrice: "$79",
+    billedAnnually: "$948",
     priceIds: {
       monthly: "price_scale_monthly",
       yearly: "price_scale_yearly",
@@ -49,23 +56,23 @@ const tiers = [
     features: [
       "250 monthly credits",
       "300 monthly AI credits",
-      "Everything from Growth",
-      "Priority support",
+      "10 TikTok automations",
     ],
   },
   {
     name: "Unlimited",
     monthlyPrice: "$195",
-    yearlyPrice: "$1950",
+    yearlyPrice: "$149",
+    billedAnnually: "$1,788",
     priceIds: {
       monthly: "price_unlimited_monthly",
       yearly: "price_unlimited_yearly",
     },
     features: [
-      "Unlimited credits",
+      "Unlimited monthly credits",
       "1,000 monthly AI credits",
-      "Everything from Scale",
-      "White-glove support",
+      "Unlimited automations",
+      "...everything from Scale tier",
     ],
   },
 ];
@@ -74,7 +81,7 @@ export function MarketingPricing({ session }: { session: boolean }) {
   const router = useRouter();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">(
-    "monthly",
+    "yearly",
   );
 
   // Mapping der sichtbaren Namen zu den Server-Plan-Keys
@@ -140,64 +147,79 @@ export function MarketingPricing({ session }: { session: boolean }) {
         </h2>
       </div>
       <div className="mb-6 flex justify-center">
-        <div className="inline-flex items-center rounded-full border border-zinc-200 bg-white p-1 text-xs shadow-sm">
-          <button
-            type="button"
-            onClick={() => setBillingPeriod("monthly")}
-            className={`px-3 py-1 rounded-full transition ${
-              billingPeriod === "monthly"
-                ? "bg-zinc-900 text-white"
-                : "text-zinc-700"
-            }`}
-          >
-            Monthly
-          </button>
-          <button
-            type="button"
-            onClick={() => setBillingPeriod("yearly")}
-            className={`px-3 py-1 rounded-full transition ${
-              billingPeriod === "yearly"
-                ? "bg-zinc-900 text-white"
-                : "text-zinc-700"
-            }`}
-          >
-            Yearly
-          </button>
-        </div>
+        <Tabs
+          value={billingPeriod}
+          onValueChange={(val) => setBillingPeriod(val as "monthly" | "yearly")}
+          className="w-full max-w-xs"
+        >
+          <TabsList className="grid grid-cols-2 h-11 rounded-full bg-white border border-[#304674]/25 p-1">
+            <TabsTrigger
+              value="monthly"
+              className="h-full flex items-center justify-center rounded-full text-sm font-medium
+                   data-[state=active]:bg-[#2A8AEC]
+                   data-[state=active]:text-white
+                   data-[state=active]:shadow-none"
+            >
+              Monthly
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="yearly"
+              className="h-full flex items-center justify-center rounded-full text-sm font-medium
+                   data-[state=active]:bg-[#2A8AEC]
+                   data-[state=active]:text-white
+                   data-[state=active]:shadow-none"
+            >
+              Yearly
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
-      <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
         {tiers.map((t) => {
           const isYearly = billingPeriod === "yearly";
           const displayPrice = isYearly ? t.yearlyPrice : t.monthlyPrice;
-          const priceLabel = isYearly ? "per year" : "per month";
+          const priceLabel = "per month";
 
           return (
             <Card
               key={t.name}
               className="relative flex flex-col justify-between bg-white rounded-2xl shadow-md hover:shadow-lg transition overflow-hidden h-full border border-[#304674]/25"
             >
-              <CardHeader className="pt-6 pb-3">
+              <CardHeader className="pt-6 pb-3 pl-4 pr-0">
                 <CardTitle className="flex items-center justify-between text-base">
                   <span className="text-zinc-900 text-3xl font-bold">
                     {t.name}
                   </span>
                 </CardTitle>
-                <div className="flex items-end gap-1 mt-1 text-zinc-900">
-                  <p className="text-4xl font-bold">{displayPrice}</p>
-                  <p className="font-semibold text-sm mb-1">{priceLabel}</p>
+                <div className="mt-1 text-zinc-900 flex flex-col gap-0.5">
+                  <div className="flex items-end gap-1">
+                    <p className="text-5xl font-bold">{displayPrice}</p>
+                    <div className="flex flex-col space-y-0 leading-tight mb-1">
+                      {isYearly && (
+                        <p className="text-xs font-medium text-zinc-500">
+                          billed annually {t.billedAnnually}
+                        </p>
+                      )}
+                      <p className="font-bold text-xs">{priceLabel}</p>
+                    </div>
+                  </div>
                 </div>
               </CardHeader>
-              <CardContent className="flex flex-col justify-between flex-1 pb-6">
+              <CardContent className="flex flex-col justify-between flex-1 pb-6 pl-5 pr-0">
                 <ul className="mt-2 space-y-2 text-sm text-zinc-700 flex-1">
                   {t.features.map((f) => (
                     <li key={f} className="flex items-start gap-2">
-                      <span className="mt-[2px]">•</span>
+                      <CheckCircle2
+                        className="mt-[2px] h-4 w-4 text-[#2A8AEC]"
+                        aria-hidden="true"
+                      />
                       <span>{f}</span>
                     </li>
                   ))}
                 </ul>
 
-                <div className="mt-8">
+                <div className="mt-8 pr-5">
                   <Button
                     onClick={() => startCheckout(t.name, billingPeriod)}
                     disabled={loadingPlan !== null}
