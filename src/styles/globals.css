@@ -133,16 +133,8 @@
     @apply border-border;
   }
   body {
-    @apply bg-background font-sans text-foreground;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
+    @apply font-sans text-foreground;
+    background-color: #F3F4EF;
   }
 }
 

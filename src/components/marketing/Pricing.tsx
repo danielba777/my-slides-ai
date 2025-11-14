@@ -116,7 +116,7 @@ export function MarketingPricing({ session }: { session: boolean }) {
   return (
     <Section id="pricing">
       <div className="text-center space-y-5 mb-8">
-        <h2 className="text-2xl sm:text-3xl lg:text-5xl font-bold tracking-tight text-zinc-900 leading-tight">
+        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-zinc-900 leading-tight">
           Pricing
         </h2>
       </div>

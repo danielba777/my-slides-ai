@@ -121,6 +121,11 @@ export function MarketingFAQ() {
 
   return (
     <Section id="faq">
+      <div className="text-center space-y-5 mb-8">
+        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-zinc-900 leading-tight">
+          Frequently Asked Questions
+        </h2>
+      </div>
       <div className="mx-auto max-w-3xl px-4 sm:px-0">
         <div className="space-y-10">
           {categories.map((cat, cIdx) => (

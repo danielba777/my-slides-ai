@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 export function MarketingPageBackground({ children }: { children: ReactNode }) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-[#304674]/6 to-[#304674]/12">
+    <div className="relative min-h-screen overflow-hidden bg-[#F3F4EF]">
       <div
         className="pointer-events-none absolute inset-0 -z-10 opacity-35 bg-repeat"
         style={{
