@@ -37,17 +37,6 @@ const testimonials = [
 export function MarketingTestimonials() {
   return (
     <Section>
-      {/* Header */}
-      <div className="text-center space-y-6 mb-8">
-        <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 leading-tight">
-          What our creators say
-        </h2>
-        <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-          Real voices from creators who scale with{" "}
-          <span className="font-bold text-[#304674]">SlidesCockpit</span>.
-        </p>
-      </div>
-
       {/* Testimonials Grid */}
       <div className="grid gap-6 sm:grid-cols-2">
         {testimonials.map((t, i) => (
@@ -55,28 +44,28 @@ export function MarketingTestimonials() {
             <Card
               className="
                 relative h-full flex flex-col justify-between
-                bg-white rounded-2xl border border-[#304674]/25
-                shadow-md hover:shadow-lg transition
+                bg-[#EEEFE8] rounded-2xl border border-[#304674]/25
+                shadow-sm hover:shadow-lg transition
               "
             >
               <CardContent className="p-6 sm:p-7 flex flex-col h-full">
                 {/* Sterne */}
-                <div className="flex gap-1 mb-3">
+                <div className="flex gap-0.5 mb-3">
                   {Array.from({ length: 5 }).map((_, idx) => (
                     <Star
                       key={idx}
-                      className={`h-4 w-4 ${
+                      className={`h-6 w-6 ${
                         idx < t.rating
-                          ? "fill-[#304674] text-[#304674]"
-                          : "text-gray-300"
+                          ? "fill-[#FACC26] text-[#FACC26] stroke-none"
+                          : "text-gray-300 stroke-gray-300"
                       }`}
                     />
                   ))}
                 </div>
 
                 {/* Text */}
-                <p className="text-[15px] text-muted-foreground leading-relaxed flex-1">
-                  "{t.text}"
+                <p className="text-base text-zinc-800 leading-relaxed flex-1 font-medium">
+                  {t.text}
                 </p>
 
                 {/* Person */}
