@@ -71,7 +71,7 @@ export function MarketingTikTokAutomation() {
         </h2>
         <p className="mt-4 text-lg text-zinc-600 font-semibold max-w-[30rem]">
           Yes! The TikToks below were 100% created &amp; published entirely with
-          ReelFarm automations
+          SlidesCockpit automations
         </p>
       </div>
       <div className="mx-auto mt-10 w-full max-w-5xl">
