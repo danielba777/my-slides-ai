@@ -1,5 +1,6 @@
 "use client";
 
+import { Section } from "@/components/marketing/Section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -159,7 +160,13 @@ const tiers = [
   },
 ];
 
-export function MarketingPricing({ session }: { session: boolean }) {
+export function MarketingPricing({
+  session,
+  compact = false,
+}: {
+  session: boolean;
+  compact?: boolean;
+}) {
   const router = useRouter();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">(
@@ -222,17 +229,21 @@ export function MarketingPricing({ session }: { session: boolean }) {
     }
   }
   return (
-    <Section id="pricing">
-      <div className="text-center space-y-5 mb-8">
+    <Section
+      id="pricing"
+      className={compact ? "py-0" : undefined}
+      container={!compact}
+    >
+      <div className={`text-center space-y-5 ${compact ? "mb-4" : "mb-8"}`}>
         <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-zinc-900 leading-tight">
           Pricing
         </h2>
       </div>
-      <div className="mb-6 flex justify-center">
+      <div className={`flex justify-center ${compact ? "mb-4" : "mb-6"}`}>
         <Tabs
           value={billingPeriod}
           onValueChange={(val) => setBillingPeriod(val as "monthly" | "yearly")}
-          className="w-full max-w-xs"
+          className={compact ? "w-full" : "w-full max-w-xs"}
         >
           <TabsList className="grid grid-cols-2 h-11 rounded-full bg-white border border-[#304674]/25 p-1">
             <TabsTrigger
@@ -257,7 +268,11 @@ export function MarketingPricing({ session }: { session: boolean }) {
           </TabsList>
         </Tabs>
       </div>
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+      <div
+        className={`grid gap-4 ${
+          compact ? "mt-4" : "mt-8"
+        } sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4`}
+      >
         {tiers.map((t) => {
           const isYearly = billingPeriod === "yearly";
           const displayPrice = isYearly ? t.yearlyPrice : t.monthlyPrice;
