@@ -9,6 +9,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
+
 // PlanButton component for the pricing cards
 function PlanButton({
   plan,
@@ -281,9 +283,19 @@ export function MarketingPricing({
           return (
             <Card
               key={t.name}
-              className="relative flex flex-col justify-between bg-white rounded-2xl shadow-md hover:shadow-lg transition overflow-hidden h-full border border-[#304674]/25"
+              className={`relative flex flex-col justify-between bg-white rounded-2xl shadow-md hover:shadow-lg transition overflow-hidden h-full border ${
+                t.name === "Growth" ? "border-[#2A8AEC]" : "border-[#304674]/25"
+              }`}
             >
               <CardHeader className="pt-6 pb-3 pl-4 pr-0">
+                <div className="mb-2 h-6 flex items-center">
+                  {t.name === "Growth" && (
+                    <Badge className="relative inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#2A8AEC] via-[#6ea8ff] to-[#2A8AEC] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm">
+                      <span className="relative z-10">Most popular</span>
+                      <span className="pointer-events-none absolute inset-0 rounded-full bg-white/30 mix-blend-soft-light" />
+                    </Badge>
+                  )}
+                </div>
                 <CardTitle className="flex items-center justify-between text-base">
                   <span className="text-zinc-900 text-3xl font-bold">
                     {t.name}
