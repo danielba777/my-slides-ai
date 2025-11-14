@@ -199,9 +199,12 @@ export function PresentationItem({
                 <Image
                   src={presentation.thumbnailUrl}
                   alt="Presentation thumbnail"
-                  height={100}
-                  width={100}
+                  height={80}
+                  width={80}
                   className="h-10 w-10 object-cover"
+                  quality={60}
+                  loading="lazy"
+                  sizes="40px"
                 />
               ) : (
                 <Presentation className="h-5 w-5 text-primary" />

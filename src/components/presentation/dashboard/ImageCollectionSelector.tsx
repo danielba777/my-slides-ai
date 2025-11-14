@@ -347,12 +347,12 @@ export const ImageCollectionSelector: React.FC = () => {
                           <Image
                             src={image.url}
                             alt={`All images preview ${index + 1}`}
-                            width={160}
-                            height={160}
+                            width={320}
+                            height={320}
                             className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
-                            quality={30}
+                            quality={50}
                             loading="lazy"
-                            sizes="160px"
+                            sizes="(max-width: 640px) 120px, (max-width: 1024px) 160px, 200px"
                           />
                         </div>
                       ))}
@@ -401,12 +401,12 @@ export const ImageCollectionSelector: React.FC = () => {
                           <Image
                             src={image.url}
                             alt={`${set.name} preview ${index + 1}`}
-                            width={160}
-                            height={160}
+                            width={320}
+                            height={320}
                             className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
-                            quality={30}
+                            quality={50}
                             loading="lazy"
-                            sizes="160px"
+                            sizes="(max-width: 640px) 120px, (max-width: 1024px) 160px, 200px"
                           />
                         </div>
                       ))}
@@ -455,12 +455,12 @@ export const ImageCollectionSelector: React.FC = () => {
                           <Image
                             src={image.url}
                             alt={`${selectedImageSet.name} preview ${index + 1}`}
-                            width={160}
-                            height={160}
+                            width={320}
+                            height={320}
                             className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
-                            quality={30}
+                            quality={50}
                             loading="lazy"
-                            sizes="160px"
+                            sizes="(max-width: 640px) 120px, (max-width: 1024px) 160px, 200px"
                           />
                         </div>
                       ),

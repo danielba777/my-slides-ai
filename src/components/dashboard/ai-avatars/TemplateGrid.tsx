@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { AiAvatarTemplate } from "@/types/ai-avatars";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 type TemplateGridProps = {
   templates: AiAvatarTemplate[];
@@ -58,10 +59,15 @@ export function AiAvatarTemplateGrid({
             key={item.template.id}
             className="relative aspect-[2/3] overflow-hidden rounded-2xl border bg-muted"
           >
-            <img
+            <Image
               src={item.template.imageUrl || item.template.rawImageUrl || ""}
               alt="AI avatar template preview"
+              width={320}
+              height={320}
               className="h-full w-full object-cover transition duration-500 hover:scale-105"
+              quality={60}
+              loading="lazy"
+              sizes="(max-width: 640px) 120px, (max-width: 1024px) 160px, 200px"
             />
             {onCopy ? (
               <div className="absolute inset-x-0 bottom-0 p-3">

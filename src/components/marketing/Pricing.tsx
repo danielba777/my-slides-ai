@@ -7,7 +7,89 @@ import { CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Section } from "./Section";
+
+// PlanButton component for the pricing cards
+function PlanButton({
+  plan,
+  session,
+  variant = "default",
+  label,
+}: {
+  plan: string;
+  session?: boolean;
+  variant?: "default" | "primary";
+  label?: string;
+}) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  const PLAN_MAP: Record<string, "STARTER" | "GROWTH" | "SCALE" | "UNLIMITED"> =
+    {
+      starter: "STARTER",
+      growth: "GROWTH",
+      scale: "SCALE",
+      unlimited: "UNLIMITED",
+    };
+
+  async function startCheckout() {
+    const serverPlan = PLAN_MAP[plan];
+    if (!serverPlan) return;
+
+    if (!session) {
+      router.push(`/auth/signin?callbackUrl=/checkout?plan=${serverPlan}`);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: serverPlan }),
+      });
+
+      let data: any = null;
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("application/json")) {
+        try {
+          data = await res.json();
+        } catch {
+          data = null;
+        }
+      } else {
+        const text = await res.text().catch(() => "");
+        console.error("Checkout non-JSON response:", text);
+      }
+
+      if (!res.ok || !data?.url) {
+        console.error("Checkout error", { status: res.status, data });
+        toast.error(
+          data?.error
+            ? `Checkout failed: ${data.error}`
+            : `Checkout failed (${res.status}). Please try again.`,
+        );
+        return;
+      }
+      window.location.href = data.url as string;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={startCheckout}
+      disabled={loading}
+      className={`w-full rounded-lg px-4 py-2 font-medium transition ${
+        variant === "primary"
+          ? "bg-[#304674] text-white hover:opacity-90"
+          : "bg-[#f5f6fa] text-[#304674] hover:bg-[#e8eefc]"
+      } disabled:opacity-50`}
+    >
+      {loading ? "Redirecting…" : label || "Choose plan"}
+    </button>
+  );
+}
 
 const tiers = [
   {
