@@ -2,7 +2,6 @@
 import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Section } from "./Section";
-import { motion } from "framer-motion";
 
 type Card = { id: string; views: string; pinned?: boolean };
 const cards: Card[] = Array.from({ length: 12 }).map((_, i) => ({
@@ -55,28 +54,22 @@ export function MarketingExamples() {
         100% created & published via SlidesCockpit automations.
       </p>
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-        {rows.flat().map((c, i) => (
-          <motion.div
-            key={c.id}
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: i * 0.03, duration: 0.35 }}
-          >
+        {rows.flat().map((c) => (
+          <div key={c.id}>
             <Card className="relative aspect-[9/16] w-full overflow-hidden rounded-xl border border-border bg-muted shadow-sm transition hover:-translate-y-1">
               <PlaceholderSlide />
-                 {c.pinned && (
-                   <span className="absolute left-2 top-2 rounded bg-rose-500 px-2 py-0.5 text-[10px] font-semibold text-white">
-                     Pinned
-                   </span>
-                 )}
-                 <div className="absolute bottom-2 left-2 rounded bg-black/65 px-2 py-1 text-xs font-medium text-white">
-                   {c.views}
-                 </div>
-               </Card>
-             </motion.div>
-           ))}
-         </div>
-       </Section>
+              {c.pinned && (
+                <span className="absolute left-2 top-2 rounded bg-rose-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                  Pinned
+                </span>
+              )}
+              <div className="absolute bottom-2 left-2 rounded bg-black/65 px-2 py-1 text-xs font-medium text-white">
+                {c.views}
+              </div>
+            </Card>
+          </div>
+        ))}
+      </div>
+    </Section>
   );
-  }
+}

@@ -1,6 +1,5 @@
 "use client";
 import { Card, CardContent } from "@/components/ui/card";
-import { motion } from "framer-motion";
 import { Star } from "lucide-react";
 import { Section } from "./Section";
 
@@ -39,12 +38,7 @@ export function MarketingTestimonials() {
   return (
     <Section>
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className="text-center space-y-6 mb-8"
-      >
+      <div className="text-center space-y-6 mb-8">
         <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 leading-tight">
           What our creators say
         </h2>
@@ -52,18 +46,12 @@ export function MarketingTestimonials() {
           Real voices from creators who scale with{" "}
           <span className="font-bold text-[#304674]">SlidesCockpit</span>.
         </p>
-      </motion.div>
+      </div>
 
       {/* Testimonials Grid */}
       <div className="grid gap-6 sm:grid-cols-2">
         {testimonials.map((t, i) => (
-          <motion.div
-            key={t.name}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1, duration: 0.4 }}
-            viewport={{ once: true }}
-          >
+          <div key={t.name}>
             <Card
               className="
                 relative h-full flex flex-col justify-between
@@ -109,7 +97,7 @@ export function MarketingTestimonials() {
                 </div>
               </CardContent>
             </Card>
-          </motion.div>
+          </div>
         ))}
       </div>
     </Section>

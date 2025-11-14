@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -116,20 +115,12 @@ export function MarketingPricing({ session }: { session: boolean }) {
   }
   return (
     <Section id="pricing">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className="text-center space-y-5 mb-8"
-      >
-        <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 leading-tight">
+      <div className="text-center space-y-5 mb-8">
+        <h2 className="text-2xl sm:text-3xl lg:text-5xl font-bold tracking-tight text-zinc-900 leading-tight">
           Pricing
         </h2>
-        <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-          Pick the plan that matches your next growth stage.
-        </p>
-      </motion.div>
-      <motion.div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      </div>
+      <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {tiers.map((t) => (
           <Card
             key={t.name}
@@ -189,7 +180,7 @@ export function MarketingPricing({ session }: { session: boolean }) {
             </CardContent>
           </Card>
         ))}
-      </motion.div>
+      </div>
     </Section>
   );
 }

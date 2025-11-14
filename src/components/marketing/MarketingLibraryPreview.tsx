@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import { Card } from "@/components/ui/card";
-import { motion } from "framer-motion";
 import { HeartIcon, PlayIcon, StarIcon, TrendingUpIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -169,12 +168,7 @@ export function MarketingLibraryPreview() {
       className="relative overflow-visible px-5 pt-16 sm:px-6"
     >
       <div className="relative mx-auto max-w-7xl">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="mb-16 space-y-6 text-center"
-        >
+        <div className="mb-16 space-y-6 text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-100 to-[#c2d5ff] px-4 py-2 text-sm font-medium text-indigo-700">
             <TrendingUpIcon className="h-4 w-4" />
             Trending slides
@@ -207,23 +201,19 @@ export function MarketingLibraryPreview() {
               Millions of views
             </div>
           </div>
-        </motion.div>
+        </div>
 
         <div className="relative">
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4">
             {displayPosts.map((post, index) => {
               const isPlaceholder = post.isPlaceholder;
               return (
-                <motion.div
+                <div
                   key={post.id}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: index * 0.1 }}
-                  onHoverStart={
+                  onMouseEnter={
                     isPlaceholder ? undefined : () => setHoveredCard(post.id)
                   }
-                  onHoverEnd={
+                  onMouseLeave={
                     isPlaceholder ? undefined : () => setHoveredCard(null)
                   }
                 >
@@ -254,17 +244,12 @@ export function MarketingLibraryPreview() {
                      )}
 
                     {post.trending && !isPlaceholder ? (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.2 + index * 0.1 }}
-                        className="absolute right-3 top-3 z-10"
-                      >
+                      <div className="absolute right-3 top-3 z-10">
                         <div className="flex items-center gap-1 rounded-full bg-gradient-to-r from-yellow-400 to-orange-400 px-3 py-1.5 text-xs font-bold text-white shadow-lg">
                           <StarIcon className="h-3 w-3 fill-white" />
                           Top {index + 1}
                         </div>
-                      </motion.div>
+                      </div>
                     ) : null}
 
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4">
@@ -280,7 +265,7 @@ export function MarketingLibraryPreview() {
                       </div>
                     </div>
                   </Card>
-                </motion.div>
+                </div>
               );
             })}
           </div>
