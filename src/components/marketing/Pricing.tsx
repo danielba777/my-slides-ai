@@ -1,5 +1,9 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -90,185 +94,230 @@ function PlanButton({
 const tiers = [
   {
     name: "Starter",
-    price: "€19",
-    priceId: "price_starter",
+    monthlyPrice: "$19",
+    yearlyPrice: "$15",
+    billedAnnually: "$180",
+    priceIds: {
+      monthly: "price_starter_monthly",
+      yearly: "price_starter_yearly",
+    },
     features: [
       "25 monthly credits",
       "50 monthly AI credits",
       "Create slideshows",
-      "AI avatars",
+      "Create hook + demo videos",
     ],
   },
   {
     name: "Growth",
-    price: "€49",
-    highlight: true,
-    badge: "Most popular",
+    monthlyPrice: "$49",
+    yearlyPrice: "$39",
+    billedAnnually: "$468",
+    priceIds: {
+      monthly: "price_growth_monthly",
+      yearly: "price_growth_yearly",
+    },
     features: [
       "100 monthly credits",
       "150 monthly AI credits",
-      "Everything from Starter",
-      "Priority queue",
+      "3 TikTok automations",
+      "Schedule posts",
+      "Add unlimited TikTok accounts",
+      "Add unlimited team members",
     ],
   },
   {
     name: "Scale",
-    price: "€95",
+    monthlyPrice: "$95",
+    yearlyPrice: "$79",
+    billedAnnually: "$948",
+    priceIds: {
+      monthly: "price_scale_monthly",
+      yearly: "price_scale_yearly",
+    },
     features: [
       "250 monthly credits",
       "300 monthly AI credits",
-      "Everything from Growth",
-      "Priority support",
+      "10 TikTok automations",
     ],
   },
   {
     name: "Unlimited",
-    price: "€195",
-    badge: "Premium",
+    monthlyPrice: "$195",
+    yearlyPrice: "$149",
+    billedAnnually: "$1,788",
+    priceIds: {
+      monthly: "price_unlimited_monthly",
+      yearly: "price_unlimited_yearly",
+    },
     features: [
-      "Unlimited credits",
+      "Unlimited monthly credits",
       "1,000 monthly AI credits",
-      "Everything from Scale",
-      "White-glove support",
+      "Unlimited automations",
+      "...everything from Scale tier",
     ],
   },
 ];
 
-type Props = {
-  session?: boolean;
-  /** Compact variant for in-app modal (less top spacing, tighter header) */
-  compact?: boolean;
-};
+export function MarketingPricing({ session }: { session: boolean }) {
+  const router = useRouter();
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">(
+    "yearly",
+  );
 
-export function MarketingPricing({ session, compact }: Props) {
+  // Mapping der sichtbaren Namen zu den Server-Plan-Keys
+  const PLAN_MAP: Record<string, "STARTER" | "GROWTH" | "SCALE" | "UNLIMITED"> =
+    {
+      Starter: "STARTER",
+      Growth: "GROWTH",
+      Scale: "SCALE",
+      Unlimited: "UNLIMITED",
+    };
+
+  async function startCheckout(name: string, period: "monthly" | "yearly") {
+    // Wenn nicht eingeloggt → zur Sign-in-Seite mit Rücksprung zu gewünschtem Plan
+    const plan = PLAN_MAP[name];
+    if (!session) {
+      router.push(`/auth/signin?callbackUrl=/checkout?plan=${plan}`);
+      return;
+    }
+    if (!plan) return;
+    try {
+      setLoadingPlan(plan);
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan, interval: period }),
+      });
+
+      // Robust gegen Non-JSON / leeren Body
+      let data: any = null;
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("application/json")) {
+        try {
+          data = await res.json();
+        } catch {
+          // JSON kaputt/leer
+          data = null;
+        }
+      } else {
+        // Fallback: Text lesen für Logging
+        const text = await res.text().catch(() => "");
+        console.error("Checkout non-JSON response:", text);
+      }
+
+      if (!res.ok || !data?.url) {
+        console.error("Checkout error", { status: res.status, data });
+        toast.error(
+          data?.error
+            ? `Checkout failed: ${data.error}`
+            : `Checkout failed (${res.status}). Please try again.`,
+        );
+        return;
+      }
+      window.location.href = data.url as string;
+    } finally {
+      setLoadingPlan(null);
+    }
+  }
   return (
-    <section className="w-full">
-      <div
-        className={`mx-auto ${compact ? "max-w-7xl" : "max-w-6xl"} px-4 md:px-8`}
-      >
-        <h2
-          className={[
-            "font-extrabold tracking-tight text-[#0F172A] text-center",
-            compact
-              ? "text-4xl md:text-5xl mt-2 md:mt-3"
-              : "text-4xl md:text-6xl mt-4 md:mt-6",
-          ].join(" ")}
-        >
+    <Section id="pricing">
+      <div className="text-center space-y-5 mb-8">
+        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-zinc-900 leading-tight">
           Pricing
         </h2>
-        <p
-          className={[
-            "text-center text-slate-600",
-            compact ? "mt-2 mb-6 md:mb-8" : "mt-3 md:mt-4 mb-10 md:mb-16",
-          ].join(" ")}
-        >
-          Pick the plan that matches your next growth stage.
-        </p>
-        <div
-          className={[
-            "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4",
-            "gap-5 md:gap-6",
-          ].join(" ")}
-        >
-          {/* Starter */}
-          <div className="relative rounded-2xl border border-slate-200 bg-white shadow-sm p-6 md:p-8">
-            <div className="flex items-start justify-between">
-              <h3 className="text-xl font-bold">Starter</h3>
-              {/* badge top */}
-              {/* (keine) */}
-            </div>
-            <p className="mt-1 text-3xl font-extrabold">€19</p>
-            <ul className="mt-4 space-y-2 text-slate-700">
-              <li>25 monthly credits</li>
-              <li>50 monthly AI credits</li>
-              <li>Create slideshows</li>
-              <li>AI avatars</li>
-            </ul>
-            <div className="mt-6">
-              <PlanButton plan="starter" session={session} />
-            </div>
-          </div>
-
-          {/* Growth */}
-          <div className="relative rounded-2xl border border-slate-200 bg-white shadow-sm p-6 md:p-8">
-            <div className="flex items-start justify-between">
-              <h3 className="text-xl font-bold">Growth</h3>
-              <span
-                className={[
-                  "absolute top-4 right-4",
-                  "inline-flex items-center justify-center rounded-full",
-                  "bg-indigo-50 text-indigo-700",
-                  "text-[13px] font-medium leading-none",
-                  "px-3.5 py-2 whitespace-nowrap text-center",
-                ].join(" ")}
-              >
-                Most popular
-              </span>
-            </div>
-            <p className="mt-1 text-3xl font-extrabold">€49</p>
-            <ul className="mt-4 space-y-2 text-slate-700">
-              <li>100 monthly credits</li>
-              <li>150 monthly AI credits</li>
-              <li>Everything from Starter</li>
-              <li>Priority queue</li>
-            </ul>
-            <div className="mt-6">
-              <PlanButton
-                plan="growth"
-                session={session}
-                variant="primary"
-                label="Start with Growth"
-              />
-            </div>
-          </div>
-
-          {/* Scale */}
-          <div className="relative rounded-2xl border border-slate-200 bg-white shadow-sm p-6 md:p-8">
-            <div className="flex items-start justify-between">
-              <h3 className="text-xl font-bold">Scale</h3>
-              {/* badge none */}
-            </div>
-            <p className="mt-1 text-3xl font-extrabold">€95</p>
-            <ul className="mt-4 space-y-2 text-slate-700">
-              <li>250 monthly credits</li>
-              <li>300 monthly AI credits</li>
-              <li>Everything from Growth</li>
-              <li>Priority support</li>
-            </ul>
-            <div className="mt-6">
-              <PlanButton plan="scale" session={session} />
-            </div>
-          </div>
-
-          {/* Unlimited */}
-          <div className="relative rounded-2xl border border-slate-200 bg-white shadow-sm p-6 md:p-8">
-            <div className="flex items-start justify-between">
-              <h3 className="text-xl font-bold">Unlimited</h3>
-              <span
-                className={[
-                  "absolute top-4 right-4",
-                  "inline-flex items-center justify-center rounded-full",
-                  "bg-slate-100 text-slate-700",
-                  "text-[13px] font-medium leading-none",
-                  "px-3.5 py-2 whitespace-nowrap text-center",
-                ].join(" ")}
-              >
-                Premium
-              </span>
-            </div>
-            <p className="mt-1 text-3xl font-extrabold">€195</p>
-            <ul className="mt-4 space-y-2 text-slate-700">
-              <li>Unlimited credits</li>
-              <li>1,000 monthly AI credits</li>
-              <li>Everything from Scale</li>
-              <li>White-glove support</li>
-            </ul>
-            <div className="mt-6">
-              <PlanButton plan="unlimited" session={session} />
-            </div>
-          </div>
-        </div>
       </div>
-    </section>
+      <div className="mb-6 flex justify-center">
+        <Tabs
+          value={billingPeriod}
+          onValueChange={(val) => setBillingPeriod(val as "monthly" | "yearly")}
+          className="w-full max-w-xs"
+        >
+          <TabsList className="grid grid-cols-2 h-11 rounded-full bg-white border border-[#304674]/25 p-1">
+            <TabsTrigger
+              value="monthly"
+              className="h-full flex items-center justify-center rounded-full text-sm font-medium
+                   data-[state=active]:bg-[#2A8AEC]
+                   data-[state=active]:text-white
+                   data-[state=active]:shadow-none"
+            >
+              Monthly
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="yearly"
+              className="h-full flex items-center justify-center rounded-full text-sm font-medium
+                   data-[state=active]:bg-[#2A8AEC]
+                   data-[state=active]:text-white
+                   data-[state=active]:shadow-none"
+            >
+              Yearly
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        {tiers.map((t) => {
+          const isYearly = billingPeriod === "yearly";
+          const displayPrice = isYearly ? t.yearlyPrice : t.monthlyPrice;
+          const priceLabel = "per month";
+
+          return (
+            <Card
+              key={t.name}
+              className="relative flex flex-col justify-between bg-white rounded-2xl shadow-md hover:shadow-lg transition overflow-hidden h-full border border-[#304674]/25"
+            >
+              <CardHeader className="pt-6 pb-3 pl-4 pr-0">
+                <CardTitle className="flex items-center justify-between text-base">
+                  <span className="text-zinc-900 text-3xl font-bold">
+                    {t.name}
+                  </span>
+                </CardTitle>
+                <div className="mt-1 text-zinc-900 flex flex-col gap-0.5">
+                  <div className="flex items-end gap-1">
+                    <p className="text-5xl font-bold">{displayPrice}</p>
+                    <div className="flex flex-col space-y-0 leading-tight mb-1">
+                      {isYearly && (
+                        <p className="text-xs font-medium text-zinc-500">
+                          billed annually {t.billedAnnually}
+                        </p>
+                      )}
+                      <p className="font-bold text-xs">{priceLabel}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="flex flex-col justify-between flex-1 pb-6 pl-5 pr-0">
+                <ul className="mt-2 space-y-2 text-sm text-zinc-700 flex-1">
+                  {t.features.map((f) => (
+                    <li key={f} className="flex items-start gap-2">
+                      <CheckCircle2
+                        className="mt-[2px] h-4 w-4 text-[#2A8AEC]"
+                        aria-hidden="true"
+                      />
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-8 pr-5">
+                  <Button
+                    onClick={() => startCheckout(t.name, billingPeriod)}
+                    disabled={loadingPlan !== null}
+                    className="w-full rounded-full text-sm font-medium transition bg-[#2A8AEC] text-white hover:bg-[#1f74c3]"
+                    data-price={t.priceIds[billingPeriod]}
+                  >
+                    {loadingPlan === PLAN_MAP[t.name]
+                      ? "Redirecting…"
+                      : "Subscribe"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </Section>
   );
 }

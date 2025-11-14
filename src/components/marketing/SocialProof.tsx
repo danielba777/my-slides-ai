@@ -1,8 +1,7 @@
 "use client";
 import { Card, CardContent } from "@/components/ui/card";
-import { motion } from "framer-motion";
 import { Section } from "./Section";
-import { CheckCircle2, Wand2, Timer, Rocket } from "lucide-react";
+import { Wand2, Timer, Rocket } from "lucide-react";
 
 export function MarketingSocialProof() {
   const items = [
@@ -29,14 +28,8 @@ export function MarketingSocialProof() {
   return (
     <Section>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {items.map((it, i) => (
-          <motion.div
-            key={it.title}
-            initial={{ opacity: 0, y: 8 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-10% 0px -10% 0px" }}
-            transition={{ delay: i * 0.05, duration: 0.35 }}
-          >
+        {items.map((it) => (
+          <div key={it.title}>
             <Card className="h-full">
               <CardContent className="p-5">
                 <div className="flex items-center gap-2">
@@ -50,7 +43,7 @@ export function MarketingSocialProof() {
                 </p>
               </CardContent>
             </Card>
-          </motion.div>
+          </div>
         ))}
       </div>
     </Section>
