@@ -14,12 +14,33 @@ import { redis } from "@/server/redis";
 
 type BillingTransactionClient = Prisma.TransactionClient;
 
+const PLAN_PRICE_MAPPINGS: Array<{ plan: Plan; ids: string[] }> = [
+  {
+    plan: "STARTER",
+    ids: [env.STRIPE_PRICE_STARTER_MONTHLY, env.STRIPE_PRICE_STARTER_YEARLY],
+  },
+  {
+    plan: "GROWTH",
+    ids: [env.STRIPE_PRICE_GROWTH_MONTHLY, env.STRIPE_PRICE_GROWTH_YEARLY],
+  },
+  {
+    plan: "SCALE",
+    ids: [env.STRIPE_PRICE_SCALE_MONTHLY, env.STRIPE_PRICE_SCALE_YEARLY],
+  },
+  {
+    plan: "UNLIMITED",
+    ids: [
+      env.STRIPE_PRICE_UNLIMITED_MONTHLY,
+      env.STRIPE_PRICE_UNLIMITED_YEARLY,
+    ],
+  },
+];
+
 export function planFromPrice(priceId?: string): Plan | undefined {
   if (!priceId) return undefined;
-  if (priceId === env.STRIPE_PRICE_STARTER) return "STARTER";
-  if (priceId === env.STRIPE_PRICE_GROWTH) return "GROWTH";
-  if (priceId === env.STRIPE_PRICE_SCALE) return "SCALE";
-  if (priceId === env.STRIPE_PRICE_UNLIMITED) return "UNLIMITED";
+  for (const { plan, ids } of PLAN_PRICE_MAPPINGS) {
+    if (ids.includes(priceId)) return plan;
+  }
   return undefined;
 }
 
