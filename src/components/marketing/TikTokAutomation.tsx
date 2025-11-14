@@ -2,6 +2,7 @@
 
 import { Section } from "@/components/marketing/Section";
 import Image from "next/image";
+import { useRef, useState, type TouchEvent } from "react";
 
 const TIKTOK_IMAGES = [
   {
@@ -31,6 +32,37 @@ const TIKTOK_IMAGES = [
 ];
 
 export function MarketingTikTokAutomation() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+
+  const showPrev = () => {
+    setActiveIndex((prev) =>
+      prev === 0 ? TIKTOK_IMAGES.length - 1 : prev - 1,
+    );
+  };
+
+  const showNext = () => {
+    setActiveIndex((prev) =>
+      prev === TIKTOK_IMAGES.length - 1 ? 0 : prev + 1,
+    );
+  };
+
+  const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    touchStartX.current = event.touches[0]?.clientX ?? null;
+  };
+
+  const handleTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    const start = touchStartX.current;
+    if (start === null) return;
+    const end = event.changedTouches[0]?.clientX ?? start;
+    const delta = end - start;
+    if (Math.abs(delta) > 40) {
+      if (delta < 0) showNext();
+      else showPrev();
+    }
+    touchStartX.current = null;
+  };
+
   return (
     <Section>
       <div className="flex flex-col items-center mx-auto max-w-3xl text-center">
@@ -42,22 +74,68 @@ export function MarketingTikTokAutomation() {
           ReelFarm automations
         </p>
       </div>
-      <div className="mx-auto mt-10 grid max-w-5xl gap-4 sm:grid-cols-2">
-        {TIKTOK_IMAGES.map((img) => (
+      <div className="mx-auto mt-10 w-full max-w-5xl">
+        <div
+          className="relative w-full overflow-hidden p-1 sm:hidden"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
           <div
-            key={img.src}
-            className="overflow-hidden rounded-2xl border border-border bg-muted p-1 shadow-sm"
+            className="flex transition-transform duration-300 ease-out"
+            style={{ transform: `translateX(-${activeIndex * 100}%)` }}
           >
-            <Image
-              src={img.src}
-              alt={img.alt}
-              width={img.width}
-              height={img.height}
-              className="h-auto w-full object-contain"
-              sizes="(max-width: 768px) 80vw, (max-width: 1200px) 45vw, 25vw"
-            />
+            {TIKTOK_IMAGES.map((img, index) => (
+              <div
+                key={img.src}
+                className="flex-shrink-0 basis-full px-0.5"
+                aria-hidden={activeIndex !== index}
+              >
+                <Image
+                  src={img.src}
+                  alt={img.alt}
+                  width={img.width}
+                  height={img.height}
+                  className="h-auto w-full rounded-xl object-contain"
+                  sizes="90vw"
+                />
+              </div>
+            ))}
           </div>
-        ))}
+          <div className="mt-4 flex items-center justify-center gap-2 pb-2">
+            {TIKTOK_IMAGES.map((img, index) => (
+              <button
+                key={img.src}
+                type="button"
+                onClick={() => setActiveIndex(index)}
+                className={`h-2.5 w-2.5 rounded-full transition ${
+                  activeIndex === index
+                    ? "bg-primary"
+                    : "bg-muted-foreground/30"
+                }`}
+                aria-label={`Show slide ${index + 1}`}
+                aria-current={activeIndex === index}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="hidden grid-cols-2 gap-4 sm:grid">
+          {TIKTOK_IMAGES.map((img) => (
+            <div
+              key={img.src}
+              className="overflow-hidden rounded-2xl border border-border bg-muted p-1 shadow-sm"
+            >
+              <Image
+                src={img.src}
+                alt={img.alt}
+                width={img.width}
+                height={img.height}
+                className="h-auto w-full object-contain"
+                sizes="(max-width: 768px) 80vw, (max-width: 1200px) 45vw, 25vw"
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </Section>
   );
