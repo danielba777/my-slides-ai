@@ -19,10 +19,26 @@ export const env = createEnv({
     // ─── Stripe (für Checkout, Webhooks, Plan-Mapping) ───────────────────────
     STRIPE_SECRET_KEY: z.string().min(1, "Missing STRIPE_SECRET_KEY"),
     STRIPE_WEBHOOK_SECRET: z.string().min(1, "Missing STRIPE_WEBHOOK_SECRET"),
-    STRIPE_PRICE_STARTER: z.string().min(1, "Missing STRIPE_PRICE_STARTER"),
-    STRIPE_PRICE_GROWTH: z.string().min(1, "Missing STRIPE_PRICE_GROWTH"),
-    STRIPE_PRICE_SCALE: z.string().min(1, "Missing STRIPE_PRICE_SCALE"),
-    STRIPE_PRICE_UNLIMITED: z.string().min(1, "Missing STRIPE_PRICE_UNLIMITED"),
+    STRIPE_PRICE_STARTER_MONTHLY: z
+      .string()
+      .min(1, "Missing STRIPE_PRICE_STARTER"),
+    STRIPE_PRICE_STARTER_YEARLY: z
+      .string()
+      .min(1, "Missing STRIPE_PRICE_STARTER"),
+    STRIPE_PRICE_GROWTH_MONTHLY: z
+      .string()
+      .min(1, "Missing STRIPE_PRICE_GROWTH"),
+    STRIPE_PRICE_GROWTH_YEARLY: z
+      .string()
+      .min(1, "Missing STRIPE_PRICE_GROWTH"),
+    STRIPE_PRICE_SCALE_MONTHLY: z.string().min(1, "Missing STRIPE_PRICE_SCALE"),
+    STRIPE_PRICE_SCALE_YEARLY: z.string().min(1, "Missing STRIPE_PRICE_SCALE"),
+    STRIPE_PRICE_UNLIMITED_MONTHLY: z
+      .string()
+      .min(1, "Missing STRIPE_PRICE_UNLIMITED"),
+    STRIPE_PRICE_UNLIMITED_YEARLY: z
+      .string()
+      .min(1, "Missing STRIPE_PRICE_UNLIMITED"),
     // optional (nur falls irgendwo im Client gebraucht wird → besser als NEXT_PUBLIC_* anlegen)
     STRIPE_PUBLISHABLE_KEY: z.string().optional(),
     ADMIN_ALLOWED_EMAILS: z.string().optional(),
@@ -59,10 +75,14 @@ export const env = createEnv({
     // Stripe
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
-    STRIPE_PRICE_STARTER: process.env.STRIPE_PRICE_STARTER,
-    STRIPE_PRICE_GROWTH: process.env.STRIPE_PRICE_GROWTH,
-    STRIPE_PRICE_SCALE: process.env.STRIPE_PRICE_SCALE,
-    STRIPE_PRICE_UNLIMITED: process.env.STRIPE_PRICE_UNLIMITED,
+    STRIPE_PRICE_STARTER_MONTHLY: process.env.STRIPE_PRICE_STARTER_MONTHLY,
+    STRIPE_PRICE_STARTER_YEARLY: process.env.STRIPE_PRICE_STARTER_YEARLY,
+    STRIPE_PRICE_GROWTH_MONTHLY: process.env.STRIPE_PRICE_GROWTH_MONTHLY,
+    STRIPE_PRICE_GROWTH_YEARLY: process.env.STRIPE_PRICE_GROWTH_YEARLY,
+    STRIPE_PRICE_SCALE_MONTHLY: process.env.STRIPE_PRICE_SCALE_MONTHLY,
+    STRIPE_PRICE_SCALE_YEARLY: process.env.STRIPE_PRICE_SCALE_YEARLY,
+    STRIPE_PRICE_UNLIMITED_MONTHLY: process.env.STRIPE_PRICE_UNLIMITED_MONTHLY,
+    STRIPE_PRICE_UNLIMITED_YEARLY: process.env.STRIPE_PRICE_UNLIMITED_YEARLY,
     STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
     ADMIN_ALLOWED_EMAILS: process.env.ADMIN_ALLOWED_EMAILS,
     NEXT_PUBLIC_TIKTOK_POST_MODE: process.env.NEXT_PUBLIC_TIKTOK_POST_MODE,
