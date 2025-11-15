@@ -158,6 +158,10 @@ interface PresentationState {
     viewCount: number;
     slideCount: number;
   } | null) => void;
+
+  // Template variety (0-100): how much the content should differ from template
+  templateVariety: number;
+  setTemplateVariety: (variety: number) => void;
 }
 
 export const usePresentationState = create<PresentationState>((set) => ({
@@ -199,6 +203,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
   editingSlideId: null,
   editingOverlaySlideId: null,
   selectedTemplate: null,
+  templateVariety: 0,
 
   // Sidebar states
   isSidebarCollapsed: false,
@@ -221,6 +226,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
   setEditingSlideId: (id) => set({ editingSlideId: id }),
   setEditingOverlaySlideId: (id) => set({ editingOverlaySlideId: id }),
   setSelectedTemplate: (template) => set({ selectedTemplate: template }),
+  setTemplateVariety: (variety) => set({ templateVariety: variety }),
   startRootImageGeneration: (slideId, query) =>
     set((state) => ({
       rootImageGeneration: {

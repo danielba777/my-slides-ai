@@ -12,7 +12,7 @@ import AllweoneText from "@/components/globals/allweone-logo";
 import { Button } from "@/components/ui/button";
 import * as motion from "framer-motion/client";
 import { ExportButton } from "./buttons/ExportButton";
-import { DownloadSlidesButton } from "./buttons/DownloadSlidesButton";
+import { PostNowButton } from "./buttons/PostNowButton";
 import { PresentButton } from "./buttons/PresentButton";
 import { SaveStatus } from "./buttons/SaveStatus";
 import { ShareButton } from "./buttons/ShareButton";
@@ -99,8 +99,8 @@ export default function PresentationHeader({ title }: PresentationHeaderProps) {
           <ExportButton presentationId={currentPresentationId ?? ""} />
         )}
 
-        {/* Download JPG .zip + TikTok Placeholder */}
-        {isPresentationPage && !isPresenting && <DownloadSlidesButton />}
+        {/* Post now button with download dropdown */}
+        {isPresentationPage && !isPresenting && <PostNowButton />}
 
         {/* Share button - Only in presentation page, not outline */}
         {isPresentationPage && !isPresenting && <ShareButton />}

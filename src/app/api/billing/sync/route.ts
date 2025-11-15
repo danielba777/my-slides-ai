@@ -1,16 +1,15 @@
-import { NextResponse } from "next/server";
+import { FREE_SLIDESHOW_QUOTA } from "@/lib/billing";
 import { auth } from "@/server/auth";
-import { db } from "@/server/db";
-import { stripe } from "@/server/stripe";
-import type Stripe from "stripe";
 import {
-  planFromPrice,
   carryOverCreditsOnPlanChange,
   isActiveStripeSubscriptionStatus,
   mapStripeSubscriptionStatus,
+  planFromPrice,
 } from "@/server/billing";
-import { PLAN_CREDITS } from "@/lib/billing";
-import { FREE_SLIDESHOW_QUOTA } from "@/lib/billing";
+import { db } from "@/server/db";
+import { stripe } from "@/server/stripe";
+import { NextResponse } from "next/server";
+import type Stripe from "stripe";
 
 // Kleine Helper, um leere/kaputte Zeiten zu vermeiden
 function dateFromUnix(sec?: number | null) {
@@ -44,7 +43,10 @@ export async function POST() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
     if (!user.stripeCustomerId) {
-      return NextResponse.json({ error: "No Stripe customer for user" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No Stripe customer for user" },
+        { status: 400 },
+      );
     }
 
     // 2) Subscriptions aus Stripe lesen
@@ -58,9 +60,8 @@ export async function POST() {
 
     const subscriptionData = subs.data as SubscriptionWithPeriods[];
     // aktive / relevante Sub finden
-    const active = subscriptionData.find(
-      (s): s is SubscriptionWithPeriods =>
-        isActiveStripeSubscriptionStatus(s.status),
+    const active = subscriptionData.find((s): s is SubscriptionWithPeriods =>
+      isActiveStripeSubscriptionStatus(s.status),
     );
 
     if (!active) {
@@ -70,7 +71,9 @@ export async function POST() {
         data: { plan: null, planRenewsAt: null },
       });
       await db.$transaction(async (tx) => {
-        const prev = await tx.creditBalance.findUnique({ where: { userId: user.id } });
+        const prev = await tx.creditBalance.findUnique({
+          where: { userId: user.id },
+        });
         if (prev) await tx.creditBalance.delete({ where: { userId: user.id } });
         await tx.creditBalance.create({
           data: {
@@ -91,7 +94,7 @@ export async function POST() {
     const firstItem = active.items?.data?.[0];
     const rawPrice = firstItem?.price;
     const priceId =
-      typeof rawPrice === "string" ? rawPrice : rawPrice?.id ?? undefined;
+      typeof rawPrice === "string" ? rawPrice : (rawPrice?.id ?? undefined);
     if (!priceId) {
       return NextResponse.json(
         {
@@ -103,7 +106,6 @@ export async function POST() {
     }
 
     const plan = planFromPrice(priceId);
-    console.log("[/api/billing/sync] priceId:", priceId, "→ plan:", plan);
     if (!plan) {
       return NextResponse.json(
         {
@@ -111,7 +113,7 @@ export async function POST() {
           hint: "Check STRIPE_PRICE_* env vars (must be price_... IDs, not product IDs)",
           priceId,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -138,7 +140,13 @@ export async function POST() {
 
     // 5) Credits & User-Plan via Carry-Over/Reset setzen (hart neu schreiben)
     await db.$transaction(async (tx) => {
-      const oldPlan = (await tx.user.findUnique({ where: { id: user.id }, select: { plan: true } }))?.plan ?? null;
+      const oldPlan =
+        (
+          await tx.user.findUnique({
+            where: { id: user.id },
+            select: { plan: true },
+          })
+        )?.plan ?? null;
       await carryOverCreditsOnPlanChange(tx, user.id, oldPlan, plan, periodEnd);
       await tx.user.update({
         where: { id: user.id },
@@ -157,11 +165,9 @@ export async function POST() {
       periodEnd: periodEnd.toISOString(),
     });
   } catch (err: any) {
-    // Immer JSON zurückgeben – kein "Unexpected end of JSON input" mehr
-    console.error("[/api/billing/sync] error:", err);
     return NextResponse.json(
       { error: err?.message ?? "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

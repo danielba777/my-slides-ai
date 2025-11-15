@@ -184,6 +184,15 @@ export class SlideParser {
    * @returns Newly parsed slides if any
    */
   public parseChunk(chunk: string): PlateSlide[] {
+    // DEBUG: Log the incoming chunk
+    if (chunk.length > 100) {
+      console.log("=".repeat(80));
+      console.log("PARSER - Processing XML chunk (length:", chunk.length, ")");
+      console.log("First 500 chars:", chunk.substring(0, 500));
+      console.log("Last 500 chars:", chunk.substring(Math.max(0, chunk.length - 500)));
+      console.log("=".repeat(80));
+    }
+
     // For generating mark tracking, store the latest content
     this.latestContent = chunk;
 
@@ -221,6 +230,10 @@ export class SlideParser {
    */
   public finalize(): PlateSlide[] {
     try {
+      console.log("=".repeat(80));
+      console.log("PARSER - Finalizing, buffer length:", this.buffer.length);
+      console.log("=".repeat(80));
+
       // Extract any complete sections first
       this.extractCompleteSections();
 
@@ -236,6 +249,7 @@ export class SlideParser {
       }
 
       if (remainingBuffer.startsWith("<SECTION")) {
+        console.log("PARSER - Force closing incomplete section");
         // We have an incomplete section, force close it
         const fixedSection = remainingBuffer + "</SECTION>";
         this.completedSections.push(fixedSection);
@@ -315,6 +329,17 @@ export class SlideParser {
     }
 
     const newSlides = this.completedSections.map(this.convertSectionToPlate);
+
+    // DEBUG: Log created slides
+    console.log("=".repeat(80));
+    console.log("PARSER - Created", newSlides.length, "new slides:");
+    newSlides.forEach((slide, index) => {
+      const h1 = slide.content.find((node) => node.type === "h1");
+      const h1Text = h1 ? (h1 as any).children?.[0]?.text || "(no text)" : "(no H1)";
+      console.log(`  Slide ${index + 1}: H1 = "${h1Text}"`);
+    });
+    console.log("=".repeat(80));
+
     this.parsedSlides = [...this.parsedSlides, ...newSlides];
     this.completedSections = [];
 

@@ -23,11 +23,18 @@ export function TemplatePreview() {
 
   const formatCount = (value: number) => compactFormatter.format(value);
 
+  const slidesWithImages = selectedTemplate.slides.filter(
+    (slide) => !!slide.imageUrl,
+  );
+  const hasExtraSlides = slidesWithImages.length > 5;
+  const visibleSlides = slidesWithImages.slice(0, hasExtraSlides ? 4 : 5);
+  const extraCount = hasExtraSlides ? slidesWithImages.length - 4 : 0;
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-sm font-bold text-foreground">
-          Selected Template
+          1. Prompt from Template
         </h2>
         <Button
           variant="ghost"
@@ -42,25 +49,25 @@ export function TemplatePreview() {
 
       <div className="relative group rounded-xl border-2 border-primary bg-card p-4">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {selectedTemplate.slides
-            .filter((slide) => slide.imageUrl)
-            .map((slide, index) => (
-              <div
-                key={slide.id}
-                className="group/image relative overflow-hidden rounded-lg border bg-muted/30 aspect-[3/4] transition hover:border-primary/50 hover:shadow-md"
-              >
-                <img
-                  src={slide.imageUrl}
-                  alt={`Slide ${index + 1}`}
-                  className="h-full w-full object-cover transition duration-300 group-hover/image:scale-105"
-                />
-                <div className="absolute bottom-1.5 right-1.5 bg-black/70 backdrop-blur-sm rounded px-1.5 py-0.5">
-                  <span className="text-[10px] font-medium text-white">
-                    {index + 1}
-                  </span>
-                </div>
-              </div>
-            ))}
+          {visibleSlides.map((slide) => (
+            <div
+              key={slide.id}
+              className="group/image relative overflow-hidden rounded-lg border bg-muted/30 aspect-[3/4] transition hover:border-primary/50 hover:shadow-md"
+            >
+              <img
+                src={slide.imageUrl}
+                alt="Template slide preview"
+                className="h-full w-full object-cover transition duration-300 group-hover/image:scale-105"
+              />
+            </div>
+          ))}
+          {hasExtraSlides && (
+            <div className="relative flex aspect-[3/4] items-center justify-center rounded-lg border border-dashed border-muted-foreground/40 bg-muted/40">
+              <span className="text-sm font-semibold text-muted-foreground">
+                +{extraCount}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">

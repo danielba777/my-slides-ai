@@ -26,6 +26,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ImageCollectionSelector } from "./ImageCollectionSelector";
 import { PresentationInput } from "./PresentationInput";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
 
 interface TemplatePost {
   id: string;
@@ -63,6 +65,8 @@ export function PresentationDashboard({
     setPresentationInput,
     setSelectedTemplate,
     selectedTemplate,
+    templateVariety,
+    setTemplateVariety,
   } = usePresentationState();
 
   const [limits, setLimits] = useState<{
@@ -359,7 +363,10 @@ export function PresentationDashboard({
       setCurrentPresentation(presentationId, result.presentation.title);
 
       // Store template data in sessionStorage so it survives navigation
-      sessionStorage.setItem("pendingTemplate", JSON.stringify(template));
+      sessionStorage.setItem("pendingTemplate", JSON.stringify({
+        ...template,
+        variety: templateVariety,
+      }));
 
       // Redirect to editor with template generation
       router.push(
@@ -597,6 +604,41 @@ export function PresentationDashboard({
       <div className="mx-auto max-w-4xl space-y-12 px-6 py-12">
         <div className="space-y-8">
           <PresentationInput handleGenerate={handleGenerate} />
+
+          {/* Variety Slider - only shown when template is selected */}
+          {selectedTemplate && (
+            <div className="space-y-4 rounded-xl border border-border/50 bg-card/30 p-6">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-medium">Variety</Label>
+                <span className="text-sm font-semibold text-muted-foreground">
+                  {templateVariety}%
+                </span>
+              </div>
+              <Slider
+                value={[templateVariety]}
+                onValueChange={(values) => setTemplateVariety(values[0] ?? 0)}
+                min={0}
+                max={100}
+                step={25}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>0</span>
+                <span>25</span>
+                <span>50</span>
+                <span>75</span>
+                <span>100</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {templateVariety === 0 && "Content will match the template exactly"}
+                {templateVariety === 25 && "Slight variations in content"}
+                {templateVariety === 50 && "Moderate content changes"}
+                {templateVariety === 75 && "Significant content differences"}
+                {templateVariety === 100 && "Completely different content, same structure"}
+              </p>
+            </div>
+          )}
+
           <ImageCollectionSelector />
           <div className="flex flex-col items-end gap-1">
             <div className="flex items-center gap-2">
