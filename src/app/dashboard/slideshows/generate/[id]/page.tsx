@@ -9,7 +9,7 @@ import {
 import { getCustomThemeById } from "@/app/_actions/presentation/theme-actions";
 import { type CanvasDoc, type CanvasTextNode } from "@/canvas/types";
 import { LoadingStateWithFixedBackground } from "@/components/presentation/presentation-page/Loading";
-import { applyBackgroundImageToCanvas, ensureSlideCanvas } from "@/components/presentation/utils/canvas";
+import { applyBackgroundImageToCanvas, ensureSlideCanvas, applySlideTikTokStyle } from "@/components/presentation/utils/canvas";
 import {
   type PlateNode,
   type PlateSlide,
@@ -227,10 +227,18 @@ export default function PresentationGenerateWithIdPage() {
         throw new Error("No slides generated from template");
       }
 
+      // Apply TikTok styling to all slides
+      console.log('Applying TikTok text styling...');
+      const slidesWithTikTokStyle = parsedSlides.map((slide, index) => {
+        // First slide gets highlight-box style, rest get outline style
+        const styleMode = index === 0 ? "highlight" : "outline";
+        return applySlideTikTokStyle(slide, styleMode);
+      });
+
       // Load images for each slide from the imageset
       console.log('Loading images for slides from imageset...');
       const slidesWithImages = await Promise.all(
-        parsedSlides.map(async (slide) => {
+        slidesWithTikTokStyle.map(async (slide) => {
           // Extract heading text to use as query
           const heading = slide.content.find((node) => node.type === "h1");
           const query = heading
