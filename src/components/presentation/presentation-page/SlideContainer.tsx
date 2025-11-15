@@ -30,6 +30,9 @@ import {
 import React, { useEffect, useState } from "react";
 import PersonalImageSelectorDialog from "./PersonalImageSelectorDialog";
 
+const ACTION_BUTTON_CLASSES =
+  "inline-flex !h-11 !w-11 !p-0 items-center justify-center rounded-full bg-white/90 text-muted-foreground shadow-md ring-1 ring-black/5 transition-colors hover:bg-white hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 dark:bg-white/10 dark:text-white/80 dark:ring-white/20";
+
 interface SlideContainerProps {
   children: React.ReactNode;
   index: number;
@@ -189,13 +192,13 @@ export function SlideContainer({
             className={cn("z-[1001] mt-3 w-full")}
             aria-label="Slide toolbar"
           >
-            <div className="mx-auto flex w-full max-w-[760px] items-center justify-center gap-2 rounded-md bg-background/95 p-2 shadow-sm backdrop-blur">
+            <div className="mx-auto flex w-full max-w-[760px] flex-wrap items-center justify-center gap-3 py-3">
               {/* Drag-Handle */}
               <button
                 ref={setActivatorNodeRef as React.Ref<HTMLButtonElement>}
                 {...listeners}
                 {...attributes}
-                className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus:outline-none focus-visible:outline-none"
+                className={cn("text-muted-foreground", ACTION_BUTTON_CLASSES)}
                 aria-label="Drag slide position"
                 title="Move"
               >
@@ -209,7 +212,7 @@ export function SlideContainer({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
+                className={ACTION_BUTTON_CLASSES}
                 onClick={() => addSlide("after", index)}
                 aria-label="Add next slide"
                 title="Add next slide"
@@ -221,7 +224,7 @@ export function SlideContainer({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
+                className={ACTION_BUTTON_CLASSES}
                 onClick={handleShuffleImage}
                 aria-label="Next image in category"
                 title={
@@ -244,7 +247,10 @@ export function SlideContainer({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-md text-muted-foreground hover:text-destructive"
+                    className={cn(
+                      ACTION_BUTTON_CLASSES,
+                      "hover:text-destructive focus-visible:ring-destructive",
+                    )}
                     aria-label="Delete slide"
                     title="Delete slide"
                   >
@@ -432,7 +438,7 @@ function PersonalImagePickerButton({ index }: { index: number }) {
       <Button
         variant="ghost"
         size="icon"
-        className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground"
+        className={ACTION_BUTTON_CLASSES}
         onClick={onMainButtonClick}
         aria-label="Personal Images"
         title="Personal Images"

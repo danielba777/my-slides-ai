@@ -93,7 +93,7 @@ const PresentationEditorStaticView = React.memo(
           <EditorStatic
             className={cn(
               className,
-              "relative z-10 flex h-full w-full flex-col border-none !bg-transparent outline-none",
+              "relative z-10 flex h-full w-full flex-col border-none !bg-transparent text-center outline-none",
               editorPaddingClass,
               initialContent?.alignment === "start" && "justify-start",
               initialContent?.alignment === "center" && "justify-center",

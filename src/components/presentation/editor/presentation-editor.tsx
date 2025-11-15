@@ -262,7 +262,7 @@ const PresentationEditor = React.memo(
                 <Editor
                   className={cn(
                     className,
-                    "relative z-10 flex h-full w-full flex-col border-none !bg-transparent py-12 outline-none",
+                    "relative z-10 flex h-full w-full flex-col border-none !bg-transparent py-12 text-center outline-none",
                     editorPaddingClass,
                     !initialContent?.alignment && "justify-center",
                     initialContent?.alignment === "start" && "justify-start",

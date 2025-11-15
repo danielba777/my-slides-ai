@@ -50,7 +50,7 @@ export function SlidePreviewStrip({
               className={cn(
                 "w-12 h-12 rounded-[10px] flex-shrink-0 flex items-center justify-center p-[1px] transition-all duration-200 shadow-sm bg-white border border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
                 currentSlideIndex === index
-                  ? "border-[#388EFF]"
+                  ? "border-[#388EFF] bg-[#388EFF]"
                   : "text-muted-foreground",
               )}
               aria-label={`Slide ${index + 1}`}
