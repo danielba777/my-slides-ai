@@ -11,16 +11,16 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
 import {
   annotateImageSetOwnership,
-  hasPersonalCategoryTag,
   isImageSetOwnedByUser as checkOwnership,
+  hasPersonalCategoryTag,
 } from "@/lib/image-set-ownership";
+import { cn } from "@/lib/utils";
 import { usePresentationState } from "@/states/presentation-state";
 import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface ImageSetImage {
   id?: string;
@@ -76,11 +76,7 @@ export const ImageCollectionSelector: React.FC = () => {
 
       if (Array.isArray(data)) {
         const normalized = data.map((set: ImageSet) =>
-          annotateImageSetOwnership(
-            set,
-            userId,
-            ownedIds.has(set.id),
-          ),
+          annotateImageSetOwnership(set, userId, ownedIds.has(set.id)),
         );
         setImageSets(normalized);
       } else {
@@ -162,14 +158,22 @@ export const ImageCollectionSelector: React.FC = () => {
     return children
       .filter(belongsToUser)
       .filter((s) => !looksPersonal(s) || checkOwnership(s, userId ?? null));
-  }, [belongsToUser, imageSets, drillDownParent, looksPersonal, userId, checkOwnership]);
+  }, [
+    belongsToUser,
+    imageSets,
+    drillDownParent,
+    looksPersonal,
+    userId,
+    checkOwnership,
+  ]);
 
   const { communitySets, mySets } = useMemo(() => {
-  // DRILLDOWN: nur Kinder des gewählten Parents
-  if (drillDownParent) {
+    // DRILLDOWN: nur Kinder des gewählten Parents
+    if (drillDownParent) {
       const parentId = drillDownParent?.id ?? null;
       const children: ImageSet[] =
-        (Array.isArray(drillDownParent.children) && drillDownParent.children.length > 0)
+        Array.isArray(drillDownParent.children) &&
+        drillDownParent.children.length > 0
           ? drillDownParent.children
           : parentId
             ? imageSets.filter((set) => set.parentId === parentId)
@@ -186,19 +190,24 @@ export const ImageCollectionSelector: React.FC = () => {
           !isAiAvatarCollection(s),
       );
       return { communitySets: community, mySets: mine };
-  }
+    }
 
-  // TOP-LEVEL: nur Wurzeln
-  const topLevel = imageSets.filter((s) => !s.parentId);
-  const mine = topLevel.filter(belongsToUser);
-  const community = topLevel.filter(
+    // TOP-LEVEL: nur Wurzeln
+    const topLevel = imageSets.filter((s) => !s.parentId);
+    const mine = topLevel.filter(belongsToUser);
+    const community = topLevel.filter(
       (s) =>
-        !allOwned.has(s.id) &&
-        !looksPersonal(s) &&
-        !isAiAvatarCollection(s),
-  );
-  return { communitySets: community, mySets: mine };
-}, [belongsToUser, drillDownParent, imageSets, allOwned, looksPersonal, isAiAvatarCollection]);
+        !allOwned.has(s.id) && !looksPersonal(s) && !isAiAvatarCollection(s),
+    );
+    return { communitySets: community, mySets: mine };
+  }, [
+    belongsToUser,
+    drillDownParent,
+    imageSets,
+    allOwned,
+    looksPersonal,
+    isAiAvatarCollection,
+  ]);
 
   const handleSelectSet = (set: ImageSet) => {
     // Check if this set has children
@@ -323,7 +332,7 @@ export const ImageCollectionSelector: React.FC = () => {
                 "group cursor-pointer rounded-lg p-2 transition bg-card relative overflow-visible",
                 pendingSetId === drillDownParent.id
                   ? "border-2 border-blue-500"
-                  : "border border-transparent hover:border-muted-foreground/30",
+                  : "border-2 border-transparent hover:border-muted-foreground/30",
               )}
             >
               <div className="mb-2 text-base font-bold text-foreground">
@@ -379,7 +388,7 @@ export const ImageCollectionSelector: React.FC = () => {
                   "group cursor-pointer rounded-lg p-2 transition bg-card relative overflow-visible",
                   pendingSetId === set.id
                     ? "border-2 border-blue-500"
-                    : "border border-transparent hover:border-muted-foreground/30",
+                    : "border-2 border-transparent hover:border-muted-foreground/30",
                 )}
               >
                 <div className="mb-2 text-base font-medium text-foreground truncate">

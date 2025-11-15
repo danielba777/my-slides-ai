@@ -336,7 +336,9 @@ export function PresentationDashboard({
     }
   };
 
-  const handleTemplateGenerate = async (template: NonNullable<typeof selectedTemplate>) => {
+  const handleTemplateGenerate = async (
+    template: NonNullable<typeof selectedTemplate>,
+  ) => {
     setIsGeneratingOutline(true);
 
     try {
@@ -357,10 +359,12 @@ export function PresentationDashboard({
       setCurrentPresentation(presentationId, result.presentation.title);
 
       // Store template data in sessionStorage so it survives navigation
-      sessionStorage.setItem('pendingTemplate', JSON.stringify(template));
+      sessionStorage.setItem("pendingTemplate", JSON.stringify(template));
 
       // Redirect to editor with template generation
-      router.push(`/dashboard/slideshows/generate/${presentationId}?template=true`);
+      router.push(
+        `/dashboard/slideshows/generate/${presentationId}?template=true`,
+      );
     } catch (error) {
       setIsGeneratingOutline(false);
       console.error("Error creating presentation from template:", error);
@@ -550,9 +554,15 @@ export function PresentationDashboard({
                     handleGeneratePrompt(
                       post.id,
                       isTemplatePost(post) ? post.slides : (post.slides ?? []),
-                      isTemplatePost(post) ? post.likeCount : (post.likeCount ?? 0),
-                      isTemplatePost(post) ? post.viewCount : (post.viewCount ?? 0),
-                      isTemplatePost(post) ? post.slideCount : (post.slideCount ?? 0),
+                      isTemplatePost(post)
+                        ? post.likeCount
+                        : (post.likeCount ?? 0),
+                      isTemplatePost(post)
+                        ? post.viewCount
+                        : (post.viewCount ?? 0),
+                      isTemplatePost(post)
+                        ? post.slideCount
+                        : (post.slideCount ?? 0),
                     )
                   }
                 >
