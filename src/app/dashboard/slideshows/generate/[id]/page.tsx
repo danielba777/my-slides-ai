@@ -170,9 +170,11 @@ export default function PresentationGenerateWithIdPage() {
         likeCount: number;
         viewCount: number;
         slideCount: number;
+        variety?: number;
       };
 
-      console.log('Starting template generation with', template.slides.length, 'slides');
+      const variety = template.variety ?? 0;
+      console.log('Starting template generation with', template.slides.length, 'slides, variety:', variety);
 
       // Call the generate-from-template API
       const response = await fetch("/api/presentation/generate-from-template", {
@@ -185,6 +187,7 @@ export default function PresentationGenerateWithIdPage() {
           slides: template.slides,
           language,
           tone: "professional",
+          variety,
         }),
       });
 

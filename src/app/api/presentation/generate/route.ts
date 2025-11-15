@@ -140,9 +140,22 @@ export async function POST(req: Request) {
       .replace(/{TOTAL_SLIDES}/g, outline.length.toString())
       .replace(/{SEARCH_RESULTS}/g, searchResultsText);
 
+    console.log("=".repeat(80));
+    console.log("PRESENTATION GENERATION - PROMPT SENT TO LLM:");
+    console.log("=".repeat(80));
+    console.log(formattedPrompt);
+    console.log("=".repeat(80));
+
     const result = streamText({
       model,
       prompt: formattedPrompt,
+      onFinish: ({ text }) => {
+        console.log("=".repeat(80));
+        console.log("PRESENTATION GENERATION - LLM XML RESPONSE:");
+        console.log("=".repeat(80));
+        console.log(text);
+        console.log("=".repeat(80));
+      },
     });
 
     return result.toDataStreamResponse();

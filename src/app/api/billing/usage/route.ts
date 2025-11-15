@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
-import { db } from "@/server/db";
 import { normalizeCreditBalance } from "@/server/billing";
+import { db } from "@/server/db";
+import { NextResponse } from "next/server";
 
 import { revalidateTag } from "next/cache";
 
@@ -22,7 +22,6 @@ export async function GET() {
   if (!session?.user?.id) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
-  console.debug("[api][billing/usage] session", { userId: session.user.id });
   const { user, balance } = await db.$transaction(async (tx) => {
     const [userRecord, bal] = await Promise.all([
       tx.user.findUnique({
@@ -32,7 +31,12 @@ export async function GET() {
           planRenewsAt: true,
           stripeCustomerId: true,
           subscriptions: {
-            select: { status: true, currentPeriodEnd: true, stripeSubscriptionId: true, stripePriceId: true },
+            select: {
+              status: true,
+              currentPeriodEnd: true,
+              stripeSubscriptionId: true,
+              stripePriceId: true,
+            },
             orderBy: { updatedAt: "desc" },
             take: 1,
           },
@@ -40,18 +44,15 @@ export async function GET() {
       }),
       normalizeCreditBalance(tx, session.user.id),
     ]);
-    console.debug("[api][billing/usage] tx result", { userId: session.user.id, hasUser: !!userRecord, balance: bal });
     return { user: userRecord, balance: bal };
   });
 
   if (!user) {
-    console.warn("[api][billing/usage] user missing", { userId: session.user?.id });
     return new NextResponse("User not found", { status: 404 });
   }
 
   const latestSub = user?.subscriptions?.[0] ?? null;
   const hasPlan = !!user?.plan;
-  console.debug("[api][billing/usage] computed", { userId: session.user.id, hasPlan, plan: user.plan, latestStatus: latestSub?.status, balance });
   // Bei Free-Plan keine "0 left"-Falle durch alte Balance:
   // Falls kein Plan und keine Balance vorhanden -> 5/0 zurueckgeben (UI zeigt dann korrekt 0/5 verwendet)
   const freeCredits = !hasPlan ? (balance?.credits ?? 5) : null;
@@ -65,13 +66,13 @@ export async function GET() {
     aiCredits: hasPlan ? (balance?.aiCredits ?? 0) : freeAi,
     usedCredits: hasPlan ? (balance?.usedCredits ?? 0) : freeUsedCredits,
     usedAiCredits: hasPlan ? (balance?.usedAiCredits ?? 0) : freeUsedAi,
-    resetsAt: hasPlan ? (balance?.resetsAt ?? user?.planRenewsAt ?? null) : null,
+    resetsAt: hasPlan
+      ? (balance?.resetsAt ?? user?.planRenewsAt ?? null)
+      : null,
     stripePriceId: latestSub?.stripePriceId ?? null,
     stripeSubscriptionId: latestSub?.stripeSubscriptionId ?? null,
     hasCustomer: !!user?.stripeCustomerId,
     hasSubscription: !!latestSub?.stripeSubscriptionId,
   };
-  console.debug("[api][billing/usage] response", { userId: session.user.id, payload });
   return NextResponse.json(payload);
 }
-

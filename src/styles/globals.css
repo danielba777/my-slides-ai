@@ -153,3 +153,25 @@ html {
 .svg-deco svg * {
   fill: #444577 !important;
 }
+
+/* Center all text in Plate.js editor elements */
+[data-slate-editor="true"] h1,
+[data-slate-editor="true"] h2,
+[data-slate-editor="true"] h3,
+[data-slate-editor="true"] h4,
+[data-slate-editor="true"] h5,
+[data-slate-editor="true"] h6,
+[data-slate-editor="true"] p {
+  text-align: center !important;
+}
+
+/* Also center in static/preview mode */
+[data-slate-node="element"][data-slate-type="h1"],
+[data-slate-node="element"][data-slate-type="h2"],
+[data-slate-node="element"][data-slate-type="h3"],
+[data-slate-node="element"][data-slate-type="h4"],
+[data-slate-node="element"][data-slate-type="h5"],
+[data-slate-node="element"][data-slate-type="h6"],
+[data-slate-node="element"][data-slate-type="p"] {
+  text-align: center !important;
+}
