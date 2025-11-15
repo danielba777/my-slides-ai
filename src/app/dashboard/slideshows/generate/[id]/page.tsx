@@ -9,10 +9,11 @@ import {
 import { getCustomThemeById } from "@/app/_actions/presentation/theme-actions";
 import { type CanvasDoc, type CanvasTextNode } from "@/canvas/types";
 import { LoadingStateWithFixedBackground } from "@/components/presentation/presentation-page/Loading";
-import { applyBackgroundImageToCanvas } from "@/components/presentation/utils/canvas";
+import { applyBackgroundImageToCanvas, ensureSlideCanvas } from "@/components/presentation/utils/canvas";
 import {
   type PlateNode,
   type PlateSlide,
+  SlideParser,
 } from "@/components/presentation/utils/parser";
 import {
   themes,
@@ -22,7 +23,7 @@ import {
 import { usePresentationState } from "@/states/presentation-state";
 import { useQuery } from "@tanstack/react-query";
 import { nanoid } from "nanoid";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
@@ -76,7 +77,10 @@ function makeCanvasFromText(text: string, w = 1080, h = 1620): CanvasDoc {
 export default function PresentationGenerateWithIdPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params.id as string;
+  const isTemplateMode = searchParams?.get("template") === "true";
+
   const {
     setCurrentPresentation,
     setPresentationInput,
@@ -93,12 +97,16 @@ export default function PresentationGenerateWithIdPage() {
     setLanguage,
     setWebSearchEnabled,
     outline,
+    selectedTemplate,
+    language,
+    theme: selectedTheme,
   } = usePresentationState();
 
   // Track if this is a fresh navigation or a revisit
   const initialLoadComplete = useRef(false);
   const generationStarted = useRef(false);
   const slidesGenerationTriggered = useRef(false);
+  const templateGenerationStarted = useRef(false);
 
   // Use React Query to fetch presentation data
   const { data: presentationData, isLoading: isLoadingPresentation } = useQuery(
@@ -131,9 +139,194 @@ export default function PresentationGenerateWithIdPage() {
     clearPresentationCookie();
   }, []);
 
+  // Template-based generation effect
+  useEffect(() => {
+    if (!isTemplateMode || templateGenerationStarted.current) {
+      return;
+    }
+
+    // Try to get template from sessionStorage
+    const pendingTemplateJson = sessionStorage.getItem('pendingTemplate');
+    if (!pendingTemplateJson) {
+      console.error('No pending template found in sessionStorage');
+      toast.error('Template data not found');
+      router.push('/dashboard/slideshows');
+      return;
+    }
+
+    templateGenerationStarted.current = true;
+    void handleTemplateGeneration(pendingTemplateJson);
+  }, [isTemplateMode]);
+
+  const handleTemplateGeneration = async (pendingTemplateJson: string) => {
+    const state = usePresentationState.getState();
+    state.setIsGeneratingOutline(true);
+
+    try {
+      // Parse template from sessionStorage
+      const template = JSON.parse(pendingTemplateJson) as {
+        id: string;
+        slides: Array<{ id: string; imageUrl: string; slideIndex?: number }>;
+        likeCount: number;
+        viewCount: number;
+        slideCount: number;
+      };
+
+      console.log('Starting template generation with', template.slides.length, 'slides');
+
+      // Call the generate-from-template API
+      const response = await fetch("/api/presentation/generate-from-template", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: `Slideshow from Template`,
+          slides: template.slides,
+          language,
+          tone: "professional",
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API error response:', errorText);
+        throw new Error(`Failed to generate presentation from template: ${response.status}`);
+      }
+
+      if (!response.body) {
+        throw new Error("No response body");
+      }
+
+      console.log('Streaming XML response...');
+
+      // Stream and parse the XML response
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      const parser = new SlideParser();
+      let xmlContent = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        xmlContent += chunk;
+      }
+
+      console.log('XML content received, length:', xmlContent.length);
+      console.log('XML preview:', xmlContent.substring(0, 500));
+
+      // Parse the complete XML to slides
+      const parsedSlides = parser.parseChunk(xmlContent);
+
+      console.log('Parsed slides:', parsedSlides.length);
+
+      if (parsedSlides.length === 0) {
+        throw new Error("No slides generated from template");
+      }
+
+      // Load images for each slide from the imageset
+      console.log('Loading images for slides from imageset...');
+      const slidesWithImages = await Promise.all(
+        parsedSlides.map(async (slide) => {
+          // Extract heading text to use as query
+          const heading = slide.content.find((node) => node.type === "h1");
+          const query = heading
+            ? ((heading as any).children?.[0]?.text || "").split(/\s+/).slice(0, 10).join(" ")
+            : "slideshow";
+
+          if (!query) {
+            console.log('No query for slide, skipping image');
+            return ensureSlideCanvas(slide);
+          }
+
+          const imageUrl = await getImageForSlide(query, state);
+
+          if (!imageUrl) {
+            console.log('No image loaded for query:', query);
+            return ensureSlideCanvas(slide);
+          }
+
+          console.log('Loaded image for slide:', imageUrl);
+
+          // Ensure slide has canvas and apply image
+          const slideWithCanvas = ensureSlideCanvas(slide);
+          const canvasWithBg = applyBackgroundImageToCanvas(slideWithCanvas.canvas, imageUrl);
+
+          return {
+            ...slideWithCanvas,
+            canvas: canvasWithBg,
+            rootImage: {
+              query,
+              url: imageUrl,
+              source: imageSource === "imageset" ? "imageset" : imageSource === "stock" ? "unsplash" : imageSource === "ai" ? "ai" : "unknown",
+              imageSetId: imageSource === "imageset" && selectedImageSetId ? selectedImageSetId : undefined,
+            },
+          };
+        })
+      );
+
+      state.setSlides(slidesWithImages);
+      state.setOutline(slidesWithImages.map((slide) => {
+        const heading = slide.content.find((node) => node.type === "h1");
+        return heading ? (heading as any).children?.[0]?.text || "Untitled" : "Untitled";
+      }));
+
+      // Set thumbnail from first slide with image
+      const firstSlideWithImage = slidesWithImages.find((slide) => slide.rootImage?.url);
+      if (firstSlideWithImage?.rootImage?.url) {
+        state.setThumbnailUrl(firstSlideWithImage.rootImage.url);
+      }
+
+      console.log('Saving presentation...');
+
+      // Save presentation
+      await updatePresentation({
+        id,
+        content: {
+          slides: slidesWithImages,
+          config: {
+            theme: selectedTheme,
+            imageSetId: imageSource === "imageset" && selectedImageSetId ? selectedImageSetId : undefined,
+          },
+        },
+        outline: state.outline,
+        title: `Slideshow from Template`,
+        theme: selectedTheme,
+        language,
+        imageSource: state.imageSource,
+        thumbnailUrl: firstSlideWithImage?.rootImage?.url,
+      });
+
+      console.log('Presentation saved, clearing template data and redirecting...');
+
+      // Clear the template from sessionStorage
+      sessionStorage.removeItem('pendingTemplate');
+
+      state.setIsGeneratingOutline(false);
+
+      // Redirect to editor
+      router.push(`/dashboard/slideshows/${id}`);
+    } catch (error) {
+      console.error("Template generation error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to generate presentation from template");
+      state.setIsGeneratingOutline(false);
+
+      // Clear the template from sessionStorage
+      sessionStorage.removeItem('pendingTemplate');
+
+      router.push("/dashboard/slideshows");
+    }
+  };
+
   // This effect handles the immediate startup of generation upon first mount
   // only if we're coming fresh from the dashboard (isGeneratingOutline === true)
   useEffect(() => {
+    // Skip if this is template mode
+    if (isTemplateMode) return;
+
     // Only run once on initial page load
     if (initialLoadComplete.current) return;
     initialLoadComplete.current = true;
@@ -154,13 +347,14 @@ export default function PresentationGenerateWithIdPage() {
         clearPendingCookie();
       }, 100);
     }
-  }, [isGeneratingOutline, setShouldStartOutlineGeneration]);
+  }, [isGeneratingOutline, setShouldStartOutlineGeneration, isTemplateMode]);
 
   /**
    * Sobald die Outline fertig ist, direkt die Slides generieren
    * und auf die Slides-Page weiterleiten — ohne dass die Outline-Seite sichtbar wird.
    */
   useEffect(() => {
+    if (isTemplateMode) return; // Skip if template mode
     if (slidesGenerationTriggered.current) return;
     const outlineReady =
       !isGeneratingOutline && Array.isArray(outline) && outline.length > 0;
@@ -168,7 +362,7 @@ export default function PresentationGenerateWithIdPage() {
       slidesGenerationTriggered.current = true;
       void handleGenerate();
     }
-  }, [outline, isGeneratingOutline, isGeneratingPresentation]);
+  }, [outline, isGeneratingOutline, isGeneratingPresentation, isTemplateMode]);
 
   // Update presentation state when data is fetched
   useEffect(() => {

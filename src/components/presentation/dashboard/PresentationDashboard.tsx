@@ -12,7 +12,6 @@ import {
 import { DummyPost, PostSkeletonGrid } from "@/components/ui/post-skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SimplePagination } from "@/components/ui/simple-pagination";
-import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePresentationState } from "@/states/presentation-state";
 import {
@@ -62,6 +61,8 @@ export function PresentationDashboard({
     showTemplates,
     setShowTemplates,
     setPresentationInput,
+    setSelectedTemplate,
+    selectedTemplate,
   } = usePresentationState();
 
   const [limits, setLimits] = useState<{
@@ -103,9 +104,6 @@ export function PresentationDashboard({
     "community",
   );
   const [templateError, setTemplateError] = useState<string | null>(null);
-  const [generatingPromptForId, setGeneratingPromptForId] = useState<
-    string | null
-  >(null);
   const [sortBy, setSortBy] = useState<
     "views-most" | "views-least" | "likes-most" | "likes-least"
   >("likes-most");
@@ -285,6 +283,15 @@ export function PresentationDashboard({
     (typeof limits?.slidesLeft === "number" && limits.slidesLeft > 0);
 
   const handleGenerate = async () => {
+    const { selectedTemplate } = usePresentationState.getState();
+
+    // Template-based generation
+    if (selectedTemplate) {
+      await handleTemplateGenerate(selectedTemplate);
+      return;
+    }
+
+    // Normal prompt-based generation
     if (!presentationInput.trim()) {
       toast.error("Please enter an AI prompt for your presentation");
       return;
@@ -329,46 +336,55 @@ export function PresentationDashboard({
     }
   };
 
-  const handleGeneratePrompt = async (
-    postId: string,
-    slides: TemplatePost["slides"],
-  ) => {
-    setGeneratingPromptForId(postId);
-    try {
-      const response = await fetch("/api/slideshow-library/generate-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId, slides }),
-      });
+  const handleTemplateGenerate = async (template: NonNullable<typeof selectedTemplate>) => {
+    setIsGeneratingOutline(true);
 
-      if (!response.ok) {
-        throw new Error("Prompt konnte nicht generiert werden");
+    try {
+      // Create empty presentation
+      const result = await createEmptyPresentation(
+        `Slideshow from Template`,
+        theme,
+        language,
+      );
+
+      if (!result.success || !result.presentation) {
+        setIsGeneratingOutline(false);
+        toast.error(result.message || "Failed to create presentation");
+        return;
       }
 
-      const { prompt } = (await response.json()) as { prompt: string };
+      const presentationId = result.presentation.id;
+      setCurrentPresentation(presentationId, result.presentation.title);
 
-      // Update the post in the state with the new prompt
-      setTemplateCommunityPosts((prev) =>
-        prev.map((post) => (post.id === postId ? { ...post, prompt } : post)),
-      );
-      setTemplatePersonalPosts((prev) =>
-        prev.map((post) => (post.id === postId ? { ...post, prompt } : post)),
-      );
+      // Store template data in sessionStorage so it survives navigation
+      sessionStorage.setItem('pendingTemplate', JSON.stringify(template));
 
-      // Copy to input
-      setPresentationInput(prompt);
-      setShowTemplates(false);
-      toast.success("Prompt wurde generiert und übernommen");
+      // Redirect to editor with template generation
+      router.push(`/dashboard/slideshows/generate/${presentationId}?template=true`);
     } catch (error) {
-      console.error("Error generating prompt:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Prompt konnte nicht generiert werden",
-      );
-    } finally {
-      setGeneratingPromptForId(null);
+      setIsGeneratingOutline(false);
+      console.error("Error creating presentation from template:", error);
+      toast.error("Failed to create presentation from template");
     }
+  };
+
+  const handleGeneratePrompt = (
+    postId: string,
+    slides: TemplatePost["slides"],
+    likeCount: number,
+    viewCount: number,
+    slideCount: number,
+  ) => {
+    // Instead of generating a prompt, directly set the selected template
+    setSelectedTemplate({
+      id: postId,
+      slides,
+      likeCount,
+      viewCount,
+      slideCount,
+    });
+    setShowTemplates(false);
+    toast.success("Template wurde ausgewählt");
   };
 
   const sortPosts = useCallback(
@@ -483,7 +499,6 @@ export function PresentationDashboard({
               ? (post.slides?.find((slide) => slide.imageUrl)?.imageUrl ?? null)
               : (post.slides?.find((slide) => slide.imageUrl)?.imageUrl ??
                 null);
-            const isGenerating = generatingPromptForId === post.id;
 
             return (
               <div key={post.id} className="flex flex-col gap-2">
@@ -535,18 +550,14 @@ export function PresentationDashboard({
                     handleGeneratePrompt(
                       post.id,
                       isTemplatePost(post) ? post.slides : (post.slides ?? []),
+                      isTemplatePost(post) ? post.likeCount : (post.likeCount ?? 0),
+                      isTemplatePost(post) ? post.viewCount : (post.viewCount ?? 0),
+                      isTemplatePost(post) ? post.slideCount : (post.slideCount ?? 0),
                     )
                   }
-                  disabled={isGenerating}
                 >
-                  {isGenerating ? (
-                    <Spinner className="h-4 w-4" />
-                  ) : (
-                    <>
-                      <PlusIcon className="h-4 w-4" />
-                      Get Prompt
-                    </>
-                  )}
+                  <PlusIcon className="h-4 w-4" />
+                  Get Prompt
                 </Button>
               </div>
             );
@@ -586,7 +597,7 @@ export function PresentationDashboard({
                 }
                 disabled={
                   isGeneratingOutline ||
-                  !presentationInput.trim() ||
+                  (!presentationInput.trim() && !selectedTemplate) ||
                   limitsLoading
                 }
                 variant={canGenerate ? "default" : "secondary"}
@@ -738,6 +749,7 @@ type DummyTemplatePost = {
   }>;
   viewCount?: number;
   likeCount?: number;
+  slideCount?: number;
 };
 
 type TemplateGridItem = TemplatePost | DummyTemplatePost;
