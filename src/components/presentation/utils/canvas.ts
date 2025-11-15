@@ -1,4 +1,15 @@
-import { DEFAULT_CANVAS, type CanvasDoc } from "@/canvas/types";
+import { DEFAULT_CANVAS, type CanvasDoc, type CanvasTextNode } from "@/canvas/types";
+import {
+  TIKTOK_OUTLINE_WIDTH,
+  TIKTOK_OUTLINE_COLOR,
+  TIKTOK_TEXT_COLOR,
+  TIKTOK_BACKGROUND_MODE,
+  TIKTOK_BACKGROUND_COLOR,
+  TIKTOK_BACKGROUND_OPACITY,
+  TIKTOK_BACKGROUND_RADIUS,
+  TIKTOK_BACKGROUND_PADDING_X,
+  TIKTOK_BACKGROUND_PADDING_Y,
+} from "@/canvas/tiktokDefaults";
 import { nanoid } from "nanoid";
 import type { PlateNode, PlateSlide } from "./parser";
 
@@ -61,6 +72,43 @@ function pickFontSize(charCount: number): number {
   if (charCount > 360) return 42;
   if (charCount > 220) return 54;
   return 72;
+}
+
+/**
+ * Applies TikTok-style text styling to a Canvas text node.
+ * Can apply either outline (stroke) or highlight-box background.
+ * @param node - The text node to style
+ * @param styleMode - "outline" for stroke effect, "highlight" for background box
+ * @returns The styled text node
+ */
+export function applyTikTokTextStyle(
+  node: Partial<CanvasTextNode>,
+  styleMode: "outline" | "highlight" = "outline",
+): Partial<CanvasTextNode> {
+  if (styleMode === "outline") {
+    // TikTok Outline/Stroke style: White text with black outline
+    return {
+      ...node,
+      fill: TIKTOK_TEXT_COLOR, // White text
+      stroke: TIKTOK_OUTLINE_COLOR, // Black outline
+      strokeWidth: TIKTOK_OUTLINE_WIDTH, // 7px outline
+    };
+  } else {
+    // TikTok Highlight-Box style: Black text on white rounded box
+    return {
+      ...node,
+      fill: TIKTOK_OUTLINE_COLOR, // Black text (#000000)
+      background: {
+        enabled: true,
+        mode: TIKTOK_BACKGROUND_MODE, // "block"
+        color: TIKTOK_TEXT_COLOR, // White background (#ffffff)
+        opacity: TIKTOK_BACKGROUND_OPACITY, // 1
+        paddingX: TIKTOK_BACKGROUND_PADDING_X, // 29px horizontal (0.4em at 72px)
+        paddingY: TIKTOK_BACKGROUND_PADDING_Y, // 14px vertical (0.2em at 72px)
+        radius: TIKTOK_BACKGROUND_RADIUS, // 22px rounded corners (0.3em at 72px)
+      },
+    };
+  }
 }
 
 export function applyBackgroundImageToCanvas(
@@ -623,4 +671,35 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
 
 export function ensureSlidesHaveCanvas(slides: PlateSlide[]): PlateSlide[] {
   return slides.map((slide) => ensureSlideCanvas(slide));
+}
+
+/**
+ * Applies TikTok text styling to all text nodes in a slide's canvas.
+ * @param slide - The slide to apply styling to
+ * @param styleMode - "outline" for stroke effect, "highlight" for background box
+ * @returns The slide with styled text nodes
+ */
+export function applySlideTikTokStyle(
+  slide: PlateSlide,
+  styleMode: "outline" | "highlight" = "outline",
+): PlateSlide {
+  if (!slide.canvas?.nodes) {
+    return slide;
+  }
+
+  const styledNodes = slide.canvas.nodes.map((node) => {
+    if (node.type !== "text") {
+      return node;
+    }
+
+    return applyTikTokTextStyle(node as CanvasTextNode, styleMode) as typeof node;
+  });
+
+  return {
+    ...slide,
+    canvas: {
+      ...slide.canvas,
+      nodes: styledNodes,
+    },
+  };
 }

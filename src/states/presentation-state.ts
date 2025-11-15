@@ -134,6 +134,30 @@ interface PresentationState {
   /** Edit-Mode für das persönliche Overlay-Bild auf einer Slide */
   editingOverlaySlideId: string | null;
   setEditingOverlaySlideId: (id: string | null) => void;
+
+  // Selected template state
+  selectedTemplate: {
+    id: string;
+    slides: Array<{
+      id: string;
+      imageUrl: string;
+      slideIndex?: number;
+    }>;
+    likeCount: number;
+    viewCount: number;
+    slideCount: number;
+  } | null;
+  setSelectedTemplate: (template: {
+    id: string;
+    slides: Array<{
+      id: string;
+      imageUrl: string;
+      slideIndex?: number;
+    }>;
+    likeCount: number;
+    viewCount: number;
+    slideCount: number;
+  } | null) => void;
 }
 
 export const usePresentationState = create<PresentationState>((set) => ({
@@ -174,6 +198,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
   pendingInsertNode: null,
   editingSlideId: null,
   editingOverlaySlideId: null,
+  selectedTemplate: null,
 
   // Sidebar states
   isSidebarCollapsed: false,
@@ -195,6 +220,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
   setConfig: (config) => set({ config }),
   setEditingSlideId: (id) => set({ editingSlideId: id }),
   setEditingOverlaySlideId: (id) => set({ editingOverlaySlideId: id }),
+  setSelectedTemplate: (template) => set({ selectedTemplate: template }),
   startRootImageGeneration: (slideId, query) =>
     set((state) => ({
       rootImageGeneration: {

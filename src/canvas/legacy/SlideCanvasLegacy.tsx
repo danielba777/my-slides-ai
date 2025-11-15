@@ -7,7 +7,8 @@ import {
   TIKTOK_BACKGROUND_COLOR,
   TIKTOK_BACKGROUND_MODE,
   TIKTOK_BACKGROUND_OPACITY,
-  TIKTOK_BACKGROUND_PADDING,
+  TIKTOK_BACKGROUND_PADDING_X,
+  TIKTOK_BACKGROUND_PADDING_Y,
   TIKTOK_BACKGROUND_RADIUS,
   TIKTOK_OUTLINE_COLOR,
   TIKTOK_OUTLINE_WIDTH,
@@ -230,11 +231,8 @@ function layoutSignature(l: SlideTextElement[]): string {
             m: x.background.mode ?? TIKTOK_BACKGROUND_MODE,
             c: x.background.color ?? TIKTOK_BACKGROUND_COLOR,
             op: x.background.opacity ?? TIKTOK_BACKGROUND_OPACITY,
-            px: x.background.paddingX ?? TIKTOK_BACKGROUND_PADDING,
-            py:
-              x.background.paddingY ??
-              x.background.paddingX ??
-              TIKTOK_BACKGROUND_PADDING,
+            px: x.background.paddingX ?? TIKTOK_BACKGROUND_PADDING_X,
+            py: x.background.paddingY ?? TIKTOK_BACKGROUND_PADDING_Y,
             rd: x.background.radius ?? TIKTOK_BACKGROUND_RADIUS,
           }
         : null,
@@ -359,11 +357,8 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
             mode: el.background.mode ?? TIKTOK_BACKGROUND_MODE,
             color: el.background.color ?? TIKTOK_BACKGROUND_COLOR,
             opacity: el.background.opacity ?? TIKTOK_BACKGROUND_OPACITY,
-            paddingX: el.background.paddingX ?? TIKTOK_BACKGROUND_PADDING,
-            paddingY:
-              el.background.paddingY ??
-              el.background.paddingX ??
-              TIKTOK_BACKGROUND_PADDING,
+            paddingX: el.background.paddingX ?? TIKTOK_BACKGROUND_PADDING_X,
+            paddingY: el.background.paddingY ?? TIKTOK_BACKGROUND_PADDING_Y,
             radius: el.background.radius ?? TIKTOK_BACKGROUND_RADIUS,
             lineOverlap: el.background.lineOverlap ?? 0,
           }
@@ -1363,6 +1358,14 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     for (const layer of sorted) {
       if (!layer.content) continue;
 
+      // Check if background is enabled to adjust line height
+      const bgConfigCheck = layer.background;
+      const bgEnabledCheck =
+        (bgConfigCheck?.enabled ?? false) || (bgConfigCheck?.opacity ?? 0) > 0;
+      // For TikTok backgrounds: line-height 1.4 allows boxes to touch without gaps or overlap
+      // 1.4 = base 1.0 + 2 * 0.2em padding compensation
+      const effectiveLineHeight = bgEnabledCheck ? 1.4 : (layer.lineHeight ?? 1.12);
+
       // Text messen (liefert u.a. lines & widths)
       const measure = measureWrappedText({
         text: String(layer.content ?? ""),
@@ -1375,7 +1378,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               : 400,
         fontStyle: (layer as any).italic ? "italic" : "normal",
         fontSizePx: BASE_FONT_PX,
-        lineHeightPx: BASE_FONT_PX * (layer.lineHeight ?? 1.12),
+        lineHeightPx: BASE_FONT_PX * effectiveLineHeight,
         maxWidthPx: Math.max(8, layer.width),
         letterSpacingPx: layer.letterSpacing ?? 0,
         whiteSpaceMode: "pre-wrap",
@@ -1449,7 +1452,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         fontWeight: weight,
         fontStyle: italic ? "italic" : "normal",
         fontSizePx: BASE_FONT_PX,
-        lineHeightPx: BASE_FONT_PX * (layer.lineHeight ?? 1.12),
+        lineHeightPx: BASE_FONT_PX * effectiveLineHeight,
         maxWidthPx: Math.max(8, layer.width),
         letterSpacingPx: layer.letterSpacing ?? 0,
         whiteSpaceMode: "pre-wrap",
@@ -1463,6 +1466,81 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const bgConfig = layer.background;
       const bgEnabled =
         (bgConfig?.enabled ?? false) || (bgConfig?.opacity ?? 0) > 0;
+
+      // Helper function to draw background box for a single line
+      const drawLineBackground = (
+        lineText: string,
+        lineY: number,
+        lineHeightPx: number,
+      ) => {
+        if (!bgEnabled) return;
+
+        const padX = Math.max(
+          0,
+          bgConfig?.paddingX ?? TIKTOK_BACKGROUND_PADDING_X,
+        );
+        const padY = Math.max(
+          0,
+          bgConfig?.paddingY ?? TIKTOK_BACKGROUND_PADDING_Y,
+        );
+        const radius = Math.max(
+          0,
+          bgConfig?.radius ?? TIKTOK_BACKGROUND_RADIUS,
+        );
+        const fill = toCssColor(bgConfig?.color, bgConfig?.opacity);
+
+        // Measure the actual width of this specific line
+        exportCtx.save();
+        exportCtx.font = `${italic ? "italic " : ""}${weight} ${BASE_FONT_PX}px ${layer.fontFamily}`;
+
+        let lineWidth = 0;
+        if (layer.letterSpacing === 0) {
+          lineWidth = exportCtx.measureText(lineText).width;
+        } else {
+          for (const ch of lineText) {
+            lineWidth += exportCtx.measureText(ch).width;
+          }
+          if (lineText.length > 1) {
+            lineWidth += layer.letterSpacing * (lineText.length - 1);
+          }
+        }
+
+        // Calculate box position based on text alignment
+        const textW = Math.max(0, layer.width - 2 * PADDING);
+        let boxX: number;
+
+        if (layer.align === "left") {
+          boxX = boxLeft + PADDING - padX;
+        } else if (layer.align === "right") {
+          boxX = boxLeft + PADDING + textW - lineWidth - padX;
+        } else {
+          // center
+          boxX = boxLeft + PADDING + (textW - lineWidth) / 2 - padX;
+        }
+
+        const boxY = lineY - lineHeightPx / 2 - padY;
+        const boxWidth = lineWidth + padX * 2;
+        const boxHeight = lineHeightPx + padY * 2;
+
+        const effectiveRadius =
+          bgConfig?.mode === "blob"
+            ? Math.max(radius, Math.min(radius * 1.5, 1600))
+            : radius;
+
+        exportCtx.fillStyle = fill;
+        drawRoundedRect(
+          exportCtx,
+          boxX,
+          boxY,
+          boxWidth,
+          boxHeight,
+          effectiveRadius,
+        );
+        exportCtx.fill();
+        exportCtx.restore();
+      };
+
+      // Keep backgroundRect for overflow calculations (use first line dimensions as approximation)
       let backgroundRect: {
         x: number;
         y: number;
@@ -1474,11 +1552,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       if (bgEnabled) {
         const padX = Math.max(
           0,
-          bgConfig?.paddingX ?? TIKTOK_BACKGROUND_PADDING,
+          bgConfig?.paddingX ?? TIKTOK_BACKGROUND_PADDING_X,
         );
         const padY = Math.max(
           0,
-          bgConfig?.paddingY ?? padX ?? TIKTOK_BACKGROUND_PADDING,
+          bgConfig?.paddingY ?? TIKTOK_BACKGROUND_PADDING_Y,
         );
         const radius = Math.max(
           0,
@@ -1502,19 +1580,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               : radius,
           fill,
         };
-
-        exportCtx.save();
-        exportCtx.fillStyle = fill;
-        drawRoundedRect(
-          exportCtx,
-          backgroundRect.x,
-          backgroundRect.y,
-          backgroundRect.width,
-          backgroundRect.height,
-          backgroundRect.radius,
-        );
-        exportCtx.fill();
-        exportCtx.restore();
       }
 
       const outlineEnabled = (layer as any).outlineEnabled;
@@ -1762,6 +1827,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       for (const raw of lines) {
         if (y - (boxTop + PADDING) > contentHeight + 1) break;
+        // Draw background box for this line (TikTok-style: per-line boxes)
+        drawLineBackground(raw, y, lineHeightPx);
         // Outline außen-only
         drawOuterStrokeLine(raw, y);
         // Normales Füllen
@@ -2500,11 +2567,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               (background?.enabled ?? false) || (background?.opacity ?? 0) > 0;
             const bgPadX = Math.max(
               0,
-              background?.paddingX ?? TIKTOK_BACKGROUND_PADDING,
+              background?.paddingX ?? TIKTOK_BACKGROUND_PADDING_X,
             );
             const bgPadY = Math.max(
               0,
-              background?.paddingY ?? bgPadX ?? TIKTOK_BACKGROUND_PADDING,
+              background?.paddingY ?? TIKTOK_BACKGROUND_PADDING_Y,
             );
             const bgRadius = Math.max(
               0,
@@ -2566,25 +2633,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                   )}
 
                   <div className="relative w-full h-full">
-                    {bgEnabled && (
-                      <div
-                        className="pointer-events-none absolute inset-0 z-0"
-                        style={{
-                          top: PADDING - bgPadY,
-                          left: PADDING - bgPadX,
-                          right: PADDING - bgPadX,
-                          bottom: PADDING - bgPadY,
-                          background: bgColor,
-                          borderRadius:
-                            bgMode === "blob"
-                              ? Math.max(
-                                  bgRadius,
-                                  Math.min(bgRadius * 1.5, 1600),
-                                )
-                              : bgRadius,
-                        }}
-                      />
-                    )}
                     {isCurrentEditing ? (
                       <textarea
                         ref={(el) => {
@@ -2609,7 +2657,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                           fontStyle: (layer as any).italic
                             ? "italic"
                             : "normal",
-                          lineHeight: layer.lineHeight,
+                          lineHeight: bgEnabled ? 1.4 : layer.lineHeight, // TikTok: 1.4 for seamless box connection
                           letterSpacing: `${layer.letterSpacing}px`,
                           textAlign: layer.align as any,
                           whiteSpace: "pre-wrap",
@@ -2617,6 +2665,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                           overflowWrap: "normal",
                           boxSizing: "border-box",
                           fontKerning: "normal" as any,
+                          /* TikTok-style per-line backgrounds (only visible when bgEnabled) */
+                          ...(bgEnabled ? {
+                            padding: "0.2em 0.4em", // TikTok standard padding
+                            borderRadius: bgMode === "blob" ? "0.45em" : "0.3em", // TikTok standard: 0.3em
+                            backgroundColor: bgColor,
+                          } : {}),
                           /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
                           textShadow:
                             (layer as any).outlineEnabled &&
@@ -2635,7 +2689,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                       <div
                         className="relative z-10 w-full h-full"
                         style={{
-                          color: layer.color,
                           fontSize: `${BASE_FONT_PX}px`,
                           fontFamily: layer.fontFamily ?? "Inter",
                           fontWeight: cssFontWeight,
@@ -2643,28 +2696,43 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                             ? "italic"
                             : "normal",
                           textAlign: layer.align,
-                          lineHeight: layer.lineHeight,
+                          lineHeight: bgEnabled ? 1.4 : layer.lineHeight, // TikTok: 1.4 for seamless box connection
                           letterSpacing: `${layer.letterSpacing}px`,
                           whiteSpace: "pre-wrap",
                           wordBreak: "normal",
                           overflowWrap: "normal",
                           boxSizing: "border-box",
                           fontKerning: "normal" as any,
-                          /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
-                          textShadow:
-                            (layer as any).outlineEnabled &&
-                            ((layer as any).outlineWidth || 0) > 0
-                              ? buildOuterTextShadow(
-                                  Math.round(
-                                    ((layer as any).outlineWidth || 6) *
-                                      layer.scale,
-                                  ),
-                                  (layer as any).outlineColor || "#000",
-                                ) + ", 0 2px 8px rgba(0,0,0,0.8)"
-                              : "0 2px 8px rgba(0,0,0,0.8)",
                         }}
                       >
-                        {layer.content}
+                        <span
+                          style={{
+                            color: layer.color,
+                            display: "inline",
+                            /* TikTok-style per-line backgrounds */
+                            ...(bgEnabled ? {
+                              background: bgColor,
+                              padding: "0.2em 0.4em", // TikTok standard: 0.2em vertical, 0.4em horizontal
+                              borderRadius: bgMode === "blob" ? "0.45em" : "0.3em", // TikTok standard: 0.3em
+                              boxDecorationBreak: "clone" as any,
+                              WebkitBoxDecorationBreak: "clone" as any,
+                            } : {}),
+                            /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
+                            textShadow:
+                              (layer as any).outlineEnabled &&
+                              ((layer as any).outlineWidth || 0) > 0
+                                ? buildOuterTextShadow(
+                                    Math.round(
+                                      ((layer as any).outlineWidth || 6) *
+                                        layer.scale,
+                                    ),
+                                    (layer as any).outlineColor || "#000",
+                                  ) + ", 0 2px 8px rgba(0,0,0,0.8)"
+                                : "0 2px 8px rgba(0,0,0,0.8)",
+                          }}
+                        >
+                          {layer.content}
+                        </span>
                       </div>
                     )}
                   </div>

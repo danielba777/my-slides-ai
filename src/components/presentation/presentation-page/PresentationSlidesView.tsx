@@ -19,7 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { Grid2x2, ImageIcon, Type } from "lucide-react";
 import dynamic from "next/dynamic";
-import React, { memo, useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { PresentModeHeader } from "../dashboard/PresentModeHeader";
 import { ThinkingDisplay } from "../dashboard/ThinkingDisplay";
 import { MultiSlideImageSelector } from "./MultiSlideImageSelector";
@@ -28,6 +28,7 @@ import {
   SingleSlideImageSelector,
   type SelectedImageResult,
 } from "./SingleSlideImageSelector";
+import { SlidePreviewStrip } from "./SlidePreviewStrip";
 import { SortableSlide } from "./SortableSlide";
 import StickyDownloadActions from "./StickyDownloadActions";
 const SlideCanvas = dynamic(() => import("@/canvas/SlideCanvasAdapter"), {
@@ -126,7 +127,8 @@ const SlideFrame = memo(function SlideFrame({
 
   // Edit-Modus State: nur wenn aktiv, wird die Toolbar angezeigt
   const { editingSlideId, setEditingSlideId } = usePresentationState();
-  const { editingOverlaySlideId, setEditingOverlaySlideId } = usePresentationState();
+  const { editingOverlaySlideId, setEditingOverlaySlideId } =
+    usePresentationState();
   const isEditingText = editingSlideId === slide.id;
   const [isHovering, setIsHovering] = useState(false);
   const [isImageSelectorOpen, setIsImageSelectorOpen] = useState(false);
@@ -180,7 +182,10 @@ const SlideFrame = memo(function SlideFrame({
       selection: [],
     }) as CanvasDoc;
     if (c.selection?.includes("user-overlay-image")) return;
-    updated[i] = { ...current, canvas: { ...c, selection: ["user-overlay-image"] } };
+    updated[i] = {
+      ...current,
+      canvas: { ...c, selection: ["user-overlay-image"] },
+    };
     setSlides(updated);
   }, [editingOverlaySlideId, slide.id]);
 
@@ -202,14 +207,17 @@ const SlideFrame = memo(function SlideFrame({
         url: selection.url,
         useGrid: false,
         gridImages: undefined,
-        imageSetId:
-          selection.imageSetId ?? currentSlide.rootImage?.imageSetId,
+        imageSetId: selection.imageSetId ?? currentSlide.rootImage?.imageSetId,
         imageSetName:
           selection.imageSetName ?? currentSlide.rootImage?.imageSetName,
         parentImageSetId:
-          selection.parentSetId ?? currentSlide.rootImage?.parentImageSetId ?? null,
+          selection.parentSetId ??
+          currentSlide.rootImage?.parentImageSetId ??
+          null,
         parentImageSetName:
-          selection.parentSetName ?? currentSlide.rootImage?.parentImageSetName ?? null,
+          selection.parentSetName ??
+          currentSlide.rootImage?.parentImageSetName ??
+          null,
         imageCategory:
           selection.category ?? currentSlide.rootImage?.imageCategory ?? null,
       },
@@ -318,7 +326,12 @@ const SlideFrame = memo(function SlideFrame({
                   showToolbar={isEditingText}
                   readOnly={disableInteractions}
                   overlayContent={(() => {
-                    const showHover = !isPresenting && !isReadOnly && isHovering && !editingSlideId && editingOverlaySlideId !== slide.id;
+                    const showHover =
+                      !isPresenting &&
+                      !isReadOnly &&
+                      isHovering &&
+                      !editingSlideId &&
+                      editingOverlaySlideId !== slide.id;
                     const inOverlayEdit = editingOverlaySlideId === slide.id;
                     if (inOverlayEdit) {
                       return (
@@ -328,14 +341,21 @@ const SlideFrame = memo(function SlideFrame({
                               <button
                                 onClick={() => {
                                   setEditingOverlaySlideId(null);
-                                  const { slides, setSlides } = usePresentationState.getState();
+                                  const { slides, setSlides } =
+                                    usePresentationState.getState();
                                   const updated = slides.slice();
-                                  const i = updated.findIndex((x) => x.id === slide.id);
+                                  const i = updated.findIndex(
+                                    (x) => x.id === slide.id,
+                                  );
                                   if (i >= 0) {
                                     const existing = updated[i];
                                     if (!existing) return;
-                                    const c = (existing.canvas ?? docWithBg) as CanvasDoc;
-                                    updated[i] = { ...existing, canvas: { ...c, selection: [] } };
+                                    const c = (existing.canvas ??
+                                      docWithBg) as CanvasDoc;
+                                    updated[i] = {
+                                      ...existing,
+                                      canvas: { ...c, selection: [] },
+                                    };
                                     setSlides(updated);
                                   }
                                 }}
@@ -347,17 +367,28 @@ const SlideFrame = memo(function SlideFrame({
                               </button>
                               <button
                                 onClick={() => {
-                                  const { slides, setSlides } = usePresentationState.getState();
+                                  const { slides, setSlides } =
+                                    usePresentationState.getState();
                                   const updated = slides.slice();
-                                  const i = updated.findIndex((x) => x.id === slide.id);
+                                  const i = updated.findIndex(
+                                    (x) => x.id === slide.id,
+                                  );
                                   if (i >= 0) {
                                     const cur = updated[i];
                                     if (!cur) return;
-                                    const c = (cur.canvas ?? docWithBg) as CanvasDoc;
+                                    const c = (cur.canvas ??
+                                      docWithBg) as CanvasDoc;
                                     const nodes = (c.nodes ?? []).filter(
-                                      (n: any) => !(n?.type === "image" && n?.id === "user-overlay-image"),
+                                      (n: any) =>
+                                        !(
+                                          n?.type === "image" &&
+                                          n?.id === "user-overlay-image"
+                                        ),
                                     );
-                                    updated[i] = { ...cur, canvas: { ...c, nodes, selection: [] } };
+                                    updated[i] = {
+                                      ...cur,
+                                      canvas: { ...c, nodes, selection: [] },
+                                    };
                                     setSlides(updated);
                                   }
                                   setEditingOverlaySlideId(null);
@@ -377,71 +408,71 @@ const SlideFrame = memo(function SlideFrame({
                     if (showHover) {
                       return (
                         <div className="relative flex flex-col h-full pointer-events-none">
-                           {/* Top Half: Edit Text */}
-                           <button
-                             onClick={() => {
-                               setEditingSlideId(slide.id);
-                               setIsHovering(false);
-                               // Focus first text element after a short delay
-                               setTimeout(() => {
-                                 canvasRef.current?.focusFirstText();
-                               }, 100);
-                             }}
-                             className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
-                           >
-                             <Type aria-hidden className="h-6 w-6 text-white" />
-                             <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
-                               Edit Text
-                             </span>
-                           </button>
-                           {/* Bottom Half: Edit Image */}
-                           <button
-                             onClick={() => {
-                               if (slide.rootImage?.useGrid) {
-                                 setIsMultiImageSelectorOpen(true);
-                               } else {
-                                 setIsImageSelectorOpen(true);
-                               }
-                               setIsHovering(false);
-                             }}
-                             className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
-                           >
-                             <ImageIcon
-                               aria-hidden
-                               className="h-6 w-6 text-white"
-                             />
-                             <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
-                               {slide.rootImage?.useGrid
-                                 ? "Edit Images"
-                                 : "Edit Image"}
-                             </span>
-                           </button>
-                           {/* Toggle Button */}
-                           {slide.rootImage && (
-                             <button
-                               onClick={() => {
-                                 toggleGridMode();
-                                 setIsHovering(false);
-                               }}
-                               className="absolute bottom-4 right-4 flex items-center gap-2 bg-white/90 hover:bg-white text-gray-900 px-4 py-2 rounded-lg transition-all backdrop-blur-sm pointer-events-auto cursor-pointer shadow-lg"
-                             >
-                               {slide.rootImage.useGrid ? (
-                                 <>
-                                   <ImageIcon className="h-4 w-4" />
-                                   <span className="text-sm font-semibold">
-                                     Single Image
-                                   </span>
-                                 </>
-                               ) : (
-                                 <>
-                                   <Grid2x2 className="h-4 w-4" />
-                                   <span className="text-sm font-semibold">
-                                     4 Images
-                                   </span>
-                                 </>
-                               )}
-                             </button>
-                           )}
+                          {/* Top Half: Edit Text */}
+                          <button
+                            onClick={() => {
+                              setEditingSlideId(slide.id);
+                              setIsHovering(false);
+                              // Focus first text element after a short delay
+                              setTimeout(() => {
+                                canvasRef.current?.focusFirstText();
+                              }, 100);
+                            }}
+                            className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
+                          >
+                            <Type aria-hidden className="h-6 w-6 text-white" />
+                            <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
+                              Edit Text
+                            </span>
+                          </button>
+                          {/* Bottom Half: Edit Image */}
+                          <button
+                            onClick={() => {
+                              if (slide.rootImage?.useGrid) {
+                                setIsMultiImageSelectorOpen(true);
+                              } else {
+                                setIsImageSelectorOpen(true);
+                              }
+                              setIsHovering(false);
+                            }}
+                            className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
+                          >
+                            <ImageIcon
+                              aria-hidden
+                              className="h-6 w-6 text-white"
+                            />
+                            <span className="text-white text-lg font-semibold group-hover:scale-105 transition-transform">
+                              {slide.rootImage?.useGrid
+                                ? "Edit Images"
+                                : "Edit Image"}
+                            </span>
+                          </button>
+                          {/* Toggle Button */}
+                          {slide.rootImage && (
+                            <button
+                              onClick={() => {
+                                toggleGridMode();
+                                setIsHovering(false);
+                              }}
+                              className="absolute bottom-4 right-4 flex items-center gap-2 bg-white/90 hover:bg-white text-gray-900 px-4 py-2 rounded-lg transition-all backdrop-blur-sm pointer-events-auto cursor-pointer shadow-lg"
+                            >
+                              {slide.rootImage.useGrid ? (
+                                <>
+                                  <ImageIcon className="h-4 w-4" />
+                                  <span className="text-sm font-semibold">
+                                    Single Image
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <Grid2x2 className="h-4 w-4" />
+                                  <span className="text-sm font-semibold">
+                                    4 Images
+                                  </span>
+                                </>
+                              )}
+                            </button>
+                          )}
                         </div>
                       );
                     }
@@ -557,6 +588,9 @@ export const PresentationSlidesView = ({
 }: PresentationSlidesViewProps) => {
   const currentSlideIndex = usePresentationState((s) => s.currentSlideIndex);
   const isPresenting = usePresentationState((s) => s.isPresenting);
+  const setCurrentSlideIndex = usePresentationState(
+    (s) => s.setCurrentSlideIndex,
+  );
   const nextSlide = usePresentationState((s) => s.nextSlide);
   const previousSlide = usePresentationState((s) => s.previousSlide);
   const setShouldShowExitHeader = usePresentationState(
@@ -568,7 +602,8 @@ export const PresentationSlidesView = ({
   const shouldShowExitHeader = usePresentationState(
     (s) => s.shouldShowExitHeader,
   );
-  const { items, sensors, handleDragEnd } = usePresentationSlides();
+  const { items, sensors, handleDragEnd, scrollToSlide } =
+    usePresentationSlides();
   // Use the slide change watcher to automatically save changes
   useSlideChangeWatcher({ debounceDelay: 600 });
   // Handle keyboard navigation in presentation mode
@@ -604,6 +639,17 @@ export const PresentationSlidesView = ({
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, [isPresenting]);
 
+  const handlePreviewSelect = useCallback(
+    (index: number) => {
+      setCurrentSlideIndex(index);
+      scrollToSlide(index);
+    },
+    [scrollToSlide, setCurrentSlideIndex],
+  );
+
+  // Carousel layout: horizontal gap between slide centers
+  const SLIDE_GAP_PX = 32; // gap in pixels between slides
+
   return (
     <div className="w-full h-full overflow-hidden flex flex-col">
       {/* Fixierter Download-Button oben rechts – nur im Edit-Modus */}
@@ -630,21 +676,51 @@ export const PresentationSlidesView = ({
               title="AI is thinking about your presentation..."
             />
 
-            <div className="flex items-start gap-6 px-6 py-4">
-              {items.map((slide, index) => (
-                <SlideFrame
-                  key={slide.id}
-                  slide={slide}
-                  index={index}
-                  slidesCount={items.length}
-                  isPresenting={isPresenting}
-                  isReadOnly={false}
-                />
-              ))}
+            <div className="relative px-6 py-4 h-[900px] flex items-start justify-center overflow-x-hidden overflow-y-visible">
+              {items.map((slide, index) => {
+                const offset = index - currentSlideIndex;
+                const isActive = offset === 0;
+
+                return (
+                  <div
+                    key={slide.id}
+                    className={cn(
+                      "absolute mb-8 transition-transform duration-300 ease-in-out",
+                      isActive ? "drop-shadow-xl" : "drop-shadow-md",
+                    )}
+                    style={{
+                      transform: `translateX(calc(${offset} * (100% + ${SLIDE_GAP_PX}px))) scale(${isActive ? 1 : 0.95})`,
+                      opacity: isActive ? 1 : 0.8,
+                      zIndex: items.length - Math.abs(offset),
+                      visibility: Math.abs(offset) > 4 ? "hidden" : "visible",
+                    }}
+                    onClick={() => {
+                      if (!isPresenting) {
+                        setCurrentSlideIndex(index);
+                      }
+                    }}
+                  >
+                    <SlideFrame
+                      slide={slide}
+                      index={index}
+                      slidesCount={items.length}
+                      isPresenting={isPresenting}
+                      isReadOnly={false}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </SortableContext>
         </DndContext>
       </div>
+      {!isPresenting && (
+        <SlidePreviewStrip
+          slides={items}
+          currentSlideIndex={currentSlideIndex}
+          onSelect={handlePreviewSelect}
+        />
+      )}
     </div>
   );
 };

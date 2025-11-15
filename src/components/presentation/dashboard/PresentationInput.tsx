@@ -3,14 +3,20 @@
 import { Button } from "@/components/ui/button";
 import { usePresentationState } from "@/states/presentation-state";
 import { Sparkles } from "lucide-react";
+import { TemplatePreview } from "./TemplatePreview";
 
 export function PresentationInput({
   handleGenerate,
 }: {
   handleGenerate: () => void;
 }) {
-  const { presentationInput, setPresentationInput, setShowTemplates } =
+  const { presentationInput, setPresentationInput, setShowTemplates, selectedTemplate } =
     usePresentationState();
+
+  // If a template is selected, show the preview instead of the input
+  if (selectedTemplate) {
+    return <TemplatePreview />;
+  }
 
   return (
     <div className="space-y-3">
