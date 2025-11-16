@@ -76,7 +76,18 @@ export async function POST(request: Request) {
     const effectiveQuality: "basic" | "high" =
       quality === "high" || quality === "basic" ? quality : "high";
     const apiKey = env["302AI_KEY"];
+
+    // DEBUG: Log environment variable status
+    console.log("[AI Avatar DEBUG] 302AI_KEY status:", {
+      exists: apiKey !== undefined,
+      isEmpty: apiKey === "",
+      type: typeof apiKey,
+      length: apiKey?.length,
+      firstChars: apiKey?.substring(0, 10) + "...",
+    });
+
     if (!apiKey) {
+      console.error("[AI Avatar] API key missing or empty");
       return NextResponse.json(
         { error: "AI Avatar generation is currently unavailable" },
         { status: 503 }
