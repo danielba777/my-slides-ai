@@ -21,6 +21,9 @@ interface LandingPageTheme {
   description?: string;
   metaTitle?: string;
   metaDescription?: string;
+  displayName?: string;
+  icon?: string;
+  showcaseDescription?: string;
   isActive: boolean;
 }
 
@@ -179,8 +182,61 @@ export default function EditThemePage() {
               </p>
             </div>
 
+            <div className="border-t pt-6 space-y-6">
+              <h3 className="text-lg font-semibold">Theme Showcase</h3>
+
+              {}
+              <div className="space-y-2">
+                <Label htmlFor="displayName">Display Name</Label>
+                <Input
+                  id="displayName"
+                  value={formData.displayName || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, displayName: e.target.value })
+                  }
+                  placeholder="z.B. Nutrition & Health"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Der Anzeigename für die Theme Showcase-Sektion auf der Landing Page
+                </p>
+              </div>
+
+              {}
+              <div className="space-y-2">
+                <Label htmlFor="icon">Icon (Emoji)</Label>
+                <Input
+                  id="icon"
+                  value={formData.icon || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, icon: e.target.value })
+                  }
+                  placeholder="z.B. 🔥, 🧠, 💪, 🍎, 📚"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Ein Emoji für das Theme (z.B. 🔥 für Fitness, 🧠 für Studytok, 🍎 für Nutrition)
+                </p>
+              </div>
+
+              {}
+              <div className="space-y-2">
+                <Label htmlFor="showcaseDescription">Showcase Beschreibung</Label>
+                <Textarea
+                  id="showcaseDescription"
+                  value={formData.showcaseDescription || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, showcaseDescription: e.target.value })
+                  }
+                  placeholder="z.B. Create engaging nutrition content that educates and inspires your audience..."
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Kurze Beschreibung für die Theme Showcase Card
+                </p>
+              </div>
+            </div>
+
             {}
-            <div className="space-y-2">
+            <div className="space-y-2 border-t pt-6">
               <Label htmlFor="description">Beschreibung (intern)</Label>
               <Textarea
                 id="description"
