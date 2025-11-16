@@ -13,8 +13,8 @@ export function loadImage(url: string): Promise<HTMLImageElement> {
 
 export async function loadImageDecoded(url: string): Promise<HTMLImageElement> {
   const img = await loadImage(url);
-  // decode() verhindert Paint-Glitches vor vollständiger Decodierung
-  // Fallback: falls nicht unterstützt, ist img schon geladen
+  
+  
   try {
     const maybeDecode = (img as HTMLImageElement & {
       decode?: () => Promise<void>;
@@ -23,7 +23,7 @@ export async function loadImageDecoded(url: string): Promise<HTMLImageElement> {
       await maybeDecode.call(img);
     }
   } catch {
-    // ignore
+    
   }
   return img;
 }

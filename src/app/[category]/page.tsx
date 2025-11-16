@@ -57,7 +57,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   );
 }
 
-// Generiere statische Seiten für alle aktiven Themes
+
 export async function generateStaticParams() {
   try {
     const response = await fetch(`${API_BASE_URL}/api/landing-page-themes`, {
@@ -82,7 +82,7 @@ export async function generateStaticParams() {
   }
 }
 
-// Metadata für SEO
+
 export async function generateMetadata({ params }: CategoryPageProps) {
   const { category } = await params;
 

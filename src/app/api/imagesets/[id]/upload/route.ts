@@ -20,7 +20,7 @@ export async function POST(
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
 
-    // 1) Originaldateien zu UploadThing hochladen
+    
     const uploaded = await Promise.all(
       files.map(async (f) => {
         const buf = Buffer.from(await f.arrayBuffer());
@@ -35,7 +35,7 @@ export async function POST(
       }),
     );
 
-    // 2) Backend direkt befüllen – ohne Cropping
+    
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (session?.user?.id) headers["x-user-id"] = session.user.id;
     if (session?.user?.email) headers["x-user-email"] = session.user.email!;
@@ -59,7 +59,7 @@ export async function POST(
       return NextResponse.json(data, { status: 200 });
     }
 
-    // 3) Fallback: alter Proxy (nur wenn nötig)
+    
     const fallbackForm = new FormData();
     form.forEach((v, k) => fallbackForm.append(k, v));
     fallbackForm.set("preserveOriginal", "1");

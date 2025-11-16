@@ -31,7 +31,7 @@ export default function AdminHomePage() {
           </CardContent>
         </Card>
 
-        {/* Neuer Bereich für von Kund:innen erstellte Sets */}
+        {}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

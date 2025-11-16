@@ -1,4 +1,4 @@
-// custom-elements/pyramid.tsx
+
 import { PlateElement, type PlateElementProps } from "platejs/react";
 import { type TPyramidGroupElement } from "../plugins/pyramid-plugin";
 

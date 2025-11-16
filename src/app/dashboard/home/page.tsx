@@ -128,7 +128,7 @@ export default function DashboardHome() {
   useEffect(() => {
     const loadPosts = async () => {
       try {
-        // Show loading spinner on initial load, skeletons on page changes
+        
         if (isInitialLoad) {
           setIsLoadingPosts(true);
           setIsInitialLoad(false);
@@ -151,8 +151,8 @@ export default function DashboardHome() {
           : [];
         setPosts(sanitized);
 
-        // For pagination, we need to get the actual total count of valid posts
-        // This is a temporary solution - ideally the backend should handle filtering
+        
+        
         const totalValidPosts = data.totalCount || 0;
         setTotalPosts(totalValidPosts);
         setTotalPages(Math.ceil(totalValidPosts / POSTS_PER_PAGE) || 1);
@@ -218,7 +218,7 @@ export default function DashboardHome() {
     }
   }, [posts, sortOption]);
 
-  // Fill up to POSTS_PER_PAGE with dummy posts
+  
   const postsWithDummies = useMemo(() => {
     const realPostsCount = postCards.length;
     const dummyCount = Math.max(0, POSTS_PER_PAGE - realPostsCount);
@@ -678,14 +678,14 @@ export default function DashboardHome() {
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
               {postsWithDummies.map((post) => {
                 if ((post as any).isDummy) {
-                  // Render dummy post
+                  
                   return <DummyPost key={post.id} />;
                 }
 
-                // Type guard to ensure this is a real post
+                
                 const realPost = post as (typeof postCards)[0];
 
-                // Render real post
+                
                 return (
                   <button
                     type="button"

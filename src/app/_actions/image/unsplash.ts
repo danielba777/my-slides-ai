@@ -34,16 +34,16 @@ export async function getImageFromUnsplash(
   query: string,
   _layoutType?: LayoutType,
 ): Promise<{ success: boolean; imageUrl?: string; error?: string }> {
-  // Get the current session
+  
   const session = await auth();
 
-  // Check if user is authenticated
+  
   if (!session?.user?.id) {
     return { success: false, error: "You must be logged in to get images" };
   }
   const orientationQuery = "&orientation=landscape";
   try {
-    // Search for images
+    
     const response = await fetch(
       `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&page=1&per_page=1${orientationQuery}`,
       {
@@ -68,7 +68,7 @@ export async function getImageFromUnsplash(
       return { success: false, error: "No images found for this query" };
     }
 
-    // Return the image URL directly without storing in database
+    
     return {
       success: true,
       imageUrl: firstImage.urls.regular,

@@ -117,7 +117,7 @@ export function RecentPresentations() {
       setIsNavigating(presentation.id);
       setCurrentPresentation(presentation.id, presentation.title);
 
-      // Check presentation status
+      
       const response = await getPresentationContent(presentation.id);
 
       if (!response.success) {
@@ -126,7 +126,7 @@ export function RecentPresentations() {
         );
       }
 
-      // Route based on content status
+      
       if (
         (response?.presentation?.content as { slides: unknown[] })?.slides
           ?.length > 0

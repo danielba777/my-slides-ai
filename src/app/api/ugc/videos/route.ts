@@ -11,10 +11,10 @@ const createVideoSchema = z.object({
   reactionAvatarId: z.string().trim().min(1, "reactionAvatarId is required"),
   demoVideoId: z.string().trim().min(1).optional().or(z.literal("")).nullable(),
   title: z.string().trim().max(120).optional(),
-  // NEU: Hook-Text wirklich einbrennen wie in der Preview
+  
   overlayText: z.string().trim().max(180).optional(),
   overlayPosition: z.enum(["upper", "middle"]).optional(),
-  soundUrl: z.string().trim().url().optional(), // optionaler Sound-URL
+  soundUrl: z.string().trim().url().optional(), 
 });
 
 export async function GET() {
@@ -95,7 +95,7 @@ export async function POST(req: Request) {
       userId: session.user.id,
       overlayText: overlayText ?? title ?? undefined,
       overlayPosition: overlayPosition ?? "upper",
-      soundUrl, // optional
+      soundUrl, 
     });
 
     const video = await db.userUGCVideo.create({

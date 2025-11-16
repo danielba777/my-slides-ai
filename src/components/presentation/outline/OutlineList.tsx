@@ -76,7 +76,7 @@ export function OutlineList() {
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
         const newItems = arrayMove(items, oldIndex, newIndex);
-        // Update the outline in the store
+        
         setOutline(newItems.map((item) => item.title));
         return newItems;
       });
@@ -88,7 +88,7 @@ export function OutlineList() {
       const newItems = items.map((item) =>
         item.id === id ? { ...item, title: newTitle } : item,
       );
-      // Update the outline in the store
+      
       setOutline(newItems.map((item) => item.title));
       return newItems;
     });
@@ -103,14 +103,14 @@ export function OutlineList() {
         : "1";
     const newItems = [...items, { id: newId, title: "New Card" }];
     setItems(newItems);
-    // Update the outline in the store
+    
     setOutline(newItems.map((item) => item.title));
   };
 
   const handleDeleteCard = (id: string) => {
     setItems((items) => {
       const newItems = items.filter((item) => item.id !== id);
-      // Update the outline in the store
+      
       setOutline(newItems.map((item) => item.title));
       return newItems;
     });
@@ -121,10 +121,10 @@ export function OutlineList() {
     const loadedCount = items.length;
     const remainingCount = Math.max(0, totalSlides - loadedCount);
 
-    // Show skeleton placeholders when web search is enabled and outline is empty (before generation starts)
+    
     const showSkeletonPlaceholders =
       webSearchEnabled && items.length === 0 && !isGeneratingOutline;
-    // Show loading skeletons only when actually generating outline
+    
     const showLoadingSkeletons = isGeneratingOutline && remainingCount > 0;
 
     return (
@@ -147,10 +147,10 @@ export function OutlineList() {
             ))}
           </div>
         </SortableContext>
-        {/* Show skeleton placeholders when web search enabled but no outline yet */}
+        {}
         {showSkeletonPlaceholders && <Skeleton className="h-96 w-full" />}
 
-        {/* Show loading skeletons only when actually generating */}
+        {}
         {showLoadingSkeletons &&
           Array.from({ length: remainingCount }).map((_, index) => (
             <Skeleton key={`loading-${index}`} className="h-16 w-full" />

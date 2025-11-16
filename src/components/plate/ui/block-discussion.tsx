@@ -1,4 +1,4 @@
-/* eslint-disable react/display-name */
+
 "use client";
 
 import * as React from "react";
@@ -52,7 +52,7 @@ export const BlockDiscussion: RenderNodeWrapper<AnyPluginConfig> = (props) => {
   const commentsApi = editor.getApi(CommentPlugin).comment;
   const blockPath = editor.api.findPath(element);
 
-  // avoid duplicate in table or column
+  
   if (!blockPath || blockPath.length > 1) return;
 
   const draftCommentNode = commentsApi.node({ at: blockPath, isDraft: true });
@@ -128,7 +128,7 @@ const BlockCommentContent = ({
 
   const [_open, setOpen] = React.useState(selected);
 
-  // in some cases, we may comment the multiple blocks
+  
   const commentingCurrent =
     !!commentingBlock && PathApi.equals(blockPath, commentingBlock);
 
@@ -324,7 +324,7 @@ const useResolvedDiscussion = (
 
     const previousPath = map.get(id);
 
-    // If there are no comment nodes in the corresponding path in the map, then update it.
+    
     if (PathApi.isPath(previousPath)) {
       const nodes = api.comment.node({ id, at: previousPath });
 
@@ -335,7 +335,7 @@ const useResolvedDiscussion = (
 
       return;
     }
-    // TODO: fix throw error
+    
     setOption("uniquePathMap", new Map(map).set(id, blockPath));
   });
 
@@ -349,7 +349,7 @@ const useResolvedDiscussion = (
       createdAt: new Date(d.createdAt),
     }))
     .filter((item: TDiscussion) => {
-      /** If comment cross blocks just show it in the first block */
+      
       const commentsPathMap = getOption("uniquePathMap");
       const firstBlockPath = commentsPathMap.get(item.id);
 

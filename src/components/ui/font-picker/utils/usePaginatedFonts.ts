@@ -1,35 +1,35 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type Font } from "../types";
-// Hook for paginated font loading with virtual scrolling
+
 export function usePaginatedFonts(
   fonts: Font[],
   searchValue: string,
   chunkSize: number = 50,
 ) {
   const [visibleCount, setVisibleCount] = useState(chunkSize);
-  const [isLoadingMore, setIsLoadingMore] = useState(false); // Filter fonts based on search - immediate, no debounce
+  const [isLoadingMore, setIsLoadingMore] = useState(false); 
 
   const filteredFonts = useMemo(() => {
     if (!searchValue.trim()) return fonts;
     const searchTerm = searchValue.toLowerCase();
     return fonts.filter((font) => font.name.toLowerCase().includes(searchTerm));
-  }, [fonts, searchValue]); // Get visible fonts (paginated)
+  }, [fonts, searchValue]); 
 
   const visibleFonts = useMemo(() => {
     return filteredFonts.slice(0, visibleCount);
-  }, [filteredFonts, visibleCount]); // Load more fonts
+  }, [filteredFonts, visibleCount]); 
 
   const loadMore = useCallback(() => {
     if (isLoadingMore || visibleCount >= filteredFonts.length) return;
 
-    setIsLoadingMore(true); // Small delay to prevent too many rapid calls
+    setIsLoadingMore(true); 
     setTimeout(() => {
       setVisibleCount((prev) =>
         Math.min(prev + chunkSize, filteredFonts.length),
       );
       setIsLoadingMore(false);
     }, 100);
-  }, [isLoadingMore, visibleCount, filteredFonts.length, chunkSize]); // Reset visible count when search changes
+  }, [isLoadingMore, visibleCount, filteredFonts.length, chunkSize]); 
 
   useEffect(() => {
     setVisibleCount(chunkSize);

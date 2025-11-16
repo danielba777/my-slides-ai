@@ -21,7 +21,7 @@ export default function ButtonElement(
 
   const variantClasses =
     variant === "outline"
-      ? "border" // colors styled inline via CSS vars below
+      ? "border" 
       : variant === "ghost"
         ? "bg-transparent"
         : "shadow-sm";
@@ -41,7 +41,7 @@ export default function ButtonElement(
         backgroundColor: "transparent",
       } as React.CSSProperties;
     }
-    // filled
+    
     return {
       backgroundColor:
         (props.element.color as string) || "var(--presentation-primary)",

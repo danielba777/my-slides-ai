@@ -1,8 +1,8 @@
-// src/app/api/fal/pika-image-to-video/route.ts
+
 import { pikaImageToVideo } from "@/server/vendors/fal";
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "nodejs"; // nicht "edge", damit es überall stabil ist
+export const runtime = "nodejs"; 
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       { status: 200 },
     );
   } catch (err: unknown) {
-    // sauberere Fehlerausgabe
+    
     const msg =
       err instanceof Error
         ? err.message
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
           ? err
           : "Unknown error";
 
-    // Hinweise auf typische Konfig-Fehler
+    
     const hint = /User 'v2\.2' not found/i.test(msg)
       ? "Fal meldet: User 'v2.2' not found → Bitte KEINE baseUrl/FAL_QUEUE_BASE_URL setzen und nur @fal-ai/client verwenden."
       : /JSON decode error|422/i.test(msg)

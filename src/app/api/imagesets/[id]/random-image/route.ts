@@ -1,4 +1,4 @@
-// src/app/api/imagesets/[id]/random-image/route.ts
+
 import { auth } from "@/server/auth";
 import { NextRequest, NextResponse } from "next/server";
 

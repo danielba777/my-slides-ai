@@ -64,9 +64,9 @@ export function ToolbarSeparator({
   );
 }
 
-// From toggleVariants
+
 const toolbarButtonVariants = cva(
-  // Angleichen an Side-Menü: klare Kanten, Border, leichte Card-Optik
+  
   "inline-flex items-center justify-center whitespace-nowrap rounded-xl border border-border/80 bg-background/90 text-sm font-medium shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-0 disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-muted data-[state=open]:text-foreground",
   {
     defaultVariants: {
@@ -336,7 +336,7 @@ function withTooltip<T extends React.ElementType>(Component: T) {
 function TooltipContent({
   children,
   className,
-  // CHANGE
+  
   sideOffset = 4,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
@@ -352,8 +352,8 @@ function TooltipContent({
         {...props}
       >
         {children}
-        {/* CHANGE */}
-        {/* <TooltipPrimitive.Arrow className="z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px] bg-primary fill-primary" /> */}
+        {}
+        {}
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   );

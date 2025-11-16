@@ -26,14 +26,14 @@ export function MentionElementStatic(
       {...props}
     >
       {IS_APPLE ? (
-        // Mac OS IME https://github.com/ianstormtaylor/slate/issues/3490
+        
         <React.Fragment>
           {props.children}
           {prefix}
           {element.value}
         </React.Fragment>
       ) : (
-        // Others like Android https://github.com/ianstormtaylor/slate/pull/5360
+        
         <React.Fragment>
           {prefix}
           {element.value}

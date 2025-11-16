@@ -20,7 +20,7 @@ import { type ImageCropSettings } from "../../utils/types";
 import { useDraggable } from "../dnd/hooks/useDraggable";
 import { PresentationImageEditor } from "./presentation-image-editor";
 
-// ImageCropSettings imported from shared types; includes optional zoom
+
 
 export interface PresentationImageElementProps {
   className?: string;
@@ -53,7 +53,7 @@ export const PresentationImageElement = withHOC(
       const imageModel = usePresentationState((s) => s.imageModel);
       const hasHandledGenerationRef = useRef(false);
 
-      // Get crop settings from element or use defaults
+      
       const cropSettings: ImageCropSettings = props.element.cropSettings || {
         objectFit: "cover",
         objectPosition: { x: 50, y: 50 },
@@ -63,7 +63,7 @@ export const PresentationImageElement = withHOC(
       const generateImage = async (prompt: string) => {
         const container = document.querySelector(".presentation-slides");
         const isEditorReadOnly = !container?.contains(imageRef?.current);
-        // Prevent image generation in read-only mode
+        
         console.log(isEditorReadOnly, hasHandledGenerationRef.current);
         if (isEditorReadOnly) {
           return;
@@ -74,7 +74,7 @@ export const PresentationImageElement = withHOC(
           let result;
 
           if (imageSource === "stock") {
-            // Use Unsplash for stock images
+            
             const unsplashResult = await getImageFromUnsplash(prompt);
             if (unsplashResult.success && unsplashResult.imageUrl) {
               result = {
@@ -83,7 +83,7 @@ export const PresentationImageElement = withHOC(
               };
             }
           } else {
-            // Use AI generation
+            
             result = await generateImageAction(prompt, imageModel);
           }
 
@@ -97,15 +97,15 @@ export const PresentationImageElement = withHOC(
             const newImageUrl = result.image.url;
             setImageUrl(newImageUrl);
 
-            // Update the element's URL and query in the editor
+            
             editor.tf.setNodes<TImageElement>({
               ...props.element,
               url: newImageUrl,
               query: prompt,
-              cropSettings: cropSettings, // Preserve crop settings
+              cropSettings: cropSettings, 
             });
 
-            // Force an immediate save to ensure the image URL is persisted
+            
             setTimeout(() => {
               void saveImmediately();
             }, 500);
@@ -117,9 +117,9 @@ export const PresentationImageElement = withHOC(
         }
       };
 
-      // Generate image if query is provided but no URL exists
+      
       useEffect(() => {
-        // Skip if in read-only mode, we've already handled this element, or if there's no query or if URL already exists
+        
         if (
           hasHandledGenerationRef.current ||
           !props.element.query ||
@@ -129,7 +129,7 @@ export const PresentationImageElement = withHOC(
           return;
         }
 
-        // Use the same generateImage function we defined above
+        
         if (props.element.query) {
           void generateImage(props.element.query);
         }
@@ -140,7 +140,7 @@ export const PresentationImageElement = withHOC(
         props.element.setNodeValue,
       ]);
 
-      // Apply crop settings to the image
+      
       const imageStyles: React.CSSProperties = {
         objectFit: cropSettings.objectFit,
         objectPosition: `${cropSettings.objectPosition.x}% ${cropSettings.objectPosition.y}%`,
@@ -195,7 +195,7 @@ export const PresentationImageElement = withHOC(
                         )}
                         alt={props.element.query ?? ""}
                         src={imageUrl}
-                        style={imageStyles} // Add crop styles
+                        style={imageStyles} 
                         onError={(e) => {
                           console.error(
                             "Presentation image failed to load:",
@@ -219,7 +219,7 @@ export const PresentationImageElement = withHOC(
             </PlateElement>
           </MediaToolbar>
 
-          {/* Image Editor Sheet */}
+          {}
           <PresentationImageEditor
             open={isSheetOpen}
             onOpenChange={setIsSheetOpen}

@@ -144,7 +144,7 @@ export function PresentationItem({
       setIsNavigating(true);
       setCurrentPresentation(presentation.id, presentation.title);
 
-      // Check presentation status
+      
       const response = await getPresentationContent(presentation.id);
 
       if (!response.success) {
@@ -154,7 +154,7 @@ export function PresentationItem({
       }
 
       console.log(response);
-      // Route based on content status
+      
       if (Object.keys(response?.presentation?.content ?? {}).length > 0) {
         router.push(`/dashboard/slideshows/${presentation.id}`);
       } else {

@@ -51,7 +51,7 @@ export const ImageCollectionSelector: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"community" | "mine">("community");
   const [allOwned, setAllOwned] = useState<Set<string>>(new Set());
 
-  // Drill-down navigation state
+  
   const [drillDownParent, setDrillDownParent] = useState<ImageSet | null>(null);
 
   const loadImageSets = useCallback(async () => {
@@ -97,7 +97,7 @@ export const ImageCollectionSelector: React.FC = () => {
   useEffect(() => {
     if (isDialogOpen) {
       setPendingSetId(imageSetId ?? null);
-      setDrillDownParent(null); // Reset drill-down when opening dialog
+      setDrillDownParent(null); 
     }
   }, [isDialogOpen, imageSetId]);
 
@@ -117,7 +117,7 @@ export const ImageCollectionSelector: React.FC = () => {
     );
   }, []);
 
-  // Korrigierte Signatur: nimmt ein ImageSet entgegen und liefert boolean
+  
   const looksPersonal = useCallback(
     (set: ImageSet) =>
       hasPersonalCategoryTag(set.category) ||
@@ -126,7 +126,7 @@ export const ImageCollectionSelector: React.FC = () => {
     [],
   );
 
-  // "looksPersonal" darf NICHT dazu führen, dass fremde Sets angezeigt werden!
+  
   const belongsToUser = useCallback(
     (set: ImageSet) =>
       checkOwnership(set, userId ?? null) || isAiAvatarCollection(set),
@@ -134,9 +134,9 @@ export const ImageCollectionSelector: React.FC = () => {
   );
 
   const availableCollections = useMemo(() => {
-    // Kein direkter Zugriff mehr auf drillDownParent.id -> verhindert TS "never"
+    
     if (!drillDownParent) {
-      // Top-Level Ansicht
+      
       return imageSets
         .filter((set) => !set.parentId)
         .filter(belongsToUser)
@@ -168,7 +168,7 @@ export const ImageCollectionSelector: React.FC = () => {
   ]);
 
   const { communitySets, mySets } = useMemo(() => {
-    // DRILLDOWN: nur Kinder des gewählten Parents
+    
     if (drillDownParent) {
       const parentId = drillDownParent?.id ?? null;
       const children: ImageSet[] =
@@ -182,17 +182,17 @@ export const ImageCollectionSelector: React.FC = () => {
       const mine = children.filter(belongsToUser);
       const community = children.filter(
         (s) =>
-          // absolut keine User-Collections (von irgendwem)
+          
           !allOwned.has(s.id) &&
-          // keine Personal/Private Tags
+          
           !looksPersonal(s) &&
-          // AI Avatars niemals in Community
+          
           !isAiAvatarCollection(s),
       );
       return { communitySets: community, mySets: mine };
     }
 
-    // TOP-LEVEL: nur Wurzeln
+    
     const topLevel = imageSets.filter((s) => !s.parentId);
     const mine = topLevel.filter(belongsToUser);
     const community = topLevel.filter(
@@ -210,16 +210,16 @@ export const ImageCollectionSelector: React.FC = () => {
   ]);
 
   const handleSelectSet = (set: ImageSet) => {
-    // Check if this set has children
+    
     const hasChildren =
       (set.children && set.children.length > 0) ||
       (set._count?.children && set._count.children > 0);
 
     if (hasChildren) {
-      // Drill down to show only children
+      
       setDrillDownParent(set);
     } else {
-      // Directly select this set
+      
       setPendingSetId(set.id);
     }
   };
@@ -237,12 +237,12 @@ export const ImageCollectionSelector: React.FC = () => {
   };
 
   const getPreviewImages = (set: ImageSet): ImageSetImage[] => {
-    // If this set has its own images, use them
+    
     if (Array.isArray(set.images) && set.images.length > 0) {
       return set.images.slice(0, 5);
     }
 
-    // If this set has children but no own images, use mixed preview
+    
     if (set.children && set.children.length > 0) {
       return getMixedPreviewImages(set);
     }
@@ -251,9 +251,9 @@ export const ImageCollectionSelector: React.FC = () => {
   };
 
   const getMixedPreviewImages = (parent: ImageSet): ImageSetImage[] => {
-    // Create a mixed preview from all children
+    
     if (!parent.children || parent.children.length === 0) {
-      // Fallback: use parent's own images if available
+      
       if (Array.isArray(parent.images) && parent.images.length > 0) {
         return parent.images.slice(0, 5);
       }
@@ -266,14 +266,14 @@ export const ImageCollectionSelector: React.FC = () => {
     );
 
     if (childrenWithImages.length === 0) {
-      // If no children have images, use parent's own images if available
+      
       if (Array.isArray(parent.images) && parent.images.length > 0) {
         return parent.images.slice(0, 5);
       }
       return [];
     }
 
-    // Distribute images evenly across children (round-robin)
+    
     let childIndex = 0;
     while (
       mixedImages.length < 5 &&
@@ -298,7 +298,7 @@ export const ImageCollectionSelector: React.FC = () => {
 
       childIndex++;
 
-      // Break if we've exhausted all images
+      
       if (childIndex >= childrenWithImages.length * 10) break;
     }
 
@@ -317,13 +317,13 @@ export const ImageCollectionSelector: React.FC = () => {
     }
 
     if (!sets.length && !drillDownParent) {
-      return null; // Wenn keine Sets vorhanden sind, nichts anzeigen
+      return null; 
     }
 
     return (
       <ScrollArea className="h-full max-h-full pr-0 scrollbar-hide">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {/* "All Images" Option when drilling down */}
+          {}
           {drillDownParent && (
             <div
               key="all-images"
@@ -376,7 +376,7 @@ export const ImageCollectionSelector: React.FC = () => {
             </div>
           )}
 
-          {/* Regular image sets */}
+          {}
           {sets.map((set) => {
             const previewImages = getPreviewImages(set);
 
@@ -522,7 +522,7 @@ export const ImageCollectionSelector: React.FC = () => {
             </div>
           </DialogHeader>
 
-          {/* Scrollbarer Mittelteil (behält feste Außenmaße bei) */}
+          {}
           <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 overscroll-contain scrollbar-hide">
             <Tabs
               value={activeTab}
@@ -560,7 +560,7 @@ export const ImageCollectionSelector: React.FC = () => {
             </Tabs>
           </div>
 
-          {/* Fixer Footer */}
+          {}
           <div
             className="
               shrink-0 border-t

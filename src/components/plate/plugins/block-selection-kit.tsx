@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: This use requires any */
+
 "use client";
 
 import { BlockSelectionPlugin } from "@platejs/selection/react";
@@ -32,18 +32,18 @@ export const BlockSelectionKit = [
       const selectedIds = editor.getOption(BlockSelectionPlugin, "selectedIds");
 
       if (selectedIds?.size === 0) {
-        // First press: select current block
+        
         const currentBlock = editor.api.block({ at: editor.selection?.focus });
         if (currentBlock) {
           const [block] = currentBlock;
           if (block.id) {
             api.blockSelection.set([block.id as string]);
-            return true; // Indicate we handled it
+            return true; 
           }
         }
       }
 
-      // Second press or fallback: select all blocks
+      
       const ids = editor.api
         .blocks({
           at: [],

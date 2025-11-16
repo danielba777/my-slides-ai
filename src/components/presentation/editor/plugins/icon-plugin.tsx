@@ -3,7 +3,7 @@ import { createTPlatePlugin } from "platejs/react";
 import { Icon } from "../custom-elements/icon";
 import { ICON_ELEMENT } from "../lib";
 
-// Create plugin for d item
+
 export const IconPlugin = createTPlatePlugin({
   key: ICON_ELEMENT,
   node: {

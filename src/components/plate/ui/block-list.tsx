@@ -1,4 +1,4 @@
-/* eslint-disable react/display-name */
+
 "use client";
 
 import type React from "react";

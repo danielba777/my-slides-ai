@@ -40,28 +40,23 @@ import {
 type TextBgMode = "block" | "blob";
 
 type LegacyEditorToolbarProps = {
-  /** Wird beim Klick auf „Text +" aufgerufen */
+  
   onAddText?: () => void;
-  /** Vorhandene (legacy) Controls werden hier gerendert */
+  
   children: React.ReactNode;
   className?: string;
   selectedText?: SlideTextElement | null;
-  // Patch kommt teils mit Zusatzfeldern aus der Toolbar (fill, stroke, fontWeight etc.)
+  
   onChangeSelectedText?: (
     patch: Partial<SlideTextElement> & Record<string, unknown>,
   ) => void;
-  /** Callback zum Schließen der Toolbar */
+  
   onClose?: () => void;
-  /** Toggle "Dim background" for the current slide (only BG image) */
+  
   onToggleDim?: () => void;
 };
 
-/**
- * Ultra-kompakte, moderne Toolbar (iOS-like):
- * – Primärzeile mit: „+ Text", Ausrichtung, BG-Toggle (mit Mini-Panel)
- * – Legacy-Controls wandern sauber in ein Collapsible
- * – Breite: niemals größer als Parent (Canvas) – der Parent begrenzt das maxWidth
- */
+
 function LegacyEditorToolbar({
   onAddText,
   children,
@@ -84,8 +79,8 @@ function LegacyEditorToolbar({
   const [textBgRadius, setTextBgRadius] = React.useState(
     TIKTOK_BACKGROUND_RADIUS,
   );
-  // Default: 0 => Hintergrund aus
-  const [textBgOpacity, setTextBgOpacity] = React.useState(0); // 0-100
+  
+  const [textBgOpacity, setTextBgOpacity] = React.useState(0); 
   const [textBgColor, setTextBgColor] = React.useState<string>(
     TIKTOK_BACKGROUND_COLOR,
   );
@@ -146,7 +141,7 @@ function LegacyEditorToolbar({
         textBgPadding ??
         TIKTOK_BACKGROUND_PADDING;
       return {
-        // "enabled" wird implizit ueber Opazitaet gesteuert:
+        
         enabled: nextOpacity > 0,
         mode: overrides?.mode ?? textBgMode ?? TIKTOK_BACKGROUND_MODE,
         color:
@@ -182,7 +177,7 @@ function LegacyEditorToolbar({
     [buildBackground, onChangeSelectedText],
   );
 
-  // Kein expliziter Toggle mehr nötig – Opazität 0 = aus, >0 = an
+  
 
   const handleModeChange = useCallback(
     (mode: TextBgMode) => {
@@ -193,7 +188,7 @@ function LegacyEditorToolbar({
     [commitBackground, hasSelection],
   );
 
-  // 🔁 Bold toggeln (an/aus) – Status in Button widerspiegeln
+  
   const toggleBold = () => {
     if (!hasSelection) return;
     const next = String(selectedFontWeight) === "bold" ? "regular" : "bold";
@@ -206,7 +201,7 @@ function LegacyEditorToolbar({
   const setAlign = (a: "left" | "center" | "right") =>
     onChangeSelectedText?.({ ...selectedText!, align: a });
 
-  // ✅ Schöne, klare Custom-Icons für Outline / Background (weißes „A")
+  
   const IconTextOutlineA = (props: React.SVGProps<SVGSVGElement>) => (
     <svg
       viewBox="0 0 24 24"
@@ -261,7 +256,7 @@ function LegacyEditorToolbar({
       aria-hidden="true"
       {...props}
     >
-      {/* vollständig schwarze Box */}
+      {}
       <rect
         x="3"
         y="5"
@@ -293,10 +288,10 @@ function LegacyEditorToolbar({
       role="toolbar"
       aria-label="Canvas toolbar"
     >
-      {/* === TikTok-Style: Add Text + Outline Toggle + Text BG Toggle === */}
+      {}
       <div className="flex items-center justify-between gap-2 px-3 py-1.5">
         <div className="flex items-center gap-2">
-          {/* Add text */}
+          {}
           <Button
             variant="secondary"
             className="rounded-xl px-3"
@@ -307,7 +302,7 @@ function LegacyEditorToolbar({
             <Plus className="mr-1 h-4 w-4" /> Text
           </Button>
 
-          {/* Text outline (toggle, unified styling) */}
+          {}
           <Button
             variant="ghost"
             size="icon"
@@ -348,7 +343,7 @@ function LegacyEditorToolbar({
             <IconTextOutlineA className="h-4 w-4" />
           </Button>
 
-          {/* Text background (toggle, unified styling) */}
+          {}
           <Button
             variant="ghost"
             size="icon"
@@ -406,7 +401,7 @@ function LegacyEditorToolbar({
             <IconTextBackgroundA className="h-4 w-4" />
           </Button>
 
-          {/* Bold (toggle) */}
+          {}
           <Button
             variant="ghost"
             size="icon"
@@ -419,7 +414,7 @@ function LegacyEditorToolbar({
             <LucideBold className="h-4 w-4" />
           </Button>
 
-          {/* Text-Ausrichtung (kompakt als Overlay-Menü) */}
+          {}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -472,10 +467,10 @@ function LegacyEditorToolbar({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Vertical align wurde entfernt: Text ist immer vertikal zentriert */}
+          {}
         </div>
 
-        {/* Done Button - rechts oben */}
+        {}
         {onClose && (
           <Button
             size="icon"
@@ -490,7 +485,7 @@ function LegacyEditorToolbar({
         )}
       </div>
 
-      {/* Sekundärzeile: vereinfachte "Optionen" */}
+      {}
       <div className="border-t px-3">
         <Collapsible>
           <CollapsibleTrigger asChild>
@@ -506,7 +501,7 @@ function LegacyEditorToolbar({
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-2 space-y-3">
             <div className="flex flex-wrap items-center gap-4 py-1.5">
-              {/* Farben als gefüllte Swatches + größere Labels */}
+              {}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground min-w-[72px]">
                   Text
@@ -597,7 +592,7 @@ function LegacyEditorToolbar({
 }
 export default LegacyEditorToolbar;
 
-// -------- Mini Range Control (kompakt & einheitlich) ----------
+
 function MiniRange({
   label,
   min,

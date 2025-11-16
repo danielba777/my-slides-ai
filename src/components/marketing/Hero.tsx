@@ -129,7 +129,7 @@ export function MarketingHero({
     const perRow = HERO_POSTERS_PER_ROW;
     const totalRows = HERO_POSTER_ROWS;
 
-    // Until we have real images, render nothing (no placeholders).
+    
     if (!posterImages.length) return [];
 
     const rows: string[][] = [];
@@ -141,12 +141,12 @@ export function MarketingHero({
     return rows;
   }, [posterImages]);
 
-  // TikTok-Bilder NICHT über next/image rendern (Host-Whitelist von Next schlägt oft zu).
-  // Alles andere weiter mit next/image (Optimierung bleibt erhalten).
+  
+  
   const isTikTokCdn = (urlStr: string) => {
     try {
       const u = new URL(urlStr);
-      // Beispiele: p16-pu-sign-no.tiktokcdn-eu.com, p19-common-sign-useastred.tiktokcdn-eu.com, ...
+      
       return /(^|\.)tiktokcdn(?:-eu)?\.com$/i.test(u.hostname);
     } catch {
       return false;
@@ -155,7 +155,7 @@ export function MarketingHero({
 
   return (
     <Section className="relative sm:min-h-[55vh] overflow-hidden bg-[#111] py-0">
-      {/* Mobile Header rendered directly in hero */}
+      {}
       <div className="md:hidden absolute inset-x-0 top-0 z-30 px-4 pt-6">
         <div className="flex items-center justify-between text-white">
           <Link href="/" className="flex items-center gap-2">
@@ -174,13 +174,13 @@ export function MarketingHero({
           </button>
         </div>
       </div>
-      {/* Netflix Background - Fixed z-index hierarchy */}
+      {}
       {posterMatrix.length > 0 && (
         <div className="hero-background-container">
-          {/* Gradient Overlay */}
+          {}
           <div className="hero-gradient-overlay" />
 
-          {/* Animated Background */}
+          {}
           <div className="hero-perspective-wrapper">
             <div className="hero-animated-grid">
               {posterMatrix.map((row, rowIndex) => (
@@ -191,7 +191,7 @@ export function MarketingHero({
                       className="hero-image-card"
                     >
                       {isTikTokCdn(imageUrl) ? (
-                        // Fallback auf <img> für TikTok-CDNs → keine Next-Whitelist nötig
+                        
                         <img
                           src={imageUrl}
                           alt=""
@@ -204,12 +204,12 @@ export function MarketingHero({
                           src={imageUrl}
                           alt=""
                           fill
-                          /* Nur für die kleinen Kacheln: extrem klein halten */
+                          
                           sizes="125px"
-                          /* Next darf optimieren -> erzeugt AVIF/WebP automatisch */
+                          
                           quality={60}
-                          // Avoid Next.js runtime error: can't set both priority and loading
-                          // Use priority for first 2 rows, lazy for the rest
+                          
+                          
                           priority={rowIndex < 2}
                           loading={rowIndex < 2 ? undefined : "lazy"}
                           style={{

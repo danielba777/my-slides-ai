@@ -194,7 +194,7 @@ export default function AccountDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {}
       <div className="flex items-center gap-4">
         <Link
           href="/admin/slideshow-library/accounts"
@@ -232,7 +232,7 @@ export default function AccountDetailPage() {
         </div>
       </div>
 
-      {/* Account Info */}
+      {}
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-start gap-6">
@@ -289,7 +289,7 @@ export default function AccountDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Posts */}
+      {}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Posts ({account.posts.length})</h2>
         <Link
@@ -335,7 +335,7 @@ export default function AccountDetailPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Slideshow Preview */}
+                {}
                 <div className="grid grid-cols-3 gap-1">
                   {post.slides.slice(0, 3).map((slide, index) => (
                     <div key={slide.id} className="aspect-square">

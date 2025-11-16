@@ -37,7 +37,7 @@ const testimonials = [
 export function MarketingTestimonials() {
   return (
     <Section>
-      {/* Testimonials Grid */}
+      {}
       <div className="grid gap-6 sm:grid-cols-2">
         {testimonials.map((t, i) => (
           <div key={t.name}>
@@ -49,7 +49,7 @@ export function MarketingTestimonials() {
               "
             >
               <CardContent className="p-6 sm:p-7 flex flex-col h-full">
-                {/* Sterne */}
+                {}
                 <div className="flex gap-0.5 mb-3">
                   {Array.from({ length: 5 }).map((_, idx) => (
                     <Star
@@ -63,12 +63,12 @@ export function MarketingTestimonials() {
                   ))}
                 </div>
 
-                {/* Text */}
+                {}
                 <p className="text-base text-zinc-800 leading-relaxed flex-1 font-medium">
                   {t.text}
                 </p>
 
-                {/* Person */}
+                {}
                 <div className="flex items-center gap-4 mt-6">
                   <div className="h-12 w-12 rounded-full overflow-hidden border border-[#304674]/30">
                     <img

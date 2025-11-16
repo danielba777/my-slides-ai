@@ -7,7 +7,7 @@ import { SlateElement } from "platejs";
 import { cn } from "@/lib/utils";
 import { type ImageCropSettings } from "../../../utils/types";
 
-// Static renderer for presentation image that preserves crop styles
+
 export function PresentationImageElementStatic(
   props: SlateElementProps<
     TImageElement & {
@@ -31,7 +31,7 @@ export function PresentationImageElementStatic(
 
   return (
     <SlateElement {...props} className={cn(props.className)}>
-      {/** biome-ignore lint/performance/noImgElement: This is a valid use case */}
+      {}
       <img
         src={url}
         alt={query ?? ""}

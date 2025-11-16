@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: This use requires any */
+
 "use client";
 
 import * as React from "react";
@@ -135,7 +135,7 @@ export function Comment(props: {
 
   const { tf } = useEditorPlugin(CommentPlugin);
 
-  // Replace to your own backend or refer to potion
+  
   const isMyComment = currentUserId === comment.userId;
 
   const initialValue = comment.contentRich;
@@ -189,7 +189,7 @@ export function Comment(props: {
           <AvatarFallback>{userInfo?.name?.[0]}</AvatarFallback>
         </Avatar>
         <h4 className="mx-2 text-sm font-semibold leading-none">
-          {/* Replace to your own backend or refer to potion */}
+          {}
           {userInfo?.name}
         </h4>
 
@@ -318,7 +318,7 @@ function CommentMoreDropdown(props: {
     if (!comment.id)
       return alert("You are operating too quickly, please try again later.");
 
-    // Find and update the discussion
+    
     const updatedDiscussions = editor
       .getOption(discussionPlugin, "discussions")
       .map((discussion) => {
@@ -342,7 +342,7 @@ function CommentMoreDropdown(props: {
         };
       });
 
-    // Save back to session storage
+    
     editor.setOption(discussionPlugin, "discussions", updatedDiscussions);
     onRemoveComment?.();
   }, [comment.discussionId, comment.id, editor, onRemoveComment]);
@@ -450,10 +450,10 @@ export function CommentCreateForm({
     commentEditor.tf.reset();
 
     if (discussionId) {
-      // Get existing discussion
+      
       const discussion = discussions.find((d) => d.id === discussionId);
       if (!discussion) {
-        // Mock creating suggestion
+        
         const newDiscussion: TDiscussion = {
           id: discussionId,
           comments: [
@@ -478,7 +478,7 @@ export function CommentCreateForm({
         return;
       }
 
-      // Create reply comment
+      
       const comment: TComment = {
         id: nanoid(),
         contentRich: commentValue,
@@ -488,13 +488,13 @@ export function CommentCreateForm({
         userId: editor.getOption(discussionPlugin, "currentUserId"),
       };
 
-      // Add reply to discussion comments
+      
       const updatedDiscussion = {
         ...discussion,
         comments: [...discussion.comments, comment],
       };
 
-      // Filter out old discussion and add updated one
+      
       const updatedDiscussions = discussions
         .filter((d) => d.id !== discussionId)
         .concat(updatedDiscussion);
@@ -515,7 +515,7 @@ export function CommentCreateForm({
       .join("");
 
     const _discussionId = nanoid();
-    // Mock creating new discussion
+    
     const newDiscussion: TDiscussion = {
       id: _discussionId,
       comments: [
@@ -555,7 +555,7 @@ export function CommentCreateForm({
   return (
     <div className={cn("flex w-full", className)}>
       <div className="mr-1 mt-2 shrink-0">
-        {/* Replace to your own backend or refer to potion */}
+        {}
         <Avatar className="size-5">
           <AvatarImage alt={userInfo?.name} src={userInfo?.avatarUrl} />
           <AvatarFallback>{userInfo?.name?.[0]}</AvatarFallback>

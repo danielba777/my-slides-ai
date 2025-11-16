@@ -1,4 +1,4 @@
-// Main visualization item component with withRef pattern
+
 "use client";
 
 import { cn } from "@/lib/utils";

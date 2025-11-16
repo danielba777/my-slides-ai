@@ -71,7 +71,7 @@ export default function LineGraphElement(props: PlateElementProps<TChartNode>) {
             <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
           </LineChart>
         </ChartContainer>
-        {/* non-editable */}
+        {}
       </div>
     </PlateElement>
   );

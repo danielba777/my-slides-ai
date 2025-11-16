@@ -13,7 +13,7 @@ export function PresentationInput({
   const { presentationInput, setPresentationInput, setShowTemplates, selectedTemplate } =
     usePresentationState();
 
-  // If a template is selected, show the preview instead of the input
+  
   if (selectedTemplate) {
     return <TemplatePreview />;
   }
@@ -41,11 +41,7 @@ export function PresentationInput({
           className="h-80 w-full resize-none rounded-lg border border-border bg-card px-4 py-3.5 pb-12 text-base text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
         />
 
-        {/*
-        <div className="absolute bottom-3 right-3 z-10">
-          <WebSearchToggle />
-        </div>
-        */}
+        {}
       </div>
     </div>
   );

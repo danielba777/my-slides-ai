@@ -128,7 +128,7 @@ export default function AdminSounds() {
               )}
               <div className="min-w-0">
                 <div className="font-medium truncate">{it.name}</div>
-                {/* Größe ausgeblendet (KB-Anzeige entfernt) */}
+                {}
               </div>
             </div>
             <a

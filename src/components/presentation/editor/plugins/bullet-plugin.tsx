@@ -4,7 +4,7 @@ import { BulletsElement } from "../custom-elements/bullet";
 import { BulletItem } from "../custom-elements/bullet-item";
 import { BULLET_GROUP, BULLET_ITEM } from "../lib";
 
-// Create plugin for bullets
+
 export const BulletGroupPlugin = createTPlatePlugin({
   key: BULLET_GROUP,
   node: {
@@ -14,7 +14,7 @@ export const BulletGroupPlugin = createTPlatePlugin({
   },
 });
 
-// Create plugin for bullet item
+
 export const BulletItemPlugin = createTPlatePlugin({
   key: BULLET_ITEM,
   node: {

@@ -11,9 +11,9 @@ export default function SmoothHashScroll() {
         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     };
-    // initial
+    
     scrollToHash();
-    // bei nachfolgenden hash-Änderungen
+    
     window.addEventListener("hashchange", scrollToHash);
     return () => window.removeEventListener("hashchange", scrollToHash);
   }, []);

@@ -32,7 +32,7 @@ export async function createPresentation({
   const userId = session.user.id;
 
   try {
-    // Wichtig: Vor dem Anlegen einen Slideshow-Credit atomar verbrauchen
+    
     await ensureAndConsumeCredits(userId, { kind: "slide", cost: 1 });
     const presentation = await db.baseDocument.create({
       data: {
@@ -119,13 +119,13 @@ export async function updatePresentation({
   }
 
   try {
-    // Extract values from content if provided there
+    
     const effectiveTheme = theme;
     const effectiveImageSource = imageSource;
     const effectivePresentationStyle = presentationStyle;
     const effectiveLanguage = language;
 
-    // Update base document with all presentation data
+    
     const presentation = await db.baseDocument.update({
       where: { id },
       data: {
@@ -203,13 +203,13 @@ export async function deletePresentations(ids: string[]) {
   }
 
   try {
-    // Delete the base documents using deleteMany (this will cascade delete the presentations)
+    
     const result = await db.baseDocument.deleteMany({
       where: {
         id: {
           in: ids,
         },
-        userId: session.user.id, // Ensure only user's own presentations can be deleted
+        userId: session.user.id, 
       },
     });
 
@@ -243,7 +243,7 @@ export async function deletePresentations(ids: string[]) {
   }
 }
 
-// Get the presentation with the presentation content
+
 export async function getPresentation(id: string) {
   const session = await auth();
   if (!session?.user) {
@@ -299,7 +299,7 @@ export async function getPresentationContent(id: string) {
       };
     }
 
-    // Check if the user has access to this presentation
+    
     if (presentation.userId !== session.user.id && !presentation.isPublic) {
       return {
         success: false,
@@ -353,7 +353,7 @@ export async function duplicatePresentation(id: string, newTitle?: string) {
   }
 
   try {
-    // Get the original presentation
+    
     const original = await db.baseDocument.findUnique({
       where: { id },
       include: {
@@ -368,7 +368,7 @@ export async function duplicatePresentation(id: string, newTitle?: string) {
       };
     }
 
-    // Create a new presentation with the same content
+    
     const duplicated = await db.baseDocument.create({
       data: {
         type: "PRESENTATION",

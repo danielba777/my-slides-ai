@@ -73,9 +73,9 @@ export function ConnectionCard() {
 
   return (
     <div className="px-1 sm:px-2 lg:px-0">
-      {/* Eine einzelne Card – keine zusätzlichen Headline-Doppler, kein blauer/weißer Balken */}
+      {}
       <div className="rounded-xl border p-4 shadow-none">
-        {/* Top-Zeile im Personal-Stil */}
+        {}
         <div className="mb-4 flex items-center justify-between gap-3">
           <Badge className="border-[#304674]/20 bg-[#304674]/10 px-3 py-1 text-[#304674] hover:bg-[#304674]/10 hover:text-[#304674] cursor-default transition-none">
             <span className="inline-flex items-center gap-2">
@@ -97,7 +97,7 @@ export function ConnectionCard() {
           </div>
         </div>
 
-        {/* Accounts */}
+        {}
         {accountsLoading ? (
           <div className="flex items-center justify-center py-6">
             <Spinner className="h-8 w-8" />

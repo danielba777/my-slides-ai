@@ -60,7 +60,7 @@ export interface MyH2Element extends MyTextBlockElement {
   type: typeof KEYS.h2;
 }
 
-/** Block props */
+
 
 export interface MyH3Element extends MyTextBlockElement {
   type: typeof KEYS.h3;

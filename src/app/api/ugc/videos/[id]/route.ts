@@ -115,7 +115,7 @@ export async function DELETE(_: Request, { params }: RouteParams) {
 
   const { id: videoId } = await params;
 
-  // Zuerst Video holen, um die URL zu haben
+  
   const existing = await db.userUGCVideo.findFirst({
     where: { id: videoId, userId: session.user.id },
     select: { id: true, compositeVideoUrl: true },
@@ -124,7 +124,7 @@ export async function DELETE(_: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // File-Key aus UploadThing-URL extrahieren (letzter Pfadteil)
+  
   const fileKey = (() => {
     const url = existing.compositeVideoUrl || "";
     try {
@@ -136,12 +136,12 @@ export async function DELETE(_: Request, { params }: RouteParams) {
     }
   })();
 
-  // Datei bei UploadThing löschen (best-effort)
+  
   if (fileKey) {
     try {
       await utapi.deleteFiles(fileKey);
     } catch {
-      // kein Hard-Fail – wir löschen trotzdem den DB-Eintrag
+      
     }
   }
 

@@ -38,7 +38,7 @@ export function SidebarUsageSummary() {
   const [isBillingRedirecting, setIsBillingRedirecting] = useState(false);
   const [isPricingOpen, setIsPricingOpen] = useState(false);
 
-  // Get user ID from localStorage for cache tagging
+  
   const getUserId = () => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("uid") ?? "anon";
@@ -190,7 +190,7 @@ export function SidebarUsageSummary() {
             <Dialog open={isPricingOpen} onOpenChange={setIsPricingOpen}>
               <DialogContent className="max-w-7xl w-[98vw]">
                 <DialogTitle className="sr-only">Choose a plan</DialogTitle>
-                {/* Marketing Pricing (identisches Design, im Modal) */}
+                {}
                 <MarketingPricing session={true} compact />
               </DialogContent>
             </Dialog>
@@ -201,10 +201,10 @@ export function SidebarUsageSummary() {
   );
 }
 
-// Export a function to manually refresh usage data
+
 export function refreshUsageData() {
   if (typeof window !== "undefined") {
-    // Trigger revalidation by calling the revalidate endpoint
+    
     const userId = localStorage.getItem("uid") ?? "anon";
     fetch("/api/billing/usage/revalidate", {
       method: "POST",

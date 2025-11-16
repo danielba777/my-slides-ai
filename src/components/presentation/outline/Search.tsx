@@ -12,7 +12,7 @@ export interface SearchResult {
   published_date: string;
   content: string;
 }
-// Searching Component
+
 export function Searching({ query }: { query: string }) {
   return (
     <div className="mb-2 w-full rounded-lg border border-primary/20 bg-background">
@@ -28,7 +28,7 @@ export function Searching({ query }: { query: string }) {
   );
 }
 
-// Searched Component
+
 export function Searched({
   results,
   query,
@@ -64,7 +64,7 @@ export function Searched({
               key={index}
               className="flex items-start gap-3 rounded-lg border border-primary/20 p-3"
             >
-              {/** biome-ignore lint/performance/noImgElement: This is a valid use case */}
+              {}
               <img src={faviconUrl} alt={domain} className="mt-1 h-4 w-4" />
               <div className="min-w-0 flex-1 overflow-hidden">
                 <h4 className="truncate text-sm font-medium">{result.title}</h4>

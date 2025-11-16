@@ -83,7 +83,7 @@ export default function SlideshowPostsPage() {
     return () => {
       window.removeEventListener("focus", handleFocus);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [selectedAccount]);
 
   const loadAccounts = async () => {
@@ -113,7 +113,7 @@ export default function SlideshowPostsPage() {
       if (response.ok) {
         const data = await response.json();
 
-        // Handle different response formats
+        
         let postsData: SlideshowPost[] = [];
         if (Array.isArray(data)) {
           postsData = data;

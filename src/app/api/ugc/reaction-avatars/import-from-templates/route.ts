@@ -46,7 +46,7 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Allow list for admin UI access: ADMIN_ALLOWED_EMAILS="email1,email2"
+  
   const allowed = (process.env.ADMIN_ALLOWED_EMAILS ?? "")
     .split(",")
     .map((value) => value.trim().toLowerCase())

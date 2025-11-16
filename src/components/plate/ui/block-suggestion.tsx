@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: This use requires any */
+
 "use client";
 
 import * as React from "react";
@@ -144,7 +144,7 @@ export function BlockSuggestionCard({
     >
       <div className="flex flex-col p-4">
         <div className="relative flex items-center">
-          {/* Replace to your own backend or refer to potion */}
+          {}
           <Avatar className="size-5">
             <AvatarImage alt={userInfo?.name} src={userInfo?.avatarUrl} />
             <AvatarFallback>{userInfo?.name?.[0]}</AvatarFallback>
@@ -288,7 +288,7 @@ export const useResolveSuggestion = (
 
     const previousPath = map.get(id);
 
-    // If there are no suggestion nodes in the corresponding path in the map, then update it.
+    
     if (PathApi.isPath(previousPath)) {
       const nodes = api.suggestion.node({ id, at: previousPath, isText: true });
       const parentNode = api.node(previousPath);
@@ -354,7 +354,7 @@ export const useResolveSuggestion = (
         }),
       ];
 
-      // move line break to the end
+      
       entries.sort(([, path1], [, path2]) => {
         return PathApi.isChild(path1, path2) ? -1 : 1;
       });
@@ -364,7 +364,7 @@ export const useResolveSuggestion = (
       let properties: any = {};
       let newProperties: any = {};
 
-      // overlapping suggestion
+      
       entries.forEach(([node]) => {
         if (TextApi.isText(node)) {
           const dataList = api.suggestion.dataList(node);
@@ -398,7 +398,7 @@ export const useResolveSuggestion = (
 
                 break;
               }
-              // No default
+              
             }
           });
         } else {
@@ -425,7 +425,7 @@ export const useResolveSuggestion = (
 
       if (!nodeData) return;
 
-      // const comments = data?.discussions.find((d) => d.id === id)?.comments;
+      
       const comments =
         discussions.find((s: TDiscussion) => s.id === id)?.comments || [];
       const createdAt = new Date(nodeData.createdAt);

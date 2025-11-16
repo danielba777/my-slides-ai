@@ -22,7 +22,7 @@ import { LogoUploader } from "./LogoUploader";
 import { ThemePreview } from "./ThemePreview";
 import { type ColorKey, type ThemeFormValues } from "./types";
 
-// Define steps for the stepper
+
 const STEPS = [
   { id: "base", label: "Base Theme", icon: "🎨" },
   { id: "colors", label: "Colors", icon: "🎭" },
@@ -68,25 +68,25 @@ export function ThemeCreator({ children }: { children?: ReactNode }) {
 
   useEffect(() => {
     if (watchedThemeBase === "blank") {
-      // Default values for blank theme - proper light/dark mode
+      
       setValue("colors", {
         light: {
-          primary: "#3B82F6", // Blue
-          secondary: "#6B7280", // Gray
-          accent: "#60A5FA", // Light blue
-          background: "#FFFFFF", // White
-          text: "#1F2937", // Dark gray
-          heading: "#111827", // Almost black
-          muted: "#9CA3AF", // Medium gray
+          primary: "#3B82F6", 
+          secondary: "#6B7280", 
+          accent: "#60A5FA", 
+          background: "#FFFFFF", 
+          text: "#1F2937", 
+          heading: "#111827", 
+          muted: "#9CA3AF", 
         },
         dark: {
-          primary: "#60A5FA", // Light blue
-          secondary: "#9CA3AF", // Medium gray
-          accent: "#93C5FD", // Lighter blue
-          background: "#111827", // Dark blue/gray
-          text: "#F9FAFB", // Almost white
-          heading: "#FFFFFF", // White
-          muted: "#6B7280", // Gray
+          primary: "#60A5FA", 
+          secondary: "#9CA3AF", 
+          accent: "#93C5FD", 
+          background: "#111827", 
+          text: "#F9FAFB", 
+          heading: "#FFFFFF", 
+          muted: "#6B7280", 
         },
       });
       setValue("fonts", {
@@ -144,7 +144,7 @@ export function ThemeCreator({ children }: { children?: ReactNode }) {
         }
       }
 
-      // Separate the basic metadata from the theme styling data
+      
       const { name, description, isPublic, ...themeStyleData } = data;
 
       const themeData = {
@@ -152,7 +152,7 @@ export function ThemeCreator({ children }: { children?: ReactNode }) {
         description,
         isPublic,
         logo: logoUrl,
-        themeData: themeStyleData, // Add the theme styling data as nested themeData field
+        themeData: themeStyleData, 
       };
 
       const result = await createCustomTheme(themeData);
@@ -199,7 +199,7 @@ export function ThemeCreator({ children }: { children?: ReactNode }) {
       <DialogContent className="h-[60vh] max-w-5xl overflow-auto p-0">
         <div className="flex h-full flex-col">
           <div className="flex h-[calc(60vh-120px)]">
-            {/* Left Side - Controls */}
+            {}
             <div className="w-1/2 overflow-y-auto border-r p-6">
               {currentStep === 0 && (
                 <div className="h-full space-y-4">
@@ -215,7 +215,7 @@ export function ThemeCreator({ children }: { children?: ReactNode }) {
                         onValueChange={field.onChange}
                         className="grid grid-cols-2 gap-4"
                       >
-                        {/* Blank theme option */}
+                        {}
                         <div className="relative">
                           <RadioGroupItem
                             value="blank"
@@ -436,7 +436,7 @@ export function ThemeCreator({ children }: { children?: ReactNode }) {
               )}
             </div>
 
-            {/* Right Side - Preview */}
+            {}
             <div className="grid w-1/2 place-items-center overflow-y-auto p-6">
               <ThemePreview
                 colors={watch("colors")}
@@ -448,7 +448,7 @@ export function ThemeCreator({ children }: { children?: ReactNode }) {
             </div>
           </div>
 
-          {/* Stepper UI */}
+          {}
           <div className="mt-auto flex items-center justify-between border-t bg-background p-4 dark:bg-background">
             <div className="flex w-full items-center justify-center gap-8">
               {STEPS.map((step, index) => (

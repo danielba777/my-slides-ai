@@ -16,7 +16,6 @@ export async function POST(req: Request) {
   });
   if (!sub?.stripeSubscriptionId) return new NextResponse("No active subscription", { status: 400 });
 
-  // Stripe: erste Subscription-Position ersetzen (proration ON by default)
   const stripeSub = await stripe.subscriptions.retrieve(sub.stripeSubscriptionId);
   const itemId = stripeSub.items.data[0]?.id;
   await stripe.subscriptions.update(sub.stripeSubscriptionId, {
@@ -24,6 +23,5 @@ export async function POST(req: Request) {
     proration_behavior: "create_prorations",
   });
 
-  // Der eigentliche Credit-Top-Up passiert im Webhook (customer.subscription.updated)
   return NextResponse.json({ ok: true, newPlan: planFromPrice(priceId) });
 }

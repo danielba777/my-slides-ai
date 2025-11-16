@@ -207,34 +207,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
   
-        {/*
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-red-500">DEBUG</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {debugItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="font-semibold"
-                    isActive={pathname.startsWith(item.url)}
-                  >
-                    <a
-                      href={item.url}
-                      data-active={pathname.startsWith(item.url)}
-                    >
-                      <item.icon className="w-5 h-5 text-red-500" />
-                      <span className="font-semibold text-red-500">
-                        {item.title}
-                      </span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        */}
+        {}
       </SidebarContent>
       <SidebarFooter className="space-y-2">
         <div className="flex flex-col gap-1 px-2">

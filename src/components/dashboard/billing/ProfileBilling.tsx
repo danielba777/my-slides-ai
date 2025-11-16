@@ -55,7 +55,7 @@ export default function ProfileBilling() {
   });
 
   useEffect(() => {
-    // Light auto-refresh on window focus
+    
     const onFocus = () => qc.invalidateQueries({ queryKey: ["billing-usage"] });
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
@@ -92,7 +92,7 @@ export default function ProfileBilling() {
     : null;
   const total = pack ? (pack.credits < 0 ? Infinity : pack.credits) : 0;
   const aiTotal = pack ? (pack.ai < 0 ? Infinity : pack.ai) : 0;
-  // Always show REMAINING like "950/1000"
+  
   const creditsLeft =
     data.credits == null ? null : data.credits < 0 ? Infinity : data.credits;
   const aiLeft =
@@ -117,7 +117,7 @@ export default function ProfileBilling() {
     aiTotal && aiTotal !== Infinity
       ? Math.min(100, Math.round((aiRemaining / aiTotal) * 100))
       : 100;
-  // If ~full (>=95% and <100), show 98% filled as requested
+  
   const displayPct =
     total === Infinity
       ? 100
@@ -131,18 +131,18 @@ export default function ProfileBilling() {
         ? 98
         : aiRemainingPct;
   const nextReset = data.resetsAt ? new Date(data.resetsAt) : null;
-  // Plan change UI & handler removed on request
+  
 
   return (
     <div className="px-1 sm:px-2 lg:px-0">
-      {/* Header */}
+      {}
       <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div className="space-y-1">
           <h2 className="text-xl font-semibold md:text-2xl">
             Personal & Billing
           </h2>
           <div className="inline-flex items-center gap-2">
-            {/* Clearer plan labeling; removes noisy "Current UNLIMITED" */}
+            {}
             <Badge className="border-[#304674]/20 bg-[#304674]/10 px-3 py-1 text-[#304674] hover:bg-[#304674]/10 hover:text-[#304674] cursor-default transition-none">
               Plan: {hasPlan ? data.plan : "Free"}
             </Badge>
@@ -179,7 +179,7 @@ export default function ProfileBilling() {
               <Dialog open={isPricingOpen} onOpenChange={setIsPricingOpen}>
                 <DialogContent className="max-w-7xl w-[98vw]">
                   <DialogTitle className="sr-only">Choose a plan</DialogTitle>
-                  {/* Gleiches Card-Design & Checkout-Flow wie Landing */}
+                  {}
                   <MarketingPricing session={!!session} compact />
                 </DialogContent>
               </Dialog>
@@ -188,10 +188,10 @@ export default function ProfileBilling() {
         </div>
       </div>
 
-      {/* Credits (Remaining) */}
+      {}
       <div className="mt-6 rounded-xl border p-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {/* Credits (remaining) */}
+          {}
           <div>
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               Credits (remaining)
@@ -238,7 +238,7 @@ export default function ProfileBilling() {
         )}
       </div>
 
-      {/* Plan Selector removed on request */}
+      {}
     </div>
   );
 }

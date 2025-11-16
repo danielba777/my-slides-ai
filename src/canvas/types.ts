@@ -5,10 +5,7 @@ export type CanvasTextNode = {
   type: "text";
   x: number;
   y: number;
-  /**
-   * Optional normalized coordinates (0-1) to make responsive positioning easier.
-   * When present, they describe the anchor point that was used to derive x/y.
-   */
+  
   nx?: number;
   ny?: number;
   rotation?: number;
@@ -51,13 +48,13 @@ export type CanvasDoc = {
   bg?: string | null;
   nodes: CanvasNode[];
   selection?: string[];
-  previewDataUrl?: string; // Snapshot für Thumbs/Export
+  previewDataUrl?: string; 
 };
 
 export const DEFAULT_CANVAS: CanvasDoc = {
   version: 1,
   width: 1080,
-  height: 1620, // 2:3 aspect ratio (1080 * 3 / 2 = 1620)
+  height: 1620, 
   bg: "#ffffff",
   nodes: [],
   selection: [],

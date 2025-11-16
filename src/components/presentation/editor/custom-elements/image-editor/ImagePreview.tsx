@@ -56,7 +56,7 @@ export function ImagePreview({
     [localCropSettings, onCropSettingsChange, onUnsavedChanges],
   );
 
-  // Custom crop state for panning
+  
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [lastObjectPosition, setLastObjectPosition] = useState({
@@ -67,7 +67,7 @@ export function ImagePreview({
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      e.preventDefault(); // Prevent default behavior
+      e.preventDefault(); 
       setIsDragging(true);
       setDragStart({ x: e.clientX, y: e.clientY });
       setLastObjectPosition({
@@ -82,21 +82,21 @@ export function ImagePreview({
     (e: MouseEvent) => {
       if (!isDragging || !containerRef.current) return;
 
-      e.preventDefault(); // Prevent text selection
+      e.preventDefault(); 
 
       const deltaX = e.clientX - dragStart.x;
       const deltaY = e.clientY - dragStart.y;
 
-      // Get container dimensions
+      
       const containerRect = containerRef.current.getBoundingClientRect();
       const containerWidth = containerRect.width;
       const containerHeight = containerRect.height;
 
-      // Convert pixel movement to percentage with increased sensitivity (3x faster)
+      
       const deltaXPercent = (deltaX / containerWidth) * 100 * 3;
       const deltaYPercent = (deltaY / containerHeight) * 100 * 3;
 
-      // Calculate new object position
+      
       const newX = Math.max(
         0,
         Math.min(100, lastObjectPosition.x + deltaXPercent),
@@ -139,12 +139,12 @@ export function ImagePreview({
     [zoom, setZoom],
   );
 
-  // Add global mouse event listeners for dragging
+  
   useEffect(() => {
     if (isDragging) {
       const preventSelection = (e: Event) => e.preventDefault();
 
-      // Add global event listeners
+      
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
       document.addEventListener("selectstart", preventSelection);
@@ -174,7 +174,7 @@ export function ImagePreview({
 
     const BASE_WIDTH_PERCENTAGE_NUMERICAL =
       parseFloat(BASE_WIDTH_PERCENTAGE) / 100;
-    // Calculate actual pixel dimensions based on the style
+    
     let actualWidth: number = parentWidth * BASE_WIDTH_PERCENTAGE_NUMERICAL;
     let actualHeight: number = 384;
 
@@ -194,21 +194,21 @@ export function ImagePreview({
 
   const containerScale = useMemo(() => {
     const maxHeight = window.innerHeight * MAX_HEIGHT_RATIO_WITH_WINDOW;
-    // Calculate responsive max-width based on window width, matching sheet classes: max-w-full md:max-w-3xl xl:max-w-5xl
+    
     const windowWidth = window.innerWidth - TOTAL_PADDING_FROM_SHEET;
     let maxWidth: number;
     if (windowWidth >= XL_BREAKPOINT) {
-      maxWidth = MAX_W_5XL - TOTAL_PADDING_FROM_SHEET; // xl:max-w-5xl (64rem = 1024px)
+      maxWidth = MAX_W_5XL - TOTAL_PADDING_FROM_SHEET; 
     } else if (windowWidth >= MD_BREAKPOINT) {
-      maxWidth = MAX_W_3XL - TOTAL_PADDING_FROM_SHEET; // md:max-w-3xl (48rem = 768px)
+      maxWidth = MAX_W_3XL - TOTAL_PADDING_FROM_SHEET; 
     } else {
-      maxWidth = windowWidth; // max-w-full (full width for small screens)
+      maxWidth = windowWidth; 
     }
     console.log("maxWidth", maxWidth, "maxHeight", maxHeight);
 
     let heightFits = imageDimensionInPresentation.height <= maxHeight;
     let widthFits = imageDimensionInPresentation.width <= maxWidth;
-    // Check if both dimensions fit without scaling
+    
     if (heightFits && widthFits) {
       return 1;
     }
@@ -229,7 +229,7 @@ export function ImagePreview({
     return Math.min(heightScale, widthScale);
   }, [imageDimensionInPresentation]);
 
-  // Debug logging for container dimensions
+  
   useEffect(() => {
     console.log("Container dimensions:", {
       width: imageDimensionInPresentation.width * containerScale,
@@ -270,7 +270,7 @@ export function ImagePreview({
 
   return (
     <div className="space-y-4">
-      {/* Image Preview Area */}
+      {}
       <div className="relative max-h-[50vh] flex justify-center items-center w-full overflow-hidden">
         {currentMode === "crop" ? (
           <div
@@ -293,7 +293,7 @@ export function ImagePreview({
             onWheel={handleWheel}
             onDragStart={(e) => e.preventDefault()}
           >
-            {/** biome-ignore lint/performance/noImgElement: This is a valid use case */}
+            {}
             <img
               src={element.url}
               alt={element.query ?? "Presentation image"}
@@ -304,14 +304,14 @@ export function ImagePreview({
                 objectPosition: `${localCropSettings.objectPosition.x}% ${localCropSettings.objectPosition.y}%`,
                 transform: `scale(${localCropSettings.zoom ?? 1})`,
                 transformOrigin: `${localCropSettings.objectPosition.x}% ${localCropSettings.objectPosition.y}%`,
-                pointerEvents: "none", // Prevent image from interfering with mouse events
-                display: "block", // Remove any default inline spacing
-                maxWidth: "none", // Prevent any max-width constraints
-                maxHeight: "none", // Prevent any max-height constraints
+                pointerEvents: "none", 
+                display: "block", 
+                maxWidth: "none", 
+                maxHeight: "none", 
               }}
               draggable={false}
             />
-            {/* Crop overlay */}
+            {}
             <div className="absolute inset-0 border-2 border-blue-500 border-dashed pointer-events-none">
               <div className="absolute top-2 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded shadow-sm">
                 Drag to pan • Scroll to zoom
@@ -319,7 +319,7 @@ export function ImagePreview({
             </div>
           </div>
         ) : (
-          // Normal Preview Mode - Show cropped preview
+          
           <div
             className="relative overflow-hidden shrink-0 rounded-lg bg-gradient-to-br aspect-auto from-muted/50 to-muted"
             style={{
@@ -328,7 +328,7 @@ export function ImagePreview({
               transformOrigin: "center center",
             }}
           >
-            {/** biome-ignore lint/performance/noImgElement: This is a valid use case */}
+            {}
             <img
               src={element.url}
               alt={element.query ?? "Presentation image"}
@@ -356,7 +356,7 @@ export function ImagePreview({
         )}
       </div>
 
-      {/* Crop Controls - Only show in crop mode */}
+      {}
       {currentMode === "crop" && (
         <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
           <div className="space-y-3">

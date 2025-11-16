@@ -53,12 +53,12 @@ export function ImageSourceSelector({
         }
         onValueChange={(value) => {
           if (value.startsWith("stock-")) {
-            // Handle stock image selection
+            
             const provider = value.replace("stock-", "") as "unsplash";
             onImageSourceChange("stock");
             onStockImageProviderChange(provider);
           } else {
-            // Handle AI model selection
+            
             onImageSourceChange("ai");
             onImageModelChange(value as ImageModelList);
           }

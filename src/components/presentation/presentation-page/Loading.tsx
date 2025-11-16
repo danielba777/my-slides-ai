@@ -19,7 +19,7 @@ export function LoadingState() {
   );
 }
 
-// Spezielle Loading-Komponente mit festem Hintergrund für Generierungs-Seiten
+
 export function LoadingStateWithFixedBackground() {
   return (
     <div

@@ -15,7 +15,7 @@ export const PresentationLeafElement = withRef<
   typeof PlateLeaf,
   PresentationLeafElementProps
 >(({ className, variant = "text", children, ...props }, ref) => {
-  // Get the appropriate class name based on theme, mode and variant
+  
   return (
     <PlateLeaf
       ref={ref}

@@ -1,9 +1,4 @@
-/* Presentation Theme Styles */
-/** biome-ignore-all lint/complexity/noImportantStyles: It is necessary for the presentation to work */
-
-/* CSS Variables for theming */
 :root {
-  /* Colors */
   --presentation-primary: #3b82f6;
   --presentation-secondary: #1f2937;
   --presentation-accent: #60a5fa;
@@ -12,15 +7,13 @@
   --presentation-heading: #111827;
   --presentation-muted: #6b7280;
 
-  /* Fonts */
   --presentation-heading-font: var(--font-sans), sans-serif;
   --presentation-body-font: var(--font-sans), sans-serif;
 
-  /* Transitions */
   --presentation-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Dark theme variables */
+
 [data-theme="dark"] {
   --presentation-primary: #60a5fa;
   --presentation-secondary: #e5e7eb;
@@ -31,7 +24,6 @@
   --presentation-muted: #9ca3af;
 }
 
-/* Fullscreen responsive styles */
 :fullscreen .presentation-element,
 :-webkit-full-screen .presentation-element,
 :-moz-full-screen .presentation-element,
@@ -72,7 +64,6 @@
   text-align: center !important;
 }
 
-/* Additional fullscreen styles for presentation mode */
 :fullscreen .ProseMirror *,
 :-webkit-full-screen .ProseMirror *,
 :-moz-full-screen .ProseMirror *,
@@ -87,7 +78,6 @@
   font-size: 1.3em !important;
 }
 
-/* Special styles for when isPresenting is true */
 [data-is-presenting="true"] .ProseMirror * {
   font-size: 1.4em !important;
 }
@@ -113,7 +103,6 @@
   text-align: center !important;
 }
 
-/* Fullscreen responsive styles for PresentationEditor container */
 :fullscreen [class*="PresentationEditor"],
 :-webkit-full-screen [class*="PresentationEditor"],
 :-moz-full-screen [class*="PresentationEditor"],
@@ -122,12 +111,10 @@
   transform-origin: center center;
 }
 
-/* Base styles */
 .presentation-element {
   transition: var(--presentation-transition);
 }
 
-/* Theme styles using CSS variables */
 .presentation-primary {
   color: var(--presentation-primary);
   background-color: transparent;
@@ -161,7 +148,6 @@
   caret-color: var(--presentation-primary);
 }
 
-/* Image styles */
 .presentation-image-container {
   margin: 1rem 0;
   text-align: center;
@@ -184,7 +170,6 @@
   font-size: 0.875rem;
 }
 
-/* Heading styles */
 h1.presentation-heading {
   font-size: 2.5em;
   margin-bottom: 1rem;
@@ -221,7 +206,6 @@ h6.presentation-heading {
   text-align: center !important;
 }
 
-/* Paragraph styles */
 .presentation-paragraph {
   margin-bottom: 1rem;
   line-height: 1.6;
@@ -229,7 +213,6 @@ h6.presentation-heading {
   text-align: center !important;
 }
 
-/* Styling for presentation slides to stand out from background */
 [data-is-presenting="true"] {
   backdrop-filter: brightness(1.05);
 }
@@ -238,7 +221,6 @@ h6.presentation-heading {
   backdrop-filter: brightness(1.1);
 }
 
-/* Presentation slide styling */
 .presentation-slide {
   background-color: var(--presentation-background) !important;
   border: 1px solid var(--presentation-accent);
@@ -246,7 +228,6 @@ h6.presentation-heading {
   color: var(--presentation-text) !important;
 }
 
-/* Additional theme-specific slide styling */
 [data-theme="light"] [data-slide-content="true"],
 [data-theme="light"] .presentation-slide,
 .presentation-slide[style] {
@@ -263,7 +244,6 @@ h6.presentation-heading {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 
-/* Override any inline bgColor from initialContent */
 .presentation-slide[style*="background"] {
   background-color: var(--presentation-background) !important;
 }

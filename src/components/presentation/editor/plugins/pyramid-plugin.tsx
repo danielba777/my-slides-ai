@@ -1,11 +1,11 @@
-// plugins/pyramid-plugin.ts
+
 import { type TElement } from "platejs";
 import { createTPlatePlugin } from "platejs/react";
 import Pyramid from "../custom-elements/pyramid";
 import { PyramidItem } from "../custom-elements/pyramid-item";
 import { PYRAMID_GROUP, PYRAMID_ITEM } from "../lib";
 
-// Create plugin for pyramid group (container)
+
 export const PyramidGroupPlugin = createTPlatePlugin({
   key: PYRAMID_GROUP,
   node: {
@@ -17,7 +17,7 @@ export const PyramidGroupPlugin = createTPlatePlugin({
   },
 });
 
-// Create plugin for pyramid item
+
 export const PyramidItemPlugin = createTPlatePlugin({
   key: PYRAMID_ITEM,
   node: {
@@ -26,10 +26,10 @@ export const PyramidItemPlugin = createTPlatePlugin({
   },
 });
 
-// Type definitions
+
 export interface TPyramidGroupElement extends TElement {
   type: typeof PYRAMID_GROUP;
-  totalChildren?: number; // Store the count on the pyramid element
+  totalChildren?: number; 
 }
 
 export interface TPyramidItemElement extends TElement {

@@ -99,7 +99,7 @@ export async function fetchUserPresentations(userId: string, page = 0) {
         type: DocumentType.PRESENTATION,
         OR: [
           { isPublic: true },
-          { userId: currentUserId }, // Include private presentations if the user is viewing their own
+          { userId: currentUserId }, 
         ],
       },
       orderBy: {

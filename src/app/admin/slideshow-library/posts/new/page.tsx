@@ -256,7 +256,7 @@ export default function CreatePostPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Post Details */}
+        {}
         <Card>
           <CardHeader>
             <CardTitle>Post Details</CardTitle>

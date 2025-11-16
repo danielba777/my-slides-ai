@@ -32,13 +32,13 @@ export function TimelineItemStatic(props: SlateElementProps) {
 
   const lineClass = lineVariants({ orientation, sidedness, showLine, isEven });
   return (
-    //* Container
+    
     <div
       className={cn(
         containerVariants({ orientation, sidedness, isEven, showLine }),
       )}
     >
-      {/* Circle */}
+      {}
       <div
         className={cn(circleVariants({ orientation, sidedness }), lineClass)}
         style={{
@@ -49,7 +49,7 @@ export function TimelineItemStatic(props: SlateElementProps) {
       >
         {numbered ? itemNumber : ""}
       </div>
-      {/* Content */}
+      {}
       <SlateElement
         className={contentVariants({ orientation, sidedness })}
         {...props}

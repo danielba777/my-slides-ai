@@ -38,7 +38,7 @@ export function TikTokPostingLoader({
   const [error, setError] = useState<string | null>(null);
   const [pollCount, setPollCount] = useState(0);
 
-  // Poll the status every 2 seconds
+  
   useEffect(() => {
     if (!publishId) return;
 
@@ -56,12 +56,12 @@ export function TikTokPostingLoader({
 
         console.log(`[TikTokPostingLoader] Poll ${pollCount + 1}:`, data);
 
-        // Check if we have a final status
+        
         if (data.status === "success" || data.status === "inbox" || data.status === "failed") {
           setLoading(false);
           onComplete?.(data.status, data.postId, data.releaseUrl);
 
-          // Auto-redirect after successful post
+          
           if (data.status === "success" || data.status === "inbox") {
             setTimeout(() => {
               router.push("/dashboard/posts/posted");
@@ -75,27 +75,27 @@ export function TikTokPostingLoader({
         setError(errorMessage);
         setLoading(false);
 
-        // Show error as toast notification
+        
         toast.error(errorMessage);
 
         onError?.(errorMessage);
       }
     };
 
-    // Initial poll
+    
     pollStatus();
 
-    // Set up polling interval
+    
     const interval = setInterval(pollStatus, 2000);
 
-    // Cleanup after 2 minutes max (60 polls * 2 seconds)
+    
     const timeout = setTimeout(() => {
       clearInterval(interval);
       setLoading(false);
       const timeoutMessage = "Post status check timed out. Please check your TikTok app.";
       setError(timeoutMessage);
 
-      // Show timeout error as toast notification
+      
       toast.error(timeoutMessage);
 
       onError?.(timeoutMessage);

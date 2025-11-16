@@ -25,11 +25,11 @@ export function usePresentationSlides() {
   );
   const isPresenting = usePresentationState((s) => s.isPresenting);
 
-  // Configure DnD sensors
+  
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // 8px
+        distance: 8, 
       },
     }),
     useSensor(KeyboardSensor, {
@@ -37,17 +37,17 @@ export function usePresentationSlides() {
     }),
   );
 
-  // Ensure all slides have IDs
+  
   const items = useMemo(
     () =>
       slides.map((slide) => (slide?.id ? slide : { ...slide, id: nanoid() })),
     [slides],
   );
 
-  // Handle drag end
+  
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      if (isPresenting) return; // Prevent drag when presenting
+      if (isPresenting) return; 
 
       const { active, over } = event;
 
@@ -60,22 +60,22 @@ export function usePresentationSlides() {
         );
         const newArray = arrayMove(items, oldIndex, newIndex);
         setSlides([...newArray]);
-        // Update current slide index to the new position
+        
         setCurrentSlideIndex(newIndex);
       }
     },
     [items, isPresenting, setSlides, setCurrentSlideIndex],
   );
 
-  // Scroll to a slide by index
+  
   const scrollToSlide = useCallback((index: number) => {
-    // Target the slide wrapper instead of slide container
+    
     const slideElement = document.querySelector(
       `.slide-wrapper-${index}`,
     ) as HTMLElement | null;
 
     if (slideElement) {
-      // Find the scrollable container
+      
       const scrollContainer = document.querySelector(
         ".presentation-slides",
       ) as HTMLElement | null;
@@ -83,7 +83,7 @@ export function usePresentationSlides() {
       if (scrollContainer) {
         const slideRect = slideElement.getBoundingClientRect();
         const containerRect = scrollContainer.getBoundingClientRect();
-        // Calculate the horizontal scroll position with a small padding
+        
         const offsetLeft =
           slideRect.left - containerRect.left + scrollContainer.scrollLeft - 30;
 
@@ -94,7 +94,7 @@ export function usePresentationSlides() {
         });
 
         setTimeout(() => {
-          // Focus the editor after scrolling
+          
           const editorElement = slideElement.querySelector(
             "[contenteditable=true]",
           );

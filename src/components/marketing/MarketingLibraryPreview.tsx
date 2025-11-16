@@ -25,8 +25,8 @@ type DisplayPost = {
   likeCount: number;
   viewCount: number;
   imageUrl: string | null;
-  title?: string; // optional, wird nicht mehr angezeigt
-  creator?: string; // optional, wird nicht mehr angezeigt
+  title?: string; 
+  creator?: string; 
   trending: boolean;
   isPlaceholder?: boolean;
 };

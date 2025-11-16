@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     title: "SlidesCockpit - Make TikTok Slides & Automate Marketing",
     description:
       "Automated slideshows that drive traffic to your website, app, or business. Generate AI TikToks and create your own gen z marketing team.",
-    /* Nutze die stabile dynamische OG-Route statt toter PNG-Referenzen */
+    
     images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
   },
   robots: {
@@ -107,7 +107,7 @@ export default function RootLayout({
           </NextAuthProvider>
         </TanstackQueryProvider>
 
-        {/* ESM + Fallback */}
+        {}
         <Script
           type="module"
           src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"

@@ -161,7 +161,7 @@ function extractSlidesFromAwemeDetail(awemeDetail: any): Array<{
     }
   });
 
-  // If no slides found from imagePost, try other structures
+  
   if (slides.length === 0) {
     const videoCover = awemeDetail?.video?.cover;
     if (
@@ -355,7 +355,6 @@ export async function ingestTikTokPost({
     prompt: null,
   };
 
-  // If it's an admin user, add directly to public library instead of user collection
   if (ownerUserId === "admin-library") {
     console.log(
       "[apify/run] Admin library user detected, adding directly to public library",
@@ -365,7 +364,6 @@ export async function ingestTikTokPost({
     );
 
     try {
-      // First, find or create the account to get a valid database ID
       console.log("[apify/run] Finding or creating account:", {
         username: accountData.username,
         displayName: accountData.displayName,
@@ -400,7 +398,7 @@ export async function ingestTikTokPost({
       });
 
       const publicPostData = {
-        accountId: createdAccount.id, // Use the database account ID
+        accountId: createdAccount.id,
         postId: postData.postId,
         caption: postData.caption,
         categories: postData.categories,
@@ -463,12 +461,10 @@ export async function ingestTikTokPost({
       );
     }
   } else {
-    // Normal user: create post in public library first, then add to user collection
     if (ownerUserId) {
       try {
         console.log("[apify/run] Normal user detected, creating post and linking to user collection");
 
-        // First, find or create the account to get a valid database ID
         const accountResponse = await fetch(
           `${API_BASE_URL}/slideshow-library/accounts/find-or-create`,
           {
@@ -497,7 +493,6 @@ export async function ingestTikTokPost({
           username: createdAccount.username,
         });
 
-        // Create the post in public library
         const publicPostData = {
           accountId: createdAccount.id,
           postId: postData.postId,
@@ -537,13 +532,12 @@ export async function ingestTikTokPost({
           originalPostId: postData.postId,
         });
 
-        // Now link the post to the user's collection
         const linkResponse = await fetch(`${API_BASE_URL}/slideshow-library/user-posts`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId: ownerUserId,
-            postId: createdPost.id, // Use the actual database post ID
+            postId: createdPost.id,
           }),
         });
 
@@ -572,10 +566,7 @@ export async function ingestTikTokPost({
 
   let resultPostData = postData;
 
-  // For normal users, update the post data with the created database IDs
   if (ownerUserId !== "admin-library") {
-    // The postData object still contains the original data, but we need to
-    // return the actual database IDs that were created
     console.log("[apify/run] Preparing result for normal user");
   }
 

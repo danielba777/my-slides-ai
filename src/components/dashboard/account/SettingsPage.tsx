@@ -16,7 +16,7 @@ export default function SettingsPage() {
   const initialTab = (searchParams?.get("tab") ?? "").trim() || "personal";
   const [tab, setTab] = useState(initialTab);
 
-  // Hash (#connections / #demos / #chrome-extension / #personal) → Tab synchronisieren
+  
   useEffect(() => {
     const applyHash = () => {
       const hash = (window.location.hash || "").replace("#", "");
@@ -34,7 +34,7 @@ export default function SettingsPage() {
     return () => window.removeEventListener("hashchange", applyHash);
   }, []);
 
-  // ?tab=… weiter unterstützen
+  
   useEffect(() => {
     const param = searchParams?.get("tab");
     if (param && param !== tab) {
@@ -78,7 +78,7 @@ export default function SettingsPage() {
               General
             </div>
 
-            {/* PERSONAL */}
+            {}
             <TabsTrigger
               value="personal"
               className="
@@ -97,7 +97,7 @@ export default function SettingsPage() {
               </span>
             </TabsTrigger>
 
-            {/* CONNECTIONS */}
+            {}
             <TabsTrigger
               value="connections"
               className="
@@ -116,7 +116,7 @@ export default function SettingsPage() {
               </span>
             </TabsTrigger>
 
-            {/* DEMO VIDEOS */}
+            {}
             <TabsTrigger
               value="demos"
               className="
@@ -135,7 +135,7 @@ export default function SettingsPage() {
               </span>
             </TabsTrigger>
 
-            {/* CHROME EXTENSION */}
+            {}
             <TabsTrigger
               value="chrome-extension"
               className="
@@ -156,9 +156,9 @@ export default function SettingsPage() {
 
             </TabsList>
 
-          {/* Right: content area */}
+          {}
           <div className="space-y-6">
-            {/* PERSONAL */}
+            {}
             <TabsContent value="personal" className="m-0" id="personal">
               <Card className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <CardContent className="p-6 md:p-8">
@@ -167,7 +167,7 @@ export default function SettingsPage() {
               </Card>
             </TabsContent>
 
-            {/* CONNECTIONS */}
+            {}
             <TabsContent value="connections" className="m-0" id="connections">
               <Card className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <CardContent className="p-6 md:p-8">
@@ -176,7 +176,7 @@ export default function SettingsPage() {
               </Card>
             </TabsContent>
 
-            {/* DEMO VIDEOS */}
+            {}
             <TabsContent value="demos" className="m-0" id="demos">
               <Card className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <CardContent className="p-0 md:p-0">
@@ -185,7 +185,7 @@ export default function SettingsPage() {
               </Card>
             </TabsContent>
 
-            {/* CHROME EXTENSION */}
+            {}
             <TabsContent
               value="chrome-extension"
               className="m-0"

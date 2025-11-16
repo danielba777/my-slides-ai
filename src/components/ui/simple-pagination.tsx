@@ -20,16 +20,16 @@ export function SimplePagination({
   const pages: (number | string)[] = [];
   const maxVisiblePages = 7;
 
-  // Calculate which pages to show
+  
   let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
   let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
 
-  // Adjust if we're near the end
+  
   if (endPage - startPage + 1 < maxVisiblePages) {
     startPage = Math.max(1, endPage - maxVisiblePages + 1);
   }
 
-  // Always show first page if not in range
+  
   if (startPage > 1) {
     pages.push(1);
     if (startPage > 2) {
@@ -37,12 +37,12 @@ export function SimplePagination({
     }
   }
 
-  // Add visible pages
+  
   for (let i = startPage; i <= endPage; i++) {
     pages.push(i);
   }
 
-  // Always show last page if not in range
+  
   if (endPage < totalPages) {
     if (endPage < totalPages - 1) {
       pages.push("...");

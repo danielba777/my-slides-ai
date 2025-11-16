@@ -1,4 +1,4 @@
-// src/app/admin/slideshows/imagesets/page.tsx
+
 "use client";
 
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +45,7 @@ export default function ImageSetsAdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [parentForNew, setParentForNew] = useState<string | null>(null);
 
-  // Alle von Usern "owned" (private) Sets global ausblenden
+  
   const [allOwned, setAllOwned] = useState<Set<string>>(new Set());
   useEffect(() => {
     (async () => {
@@ -59,24 +59,24 @@ export default function ImageSetsAdminPage() {
     })();
   }, []);
 
-  // Form state für neues ImageSet
+  
   const [newImageSet, setNewImageSet] = useState({
     name: "",
     parentId: null as string | null,
   });
 
-  // Form state für Bearbeitung
+  
   const [editingImageSet, setEditingImageSet] = useState<ImageSet | null>(null);
   const [editForm, setEditForm] = useState({
     name: "",
     isActive: true,
   });
 
-  // Filterfunktion MUSS innerhalb der Komponente auf allOwned zugreifen
+  
   const removePrivateCollections = useMemo(
     () =>
       (list: ImageSet[]) =>
-        // AI Avatars IMMER zeigen, alle owned (private) ausblenden
+        
         list.filter((s) => isAiAvatars(s) || !allOwned.has(s.id)),
     [allOwned],
   );
@@ -217,17 +217,17 @@ export default function ImageSetsAdminPage() {
     });
   };
 
-  // Hierarchie-Helfer: Baue Baumstruktur
+  
   const buildTree = (sets: ImageSet[]): ImageSet[] => {
     const map = new Map<string, ImageSet>();
     const roots: ImageSet[] = [];
 
-    // Erstelle Map mit allen Sets
+    
     sets.forEach((set) => {
       map.set(set.id, { ...set, children: [] });
     });
 
-    // Ordne children zu parents zu
+    
     sets.forEach((set) => {
       const node = map.get(set.id)!;
       if (set.parentId) {
@@ -236,7 +236,7 @@ export default function ImageSetsAdminPage() {
           parent.children = parent.children || [];
           parent.children.push(node);
         } else {
-          roots.push(node); // Fallback wenn Parent nicht gefunden
+          roots.push(node); 
         }
       } else {
         roots.push(node);
@@ -246,7 +246,7 @@ export default function ImageSetsAdminPage() {
     return roots;
   };
 
-  // Flache Liste für Tabelle mit Einrückung
+  
   const flattenTree = (
     sets: ImageSet[],
     level = 0,
@@ -302,7 +302,7 @@ export default function ImageSetsAdminPage() {
         </Button>
       </div>
 
-      {/* Neues Bilder-Set erstellen */}
+      {}
       {isCreating && (
         <Card>
           <CardHeader>
@@ -340,7 +340,7 @@ export default function ImageSetsAdminPage() {
         </Card>
       )}
 
-      {/* Bilder-Set bearbeiten */}
+      {}
       {editingImageSet && (
         <Card>
           <CardHeader>
@@ -368,7 +368,7 @@ export default function ImageSetsAdminPage() {
         </Card>
       )}
 
-      {/* Kompakte Tabellenansicht */}
+      {}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

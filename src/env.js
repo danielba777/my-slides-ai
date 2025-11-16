@@ -16,7 +16,6 @@ export const env = createEnv({
     GOOGLE_CLIENT_ID: z.string(),
     GOOGLE_CLIENT_SECRET: z.string(),
     UNSPLASH_ACCESS_KEY: z.string(),
-    // ─── Stripe (für Checkout, Webhooks, Plan-Mapping) ───────────────────────
     STRIPE_SECRET_KEY: z.string().min(1, "Missing STRIPE_SECRET_KEY"),
     STRIPE_WEBHOOK_SECRET: z.string().min(1, "Missing STRIPE_WEBHOOK_SECRET"),
     STRIPE_PRICE_STARTER_MONTHLY: z
@@ -39,7 +38,6 @@ export const env = createEnv({
     STRIPE_PRICE_UNLIMITED_YEARLY: z
       .string()
       .min(1, "Missing STRIPE_PRICE_UNLIMITED"),
-    // optional (nur falls irgendwo im Client gebraucht wird → besser als NEXT_PUBLIC_* anlegen)
     STRIPE_PUBLISHABLE_KEY: z.string().optional(),
     ADMIN_ALLOWED_EMAILS: z.string().optional(),
     NEXTAUTH_URL: z.preprocess(
@@ -72,7 +70,6 @@ export const env = createEnv({
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     SLIDESCOCKPIT_API: process.env.SLIDESCOCKPIT_API,
-    // Stripe
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     STRIPE_PRICE_STARTER_MONTHLY: process.env.STRIPE_PRICE_STARTER_MONTHLY,

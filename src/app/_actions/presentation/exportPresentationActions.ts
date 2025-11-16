@@ -24,24 +24,24 @@ export async function exportPresentation(
       return { success: false, error: "Unauthorized" };
     }
 
-    // Here you would fetch the presentation data from your database
-    // This is a placeholder - implement actual data fetching based on your data model
+    
+    
     const presentationData = await fetchPresentationData(
       presentationId,
       session.user.id,
     );
 
-    // Generate the PPT file (ArrayBuffer)
+    
     const arrayBuffer = await convertPlateJSToPPTX(
       { slides: presentationData.slides },
       theme,
     );
 
-    // Convert ArrayBuffer to Base64 string for transmission to the client
+    
     const buffer = Buffer.from(arrayBuffer);
     const base64 = buffer.toString("base64");
 
-    // Return base64 data so client can download it
+    
     return {
       success: true,
       data: base64,
@@ -53,12 +53,12 @@ export async function exportPresentation(
   }
 }
 
-// Helper function to fetch presentation data
-async function fetchPresentationData(presentationId: string, userId: string) {
-  // Implement your actual data fetching logic here
-  // For now returning a placeholder
 
-  // In a real implementation, you would fetch from your database
+async function fetchPresentationData(presentationId: string, userId: string) {
+  
+  
+
+  
   const presentation = await db.baseDocument.findFirst({
     where: { id: presentationId, userId: userId },
     include: { presentation: true },

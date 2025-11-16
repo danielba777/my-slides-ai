@@ -1,7 +1,7 @@
 "use client";
 
-// A small helper used to build a stable signature of a slide for memoization.
-// Lives in hooks/presentation per request to centralize extra functions.
+
+
 export function previewSignature(slide: unknown): string {
   try {
     const s = slide as {

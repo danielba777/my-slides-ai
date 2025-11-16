@@ -36,18 +36,18 @@ export default function RootImage({
   layoutType,
   slideId,
 }: RootImageProps) {
-  // State for image editor sheet
+  
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  // State for showing delete popover
+  
   const [showDeletePopover, setShowDeletePopover] = useState(false);
-  // State for image selectors
+  
   const [isSingleImageSelectorOpen, setIsSingleImageSelectorOpen] =
     useState(false);
   const [isMultiImageSelectorOpen, setIsMultiImageSelectorOpen] =
     useState(false);
   const setSlides = usePresentationState((s) => s.setSlides);
   const slides = usePresentationState((s) => s.slides);
-  // Check if editor is in read-only mode
+  
   const readOnly = useEditorReadOnly();
 
   const {
@@ -62,14 +62,14 @@ export default function RootImage({
     startRootImageGeneration,
   } = useRootImageActions(slideIndex, { image, layoutType, slideId });
 
-  // Ensure popover closes when delete action is invoked
+  
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     removeRootImageFromSlide();
     setShowDeletePopover(false);
   };
 
-  // Toggle between single image and grid layout
+  
   const toggleGridMode = () => {
     const currentSlide = slides[slideIndex];
     if (!currentSlide?.rootImage) return;
@@ -98,7 +98,7 @@ export default function RootImage({
     );
   };
 
-  // Handle single image selection
+  
   const handleSingleImageSelect = (selection: SelectedImageResult) => {
     setSlides(
       slides.map((slide, index) => {
@@ -125,7 +125,7 @@ export default function RootImage({
     );
   };
 
-  // Handle multi-image selection
+  
   const handleMultiImageSelect = (imageUrls: string[]) => {
     setSlides(
       slides.map((slide, index) => {
@@ -141,7 +141,7 @@ export default function RootImage({
     );
   };
 
-  // Double-click handler for the image
+  
   const handleImageDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!readOnly) {
@@ -170,7 +170,7 @@ export default function RootImage({
     layoutType === "vertical";
 
   if (isOverlayLayout) {
-    // Render grid layout if enabled
+    
     if (image.useGrid && image.gridImages) {
       return (
         <div className="absolute inset-0">
@@ -186,7 +186,7 @@ export default function RootImage({
                 >
                   {hasImage ? (
                     <>
-                      {/** biome-ignore lint/performance/noImgElement: This is a valid use case */}
+                      {}
                       <img
                         src={gridImage.url}
                         alt={`Grid image ${index + 1}`}
@@ -298,7 +298,7 @@ export default function RootImage({
       );
     }
 
-    // Render single image layout (default)
+    
     return (
       <div className="absolute inset-0">
         <div
@@ -329,7 +329,7 @@ export default function RootImage({
             />
           ) : (
             <div className="relative h-full w-full">
-              {/** biome-ignore lint/performance/noImgElement: This is a valid use case */}
+              {}
               <img
                 src={computedImageUrl}
                 alt={image.query}
@@ -503,12 +503,12 @@ export default function RootImage({
                   }}
                   onDoubleClick={handleImageDoubleClick}
                 >
-                  {/** biome-ignore lint/performance/noImgElement: This is a valid use case */}
+                  {}
                   <img
                     src={computedImageUrl}
                     alt={image.query}
-                    className="" // Removed h-full w-full to avoid conflicts with inline styles
-                    style={imageStyles} // All sizing and crop styles handled here
+                    className="" 
+                    style={imageStyles} 
                     onError={(e) => {
                       console.error(
                         "Image failed to load:",
@@ -557,7 +557,7 @@ export default function RootImage({
           )}
         </div>
       </div>
-      {/* Image Editor Sheet */}
+      {}
       <PresentationImageEditor
         open={isSheetOpen}
         onOpenChange={setIsSheetOpen}

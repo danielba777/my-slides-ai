@@ -21,7 +21,7 @@ import RootImage from "./custom-elements/root-image";
 import LayoutImageDrop from "./dnd/components/LayoutImageDrop";
 import { presentationPlugins } from "./plugins";
 import PresentationEditorStaticView from "./presentation-editor-static";
-// Canvas (Polotno-like)
+
 import SlideCanvasAdapter from "@/canvas/SlideCanvasAdapter";
 import type { CanvasDoc } from "@/canvas/types";
 
@@ -50,7 +50,7 @@ interface PresentationEditorProps {
   readOnly?: boolean;
   isPreview?: boolean;
 }
-// Use React.memo with a custom comparison function to prevent unnecessary re-renders
+
 const PresentationEditor = React.memo(
   ({
     initialContent,
@@ -66,12 +66,12 @@ const PresentationEditor = React.memo(
     const setCurrentSlideIndex = usePresentationState(
       (s) => s.setCurrentSlideIndex,
     );
-    // ✅ Immer gültiges Array als Fallback übergeben
+    
     const DEFAULT_VALUE: PlateNode[] = [
       { type: "p", children: [{ text: "" }] },
     ];
 
-    // ⚠️ WICHTIG: ID setzen, damit überall derselbe Editor-Store verwendet wird
+    
     const editor = usePlateEditor({
       id: "presentation",
       plugins: presentationPlugins,
@@ -105,15 +105,15 @@ const PresentationEditor = React.memo(
       (value: Value, slideIndex: number) => {
         const { slides, setSlides } = usePresentationState.getState();
         const updatedSlides = [...slides];
-        // Make sure we have the slide at that index
+        
         if (updatedSlides[slideIndex]) {
-          // Update the content of the slide
+          
           updatedSlides[slideIndex] = {
             ...updatedSlides[slideIndex],
             content: value as PlateNode[],
           };
 
-          // Update the global state
+          
           setSlides(updatedSlides);
         }
       },
@@ -131,7 +131,7 @@ const PresentationEditor = React.memo(
       { maxWait: 200 },
     );
 
-    // Cleanup debounce on unmount
+    
     useEffect(() => {
       return () => {
         debouncedOnChange.cancel();
@@ -142,8 +142,8 @@ const PresentationEditor = React.memo(
     const editorPaddingClass =
       hasRootImage || readOnly || isGenerating ? "px-16" : undefined;
 
-    // === Canvas-Variante (Polotno-like) ===
-    // Wenn das Slide bereits ein CanvasDoc hat, rendere SlideCanvas (frei verschieb-/skalierbar).
+    
+    
     if (initialContent?.canvas) {
       return (
         <TooltipProvider>
@@ -172,11 +172,11 @@ const PresentationEditor = React.memo(
             data-is-presenting={readOnly && isPresenting ? "true" : "false"}
             data-slide-content="true"
           >
-            {/* Canvas */}
+            {}
             <SlideCanvasAdapter
               doc={initialContent.canvas as CanvasDoc}
               onChange={(next: CanvasDoc) => {
-                // Slides im globalen State aktualisieren (inkl. optionalem Preview)
+                
                 const { slides, setSlides } = usePresentationState.getState();
                 const updated = [...slides];
                 if (updated[slideIndex]) {
@@ -184,7 +184,7 @@ const PresentationEditor = React.memo(
                     ...updated[slideIndex],
                     canvas: {
                       ...next,
-                      // optional: aktualisiertes Snapshot-Bild für Sidebar
+                      
                       previewDataUrl:
                         next.previewDataUrl ??
                         updated[slideIndex]?.canvas?.previewDataUrl,
@@ -199,7 +199,7 @@ const PresentationEditor = React.memo(
       );
     }
 
-    // === Fallback: Plate-Editor (nur wenn noch kein CanvasDoc existiert) ===
+    
     return (
       <TooltipProvider>
         <div
@@ -245,7 +245,7 @@ const PresentationEditor = React.memo(
               }}
               readOnly={isGenerating || readOnly}
             >
-              {/* Insert from palette via state */}
+              {}
               <PaletteInsertionListener />
               {!readOnly && (
                 <LayoutImageDrop slideIndex={slideIndex}></LayoutImageDrop>
@@ -274,7 +274,7 @@ const PresentationEditor = React.memo(
                   variant="ghost"
                   readOnly={isPreview || isGenerating || readOnly}
                   onFocus={() => {
-                    // Update current slide index when editor receives focus
+                    
                     if (!readOnly && !isGenerating && !isPresenting) {
                       setCurrentSlideIndex(slideIndex);
                     }
@@ -289,10 +289,10 @@ const PresentationEditor = React.memo(
     );
   },
   (prev, next) => {
-    // Prevent unnecessary re-renders when parent re-renders or callbacks change.
-    // Only re-render when slide-specific props actually change.
+    
+    
     if (prev.id !== next.id) return false;
-    // Deep-compare important slide fields using a stable JSON signature
+    
     if (
       slideSignature(prev.initialContent) !==
       slideSignature(next.initialContent)
@@ -304,7 +304,7 @@ const PresentationEditor = React.memo(
     if (prev.className !== next.className) return false;
     if (prev.isGenerating !== next.isGenerating) return false;
     if (prev.slideIndex !== next.slideIndex) return false;
-    // Intentionally ignore function prop identity (onChange) differences
+    
     return true;
   },
 );

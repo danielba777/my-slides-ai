@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 
-/**
- * Force-correct XML sitemap with proper Content-Type.
- * This overrides any fallback that might return text/html on HEAD.
- */
+
 export async function GET() {
   const base =
     process.env.NEXT_PUBLIC_APP_URL ||
@@ -39,7 +36,7 @@ ${urls
 }
 
 export async function HEAD() {
-  // Return only headers with the correct MIME type for Search Console
+  
   return new NextResponse(null, {
     status: 200,
     headers: { "Content-Type": "application/xml; charset=utf-8" },

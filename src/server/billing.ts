@@ -1,4 +1,4 @@
-// server-only Funktionen rund um Billing/Credits
+
 import "server-only";
 import { db } from "@/server/db";
 import { env } from "@/env";
@@ -142,16 +142,16 @@ type ConsumeArgs =
 export async function ensureAndConsumeCredits(userId: string, args: ConsumeArgs) {
   const cost = Math.max(1, args.cost ?? (args.kind === "ai" ? 2 : 1));
   console.debug("[billing] ensureAndConsumeCredits:start", { userId, args, cost });
-  // 🧩 Verbesserter Redis-Lock (auto-refresh + safe release)
+  
   const redis = globalThis.redis;
   const redisKey = `creditlock:${userId}`;
-  const lockTTL = 5000; // 5 Sekunden Sicherheitsfenster
+  const lockTTL = 5000; 
 
-  // Versuche Lock mehrfach, falls er hängt
+  
   let acquired = false;
   try {
-    // Wenn Redis nicht verbunden ist, nicht versuchen
-    // (node-redis v4 hat isOpen / isReady; wir nutzen das defensiv)
+    
+    
     const canUseRedis = !!redis && (redis as any).isOpen !== false;
     if (canUseRedis) {
       for (let i = 0; i < 5; i++) {
@@ -162,17 +162,17 @@ export async function ensureAndConsumeCredits(userId: string, args: ConsumeArgs)
     }
 
     if (!acquired) {
-      // ❗ Kein Hard-Fail mehr – wir verlassen uns auf den DB-Row-Lock (SELECT … FOR UPDATE)
+      
       console.warn(`[billing] ⚠️ Proceeding without Redis lock for user ${userId} (falling back to DB row lock)`);
     }
   } catch (e) {
-    // Ebenfalls kein Hard-Fail – Redis kann fehlen, DB-Sperre bleibt robust
+    
     console.warn(`[billing] ⚠️ Redis lock attempt failed for user ${userId}, using DB row lock`, e);
   }
 
   try {
     const result = await db.$transaction(async (tx) => {
-      // 🔒 Row-Lock gegen Race-Conditions (SELECT FOR UPDATE)
+      
       await tx.$executeRawUnsafe(`SELECT * FROM "CreditBalance" WHERE "userId" = $1 FOR UPDATE`, userId);
     const [sub, userRecord] = await Promise.all([
       tx.subscription.findFirst({
@@ -250,7 +250,7 @@ export async function ensureAndConsumeCredits(userId: string, args: ConsumeArgs)
         throw err;
       }
 
-    // 🔄 Notify frontend to update sidebar usage (credits live refresh)
+    
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/billing/usage/revalidate`, {
         method: "POST",
@@ -281,7 +281,7 @@ export async function ensureAndConsumeCredits(userId: string, args: ConsumeArgs)
       throw err;
     }
 
-    // 🔄 Notify frontend to update sidebar usage (credits live refresh)
+    
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/billing/usage/revalidate`, {
         method: "POST",
@@ -299,7 +299,7 @@ export async function ensureAndConsumeCredits(userId: string, args: ConsumeArgs)
 
     return result;
   } finally {
-    // Nur freigeben, wenn auch wirklich erworben
+    
     if (acquired) {
       try {
         await redis?.del(redisKey);
@@ -311,12 +311,7 @@ export async function ensureAndConsumeCredits(userId: string, args: ConsumeArgs)
   }
 }
 
-/**
- * Rewrites the credit balance for a target plan.
- * - Downgrade: usage reset to 0
- * - Upgrade:   usage carried over and remaining = new quota - used
- * - Unlimited: stored as sentinel -1 with usage reset
- */
+
 export async function carryOverCreditsOnPlanChange(
   tx: BillingTransactionClient,
   userId: string,
@@ -338,7 +333,7 @@ export async function carryOverCreditsOnPlanChange(
 
   await tx.creditBalance.deleteMany({ where: { userId } });
 
-  // Altdaten sichern
+  
   const prevUsedSlides   = prev?.usedCredits    ?? 0;
   const prevUsedAi       = prev?.usedAiCredits  ?? 0;
   const prevLeftSlides   = prev?.credits        ?? 0;
@@ -346,7 +341,7 @@ export async function carryOverCreditsOnPlanChange(
   const prevLeftSlidesFinite = prevLeftSlides < 0 ? null : prevLeftSlides;
   const prevLeftAiFinite = prevLeftAi < 0 ? null : prevLeftAi;
 
-  // Neues Kontingent ermitteln
+  
   const target = PLAN_CREDITS[newPlan];
   const newTotalSlides = target.credits < 0 ? Number.POSITIVE_INFINITY : target.credits;
   const newTotalAi     = target.ai      < 0 ? Number.POSITIVE_INFINITY : target.ai;
@@ -357,9 +352,9 @@ export async function carryOverCreditsOnPlanChange(
     (oldPlan && PLAN_CREDITS[oldPlan].credits > 0) &&
     (PLAN_CREDITS[oldPlan].credits > PLAN_CREDITS[newPlan].credits);
 
-  // Determine used values in a robust way:
-  // a) Prefer stored used counters if present
-  // b) Otherwise derive from remaining credits when the old plan was finite
+  
+  
+  
   const inferredUsedSlides = Number.isFinite(newTotalSlides)
     ? (prevUsedSlides || (oldPlan && oldPlan !== "UNLIMITED" && PLAN_CREDITS[oldPlan].credits >= 0 && prevLeftSlidesFinite != null
         ? Math.max(0, PLAN_CREDITS[oldPlan].credits - prevLeftSlidesFinite)
@@ -397,7 +392,7 @@ export async function carryOverCreditsOnPlanChange(
     nextLeftAi = finiteAiQuota != null ? finiteAiQuota : Number.POSITIVE_INFINITY;
   }
 
-  // Persist cleaned balance row
+  
   const storedCredits = finiteSlideQuota != null
     ? Math.max(0, Math.trunc(nextLeftSlides))
     : -1;

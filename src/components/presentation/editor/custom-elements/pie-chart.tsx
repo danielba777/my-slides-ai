@@ -72,7 +72,7 @@ export default function PieChartElement(props: PlateElementProps<TChartNode>) {
             >
               {dataArray.map((_entry, index) => (
                 <Cell
-                  // Use CSS variable color cycling if present, fallback to chart-1
+                  
                   key={`cell-${index}`}
                   fill={`hsl(var(--chart-${(index % 5) + 1}))`}
                 />
@@ -82,7 +82,7 @@ export default function PieChartElement(props: PlateElementProps<TChartNode>) {
             <ChartTooltip content={<ChartTooltipContent />} />
           </PieChart>
         </ChartContainer>
-        {/* non-editable */}
+        {}
       </div>
     </PlateElement>
   );
