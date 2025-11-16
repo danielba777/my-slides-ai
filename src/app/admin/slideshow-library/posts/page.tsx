@@ -19,11 +19,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { SimplePagination } from "@/components/ui/simple-pagination";
 import { cn } from "@/lib/utils";
-import { Eye, FileText, Plus, Trash2, Users } from "lucide-react";
+import { Eye, FileText, Plus, Trash2, Users, ChevronDown, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
+
+const POSTS_PER_PAGE = 60;
 
 interface SlideshowPost {
   id: string;
@@ -65,14 +75,25 @@ export default function SlideshowPostsPage() {
   const [accounts, setAccounts] = useState<SlideshowAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [updatingPostId, setUpdatingPostId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPosts, setTotalPosts] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const pageTopRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     loadAccounts();
-    loadPosts();
+    loadCategories();
   }, []);
 
   useEffect(() => {
     loadPosts();
+  }, [currentPage, selectedAccount]);
+
+  useEffect(() => {
+    // Reset to page 1 when account filter changes
+    setCurrentPage(1);
   }, [selectedAccount]);
 
   useEffect(() => {
@@ -83,8 +104,7 @@ export default function SlideshowPostsPage() {
     return () => {
       window.removeEventListener("focus", handleFocus);
     };
-    
-  }, [selectedAccount]);
+  }, [currentPage, selectedAccount]);
 
   const loadAccounts = async () => {
     try {
@@ -98,10 +118,28 @@ export default function SlideshowPostsPage() {
     }
   };
 
+  const loadCategories = async () => {
+    try {
+      const response = await fetch("/api/slideshow-library/categories");
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableCategories(data);
+      }
+    } catch (error) {
+      console.error("Error loading categories:", error);
+    }
+  };
+
   const loadPosts = async () => {
     try {
       setIsLoading(true);
       const params = new URLSearchParams();
+
+      // Add pagination parameters
+      const offset = (currentPage - 1) * POSTS_PER_PAGE;
+      params.set("limit", POSTS_PER_PAGE.toString());
+      params.set("offset", offset.toString());
+
       if (selectedAccount !== "all") {
         params.set("accountId", selectedAccount);
       }
@@ -113,12 +151,16 @@ export default function SlideshowPostsPage() {
       if (response.ok) {
         const data = await response.json();
 
-        
         let postsData: SlideshowPost[] = [];
         if (Array.isArray(data)) {
           postsData = data;
         } else if (data && Array.isArray(data.posts)) {
           postsData = data.posts;
+
+          // Set total count and calculate total pages
+          const totalCount = data.totalCount || 0;
+          setTotalPosts(totalCount);
+          setTotalPages(Math.ceil(totalCount / POSTS_PER_PAGE) || 1);
         } else if (data && typeof data === 'object') {
           console.error("Unexpected API response format:", data);
           toast.error("Ungültiges Datenformat vom Server erhalten");
@@ -128,13 +170,55 @@ export default function SlideshowPostsPage() {
       } else {
         toast.error("Fehler beim Laden der Posts");
         setPosts([]);
+        setTotalPosts(0);
+        setTotalPages(0);
       }
     } catch (error) {
       console.error("Error loading posts:", error);
       toast.error("Fehler beim Laden der Posts");
       setPosts([]);
+      setTotalPosts(0);
+      setTotalPages(0);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const updateCategories = async (postId: string, categories: string[]) => {
+    try {
+      setUpdatingPostId(postId);
+      const response = await fetch(`/api/slideshow-library/posts/${postId}/categories`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categories }),
+      });
+
+      if (response.ok) {
+        toast.success("Kategorien aktualisiert");
+
+        // Update local state
+        setPosts(prevPosts =>
+          prevPosts.map(post =>
+            post.id === postId ? { ...post, categories } : post
+          )
+        );
+
+        // Add new categories to available categories list (optimistic update)
+        const newCategories = categories.filter(cat => !availableCategories.includes(cat));
+        if (newCategories.length > 0) {
+          setAvailableCategories(prev => [...prev, ...newCategories].sort());
+        }
+
+        // Reload categories from server to ensure consistency
+        loadCategories();
+      } else {
+        toast.error("Fehler beim Aktualisieren der Kategorien");
+      }
+    } catch (error) {
+      console.error("Error updating categories:", error);
+      toast.error("Fehler beim Aktualisieren der Kategorien");
+    } finally {
+      setUpdatingPostId(null);
     }
   };
 
@@ -160,6 +244,20 @@ export default function SlideshowPostsPage() {
     }
   };
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    // Scroll to top of page
+    if (pageTopRef.current) {
+      const anchorTop = window.scrollY + pageTopRef.current.getBoundingClientRect().top;
+      window.scrollTo({
+        top: Math.max(anchorTop - 20, 0),
+        behavior: "smooth",
+      });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -173,7 +271,7 @@ export default function SlideshowPostsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div ref={pageTopRef} className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Slideshow Posts</h1>
           <p className="text-muted-foreground">
@@ -229,7 +327,7 @@ export default function SlideshowPostsPage() {
             <CardTitle className="flex items-center gap-2">
               Übersicht
               <Badge variant="secondary" className="text-xs">
-                {posts.length}
+                {totalPosts} gesamt
               </Badge>
             </CardTitle>
           </CardHeader>
@@ -298,23 +396,131 @@ export default function SlideshowPostsPage() {
                           </div>
                         </TableCell>
                         <TableCell className="align-middle">
-                          {categories.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {categories.map((category) => (
-                                <Badge
-                                  key={`${post.id}-${category}`}
-                                  variant="secondary"
-                                  className="text-xs"
-                                >
-                                  {category}
-                                </Badge>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              Keine Kategorien
-                            </span>
-                          )}
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 justify-between gap-2 text-xs"
+                                disabled={updatingPostId === post.id}
+                              >
+                                <span className="truncate">
+                                  {categories.length > 0
+                                    ? `${categories.length} ${categories.length === 1 ? 'Kategorie' : 'Kategorien'}`
+                                    : 'Kategorien wählen'}
+                                </span>
+                                <ChevronDown className="h-3 w-3 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-3" align="start">
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-sm font-semibold">Kategorien</h4>
+                                  {categories.length > 0 && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => updateCategories(post.id, [])}
+                                    >
+                                      Alle entfernen
+                                    </Button>
+                                  )}
+                                </div>
+
+                                {/* Currently selected categories */}
+                                {categories.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 pb-2 border-b">
+                                    {categories.map((category) => (
+                                      <Badge
+                                        key={`selected-${post.id}-${category}`}
+                                        variant="secondary"
+                                        className="text-xs flex items-center gap-1"
+                                      >
+                                        {category}
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            updateCategories(
+                                              post.id,
+                                              categories.filter((c) => c !== category)
+                                            );
+                                          }}
+                                          className="ml-1 rounded-sm hover:bg-muted"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Available categories */}
+                                <div className="max-h-48 overflow-y-auto space-y-2">
+                                  {availableCategories
+                                    .filter((cat) => !categories.includes(cat))
+                                    .map((category) => (
+                                      <div
+                                        key={`available-${post.id}-${category}`}
+                                        className="flex items-center space-x-2"
+                                      >
+                                        <Checkbox
+                                          id={`cat-${post.id}-${category}`}
+                                          checked={categories.includes(category)}
+                                          onCheckedChange={(checked) => {
+                                            if (checked) {
+                                              updateCategories(post.id, [...categories, category]);
+                                            } else {
+                                              updateCategories(
+                                                post.id,
+                                                categories.filter((c) => c !== category)
+                                              );
+                                            }
+                                          }}
+                                        />
+                                        <label
+                                          htmlFor={`cat-${post.id}-${category}`}
+                                          className="text-sm cursor-pointer flex-1"
+                                        >
+                                          {category}
+                                        </label>
+                                      </div>
+                                    ))}
+                                  {availableCategories.filter((cat) => !categories.includes(cat)).length === 0 && categories.length > 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Alle Kategorien ausgewählt
+                                    </p>
+                                  )}
+                                  {availableCategories.length === 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Keine Kategorien verfügbar
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Add new category */}
+                                <div className="pt-2 border-t">
+                                  <Input
+                                    placeholder="Neue Kategorie..."
+                                    className="h-8 text-xs"
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        const value = e.currentTarget.value.trim();
+                                        if (value && !categories.includes(value)) {
+                                          updateCategories(post.id, [...categories, value]);
+                                          e.currentTarget.value = "";
+                                        }
+                                      }
+                                    }}
+                                  />
+                                  <p className="text-[10px] text-muted-foreground mt-1">
+                                    Enter drücken zum Hinzufügen
+                                  </p>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         </TableCell>
                         <TableCell className="align-middle">
                           <div className="flex min-w-0 items-center gap-2">
@@ -384,6 +590,20 @@ export default function SlideshowPostsPage() {
                 </TableBody>
               </Table>
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Zeige {((currentPage - 1) * POSTS_PER_PAGE) + 1} bis {Math.min(currentPage * POSTS_PER_PAGE, totalPosts)} von {totalPosts} Posts
+                </div>
+                <SimplePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
