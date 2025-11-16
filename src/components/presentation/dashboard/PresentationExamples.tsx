@@ -57,7 +57,7 @@ export function PresentationExamples() {
   const { setNumSlides, setLanguage, setPageStyle, setPresentationInput } =
     usePresentationState();
 
-  // Use useQuery to subscribe to the same data as RecentPresentations
+  
   const { data, isLoading: isPresentationsLoading } = useInfiniteQuery({
     queryKey: ["presentations-all"],
     queryFn: async ({ pageParam = 0 }) => {
@@ -68,11 +68,11 @@ export function PresentationExamples() {
     getNextPageParam: (lastPage) => (lastPage?.hasMore ? 0 : 0),
   });
 
-  // Check if there are any actual presentations in the data
+  
   const presentationsPages = data?.pages;
   const hasPresentations = !!presentationsPages?.[0]?.items?.length;
 
-  // Don't show examples if presentations are still loading OR if there are presentations
+  
   if (isPresentationsLoading || hasPresentations) return null;
 
   const handleExampleClick = (example: (typeof EXAMPLE_PROMPTS)[0]) => {

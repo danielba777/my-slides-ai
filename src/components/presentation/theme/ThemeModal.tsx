@@ -21,7 +21,7 @@ import { useTheme } from "next-themes";
 import { useState, type ReactNode } from "react";
 import { ThemeCreator } from "./ThemeCreator";
 
-// Define interfaces for the theme data
+
 interface CustomTheme {
   id: string;
   name: string;
@@ -56,7 +56,7 @@ export function ThemeModal({ children }: { children?: ReactNode }) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
-  // Fetch user themes with React Query
+  
   const { data: userThemes = [], isLoading: isLoadingUserThemes } = useQuery({
     queryKey: ["userThemes"],
     queryFn: async () => {
@@ -66,7 +66,7 @@ export function ThemeModal({ children }: { children?: ReactNode }) {
     enabled: isOpen,
   });
 
-  // Fetch public themes with React Query
+  
   const { data: publicThemes = [], isLoading: isLoadingPublicThemes } =
     useQuery({
       queryKey: ["publicThemes"],
@@ -78,7 +78,7 @@ export function ThemeModal({ children }: { children?: ReactNode }) {
     });
 
   const handleSelectTheme = (theme: CustomTheme) => {
-    // Instead of just passing the ID, pass the full theme data
+    
     setTheme(theme.id, theme.themeData);
     setIsOpen(false);
   };

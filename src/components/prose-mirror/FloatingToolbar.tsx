@@ -63,12 +63,12 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
   }
 
   const execCommand = (cmd: Command): void => {
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+    
     cmd(view.state, view.dispatch, view);
     view.focus();
   };
 
-  // Helper to check if selection is in a specific node type
+  
   const isInNode = (
     nodeType: NodeType,
     attrs: { level?: number } = {},
@@ -81,7 +81,7 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
     return node.type === nodeType;
   };
 
-  // Helper to check if selection is in a list
+  
   const isInList = (listType: NodeType): boolean => {
     const { $from } = view.state.selection;
     let depth = $from.depth;
@@ -95,27 +95,27 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
     return false;
   };
 
-  // Toggle list command
+  
   const toggleList = (listType: NodeType): Command => {
     return (state, dispatch, view) => {
       if (isInList(listType)) {
-        // If we're in this type of list, lift the list items out
+        
         return liftListItem(listItemNode)(state, dispatch, view);
       } else {
-        // If we're not in a list, or in a different type of list, wrap in this list type
+        
         return wrapInList(listType)(state, dispatch, view);
       }
     };
   };
 
-  // Toggle heading command
+  
   const toggleHeading = (level: number): Command => {
     return (state, dispatch, view) => {
       if (isInNode(headingNode, { level })) {
-        // If it's already this heading level, convert to paragraph
+        
         return setBlockType(paragraphNode)(state, dispatch, view);
       } else {
-        // Otherwise, convert to this heading level
+        
         return setBlockType(headingNode, { level })(state, dispatch, view);
       }
     };
@@ -206,7 +206,7 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
         </Button>
         <div className="h-4 w-[1px] bg-border" />
 
-        {/* List Types Dropdown */}
+        {}
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
@@ -244,7 +244,7 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Heading Levels Dropdown */}
+        {}
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button

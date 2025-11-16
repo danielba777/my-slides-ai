@@ -135,12 +135,12 @@ const autoformatBlocks: AutoformatRule[] = [
       });
     },
   },
-  // {
-  //   match: '+ ',
-  //   mode: 'block',
-  //   preFormat: openNextToggles,
-  //   type: KEYS.toggle,
-  // },
+  
+  
+  
+  
+  
+  
   {
     match: ["---", "—-", "___ "],
     mode: "block",

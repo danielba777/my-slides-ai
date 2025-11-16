@@ -37,15 +37,15 @@ export function FloatingToolbar({
   const isFloatingLinkOpen = !!usePluginOption({ key: KEYS.link }, "mode");
   const isAIChatOpen = usePluginOption({ key: KEYS.aiChat }, "open");
 
-  // Check if any blocks are selected
+  
   const selectedIds = usePluginOption(BlockSelectionPlugin, "selectedIds");
   const hasBlockSelection = selectedIds && selectedIds.size > 0;
 
-  // Check if the selected blocks are layout blocks
+  
   const isLayoutBlockSelected = React.useMemo(() => {
     if (!hasBlockSelection || !selectedIds) return false;
 
-    // Check if any of the selected blocks are layout blocks
+    
     for (const blockId of selectedIds) {
       const block = editor.api.node({ id: blockId, at: [] });
       if (block?.[0]) {
@@ -63,7 +63,7 @@ export function FloatingToolbar({
     editorId,
     focusedEditorId,
     hideToolbar: isLayoutBlockSelected || isFloatingLinkOpen || isAIChatOpen,
-    // Override the default behavior to show toolbar when blocks are selected
+    
     enableBlockSelection: true,
     ...state,
     floatingOptions: {
@@ -93,7 +93,7 @@ export function FloatingToolbar({
 
   const ref = useComposedRef<HTMLDivElement>(props.ref, floatingRef);
 
-  // Show toolbar if blocks are selected, even if normally hidden
+  
   if (hidden && !hasBlockSelection) return null;
 
   return (

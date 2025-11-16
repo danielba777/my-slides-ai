@@ -1,7 +1,7 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: This use requires any */
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-// The font info is now imported statically at the top of the file.
+
 import fontInfos from "../font-preview/fontInfo.json";
 
 import { cn } from "@/lib/utils";
@@ -38,15 +38,15 @@ export default function FontPicker({
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  // All state and effects for loading have been removed (fontInfos, isLoadingFonts, error).
+  
 
   const allGoogleFonts: Font[] = useMemo(() => {
-    // The data from fontInfos is available immediately.
+    
     return (fontInfos as any[]).map((info: Omit<Font, "cased">) => ({
       ...info,
       cased: info.name.toLowerCase(),
     }));
-  }, []); // The dependency on fontInfos is removed as it's now a constant import.
+  }, []); 
 
   const fonts = useMemo(() => {
     let activeFonts: Font[];
@@ -161,7 +161,7 @@ export default function FontPicker({
     return null;
   }
 
-  // Error display is removed as a static import will fail at build time, not run time.
+  
 
   return (
     <div className={cn("w-full", className)} {...rest}>

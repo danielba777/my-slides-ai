@@ -50,13 +50,13 @@ export function FixedToolbarButtons() {
   const readOnly = useEditorReadOnly();
 
   const handleAddText = () => {
-    // Triggert im Canvas das Hinzufügen eines Textfeldes
+    
     window.dispatchEvent(new CustomEvent("canvas:add-text"));
   };
 
   return (
     <div className="flex w-full">
-      {/* Linke Sektion: immer sichtbarer "Text +" Button */}
+      {}
       <ToolbarGroup>
         <button
           onClick={handleAddText}

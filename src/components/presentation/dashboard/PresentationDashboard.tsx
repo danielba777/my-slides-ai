@@ -146,7 +146,7 @@ export function PresentationDashboard({
 
   useEffect(() => {
     setCurrentPresentation("", "");
-    // Make sure to reset any generation flags when landing on dashboard
+    
     setIsGeneratingOutline(false);
     setShouldStartOutlineGeneration(false);
   }, []);
@@ -289,19 +289,19 @@ export function PresentationDashboard({
   const handleGenerate = async () => {
     const { selectedTemplate } = usePresentationState.getState();
 
-    // Template-based generation
+    
     if (selectedTemplate) {
       await handleTemplateGenerate(selectedTemplate);
       return;
     }
 
-    // Normal prompt-based generation
+    
     if (!presentationInput.trim()) {
       toast.error("Please enter an AI prompt for your presentation");
       return;
     }
 
-    // Set UI loading state
+    
     setIsGeneratingOutline(true);
 
     try {
@@ -312,7 +312,7 @@ export function PresentationDashboard({
       );
 
       if (result.success && result.presentation) {
-        // Setze Pending-Cookie, sodass die Zielseite sofort loslegt
+        
         try {
           const domain =
             typeof window !== "undefined" &&
@@ -323,7 +323,7 @@ export function PresentationDashboard({
             `presentation_generation_pending=true; path=/; SameSite=Lax;` +
             (domain !== "localhost" ? ` domain=${domain};` : "");
         } catch {}
-        // Set the current presentation
+        
         setCurrentPresentation(
           result.presentation.id,
           result.presentation.title,
@@ -346,7 +346,7 @@ export function PresentationDashboard({
     setIsGeneratingOutline(true);
 
     try {
-      // Create empty presentation
+      
       const result = await createEmptyPresentation(
         `Slideshow from Template`,
         theme,
@@ -362,13 +362,13 @@ export function PresentationDashboard({
       const presentationId = result.presentation.id;
       setCurrentPresentation(presentationId, result.presentation.title);
 
-      // Store template data in sessionStorage so it survives navigation
+      
       sessionStorage.setItem("pendingTemplate", JSON.stringify({
         ...template,
         variety: templateVariety,
       }));
 
-      // Redirect to editor with template generation
+      
       router.push(
         `/dashboard/slideshows/generate/${presentationId}?template=true`,
       );
@@ -386,7 +386,7 @@ export function PresentationDashboard({
     viewCount: number,
     slideCount: number,
   ) => {
-    // Instead of generating a prompt, directly set the selected template
+    
     setSelectedTemplate({
       id: postId,
       slides,
@@ -605,7 +605,7 @@ export function PresentationDashboard({
         <div className="space-y-8">
           <PresentationInput handleGenerate={handleGenerate} />
 
-          {/* Variety Slider - only shown when template is selected */}
+          {}
           {selectedTemplate && (
             <div className="space-y-4 rounded-xl border border-border/50 bg-card/30 p-6">
               <div className="flex items-center justify-between">

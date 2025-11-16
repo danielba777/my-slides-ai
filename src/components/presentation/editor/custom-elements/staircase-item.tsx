@@ -8,9 +8,9 @@ import {
   type TStairItemElement,
 } from "../plugins/staircase-plugin";
 
-// StairItem component aligned with PyramidItem behavior
+
 export const StairItem = (props: PlateElementProps<TStairItemElement>) => {
-  // Derive parent stair element and totalChildren like pyramid
+  
   const parentPath = PathApi.parent(props.path);
   const parentElement = NodeApi.get(
     props.editor,
@@ -20,7 +20,7 @@ export const StairItem = (props: PlateElementProps<TStairItemElement>) => {
   const totalItems = parentElement?.children?.length || 1;
   const index = props.path.at(-1) ?? 0;
 
-  // Calculate a width ramp similar to previous design, but driven by totalItems
+  
   const baseWidth = 70;
   const maxWidth = 220;
   const increment = (maxWidth - baseWidth) / (totalItems - 1 || 1);
@@ -29,7 +29,7 @@ export const StairItem = (props: PlateElementProps<TStairItemElement>) => {
   return (
     <div className={cn("group/stair-item relative mb-2 w-full")}>
       <div className="flex items-center gap-4 border-b border-gray-700">
-        {/* Width-growing block with number */}
+        {}
         <div
           style={{
             width: `${widthPx}px`,
@@ -42,7 +42,7 @@ export const StairItem = (props: PlateElementProps<TStairItemElement>) => {
         >
           {index + 1}
         </div>
-        {/* Content area */}
+        {}
 
         <PlateElement className="flex flex-1 items-center" {...props}>
           {props.children}

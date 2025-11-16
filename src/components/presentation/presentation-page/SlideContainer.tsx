@@ -57,8 +57,8 @@ export function SlideContainer({
   const setCurrentSlideIndex = usePresentationState(
     (s) => s.setCurrentSlideIndex,
   );
-  // setSlides no longer needed after extracting operations
-  // Select only this slide's data so other slides don't re-render on unrelated changes
+  
+  
   const currentSlide = usePresentationState((s) => s.slides[index]);
   const {
     attributes,
@@ -129,7 +129,7 @@ export function SlideContainer({
       const updated = state.slides.slice();
       const idx = updated.findIndex((slideItem) => slideItem.id === id);
       if (idx >= 0) {
-        // Guard: updated[idx] kann noch nicht existieren
+        
         const prevRoot = updated[idx]?.rootImage ?? { query: "" };
         updated[idx] = {
           ...(updated[idx] as any),
@@ -179,21 +179,21 @@ export function SlideContainer({
           className,
         )}
       >
-        {/* Untere Toolbar: unter dem Canvas, horizontal und mittig */}
+        {}
         {!isPresenting && !isReadOnly && null}
 
-        {/* Hinweis: die früheren schwebenden + Buttons oben/unten wurden entfernt */}
+        {}
 
         {children}
 
-        {/* Untere Toolbar unter dem Canvas */}
+        {}
         {!isPresenting && !isReadOnly && (
           <div
             className={cn("z-[1001] mt-3 w-full")}
             aria-label="Slide toolbar"
           >
             <div className="mx-auto flex w-full max-w-[760px] flex-wrap items-center justify-center gap-3 py-3">
-              {/* Drag-Handle */}
+              {}
               <button
                 ref={setActivatorNodeRef as React.Ref<HTMLButtonElement>}
                 {...listeners}
@@ -205,10 +205,10 @@ export function SlideContainer({
                 <GripVertical className="h-4 w-4" />
               </button>
 
-              {/* Neuer: Persönliche Bilder (ersetzt den Edit/Canvas-Button) */}
+              {}
               <PersonalImagePickerButton index={index} />
 
-              {/* Neue Folie darunter */}
+              {}
               <Button
                 variant="ghost"
                 size="icon"
@@ -220,7 +220,7 @@ export function SlideContainer({
                 <Plus className="h-4 w-4" />
               </Button>
 
-              {/* Zufallsbild innerhalb der Kategorie */}
+              {}
               <Button
                 variant="ghost"
                 size="icon"
@@ -241,7 +241,7 @@ export function SlideContainer({
                 )}
               </Button>
 
-              {/* Löschen */}
+              {}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -302,12 +302,7 @@ export function SlideContainer({
   );
 }
 
-/**
- * Button + Dialog for personal images:
- * - Opens own menu (same styling/sizes as ImageCollectionSelector)
- * - Tab "Upload" (+ per-account storage), Tab "My Images"
- * - Confirm sets the image centered as rootImage of the current slide
- */
+
 function PersonalImagePickerButton({ index }: { index: number }) {
   const [open, setOpen] = useState(false);
   const slides = usePresentationState((s) => s.slides);
@@ -334,17 +329,17 @@ function PersonalImagePickerButton({ index }: { index: number }) {
     const updated = slides.slice();
     if (!updated[index]) return;
 
-    // ➕ Persönliches Bild als Overlay-Node (unter dem Text, über dem BG)
+    
     const slide = updated[index]!;
     const canvas = ensureCanvas(slide.canvas as CanvasDoc | undefined);
 
-    // Entferne evtl. vorhandenes persönliches Bild (1 pro Slide)
+    
     const nodesWithoutOld = canvas.nodes.filter(
       (n: any) => !(n?.type === "image" && n?.id === "user-overlay-image"),
     );
 
-    // Bild NATÜRLICH und ZENTRIERT platzieren (kein Zuschneiden, kein Cover)
-    // -> auf natürliche Größe, falls größer als Canvas: proportional auf Canvas einpassen (contain)
+    
+    
     let natW = canvas.width;
     let natH = canvas.height;
     try {
@@ -352,7 +347,7 @@ function PersonalImagePickerButton({ index }: { index: number }) {
       natW = img.naturalWidth || natW;
       natH = img.naturalHeight || natH;
     } catch {
-      // Fallback: halbe Canvasgröße
+      
       natW = Math.round(canvas.width * 0.5);
       natH = Math.round(canvas.height * 0.5);
     }
@@ -370,21 +365,21 @@ function PersonalImagePickerButton({ index }: { index: number }) {
       width: finalW,
       height: finalH,
       url: imageUrl,
-      // 🔒 Explizit jedes Zuschneiden deaktivieren
+      
       cropX: 0,
       cropY: 0,
       cropWidth: natW,
       cropHeight: natH,
-      fit: "contain",            // falls der Renderer eine Fit-Strategie kennt
-      preserveAspectRatio: true, // klarstellen, dass nichts verzerrt/cropped wird
-      clipToCanvas: false,       // falls es eine Canvas-Clip-Option gibt → aus
-      mask: false,               // falls Masking im Renderer existiert → aus
+      fit: "contain",            
+      preserveAspectRatio: true, 
+      clipToCanvas: false,       
+      mask: false,               
     };
 
     const nextCanvas: CanvasDoc = {
       ...canvas,
       nodes: [...nodesWithoutOld, personalNode],
-      // direkt vorselektieren, damit Drag/Zoom sofort funktioniert
+      
       selection: ["user-overlay-image"],
     };
 
@@ -393,20 +388,20 @@ function PersonalImagePickerButton({ index }: { index: number }) {
     setOpen(false);
   };
 
-  // --- Verhindere Seiten-Scrollen beim Zoomen/Edithieren des Overlay-Bildes ---
-  // Wenn das persönliche Overlay-Bild ausgewählt ist, unterbinden wir global das Wheel-Scrollen,
-  // damit nur das Canvas-Zoomen/Transformieren greift.
+  
+  
+  
   useEffect(() => {
     const sel = (slides[index]?.canvas as CanvasDoc | undefined)?.selection ?? [];
     const overlaySelected = sel.includes("user-overlay-image");
     if (!overlaySelected) return;
     const onWheel = (e: WheelEvent) => {
-      // wichtig: passive:false nötig, darum preventDefault hier möglich
+      
       e.preventDefault();
     };
     window.addEventListener("wheel", onWheel, { passive: false });
     return () => window.removeEventListener("wheel", onWheel as any, false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [(slides[index]?.canvas as any)?.selection]);
 
   const onMainButtonClick = () => {
@@ -420,7 +415,7 @@ function PersonalImagePickerButton({ index }: { index: number }) {
       );
 
     if (hasPersonal) {
-      // Statt Dialog: in den Editmodus wechseln
+      
       const ensured = ensureCanvas(c);
       const next: CanvasDoc = { ...ensured, selection: ["user-overlay-image"] };
       const updated = slides.slice();
@@ -429,7 +424,7 @@ function PersonalImagePickerButton({ index }: { index: number }) {
       setEditingOverlaySlideId(slide.id);
       return;
     }
-    // Sonst Dialog öffnen
+    
     setOpen(true);
   };
 

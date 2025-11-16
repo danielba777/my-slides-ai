@@ -21,7 +21,7 @@ export default function LayoutImageDrop({
 }: {
   slideIndex: number;
 }) {
-  // Create drop zones for top, left, and right
+  
   const topRef = useRef<HTMLDivElement>(null);
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
@@ -31,23 +31,23 @@ export default function LayoutImageDrop({
     item: { element: TElement },
     layoutType: LayoutType,
   ) => {
-    // Only handle image elements
+    
     if (item?.element?.type !== ImagePlugin.key) return;
 
-    // Store the image URL and query
+    
     let imageUrl = item.element.url as string;
     let imageQuery = item.element.query as string;
 
-    // Check if the image is from the editor and needs to be removed
+    
     const element = removeNodeById(editor, item.element);
     if (element?.url) imageUrl = element.url as string;
     if (element?.query) imageQuery = element.query as string;
 
-    // Get the current slides state
+    
     const { slides, setSlides, setCurrentSlideIndex } =
       usePresentationState.getState();
 
-    // Update the slides array with the new root image and layout type
+    
     const updatedSlides = slides.map((slide, index) => {
       if (index === slideIndex) {
         return {
@@ -63,19 +63,19 @@ export default function LayoutImageDrop({
       return slide;
     });
 
-    // Update the slides state and current slide index
+    
     setSlides(updatedSlides);
     setCurrentSlideIndex(slideIndex);
   };
 
-  // Setup drop zones
+  
   const [{ isTopOver }, dropTop] = useDrop({
     accept: [DRAG_ITEM_BLOCK],
     canDrop: (item: { element: TElement }) =>
       item.element.type === ImagePlugin.key,
     drop: (item) => {
       handleImageDrop(item, "vertical");
-      return { droppedInLayoutZone: true }; // Add this return value
+      return { droppedInLayoutZone: true }; 
     },
     collect: (monitor) => ({
       isTopOver: monitor.isOver() && monitor.canDrop(),
@@ -88,7 +88,7 @@ export default function LayoutImageDrop({
       item?.element?.type === ImagePlugin.key,
     drop: (item) => {
       handleImageDrop(item, "left");
-      return { droppedInLayoutZone: true }; // Add this return value
+      return { droppedInLayoutZone: true }; 
     },
     collect: (monitor) => ({
       isLeftOver: monitor.isOver() && monitor.canDrop(),
@@ -101,20 +101,20 @@ export default function LayoutImageDrop({
       item.element.type === ImagePlugin.key,
     drop: (item) => {
       handleImageDrop(item, "right");
-      return { droppedInLayoutZone: true }; // Add this return value
+      return { droppedInLayoutZone: true }; 
     },
     collect: (monitor) => ({
       isRightOver: monitor.isOver() && monitor.canDrop(),
     }),
   });
-  // Connect the drop refs
+  
   dropTop(topRef);
   dropLeft(leftRef);
   dropRight(rightRef);
 
   return (
     <>
-      {/* Top drop zone */}
+      {}
       <div
         ref={topRef}
         className={cn(
@@ -124,7 +124,7 @@ export default function LayoutImageDrop({
         )}
       />
 
-      {/* Left drop zone */}
+      {}
       <div
         ref={leftRef}
         className={cn(
@@ -134,7 +134,7 @@ export default function LayoutImageDrop({
         )}
       />
 
-      {/* Right drop zone */}
+      {}
       <div
         ref={rightRef}
         className={cn(

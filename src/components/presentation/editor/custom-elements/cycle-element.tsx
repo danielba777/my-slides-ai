@@ -1,11 +1,11 @@
 "use client";
 
-// Import CycleItem and constants
+
 import { cn } from "@/lib/utils";
 import { PlateElement, type StyledPlateElementProps } from "platejs/react";
 import { type TCycleItemElement } from "../plugins/cycle-plugin";
 
-// Main cycle component with withRef pattern
+
 export const CycleElement = ({
   className,
   ref,
@@ -17,9 +17,9 @@ export const CycleElement = ({
       className={cn("relative my-8", className)}
       {...props}
     >
-      {/* Three-column grid layout for content */}
+      {}
       <div className="mx-auto grid grid-cols-3 gap-4 px-12">
-        {/* Central SVG wheel */}
+        {}
         <div className="relative col-start-2 row-span-2 row-start-2 mx-auto h-64 w-64">
           <svg
             xmlns="http://www.w3.org/2000/svg"

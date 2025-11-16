@@ -11,7 +11,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 
-// PlanButton component for the pricing cards
+
 function PlanButton({
   plan,
   session,
@@ -175,7 +175,7 @@ export function MarketingPricing({
     "yearly",
   );
 
-  // Mapping der sichtbaren Namen zu den Server-Plan-Keys
+  
   const PLAN_MAP: Record<string, "STARTER" | "GROWTH" | "SCALE" | "UNLIMITED"> =
     {
       Starter: "STARTER",
@@ -185,7 +185,7 @@ export function MarketingPricing({
     };
 
   async function startCheckout(name: string, period: "monthly" | "yearly") {
-    // Wenn nicht eingeloggt → zur Sign-in-Seite mit Rücksprung zu gewünschtem Plan
+    
     const plan = PLAN_MAP[name];
     if (!session) {
       router.push(`/auth/signin?callbackUrl=/checkout?plan=${plan}`);
@@ -200,18 +200,18 @@ export function MarketingPricing({
         body: JSON.stringify({ plan, interval: period }),
       });
 
-      // Robust gegen Non-JSON / leeren Body
+      
       let data: any = null;
       const ct = res.headers.get("content-type") || "";
       if (ct.includes("application/json")) {
         try {
           data = await res.json();
         } catch {
-          // JSON kaputt/leer
+          
           data = null;
         }
       } else {
-        // Fallback: Text lesen für Logging
+        
         const text = await res.text().catch(() => "");
         console.error("Checkout non-JSON response:", text);
       }

@@ -18,12 +18,12 @@ export async function POST(req: Request) {
   const userId = session.user.id;
   const saved: { id: string; url: string }[] = [];
 
-  // ⬆️ Upload extern via UploadThing (analog zu euren Image/AI-Uploads)
-  //    Pro User gespeichert (DB filtert ohnehin per userId)
+  
+  
   const utFiles: UTFile[] = [];
   for (const file of files) {
     const buf = new Uint8Array(await file.arrayBuffer());
-    // Dateiname präfixen (nur kosmetisch – der Storage-Key wird von UT verwaltet)
+    
     const safeName =
       (file.name?.replace(/[^\w.\-]+/g, "_") || "image") +
       "_" +
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   const uploads = await utapi.uploadFiles(utFiles);
 
   for (const up of uploads) {
-    if (!up?.data?.ufsUrl) continue; // Falls ein einzelner Upload fehlschlägt, überspringen
+    if (!up?.data?.ufsUrl) continue; 
     const rec = await db.userImage.create({
       data: { userId, url: up.data.ufsUrl },
       select: { id: true, url: true },

@@ -52,7 +52,7 @@ export default function CustomImagesetsAdminPage() {
   const [data, setData] = useState<ImageSet[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Besitzer-E-Mails laden
+  
   const [owners, setOwners] = useState<Record<string, { userId: string; email: string | null }>>({});
   useEffect(() => {
     void (async () => {
@@ -83,8 +83,8 @@ export default function CustomImagesetsAdminPage() {
           : [];
         const owned = new Set(ownedIds);
 
-        // Admin → "Custom Imagesets": alle User-Collections anzeigen:
-        // Kriterium: in Ownership-Tabelle ODER als 'personal' getaggt.
+        
+        
         const filterCustom = (arr: ImageSet[] = []): ImageSet[] =>
           arr
             .filter((s) => owned.has(s.id) || isPersonalSet(s))

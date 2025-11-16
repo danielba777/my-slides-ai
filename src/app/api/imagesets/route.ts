@@ -31,12 +31,12 @@ export async function POST(request: NextRequest) {
     const session = await auth();
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (session?.user?.id) {
-      // WICHTIG: Owner-Verknüpfung für persönliche Kollektionen
+      
       headers["x-user-id"] = session.user.id;
     }
 
-    // Fallback: Wenn kein category-Feld gesetzt ist, aber ein User existiert,
-    // defaulten wir auf "personal", damit die Collection sauber einsortiert wird.
+    
+    
     const payload =
       body && typeof body === "object"
         ? { category: "personal", ...body }

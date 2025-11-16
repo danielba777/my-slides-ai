@@ -70,7 +70,7 @@ export default function BarGraphElement(props: PlateElementProps<TChartNode>) {
             <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
           </BarChart>
         </ChartContainer>
-        {/* non-editable */}
+        {}
       </div>
     </PlateElement>
   );

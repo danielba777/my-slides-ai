@@ -143,7 +143,7 @@ export function PresentationGenerationManager() {
         cleanContent = cleanContent.replace(/<TITLE>.*?<\/TITLE>/i, "").trim();
       }
 
-      // Neue Logik: Erfasse komplette Multi-Line Outline-Items
+      
       const lines = cleanContent.split("\n");
       const outlineItems: string[] = [];
       let currentItem = "";
@@ -152,35 +152,35 @@ export function PresentationGenerationManager() {
       for (const line of lines) {
         const trimmedLine = line.trim();
 
-        // Check if this line starts a new numbered item
+        
         const numberMatch = trimmedLine.match(/^(\d+)[\.\)]\s+(.*)$/);
 
         if (numberMatch) {
-          // Save the previous item if it exists
+          
           if (currentItem.trim()) {
             outlineItems.push(currentItem.trim());
           }
-          // Start a new item with the content after the number
+          
           currentItem = numberMatch[2] || "";
           inItem = true;
         } else if (inItem && trimmedLine) {
-          // Continue the current item (bullet points, sub-text, etc.)
+          
           currentItem += "\n" + trimmedLine;
         } else if (!trimmedLine) {
-          // Empty line - might be separator between items
+          
           if (currentItem.trim()) {
-            // Don't add the item yet, wait for next numbered item or end
+            
           }
         }
       }
 
-      // Don't forget the last item
+      
       if (currentItem.trim()) {
         outlineItems.push(currentItem.trim());
       }
 
       if (outlineItems.length === 0) {
-        // Fallback: Try to extract single-line items if multi-line parsing failed
+        
         const numberedMatches = Array.from(
           cleanContent.matchAll(/^\s*\d+[\.\)]\s+(.*\S)\s*$/gm),
         )
@@ -192,7 +192,7 @@ export function PresentationGenerationManager() {
         if (numberedMatches.length > 0) {
           outlineItems.push(...numberedMatches);
         } else {
-          // Second fallback: Try markdown-style headers
+          
           const sections = cleanContent.split(/^#\s+/gm).filter(Boolean);
           if (sections.length > 0) {
             outlineItems.push(

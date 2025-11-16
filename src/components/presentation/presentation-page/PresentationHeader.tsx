@@ -7,7 +7,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-// Import our new components
+
 import AllweoneText from "@/components/globals/allweone-logo";
 import { Button } from "@/components/ui/button";
 import * as motion from "framer-motion/client";
@@ -32,12 +32,12 @@ export default function PresentationHeader({ title }: PresentationHeaderProps) {
   const [presentationTitle, setPresentationTitle] =
     useState<string>("Presentation");
   const pathname = usePathname();
-  // Check if we're on the generate/outline page
+  
   const isPresentationPage =
     pathname.startsWith("/dashboard/slideshows/") &&
     !pathname.includes("generate");
 
-  // Update title when it changes in the state
+  
   useEffect(() => {
     if (currentPresentationTitle) {
       setPresentationTitle(currentPresentationTitle);
@@ -50,7 +50,7 @@ export default function PresentationHeader({ title }: PresentationHeaderProps) {
     return (
       <header className="flex h-12 max-w-[100vw]  items-center justify-between overflow-clip border-accent px-2 py-2">
         <div className="flex items-center gap-2">
-          {/* This component is suppose to be logo but for now its is actually hamburger menu */}
+          {}
 
           <Link href={"/dashboard/slideshows/create"}>
             <Button size={"icon"} className="rounded-full" variant={"ghost"}>
@@ -75,7 +75,7 @@ export default function PresentationHeader({ title }: PresentationHeaderProps) {
 
   return (
     <header className="flex h-12 w-full items-center justify-between border-b border-accent bg-background px-4">
-      {/* Left section with breadcrumb navigation */}
+      {}
       <div className="flex items-center gap-2">
         <Link
           href="/dashboard/slideshows"
@@ -87,28 +87,28 @@ export default function PresentationHeader({ title }: PresentationHeaderProps) {
         <span className="font-medium">{presentationTitle}</span>
       </div>
 
-      {/* Right section with actions */}
+      {}
       <div className="flex items-center gap-2">
-        {/* Save status indicator */}
+        {}
         <SaveStatus />
 
-        {/* Theme selector moved to right editor panel */}
+        {}
 
-        {/* Export button - Only in presentation page, not outline or present mode */}
+        {}
         {isPresentationPage && !isPresenting && (
           <ExportButton presentationId={currentPresentationId ?? ""} />
         )}
 
-        {/* Post now button with download dropdown */}
+        {}
         {isPresentationPage && !isPresenting && <PostNowButton />}
 
-        {/* Share button - Only in presentation page, not outline */}
+        {}
         {isPresentationPage && !isPresenting && <ShareButton />}
 
-        {/* Present button - Only in presentation page, not outline */}
+        {}
         {isPresentationPage && <PresentButton />}
 
-        {/* User profile dropdown - Keep this on all pages */}
+        {}
         {!isPresenting && <SideBarDropdown />}
       </div>
     </header>

@@ -14,7 +14,7 @@ import { CalloutKit } from "@/components/plate/plugins/callout-kit";
 import { CodeBlockKit } from "@/components/plate/plugins/code-block-kit";
 import { ColumnKit } from "@/components/plate/plugins/column-kit";
 import { CommentKit } from "@/components/plate/plugins/comment-kit";
-// import { CopilotKit } from "@/components/plate/plugins/copilot-kit";
+
 import { CursorOverlayKit } from "@/components/plate/plugins/cursor-overlay-kit";
 import { DateKit } from "@/components/plate/plugins/date-kit";
 import { DiscussionKit } from "@/components/plate/plugins/discussion-kit";
@@ -37,10 +37,10 @@ import { TocKit } from "@/components/plate/plugins/toc-kit";
 import { ToggleKit } from "@/components/plate/plugins/toggle-kit";
 
 export const EditorKit = [
-  // ...CopilotKit,
+  
   ...AIKit,
 
-  // Elements
+  
   ...BasicBlocksKit,
   ...CodeBlockKit,
   ...TableKit,
@@ -54,21 +54,21 @@ export const EditorKit = [
   ...LinkKit,
   ...MentionKit,
 
-  // Marks
+  
   ...BasicMarksKit,
   ...FontKit,
 
-  // Block Style
+  
   ...ListKit,
   ...AlignKit,
   ...LineHeightKit,
 
-  // Collaboration
+  
   ...DiscussionKit,
   ...CommentKit,
   ...SuggestionKit,
 
-  // Editing
+  
   ...SlashKit,
   ...AutoformatKit,
   ...CursorOverlayKit,
@@ -77,10 +77,10 @@ export const EditorKit = [
   ...ExitBreakKit,
   TrailingBlockPlugin,
 
-  // Parsers
+  
   ...MarkdownKit,
 
-  // UI
+  
   ...BlockPlaceholderKit,
   ...FixedToolbarKit,
   ...FloatingToolbarKit,

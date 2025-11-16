@@ -9,13 +9,13 @@ import {
 } from "platejs/react";
 import { type TCycleItemElement } from "../plugins/cycle-plugin";
 
-// CycleItem component for individual items in the cycle
+
 export const CycleItem = (
   props: StyledPlateElementProps<TCycleItemElement>,
 ) => {
   const index = props.path.at(-1) as number;
 
-  // Calculate item color based on index
+  
   const getItemColor = () => {
     const colors = [
       "bg-blue-500",
@@ -34,10 +34,10 @@ export const CycleItem = (
   return (
     <div className={cn(gridClass)}>
       <div className={cn("group/cycle-item relative mb-6")}>
-        {/* Drop target indicator lines */}
-        {/* Content container with heading */}
+        {}
+        {}
         <div className="rounded-md border border-primary/20 bg-card p-4 shadow-sm">
-          {/* Heading with number */}
+          {}
           <div className="mb-2 flex items-center">
             <div
               className={cn(
@@ -49,7 +49,7 @@ export const CycleItem = (
             </div>
           </div>
 
-          {/* Content area */}
+          {}
           <PlateElement className="mt-2" {...props}>
             {props.children}
           </PlateElement>
@@ -59,7 +59,7 @@ export const CycleItem = (
   );
 };
 
-// Compute grid placement class for a cycle item given editor context
+
 export function getCycleItemGridClass(
   editor: PlateEditor,
   element: TElement,

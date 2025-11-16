@@ -51,7 +51,7 @@ export function IconStatic(props: SlateElementProps<TIconElement>) {
         return;
       }
       if (query) {
-        // Try FA then MD for a fuzzy match
+        
         const [fa, md] = await Promise.all([
           import("react-icons/fa"),
           import("react-icons/md"),

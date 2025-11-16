@@ -27,9 +27,9 @@ export const DndKit = [
     },
     render: {
       aboveNodes: BlockDraggable,
-      // aboveSlate: ({ children }) => (
-      //   <DndProvider backend={HTML5Backend}>{children}</DndProvider>
-      // ),
+      
+      
+      
     },
   }),
 ];

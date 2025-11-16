@@ -158,13 +158,13 @@ export function TimelineItem(props: PlateElementProps) {
 
   const lineClass = lineVariants({ orientation, sidedness, showLine, isEven });
   return (
-    //* Container
+    
     <div
       className={cn(
         containerVariants({ orientation, sidedness, isEven, showLine }),
       )}
     >
-      {/* Circle */}
+      {}
       <div
         className={cn(circleVariants({ orientation, sidedness }), lineClass)}
         style={
@@ -184,7 +184,7 @@ export function TimelineItem(props: PlateElementProps) {
       >
         {numbered ? itemNumber : ""}
       </div>
-      {/* Content */}
+      {}
       <PlateElement
         className={contentVariants({ orientation, sidedness })}
         {...props}

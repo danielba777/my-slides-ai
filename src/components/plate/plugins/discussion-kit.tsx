@@ -240,7 +240,7 @@ const usersData: Record<
   },
 };
 
-// This plugin is purely UI. It's only used to store the discussions and users data
+
 export const discussionPlugin = createPlatePlugin({
   key: "discussion",
   options: {

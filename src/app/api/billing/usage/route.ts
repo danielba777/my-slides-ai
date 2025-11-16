@@ -5,7 +5,6 @@ import { NextResponse } from "next/server";
 
 import { revalidateTag } from "next/cache";
 
-// ✅ New route for triggering live updates (called from server)
 export async function POST(req: Request) {
   try {
     const { userId } = await req.json();
@@ -27,7 +26,7 @@ export async function GET() {
       tx.user.findUnique({
         where: { id: session.user.id },
         select: {
-          plan: true, // kann null sein = Free
+          plan: true,
           planRenewsAt: true,
           stripeCustomerId: true,
           subscriptions: {
@@ -53,8 +52,6 @@ export async function GET() {
 
   const latestSub = user?.subscriptions?.[0] ?? null;
   const hasPlan = !!user?.plan;
-  // Bei Free-Plan keine "0 left"-Falle durch alte Balance:
-  // Falls kein Plan und keine Balance vorhanden -> 5/0 zurueckgeben (UI zeigt dann korrekt 0/5 verwendet)
   const freeCredits = !hasPlan ? (balance?.credits ?? 5) : null;
   const freeAi = !hasPlan ? (balance?.aiCredits ?? 0) : null;
   const freeUsedCredits = !hasPlan ? (balance?.usedCredits ?? 0) : null;

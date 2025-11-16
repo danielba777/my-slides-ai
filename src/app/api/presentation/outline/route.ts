@@ -115,7 +115,7 @@ export async function POST(req: Request) {
       ar: "Arabic",
     };
 
-    const actualLanguage = languageMap[language] ?? language; // Fallback to the original if not found
+    const actualLanguage = languageMap[language] ?? language; 
     const currentDate = new Date().toLocaleDateString("en-US", {
       weekday: "long",
       year: "numeric",
@@ -123,7 +123,7 @@ export async function POST(req: Request) {
       day: "numeric",
     });
 
-    // Add a per-request diversity signature and a random variation directive to boost variety
+    
     const diversitySig = Math.random().toString(36).slice(2, 10);
     const variabilityDirectives = [
       "Focus on underrated, lesser-known examples that people rarely mention.",
@@ -140,7 +140,7 @@ export async function POST(req: Request) {
 
     const model = modelPicker(modelProvider, modelId);
 
-    // Format the prompt with template variables
+    
     const formattedPrompt = outlineTemplate
       .replace(/{numberOfCards}/g, numberOfCards.toString())
       .replace(/{language}/g, actualLanguage)

@@ -1,6 +1,4 @@
-/* Lightweight JSON-LD for Organization + FAQPage.
 
-- Hält sich an die Inhalte der Landing Page (FAQ vorhanden). */
 export function SeoJsonLd() {
   const org = {
     "@context": "https://schema.org",
@@ -10,7 +8,7 @@ export function SeoJsonLd() {
     logo: "https://slidescockpit.com/logo-og.png",
   };
 
-  // Minimale FAQPage (Fragen-Titel spiegeln Sektionen in der Landing)
+  
   const faq = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -49,12 +47,12 @@ export function SeoJsonLd() {
     <>
       <script
         type="application/ld+json"
-        // eslint-disable-next-line react/no-danger
+        
         dangerouslySetInnerHTML={{ __html: JSON.stringify(org) }}
       />
       <script
         type="application/ld+json"
-        // eslint-disable-next-line react/no-danger
+        
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faq) }}
       />
     </>

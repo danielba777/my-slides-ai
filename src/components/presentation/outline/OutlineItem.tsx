@@ -13,7 +13,7 @@ interface OutlineItemProps {
   onDelete: (id: string) => void;
 }
 
-// Wrap the component with memo to prevent unnecessary re-renders
+
 export const OutlineItem = memo(function OutlineItem({
   id,
   index,
@@ -21,7 +21,7 @@ export const OutlineItem = memo(function OutlineItem({
   onTitleChange,
   onDelete,
 }: OutlineItemProps) {
-  // Always editable, no need for isEditing state
+  
   const [editedTitle, setEditedTitle] = useState(title);
 
   const {
@@ -38,7 +38,7 @@ export const OutlineItem = memo(function OutlineItem({
     transition,
   };
 
-  // Update editedTitle when title prop changes
+  
   useEffect(() => {
     setTimeout(() => {
       setEditedTitle(title);
@@ -92,5 +92,5 @@ export const OutlineItem = memo(function OutlineItem({
   );
 });
 
-// Add a display name for debugging purposes
+
 OutlineItem.displayName = "OutlineItem";

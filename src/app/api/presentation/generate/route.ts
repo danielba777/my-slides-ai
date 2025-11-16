@@ -2,19 +2,19 @@ import { modelPicker } from "@/lib/model-picker";
 import { auth } from "@/server/auth";
 import { streamText } from "ai";
 import { NextResponse } from "next/server";
-// Use AI SDK types for proper type safety
+
 
 interface SlidesRequest {
-  title: string; // Generated presentation title
-  prompt: string; // Original user prompt/request
-  outline: string[]; // Array of main topics with markdown content
-  language: string; // Language to use for the slides
-  tone: string; // Style for image queries (optional)
-  modelProvider?: string; // Model provider (openai, ollama, or lmstudio)
-  modelId?: string; // Specific model ID for the provider
-  searchResults?: Array<{ query: string; results: unknown[] }>; // Search results for context
+  title: string; 
+  prompt: string; 
+  outline: string[]; 
+  language: string; 
+  tone: string; 
+  modelProvider?: string; 
+  modelId?: string; 
+  searchResults?: Array<{ query: string; results: unknown[] }>; 
 }
-// TODO: Add table and chart to the available layouts
+
 const slidesTemplate = `
 You are an expert presentation writer. Your task is to create a clear, text-only presentation in XML format.
 
@@ -91,7 +91,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Format search results
+    
     let searchResultsText = "No research data available.";
     if (searchResults && searchResults.length > 0) {
       const searchData = searchResults
@@ -129,7 +129,7 @@ export async function POST(req: Request) {
 
     const model = modelPicker(modelProvider, modelId);
 
-    // Format the prompt with template variables
+    
     const formattedPrompt = slidesTemplate
       .replace(/{TITLE}/g, title)
       .replace(/{PROMPT}/g, userPrompt || "No specific prompt provided")

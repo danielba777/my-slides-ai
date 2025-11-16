@@ -124,7 +124,7 @@ export default function PersonalImageSelectorDialog({
 
   const belongsToUser = useCallback(
     (set: ImageSet) =>
-      // Persönliche Sets zählen nur für den Besitzer als "mine"
+      
       checkOwnership(set, userId ?? null) || isAiAvatarCollection(set),
     [isAiAvatarCollection, looksPersonal, userId],
   );
@@ -138,7 +138,7 @@ export default function PersonalImageSelectorDialog({
         [];
       return children
         .filter(belongsToUser)
-        // Safety: niemals Personal anderer in der Liste
+        
         .filter((s) => !looksPersonal(s) || checkOwnership(s, userId ?? null));
     }
     return imageSets

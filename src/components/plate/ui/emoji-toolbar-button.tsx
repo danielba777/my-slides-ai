@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: This use requires any */
+
 "use client";
 
 import * as React from "react";
@@ -534,7 +534,7 @@ const emojiCategoryIcons: Record<
   EmojiCategoryList,
   {
     outline: React.ReactElement;
-    solid: React.ReactElement; // Needed to add another solid variant - outline will be used for now
+    solid: React.ReactElement; 
   }
 > = {
   activity: {

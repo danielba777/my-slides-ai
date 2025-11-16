@@ -17,7 +17,7 @@ export async function GET() {
     
     const posts = await response.json();
     
-    // Extrahiere alle eindeutigen Kategorien aus allen Posts
+    
     const categoriesSet = new Set<string>();
     
     for (const post of posts) {

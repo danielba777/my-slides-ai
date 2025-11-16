@@ -100,10 +100,7 @@ const InlineCombobox = ({
     [setValueProp, hasValueProp],
   );
 
-  /**
-   * Track the point just before the input element so we know where to
-   * insertText if the combobox closes due to a selection change.
-   */
+  
   const insertPoint = React.useRef<Point | null>(null);
 
   React.useEffect(() => {
@@ -166,16 +163,13 @@ const InlineCombobox = ({
   );
 
   const store = useComboboxStore({
-    // open: ,
+    
     setValue: (newValue) => React.startTransition(() => setValue(newValue)),
   });
 
   const items = store.useState("items");
 
-  /**
-   * If there is no active ID and the list of items changes, select the first
-   * item.
-   */
+  
   React.useEffect(() => {
     if (!store.getState().activeId) {
       store.setActiveId(store.first());
@@ -215,12 +209,7 @@ const InlineComboboxInput = React.forwardRef<
 
   const ref = useComposedRef(propRef, contextRef);
 
-  /**
-   * To create an auto-resizing input, we render a visually hidden span
-   * containing the input value and position the input element on top of it.
-   * This works well for all cases except when input exceeds the width of the
-   * container.
-   */
+  
 
   return (
     <>
@@ -256,7 +245,7 @@ const InlineComboboxContent: typeof ComboboxPopover = ({
   className,
   ...props
 }) => {
-  // Portal prevents CSS from leaking into popover
+  
   return (
     <Portal>
       <ComboboxPopover
@@ -306,8 +295,8 @@ const InlineComboboxItem = ({
 
   const store = useComboboxContext()!;
 
-  // Optimization: Do not subscribe to value if filter is false
-  // biome-ignore lint/correctness/useHookAtTopLevel: This code is at top level
+  
+  
   const search = filter && store.useState("value");
 
   const visible = React.useMemo(

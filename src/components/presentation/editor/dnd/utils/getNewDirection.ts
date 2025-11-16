@@ -1,4 +1,4 @@
-/** Get new direction if updated */
+
 import { type DropLineDirection } from "@platejs/dnd";
 
 export const getNewDirection = (

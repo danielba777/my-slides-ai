@@ -9,7 +9,7 @@ import {
 export const withDefaults = (c?: CanvasDoc): CanvasDoc => ({
   version: 1,
   width: c?.width ?? 1080,
-  height: c?.height ?? 1620, // 2:3 aspect ratio
+  height: c?.height ?? 1620, 
   bg: c?.bg ?? "#ffffff",
   nodes: c?.nodes ?? [],
   selection: c?.selection ?? [],
@@ -21,10 +21,10 @@ export const addText = (c: CanvasDoc, text = "Neuer Text"): CanvasDoc => ({
   nodes: [
     ...c.nodes,
     (() => {
-      const width = Math.round(c.width * 0.7); // ~70% Breite
-      // Verwende normalisierte Koordinaten (0-1) für korrekte Zentrierung
-      const nx = 0.5; // horizontal zentriert
-      const ny = 0.5; // vertikal zentriert
+      const width = Math.round(c.width * 0.7); 
+      
+      const nx = 0.5; 
+      const ny = 0.5; 
       const pxX = Math.round(nx * c.width);
       const pxY = Math.round(ny * c.height);
       return {

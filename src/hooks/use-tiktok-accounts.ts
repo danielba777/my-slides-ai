@@ -81,7 +81,7 @@ export function useTikTokAccounts(): UseTikTokAccountsResult {
         throw new Error(message);
       }
 
-      // Refresh the accounts list after successful disconnection
+      
       await refresh();
       return true;
     } catch (err) {

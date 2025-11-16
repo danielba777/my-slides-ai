@@ -55,7 +55,7 @@ export const PresentationImageEditor = ({
     console.log("Element on mount", element);
   }, []);
 
-  // Local crop settings state - only saved when user clicks save
+  
   const [localCropSettings, setLocalCropSettings] = useState<ImageCropSettings>(
     {
       objectFit: element.cropSettings?.objectFit ?? "cover",
@@ -133,10 +133,10 @@ export const PresentationImageEditor = ({
         </SheetHeader>
 
         <div className="flex-1 space-y-6 py-6">
-          {/* Error messages */}
+          {}
           <ErrorDisplay error={undefined} localError={null} />
 
-          {/* Main Preview Area with Action Buttons */}
+          {}
           <Card>
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
@@ -157,7 +157,7 @@ export const PresentationImageEditor = ({
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Image Preview Area with Controls */}
+              {}
               <ImagePreview
                 element={element}
                 currentMode={currentMode}
@@ -169,7 +169,7 @@ export const PresentationImageEditor = ({
                 onUnsavedChanges={setHasUnsavedChanges}
               />
 
-              {/* Generate Mode Controls */}
+              {}
               {currentMode === "generate" && (
                 <GenerateControls
                   element={element}

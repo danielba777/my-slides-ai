@@ -17,7 +17,7 @@ export const VisualizationListPlugin = createTPlatePlugin({
   },
 });
 
-// Create plugin for visualization item
+
 export const VisualizationItemPlugin = createTPlatePlugin({
   key: VISUALIZATION_LIST_ITEM,
   node: {

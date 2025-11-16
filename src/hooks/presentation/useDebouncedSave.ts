@@ -4,27 +4,20 @@ import debounce from "lodash.debounce";
 import { useCallback, useEffect, useRef } from "react";
 
 interface UseDebouncedSaveOptions {
-  /**
-   * Debounce delay in milliseconds
-   * @default 1000
-   */
+  
   delay?: number;
 }
 
-/**
- * Custom hook for debounced saving of presentation slides
- * Automatically saves when slides are changed after the specified delay
- * Will not save while content is being generated
- */
+
 export const useDebouncedSave = (options: UseDebouncedSaveOptions = {}) => {
   const { delay = 1000 } = options;
   const { setSavingStatus } = usePresentationState();
 
-  // Create debounced save function
+  
   const debouncedSave = useRef(
     debounce(
       async () => {
-        // Get the latest state directly from the store
+        
         const {
           slides,
           currentPresentationId,
@@ -37,7 +30,7 @@ export const useDebouncedSave = (options: UseDebouncedSaveOptions = {}) => {
           thumbnailUrl,
         } = usePresentationState.getState();
 
-        // Don't save if there's no presentation or slides
+        
         if (!currentPresentationId || slides.length === 0) return;
         try {
           setSavingStatus("saving");
@@ -57,7 +50,7 @@ export const useDebouncedSave = (options: UseDebouncedSaveOptions = {}) => {
           });
 
           setSavingStatus("saved");
-          // Reset to idle after 2 seconds
+          
           setTimeout(() => {
             setSavingStatus("idle");
           }, 2000);
@@ -71,18 +64,18 @@ export const useDebouncedSave = (options: UseDebouncedSaveOptions = {}) => {
     ),
   ).current;
 
-  // Cleanup debounce on unmount
+  
   useEffect(() => {
     return () => {
       debouncedSave.cancel();
     };
   }, [debouncedSave]);
 
-  // Save slides immediately (useful for manual saves)
+  
   const saveImmediately = useCallback(async () => {
     debouncedSave.cancel();
 
-    // Get the latest state directly from the store
+    
     const {
       slides,
       currentPresentationId,
@@ -95,7 +88,7 @@ export const useDebouncedSave = (options: UseDebouncedSaveOptions = {}) => {
       thumbnailUrl,
     } = usePresentationState.getState();
 
-    // Don't save if there's no presentation
+    
     if (!currentPresentationId || slides.length === 0) return;
 
     try {
@@ -116,7 +109,7 @@ export const useDebouncedSave = (options: UseDebouncedSaveOptions = {}) => {
       });
 
       setSavingStatus("saved");
-      // Reset to idle after 2 seconds
+      
       setTimeout(() => {
         setSavingStatus("idle");
       }, 2000);
@@ -126,7 +119,7 @@ export const useDebouncedSave = (options: UseDebouncedSaveOptions = {}) => {
     }
   }, [debouncedSave, setSavingStatus]);
 
-  // Trigger save function
+  
   const save = useCallback(() => {
     setSavingStatus("saving");
     void debouncedSave();

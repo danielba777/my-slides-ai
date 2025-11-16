@@ -5,7 +5,7 @@ import { NodeApi, PathApi } from "platejs";
 import { PlateElement, type PlateElementProps } from "platejs/react";
 
 export const BoxItem = (props: PlateElementProps) => {
-  // Get parent element for color
+  
   const parentPath = PathApi.parent(props.path);
   const parentElement = NodeApi.get(props.editor, parentPath);
 

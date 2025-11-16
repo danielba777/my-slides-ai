@@ -18,7 +18,7 @@ export default function SettingsConnections() {
   const [disconnectingOpenId, setDisconnectingOpenId] = useState<string | null>(
     null,
   );
-  // loading + error + disconnect mit aus dem Hook holen
+  
   const { accounts, loading, error, refresh, disconnect } = useTikTokAccounts();
 
   useEffect(() => {
@@ -98,7 +98,7 @@ export default function SettingsConnections() {
 
   return (
     <div className="px-1 md:px-2 py-1 md:py-2 space-y-4">
-      {/* Header wie „Personal" */}
+      {}
       <div className="mb-2">
         <h2 className="text-xl md:text-2xl font-semibold">Connections</h2>
         <p className="text-sm text-muted-foreground">
@@ -124,7 +124,7 @@ export default function SettingsConnections() {
         </div>
       </div>
 
-      {/* Body (no extra borders like an inner card header) */}
+      {}
       {loading ? (
         <div className="flex items-center justify-center py-6">
           <Spinner className="h-8 w-8" />
@@ -151,7 +151,7 @@ export default function SettingsConnections() {
                 </Avatar>
                 <span className="text-xs font-medium">{labelFor(a)}</span>
 
-                {/* Disconnect Button (ständig sichtbar; keine Label-Hover-Effekte) */}
+                {}
                 <button
                   onClick={() => handleDisconnect(a)}
                   disabled={disconnectingOpenId === a.openId}

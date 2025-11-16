@@ -1,10 +1,8 @@
 "use client";
 
-/**
- * Utility helpers for exporting slides to PNG/JPG/ZIP blobs.
- */
 
-// JSZip wird lazy geladen, damit der initiale Bundle klein bleibt
+
+
 export async function zipFiles(
   files: Array<{ name: string; blob: Blob }>,
 ): Promise<Blob> {
@@ -23,7 +21,7 @@ export async function zipFiles(
   return content;
 }
 
-// Lädt einen Blob als HTMLImageElement
+
 export async function loadBlobAsImage(blob: Blob): Promise<HTMLImageElement> {
   const dataUrl = await blobToDataUrl(blob);
   return await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -35,7 +33,7 @@ export async function loadBlobAsImage(blob: Blob): Promise<HTMLImageElement> {
   });
 }
 
-// Erzwingt Full-Frame-Export 1080x1620 (2:3) mit zentriertem Cover-Fitting
+
 export async function normalizeToDesignPNG(
   pngBlob: Blob,
   W = 1080,
@@ -67,7 +65,7 @@ export async function blobToJpeg(
   W = 1080,
   H = 1620,
 ): Promise<Blob> {
-  // Erst sicherstellen, dass wir exakt den vollen Frame (1080×1620, 2:3) haben
+  
   const normalized = await normalizeToDesignPNG(pngBlob, W, H);
   const img = await loadBlobAsImage(normalized);
   const canvas = document.createElement("canvas");

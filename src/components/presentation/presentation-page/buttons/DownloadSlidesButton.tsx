@@ -20,14 +20,14 @@ export function DownloadSlidesButton() {
       setDownloading(true);
       const exporters: Map<string, () => Promise<Blob>> =
         (window as any).__slideExporters ?? new Map();
-      // sichere Reihenfolge (aktuelle UI-Reihenfolge im State)
+      
       const ordered = slides.map((s, idx) => ({ id: s.id as string, idx }));
       const jpgFiles: Array<{ name: string; blob: Blob }> = [];
       for (const { id, idx } of ordered) {
         const exporter = exporters.get(id);
         if (!exporter) continue;
         const png = await exporter();
-        // Erzwinge Full-Frame 1080×1620 (2:3) + Rand-Clip, danach nach JPG
+        
         const jpg = await blobToJpeg(png, 1080, 1620);
         const name = `${String(idx + 1).padStart(3, "0")}.jpg`;
         jpgFiles.push({ name, blob: jpg });

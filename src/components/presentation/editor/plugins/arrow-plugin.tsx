@@ -4,7 +4,7 @@ import { ARROW_LIST, ARROW_LIST_ITEM } from "../lib";
 import { type TElement } from "platejs";
 import { ArrowItem } from "../custom-elements/arrow-item";
 import ArrowList from "../custom-elements/arrow-list";
-// Create plugin for visualization item
+
 export const ArrowListPlugin = createPlatePlugin({
   key: ARROW_LIST,
   node: {
@@ -13,7 +13,7 @@ export const ArrowListPlugin = createPlatePlugin({
   },
 });
 
-// Create plugin for visualization list
+
 export const ArrowListItemPlugin = createPlatePlugin({
   key: ARROW_LIST_ITEM,
   node: {

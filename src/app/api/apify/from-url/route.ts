@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { ApifyIngestError, ingestTikTokPost } from "../run/route";
 import { db } from "@/server/db";
 
-// CORS Headers für Extension-Zugriff
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -44,7 +43,6 @@ function extractFromTikTokUrl(rawUrl: string) {
     hasVideoSegment: segments.includes("video"),
   });
 
-  // Check if this is a photo post and log it
   if (segments.includes("photo")) {
     console.log("[apify/from-url] Detected photo post", {
       awemeId,
@@ -69,7 +67,6 @@ function extractFromTikTokUrl(rawUrl: string) {
   return { awemeId, profileUsername };
 }
 
-// OPTIONS Handler für CORS Preflight
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
@@ -149,7 +146,6 @@ async function authenticateExtensionUser(request: Request) {
     throw new ApifyIngestError("Missing extension token", 401);
   }
 
-  // First check if it's an admin library token
   try {
     const adminResponse = await fetch(`${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/admin/library-token`, {
       method: "POST",
@@ -161,7 +157,6 @@ async function authenticateExtensionUser(request: Request) {
       const adminResult = await adminResponse.json();
       if (adminResult.isValid) {
         console.log("[apify/from-url] Admin library token detected");
-        // Return a special admin user object
         return {
           id: "admin-library",
           email: "admin@slidescockpit.com",
@@ -170,11 +165,9 @@ async function authenticateExtensionUser(request: Request) {
       }
     }
   } catch (error) {
-    // Continue with normal user authentication if admin check fails
     console.debug("[apify/from-url] Admin token check failed, trying normal user:", error);
   }
 
-  // Normal user authentication
   const user = await db.user.findUnique({
     where: { extensionToken: token },
     select: { id: true, email: true },

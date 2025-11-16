@@ -18,7 +18,7 @@ import { BaseTocKit } from "@/components/plate/plugins/toc-base-kit";
 import { BaseToggleKit } from "@/components/plate/plugins/toggle-base-kit";
 import { PresentationBasicBlocksBaseKit } from "./presentation-basic-blocks-base-kit";
 
-// Presentation-focused BaseEditorKit using presentation static components for headings/paragraphs
+
 export const PresentationEditorBaseKit = [
   ...PresentationBasicBlocksBaseKit,
   ...BaseCodeBlockKit,

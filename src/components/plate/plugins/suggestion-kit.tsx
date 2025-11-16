@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: This use requires any */
+
 "use client";
 
 import {
@@ -35,7 +35,7 @@ export const suggestionPlugin = toTPlatePlugin<SuggestionConfig>(
   BaseSuggestionPlugin,
   ({ editor }) => ({
     handlers: {
-      // unset active suggestion when clicking outside of suggestion
+      
       onClick: ({ api, event, setOption, type }) => {
         let leaf = event.target as HTMLElement;
         let isSet = false;

@@ -35,7 +35,7 @@ const SlideCanvas = dynamic(() => import("@/canvas/SlideCanvasAdapter"), {
   ssr: false,
 });
 
-// -- Small utility to wait for root image decode before mounting the canvas --
+
 function useImageReady(url?: string) {
   const [ready, setReady] = React.useState(!url);
   React.useEffect(() => {
@@ -47,7 +47,7 @@ function useImageReady(url?: string) {
     const img = new Image();
     img.crossOrigin = "anonymous";
     const markReady = () => active && setReady(true);
-    // Prefer decode() to avoid showing half-rendered frames (Chrome/Firefox)
+    
     img.src = url;
     if (typeof (img as any).decode === "function") {
       (img as any).decode().then(markReady).catch(markReady);
@@ -62,7 +62,7 @@ function useImageReady(url?: string) {
   return ready;
 }
 
-// ✅ Child-Komponente, damit der Hook NICHT in einer Schleife aufgerufen wird
+
 const SlideFrame = memo(function SlideFrame({
   slide,
   index,
@@ -86,7 +86,7 @@ const SlideFrame = memo(function SlideFrame({
   };
   const imgUrl = slide.rootImage?.url as string | undefined;
 
-  // Bild-URL CORS-sicher machen, damit Canvas-Export nicht "tainted" ist
+  
   const [safeImgUrl, setSafeImgUrl] = useState<string | undefined>(imgUrl);
   useEffect(() => {
     let active = true;
@@ -101,12 +101,12 @@ const SlideFrame = memo(function SlideFrame({
     (async () => {
       const safeUrl = await getCorsSafeImageUrl(imgUrl);
       if (!active) return;
-      // Wenn wir eine neue blob:-URL erzeugen, alte aufräumen
+      
       if (previousBlobUrl && previousBlobUrl !== safeUrl) {
         revokeCorsSafeImageUrl(previousBlobUrl);
       }
       setSafeImgUrl(safeUrl);
-      // Merken, um beim nächsten Durchlauf zu revoken
+      
       if (safeUrl.startsWith("blob:")) previousBlobUrl = safeUrl;
     })();
     return () => {
@@ -115,7 +115,7 @@ const SlideFrame = memo(function SlideFrame({
     };
   }, [imgUrl]);
 
-  // BG-Image direkt in den Canvas-Daten verankern, ohne Text zu verlieren
+  
   const docWithBg = applyBackgroundImageToCanvas(
     safeCanvas,
     slide.rootImage?.useGrid ? null : safeImgUrl,
@@ -125,7 +125,7 @@ const SlideFrame = memo(function SlideFrame({
 
   const canvasRef = useRef<SlideCanvasAdapterHandle | null>(null);
 
-  // Edit-Modus State: nur wenn aktiv, wird die Toolbar angezeigt
+  
   const { editingSlideId, setEditingSlideId } = usePresentationState();
   const { editingOverlaySlideId, setEditingOverlaySlideId } =
     usePresentationState();
@@ -134,11 +134,11 @@ const SlideFrame = memo(function SlideFrame({
   const [isImageSelectorOpen, setIsImageSelectorOpen] = useState(false);
   const [isMultiImageSelectorOpen, setIsMultiImageSelectorOpen] =
     useState(false);
-  // ❗ Wenn ein anderer Slide im Text-Edit ist, sind diese Slide-Interaktionen read-only
+  
   const disableInteractions = !!editingSlideId && editingSlideId !== slide.id;
 
-  // Registriere pro Slide einen Exporter in einer globalen Map, damit der Header
-  // zentral in der aktuellen Reihenfolge exportieren kann.
+  
+  
   useEffect(() => {
     (window as any).__slideExporters =
       (window as any).__slideExporters ||
@@ -157,14 +157,14 @@ const SlideFrame = memo(function SlideFrame({
     };
   }, [slide?.id]);
 
-  // Entferne Text-Fokus, wenn der Edit-Modus dieser Slide beendet wird
+  
   useEffect(() => {
     if (!isEditingText) {
       canvasRef.current?.clearTextFocus();
     }
   }, [isEditingText]);
 
-  // Wenn Overlay-Editmodus aktiv: sicherstellen, dass das persönliche Bild selektiert ist
+  
   useEffect(() => {
     if (editingOverlaySlideId !== slide.id) return;
     const { slides, setSlides } = usePresentationState.getState();
@@ -189,7 +189,7 @@ const SlideFrame = memo(function SlideFrame({
     setSlides(updated);
   }, [editingOverlaySlideId, slide.id]);
 
-  // Handler für die Bild-Auswahl
+  
   const handleImageSelect = (selection: SelectedImageResult) => {
     const { slides, setSlides } = usePresentationState.getState();
     const updated = slides.slice();
@@ -199,7 +199,7 @@ const SlideFrame = memo(function SlideFrame({
     const currentSlide = updated[i];
     if (!currentSlide) return;
 
-    // Update nur das rootImage dieser Slide
+    
     updated[i] = {
       ...currentSlide,
       rootImage: {
@@ -225,7 +225,7 @@ const SlideFrame = memo(function SlideFrame({
     setSlides(updated);
   };
 
-  // Handler für die Multi-Bild-Auswahl
+  
   const handleMultiImageSelect = (imageUrls: string[]) => {
     const { slides, setSlides } = usePresentationState.getState();
     const updated = slides.slice();
@@ -246,7 +246,7 @@ const SlideFrame = memo(function SlideFrame({
     setSlides(updated);
   };
 
-  // Toggle zwischen Single und Grid Mode
+  
   const toggleGridMode = () => {
     const { slides, setSlides } = usePresentationState.getState();
     const updated = slides.slice();
@@ -277,7 +277,7 @@ const SlideFrame = memo(function SlideFrame({
 
   return (
     <>
-      {/* Image Selector Modals */}
+      {}
       <SingleSlideImageSelector
         isOpen={isImageSelectorOpen}
         onClose={() => setIsImageSelectorOpen(false)}
@@ -316,7 +316,7 @@ const SlideFrame = memo(function SlideFrame({
               onMouseLeave={() =>
                 !isPresenting && !isReadOnly && setIsHovering(false)
               }
-              // Beim Klick in andere Slides NICHT mehr automatisch den Edit-Modus schließen
+              
               onClick={() => {}}
             >
               {imageReady ? (
@@ -408,12 +408,12 @@ const SlideFrame = memo(function SlideFrame({
                     if (showHover) {
                       return (
                         <div className="relative flex flex-col h-full pointer-events-none">
-                          {/* Top Half: Edit Text */}
+                          {}
                           <button
                             onClick={() => {
                               setEditingSlideId(slide.id);
                               setIsHovering(false);
-                              // Focus first text element after a short delay
+                              
                               setTimeout(() => {
                                 canvasRef.current?.focusFirstText();
                               }, 100);
@@ -425,7 +425,7 @@ const SlideFrame = memo(function SlideFrame({
                               Edit Text
                             </span>
                           </button>
-                          {/* Bottom Half: Edit Image */}
+                          {}
                           <button
                             onClick={() => {
                               if (slide.rootImage?.useGrid) {
@@ -447,7 +447,7 @@ const SlideFrame = memo(function SlideFrame({
                                 : "Edit Image"}
                             </span>
                           </button>
-                          {/* Toggle Button */}
+                          {}
                           {slide.rootImage && (
                             <button
                               onClick={() => {
@@ -480,7 +480,7 @@ const SlideFrame = memo(function SlideFrame({
                   })()}
                   onCloseToolbar={() => {
                     setEditingSlideId(null);
-                    // Remove focus from text
+                    
                     canvasRef.current?.clearTextFocus();
                   }}
                   onChange={(next: CanvasDoc) => {
@@ -494,7 +494,7 @@ const SlideFrame = memo(function SlideFrame({
 
                     const currCanvas = current.canvas as CanvasDoc | undefined;
 
-                    // 🛡️ SAFETY MERGE: verliere nie Textknoten beim Update
+                    
                     const currTextNodes = Array.isArray(currCanvas?.nodes)
                       ? currCanvas!.nodes.filter((n: any) => n?.type === "text")
                       : [];
@@ -507,7 +507,7 @@ const SlideFrame = memo(function SlideFrame({
                       currTextNodes.length > 0 &&
                       nextTextNodes.length === 0
                     ) {
-                      // Race: next hat (noch) keine Texte → Texte aus current konservieren
+                      
                       const otherNodes = Array.isArray(next?.nodes)
                         ? next.nodes.filter((n: any) => n?.type !== "text")
                         : [];
@@ -517,7 +517,7 @@ const SlideFrame = memo(function SlideFrame({
                       };
                     }
 
-                    // Nur setzen, wenn sich tatsächlich was geändert hat
+                    
                     if (currCanvas !== merged) {
                       updated[i] = { ...current, canvas: merged };
                       setSlides(updated);
@@ -525,7 +525,7 @@ const SlideFrame = memo(function SlideFrame({
                   }}
                 />
               ) : (
-                // Stabiles Placeholder, aber KEIN Entfernen/Neu-Erzeugen der Nodes
+                
                 <SlideCanvas
                   doc={docWithBg}
                   showToolbar={isEditingText}
@@ -536,7 +536,7 @@ const SlideFrame = memo(function SlideFrame({
                     isHovering &&
                     !editingSlideId ? (
                       <div className="flex flex-col h-full pointer-events-none">
-                        {/* Top Half: Edit Text */}
+                        {}
                         <button
                           onClick={() => {
                             setEditingSlideId(slide.id);
@@ -549,7 +549,7 @@ const SlideFrame = memo(function SlideFrame({
                             Edit Text
                           </span>
                         </button>
-                        {/* Bottom Half: Edit Image */}
+                        {}
                         <button
                           onClick={() => {
                             setIsImageSelectorOpen(true);
@@ -604,9 +604,9 @@ export const PresentationSlidesView = ({
   );
   const { items, sensors, handleDragEnd, scrollToSlide } =
     usePresentationSlides();
-  // Use the slide change watcher to automatically save changes
+  
   useSlideChangeWatcher({ debounceDelay: 600 });
-  // Handle keyboard navigation in presentation mode
+  
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isPresenting) return;
@@ -623,10 +623,10 @@ export const PresentationSlidesView = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [nextSlide, previousSlide, isPresenting]);
 
-  // Handle showing header on mouse move
+  
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
-      if (!isPresenting) return; // Only show header when in presentation mode
+      if (!isPresenting) return; 
 
       if (event.clientY < 100) {
         setShouldShowExitHeader(true);
@@ -647,12 +647,12 @@ export const PresentationSlidesView = ({
     [scrollToSlide, setCurrentSlideIndex],
   );
 
-  // Carousel layout: horizontal gap between slide centers
-  const SLIDE_GAP_PX = 32; // gap in pixels between slides
+  
+  const SLIDE_GAP_PX = 32; 
 
   return (
     <div className="w-full h-full overflow-hidden flex flex-col">
-      {/* Fixierter Download-Button oben rechts – nur im Edit-Modus */}
+      {}
       {!isPresenting && <StickyDownloadActions />}
 
       <div className="flex-1 overflow-auto">

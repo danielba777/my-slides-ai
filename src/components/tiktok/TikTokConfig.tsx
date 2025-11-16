@@ -57,9 +57,9 @@ export function TikTokConfig({
 
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Metadata state
+  
   const [metadata, setMetadata] = useState({
-    privacyLevel: "", // No default selection as required by checklist
+    privacyLevel: "", 
     disableComment: false,
     disableDuet: true,
     disableStitch: true,
@@ -75,7 +75,7 @@ export function TikTokConfig({
     ...DEFAULT_PRIVACY_OPTIONS,
   ]);
 
-  // Load creator info when component mounts or openId changes
+  
   useEffect(() => {
     if (!openId) return;
 
@@ -87,7 +87,7 @@ export function TikTokConfig({
         );
 
         if (!response.ok) {
-          // Use fallback if API is not available
+          
           const defaultCreatorInfo: CreatorInfo = {
             privacy_level_options: [...DEFAULT_PRIVACY_OPTIONS],
             comment_disabled: false,
@@ -108,7 +108,7 @@ export function TikTokConfig({
             setPrivacyOptions([...DEFAULT_PRIVACY_OPTIONS]);
           }
 
-          // Check post limits
+          
           if (data.post_limits && !data.post_limits.can_post) {
             const reason =
               data.post_limits.reason ||
@@ -122,7 +122,7 @@ export function TikTokConfig({
         }
       } catch (error) {
         console.error("Failed to load creator info:", error);
-        // Use fallback
+        
         const defaultCreatorInfo: CreatorInfo = {
           privacy_level_options: [...DEFAULT_PRIVACY_OPTIONS],
           comment_disabled: false,
@@ -142,16 +142,16 @@ export function TikTokConfig({
     loadCreatorInfo();
   }, [openId]);
 
-  // Update parent component when metadata changes
+  
   useEffect(() => {
-    // Check if metadata is valid for posting
+    
     const isValid =
-      metadata.privacyLevel !== "" && // Privacy level must be selected
-      (!metadata.isCommercialContent || metadata.brandOption !== null); // If commercial content, brand option must be selected
+      metadata.privacyLevel !== "" && 
+      (!metadata.isCommercialContent || metadata.brandOption !== null); 
 
     onMetadataChange?.(metadata);
 
-    // Also inform about validation status
+    
     if (typeof window !== "undefined") {
       (window as any).__tiktokMetadataValid = isValid;
     }
@@ -161,15 +161,15 @@ export function TikTokConfig({
     setMetadata((prev) => {
       const newMetadata = { ...prev, [key]: value };
 
-      // Validate commercial content rules
+      
       const newErrors: Record<string, string> = {};
 
-      // Check if privacy level is selected
+      
       if (!newMetadata.privacyLevel) {
         newErrors.privacyLevel = "Please select who can see this post.";
       }
 
-      // Check privacy constraints for branded content
+      
       const brandedContentSelected =
         newMetadata.brandOption === "BRANDED_CONTENT" ||
         newMetadata.brandOption === "BOTH";
@@ -181,7 +181,7 @@ export function TikTokConfig({
       ) {
         newErrors.privacyConstraint =
           "Branded content cannot be set to private. Visibility has been switched to Public.";
-        // Auto-correct privacy level
+        
         newMetadata.privacyLevel = "PUBLIC_TO_EVERYONE";
       }
 
@@ -258,7 +258,7 @@ export function TikTokConfig({
 
       {isExpanded && (
         <div className="rounded-lg border bg-card p-4 space-y-4">
-          {/* Post Limit Error Alert */}
+          {}
           {postLimitError && (
             <Alert>
               <InfoIcon className="h-4 w-4" />
@@ -267,7 +267,7 @@ export function TikTokConfig({
               </AlertDescription>
             </Alert>
           )}
-          {/* Title Field */}
+          {}
           <div className="space-y-2">
             <Label htmlFor="tiktok-title">Title (Optional)</Label>
             <Input
@@ -291,7 +291,7 @@ export function TikTokConfig({
             </p>
           </div>
 
-          {/* Privacy Level */}
+          {}
           <div className="space-y-2">
             <Label>Who can see this post</Label>
             <Select
@@ -331,7 +331,7 @@ export function TikTokConfig({
             )}
           </div>
 
-          {/* Interaction Options */}
+          {}
           <div className="space-y-3">
             <Label className="text-sm font-semibold">Allow users to</Label>
             <div className="flex flex-wrap items-center gap-6">
@@ -351,7 +351,7 @@ export function TikTokConfig({
             </div>
           </div>
 
-          {/* Auto Music Toggle */}
+          {}
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
               <Label htmlFor="auto-music">Auto Music</Label>
@@ -366,7 +366,7 @@ export function TikTokConfig({
             />
           </div>
 
-          {/* Commercial Content Disclosure */}
+          {}
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">

@@ -41,7 +41,7 @@ export function useRootImageActions(
 
   const editor = useEditorRef();
 
-  // Local size state mirrors persisted size, initializes from provided image
+  
   const [size, setSize] = useState<{ w?: string; h?: number }>(() => ({
     w: image?.size?.w ?? undefined,
     h: image?.size?.h ?? undefined,
@@ -56,7 +56,7 @@ export function useRootImageActions(
     [computedGen?.url, image?.url],
   );
 
-  // Get crop settings from image or use defaults
+  
   const cropSettings: ImageCropSettings = useMemo(
     () =>
       image?.cropSettings || {
@@ -67,7 +67,7 @@ export function useRootImageActions(
     [image?.cropSettings],
   );
 
-  // Derived styles
+  
   const imageStyles: React.CSSProperties = useMemo(
     () => ({
       objectFit: cropSettings.objectFit,
@@ -94,7 +94,7 @@ export function useRootImageActions(
     return { width: size.w } as const;
   }, [layoutType, size.h, size.w]);
 
-  // Actions
+  
   const updateCropSettings = useCallback(
     (settings: ImageCropSettings) => {
       const { slides } = usePresentationState.getState();
@@ -191,7 +191,7 @@ export function useRootImageActions(
     [setSlides, slideIndex],
   );
 
-  // Resizable handler logic moved here
+  
   const onResizeStop = useCallback(
     (
       _e: unknown,
@@ -219,7 +219,7 @@ export function useRootImageActions(
     [layoutType, size?.h, size?.w, updateRootImageSize],
   );
 
-  // Drag-and-drop logic moved here
+  
   const id = useId();
   const dragElement = useMemo(
     () => ({
@@ -251,7 +251,7 @@ export function useRootImageActions(
   });
 
   return {
-    // Derived data
+    
     computedGen,
     computedImageUrl,
     cropSettings,
@@ -260,7 +260,7 @@ export function useRootImageActions(
     isDragging,
     handleRef,
 
-    // Actions
+    
     startRootImageGeneration,
     updateCropSettings,
     replaceImageUrl,

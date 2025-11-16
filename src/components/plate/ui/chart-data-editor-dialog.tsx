@@ -21,7 +21,7 @@ import {
 } from "./dialog";
 import { Input } from "./input";
 
-// Data types for different chart types
+
 export type LabelValueData = {
   label: string;
   value: number;
@@ -141,7 +141,7 @@ export function ChartDataEditorDialog({
 
   const handleSave = () => {
     if (!validateData()) {
-      // You could add a toast notification here for validation errors
+      
       return;
     }
     onDataChange(localData);

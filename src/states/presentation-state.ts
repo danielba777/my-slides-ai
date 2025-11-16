@@ -31,24 +31,24 @@ interface PresentationState {
 
   config: Record<string, unknown>;
   setConfig: (config: Record<string, unknown>) => void;
-  // Generation states
+  
   shouldStartOutlineGeneration: boolean;
   shouldStartPresentationGeneration: boolean;
   isGeneratingOutline: boolean;
   isGeneratingPresentation: boolean;
   outline: string[];
-  searchResults: Array<{ query: string; results: unknown[] }>; // Store search results for context
-  webSearchEnabled: boolean; // Toggle for web search in outline generation
+  searchResults: Array<{ query: string; results: unknown[] }>; 
+  webSearchEnabled: boolean; 
   slides: PlateSlide[];
 
-  // Thinking content from AI responses
-  outlineThinking: string; // Thinking content from outline generation
-  presentationThinking: string; // Thinking content from presentation generation
+  
+  outlineThinking: string; 
+  presentationThinking: string; 
 
   imageSetId: string | null;
   setImageSetId: (id: string | null) => void;
 
-  // Root image generation tracking by slideId
+  
   rootImageGeneration: Record<
     string,
     {
@@ -105,7 +105,7 @@ interface PresentationState {
   previousSlide: () => void;
 
   setIsThemeCreatorOpen: (update: boolean) => void;
-  // Generation actions
+  
   setShouldStartOutlineGeneration: (shouldStart: boolean) => void;
   setShouldStartPresentationGeneration: (shouldStart: boolean) => void;
   setIsGeneratingOutline: (isGenerating: boolean) => void;
@@ -115,7 +115,7 @@ interface PresentationState {
   resetGeneration: () => void;
   resetForNewGeneration: () => void;
 
-  // Selection state
+  
   isSelecting: boolean;
   selectedPresentations: string[];
   toggleSelecting: () => void;
@@ -123,19 +123,19 @@ interface PresentationState {
   deselectAllPresentations: () => void;
   togglePresentationSelection: (id: string) => void;
 
-  // Palette → Editor communication
+  
   pendingInsertNode: TElement | null;
   setPendingInsertNode: (node: TElement | null) => void;
 
-  // Slide editing state
+  
   editingSlideId: string | null;
   setEditingSlideId: (id: string | null) => void;
 
-  /** Edit-Mode für das persönliche Overlay-Bild auf einer Slide */
+  
   editingOverlaySlideId: string | null;
   setEditingOverlaySlideId: (id: string | null) => void;
 
-  // Selected template state
+  
   selectedTemplate: {
     id: string;
     slides: Array<{
@@ -159,7 +159,7 @@ interface PresentationState {
     slideCount: number;
   } | null) => void;
 
-  // Template variety (0-100): how much the content should differ from template
+  
   templateVariety: number;
   setTemplateVariety: (variety: number) => void;
 }
@@ -205,13 +205,13 @@ export const usePresentationState = create<PresentationState>((set) => ({
   selectedTemplate: null,
   templateVariety: 0,
 
-  // Sidebar states
+  
   isSidebarCollapsed: false,
   setIsSidebarCollapsed: (update) => set({ isSidebarCollapsed: update }),
   isRightPanelCollapsed: false,
   setIsRightPanelCollapsed: (update) => set({ isRightPanelCollapsed: update }),
 
-  // Generation states
+  
   shouldStartOutlineGeneration: false,
   shouldStartPresentationGeneration: false,
   isGeneratingOutline: false,
@@ -258,7 +258,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
     })),
   clearRootImageGeneration: (slideId) =>
     set((state) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      
       const { [slideId]: _removed, ...rest } = state.rootImageGeneration;
       return { rootImageGeneration: rest } as Partial<PresentationState>;
     }),
@@ -304,7 +304,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
       currentSlideIndex: Math.max(state.currentSlideIndex - 1, 0),
     })),
 
-  // Generation actions
+  
   setShouldStartOutlineGeneration: (shouldStart) =>
     set({ shouldStartOutlineGeneration: shouldStart }),
   setShouldStartPresentationGeneration: (shouldStart) =>
@@ -335,7 +335,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
       searchResults: [],
     }),
 
-  // Reset everything except ID and current input when starting new outline generation
+  
   resetForNewGeneration: () =>
     set(() => ({
       thumbnailUrl: undefined,
@@ -349,7 +349,7 @@ export const usePresentationState = create<PresentationState>((set) => ({
     })),
 
   setIsThemeCreatorOpen: (update) => set({ isThemeCreatorOpen: update }),
-  // Selection state
+  
   isSelecting: false,
   selectedPresentations: [],
   toggleSelecting: () =>

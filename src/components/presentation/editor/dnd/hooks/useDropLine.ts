@@ -6,7 +6,7 @@ import { type DropLineDirection } from "@platejs/dnd";
 export const useDropLine = ({
   id: idProp,
 }: {
-  /** The id of the element to show the dropline for. */
+  
   id?: string;
 } = {}): {
   dropLine?: DropLineDirection;
@@ -22,7 +22,7 @@ export const useDropLine = ({
       return dropTarget.line;
     }) ?? "";
 
-  // Return the drop line direction as-is (supports all directions)
+  
   return {
     dropLine,
   };

@@ -52,21 +52,21 @@ export function TikTokPostForm({
     refreshAccounts,
   } = action;
 
-  // Check if posting is allowed due to post limits and metadata validation
+  
   const canPost = typeof window !== 'undefined' ?
     ((window as any).__tiktokCanPost !== false && (window as any).__tiktokMetadataValid !== false) : true;
   const postLimitReason = typeof window !== 'undefined' ? (window as any).__tiktokPostLimitReason : null;
 
-  // Custom handleSubmit with privacy level validation
+  
   const handleValidatedSubmit = () => {
-    // Check if privacy level is selected
+    
     const metadata = typeof window !== 'undefined' ? (window as any).__tiktokMetadata : null;
     if (!metadata || !metadata.privacyLevel) {
       toast.error("Please select who can see this post before posting.");
       return;
     }
 
-    // If validation passes, call the original handleSubmit
+    
     void handleSubmit();
   };
 
@@ -212,7 +212,7 @@ export function TikTokPostForm({
           </p>
         </div>
 
-        {/* TikTok Config Section */}
+        {}
         <TikTokConfig
           title={form.title || ""}
           autoAddMusic={form.autoAddMusic ?? true}
@@ -220,48 +220,23 @@ export function TikTokPostForm({
           onTitleChange={(title) => updateField("title", title)}
           onAutoAddMusicChange={(autoAddMusic) => updateField("autoAddMusic", autoAddMusic)}
           onMetadataChange={(metadata) => {
-            // Store metadata in a global state for later use in submission
-            // This will be accessed by the parent component during post submission
+            
+            
             if (typeof window !== 'undefined') {
               (window as any).__tiktokMetadata = metadata;
             }
           }}
           onPostLimitChange={(canPost, reason) => {
-            // Store post limit status in global state for the submit button
+            
             if (typeof window !== 'undefined') {
               (window as any).__tiktokCanPost = canPost;
               (window as any).__tiktokPostLimitReason = reason;
             }
           }}
         />
-        {/* Errors and hints are surfaced via toast notifications */}
+        {}
       </CardContent>
-      {/*
-      <CardFooter className="flex items-center gap-4">
-        <Button
-          onClick={handleValidatedSubmit}
-          disabled={
-            submitting ||
-            accountsLoading ||
-            accounts.length === 0 ||
-            form.photoImages.length === 0 ||
-            !canPost
-          }
-        >
-          {submitting ? "Posting & polling…" : submitLabel}
-        </Button>
-        {showRefreshButton && (
-          <Button
-            variant="outline"
-            onClick={() => void refreshAccounts()}
-            disabled={accountsLoading}
-          >
-            {refreshLabel}
-          </Button>
-        )}
-        {footer}
-      </CardFooter>
-      */}
+      {}
       {showSubmitButton && (
         <CardFooter className="mt-0 flex items-center gap-4">
           <Button

@@ -124,7 +124,7 @@ export default function EditThemePage() {
             <CardTitle>Theme Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Kategorie */}
+            {}
             <div className="space-y-2">
               <Label htmlFor="category">
                 Kategorie <span className="text-destructive">*</span>
@@ -143,7 +143,7 @@ export default function EditThemePage() {
               </p>
             </div>
 
-            {/* Hero Title */}
+            {}
             <div className="space-y-2">
               <Label htmlFor="heroTitle">
                 Hero Title <span className="text-destructive">*</span>
@@ -162,7 +162,7 @@ export default function EditThemePage() {
               </p>
             </div>
 
-            {/* Hero Subtitle */}
+            {}
             <div className="space-y-2">
               <Label htmlFor="heroSubtitle">Hero Subtitle</Label>
               <Textarea
@@ -179,7 +179,7 @@ export default function EditThemePage() {
               </p>
             </div>
 
-            {/* Description */}
+            {}
             <div className="space-y-2">
               <Label htmlFor="description">Beschreibung (intern)</Label>
               <Textarea
@@ -193,7 +193,7 @@ export default function EditThemePage() {
               />
             </div>
 
-            {/* Meta Title */}
+            {}
             <div className="space-y-2">
               <Label htmlFor="metaTitle">SEO Meta Title</Label>
               <Input
@@ -209,7 +209,7 @@ export default function EditThemePage() {
               </p>
             </div>
 
-            {/* Meta Description */}
+            {}
             <div className="space-y-2">
               <Label htmlFor="metaDescription">SEO Meta Description</Label>
               <Textarea
@@ -226,7 +226,7 @@ export default function EditThemePage() {
               </p>
             </div>
 
-            {/* Is Active */}
+            {}
             <div className="flex items-center space-x-2">
               <Switch
                 id="isActive"
@@ -240,7 +240,7 @@ export default function EditThemePage() {
               </Label>
             </div>
 
-            {/* Actions */}
+            {}
             <div className="flex gap-4 pt-4">
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Wird gespeichert..." : "Änderungen speichern"}

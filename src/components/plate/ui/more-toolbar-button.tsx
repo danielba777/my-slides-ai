@@ -61,7 +61,7 @@ export function MoreToolbarButton(props: DropdownMenuProps) {
           >
             <SuperscriptIcon />
             Superscript
-            {/* (⌘+,) */}
+            {}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => {
@@ -73,7 +73,7 @@ export function MoreToolbarButton(props: DropdownMenuProps) {
           >
             <SubscriptIcon />
             Subscript
-            {/* (⌘+.) */}
+            {}
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>

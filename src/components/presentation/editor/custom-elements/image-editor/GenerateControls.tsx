@@ -39,7 +39,7 @@ export function GenerateControls({
   const [newPrompt, setNewPrompt] = useState(element.query ?? "");
   const [localError, setLocalError] = useState<string | null>(null);
 
-  // Update prompt when element changes
+  
   useEffect(() => {
     setNewPrompt(element.query ?? "");
   }, [element.query]);
@@ -54,7 +54,7 @@ export function GenerateControls({
         imageModel as ImageModelList,
       );
       if (result.success && result.image) {
-        // Update the element using the editor or global state
+        
         const { slides, setSlides } = usePresentationState.getState();
         if (isRootImage) {
           setSlides(
@@ -97,7 +97,7 @@ export function GenerateControls({
         imageModel as ImageModelList,
       );
       if (result.success && result.image) {
-        // Update the element using the editor or global state
+        
         const { slides, setSlides } = usePresentationState.getState();
         if (isRootImage) {
           setSlides(

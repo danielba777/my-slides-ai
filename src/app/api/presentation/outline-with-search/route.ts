@@ -105,7 +105,7 @@ export async function POST(req: Request) {
       day: "numeric",
     });
 
-    // Create model based on selection
+    
     const model = modelPicker(modelProvider, modelId);
 
     const result = streamText({
@@ -123,8 +123,8 @@ export async function POST(req: Request) {
       tools: {
         webSearch: search_tool,
       },
-      maxSteps: 5, // Allow up to 5 tool calls
-      toolChoice: "auto", // Let the model decide when to use tools
+      maxSteps: 5, 
+      toolChoice: "auto", 
     });
 
     return result.toDataStreamResponse();

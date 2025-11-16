@@ -4,7 +4,7 @@ import { type PlateEditor } from "platejs/react";
 export function extractFontsFromEditor(editor: PlateEditor) {
   const fontFamilies = new Set<string>();
 
-  // Scan all nodes for font family marks
+  
   try {
     for (const [node] of editor.api.nodes({
       at: [],
@@ -30,7 +30,7 @@ export function extractFontsFromEditor(editor: PlateEditor) {
     return [];
   }
 
-  // Convert Set to array and update state
+  
   const fontsArray = Array.from(fontFamilies);
   return fontsArray;
 }

@@ -169,7 +169,6 @@ export async function POST(request: Request) {
 
         console.error("[TikTokCreatePostAPI] Backend error:", errorData);
 
-        // Extract the most descriptive error message
         const errorMessage =
           errorData.message ||
           errorData.error ||

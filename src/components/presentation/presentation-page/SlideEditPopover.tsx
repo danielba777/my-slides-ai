@@ -56,8 +56,8 @@ export function SlideEditPopover({ index }: SlideEditPopoverProps) {
   const hasRootImage = !!currentSlide?.rootImage;
 
   const handleImageEdit = () => {
-    // For demo purposes, just set a placeholder image
-    // In production, this would open an image selector
+    
+    
     updateSlide({
       rootImage: {
         query: "placeholder image",
@@ -87,7 +87,7 @@ export function SlideEditPopover({ index }: SlideEditPopoverProps) {
         side="bottom"
       >
         <div className="space-y-2">
-          {/* Card Color */}
+          {}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="h-4 w-4 rounded-full bg-current" />
@@ -98,10 +98,10 @@ export function SlideEditPopover({ index }: SlideEditPopoverProps) {
               onChange={(color) => updateSlide({ bgColor: color })}
             />
           </div>
-          {/* Accent Image */}
+          {}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              {}
               <Image className="h-4 w-4" />
               <span className="text-sm text-zinc-200">Accent image</span>
             </div>
@@ -124,7 +124,7 @@ export function SlideEditPopover({ index }: SlideEditPopoverProps) {
               </Button>
             </div>
           </div>
-          {/* Content Alignment */}
+          {}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <AlignCenter className="h-4 w-4"></AlignCenter>
@@ -167,7 +167,7 @@ export function SlideEditPopover({ index }: SlideEditPopoverProps) {
             </div>
           </div>
 
-          {/* Image Placement */}
+          {}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <LayoutGrid className="h-4 w-4" />
@@ -188,7 +188,7 @@ export function SlideEditPopover({ index }: SlideEditPopoverProps) {
             </div>
           </div>
 
-          {/* Card Width */}
+          {}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <MoveHorizontal className="h-4 w-4"></MoveHorizontal>

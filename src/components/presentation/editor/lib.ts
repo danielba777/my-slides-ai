@@ -23,7 +23,7 @@ export const PYRAMID_ITEM = "pyramid-item";
 export const TIMELINE_GROUP = "timeline";
 export const TIMELINE_ITEM = "timeline-item";
 
-// New components
+
 export const BOX_GROUP = "boxes";
 export const BOX_ITEM = "box-item";
 
@@ -40,19 +40,19 @@ export const CONS_ITEM = "cons-item";
 export const SEQUENCE_ARROW_GROUP = "arrow-vertical";
 export const SEQUENCE_ARROW_ITEM = "arrow-vertical-item";
 
-// Individual chart element keys
+
 export const PIE_CHART_ELEMENT = "chart-pie" as const;
 export const BAR_CHART_ELEMENT = "chart-bar" as const;
 export const AREA_CHART_ELEMENT = "chart-area" as const;
 export const RADAR_CHART_ELEMENT = "chart-radar" as const;
 export const SCATTER_CHART_ELEMENT = "chart-scatter" as const;
 export const LINE_CHART_ELEMENT = "chart-line" as const;
-// Button element key
+
 export const BUTTON_ELEMENT = "button" as const;
 
-// Chart compatibility groups based on data structure
+
 export const CHART_TYPES = {
-  // Charts using label/value data structure (compatible with each other)
+  
   LABEL_VALUE_CHARTS: [
     PIE_CHART_ELEMENT,
     BAR_CHART_ELEMENT,
@@ -60,16 +60,16 @@ export const CHART_TYPES = {
     RADAR_CHART_ELEMENT,
     LINE_CHART_ELEMENT,
   ],
-  // Charts using coordinate data structure (x/y)
+  
   COORDINATE_CHARTS: [SCATTER_CHART_ELEMENT],
 } as const;
 
-// Helper function to check if two chart types are compatible
+
 export function areChartTypesCompatible(
   chartType1: string,
   chartType2: string,
 ): boolean {
-  // Charts are compatible if they use the same data structure
+  
   const isLabelValue1 = CHART_TYPES.LABEL_VALUE_CHARTS.includes(
     chartType1 as (typeof CHART_TYPES.LABEL_VALUE_CHARTS)[number],
   );
@@ -86,7 +86,7 @@ export function areChartTypesCompatible(
   return (isLabelValue1 && isLabelValue2) || (isCoordinate1 && isCoordinate2);
 }
 
-// Helper function to check if an element type is a chart
+
 export function isChartType(elementType: string): boolean {
   return [
     ...CHART_TYPES.LABEL_VALUE_CHARTS,
@@ -98,7 +98,7 @@ export function isChartType(elementType: string): boolean {
   );
 }
 
-// Element capabilities - defines which elements support which layout options
+
 export const ELEMENT_CAPABILITIES = {
   [TIMELINE_GROUP]: {
     orientation: ["vertical", "horizontal"] as const,
@@ -106,16 +106,16 @@ export const ELEMENT_CAPABILITIES = {
     numbered: true,
     showLine: true,
   },
-  // Add more elements here as they gain orientation/sidedness support
-  // [ARROW_LIST]: {
-  //   orientation: ["vertical", "horizontal"] as const,
-  // },
-  // [COMPARE_GROUP]: {
-  //   sidedness: ["single", "double"] as const,
-  // },
+  
+  
+  
+  
+  
+  
+  
 } as const;
 
-// Helper functions to check element capabilities
+
 export function supportsOrientation(elementType: string): boolean {
   return (
     elementType in ELEMENT_CAPABILITIES &&
@@ -172,9 +172,9 @@ export function getShowLineOptions(elementType: string): boolean {
   return capabilities?.showLine ?? false;
 }
 
-// Available layout blocks with their display names
+
 export const BLOCKS = [
-  // Layout Groups
+  
   { type: BULLET_GROUP, name: "Bullet" },
   { type: STAIRCASE_GROUP, name: "Staircase" },
   { type: CYCLE_GROUP, name: "Cycle" },
@@ -188,7 +188,7 @@ export const BLOCKS = [
   { type: PROS_CONS_GROUP, name: "Pros Cons" },
   { type: SEQUENCE_ARROW_GROUP, name: "Arrow Sequence" },
 
-  // Chart Elements
+  
   { type: PIE_CHART_ELEMENT, name: "Pie Chart" },
   { type: BAR_CHART_ELEMENT, name: "Bar Chart" },
   { type: AREA_CHART_ELEMENT, name: "Area Chart" },
@@ -196,7 +196,7 @@ export const BLOCKS = [
   { type: SCATTER_CHART_ELEMENT, name: "Scatter Chart" },
   { type: LINE_CHART_ELEMENT, name: "Line Chart" },
 
-  // Other Elements
+  
   { type: BUTTON_ELEMENT, name: "Button" },
 ] as const;
 
@@ -238,7 +238,7 @@ export const PARENT_CHILD_RELATIONSHIP = {
     child: SEQUENCE_ARROW_ITEM,
   },
 };
-// Single helper per latest instruction: given only editor and element, derive class.
+
 export function getGridClassForElement(
   editor: PlateEditor,
   element: TElement,
@@ -254,23 +254,19 @@ export function getGridClassForElement(
   return "";
 }
 
-/**
- * Gets available conversion options based on the current element type
- * @param currentElementType - The type of the currently selected element
- * @returns Array of available block types for conversion
- */
+
 export function getAvailableConversionOptions(currentElementType: string) {
   const isCurrentElementChart = isChartType(currentElementType);
 
   return BLOCKS.filter((blockType) => {
     const isBlockTypeChart = isChartType(blockType.type);
 
-    // If current element is not a chart, show all non-chart elements
+    
     if (!isCurrentElementChart) {
       return !isBlockTypeChart;
     }
 
-    // If current element is a chart, only show compatible chart types
+    
     if (isCurrentElementChart) {
       return (
         isBlockTypeChart &&
@@ -281,11 +277,7 @@ export function getAvailableConversionOptions(currentElementType: string) {
     return false;
   });
 }
-/**
- * Handles the conversion of layout elements to different types
- * @param editor - The Plate editor instance
- * @param type - The target element type to convert to
- */
+
 export function handleLayoutChange(editor: MyEditor, type: string): void {
   const selectionIds = editor.getOption(BlockSelectionPlugin, "selectedIds");
   const node = editor.api.nodes({ id: Array.from(selectionIds ?? [])[0] });
@@ -293,7 +285,7 @@ export function handleLayoutChange(editor: MyEditor, type: string): void {
 
   if (!element) return;
 
-  // Handle parent-child relationship elements (lists, groups, etc.)
+  
   if (PARENT_CHILD_RELATIONSHIP[element.type]?.child) {
     editor.tf.withoutNormalizing(() => {
       editor.tf.setNodes({ type }, { at: editor.api.findPath(element) });
@@ -307,18 +299,13 @@ export function handleLayoutChange(editor: MyEditor, type: string): void {
     return;
   }
 
-  // Handle chart elements (direct conversion)
+  
   if (isChartType(element.type)) {
     editor.tf.setNodes({ type }, { at: editor.api.findPath(element) });
   }
 }
 
-/**
- * Handles updating node properties with forced sibling updates
- * @param editor - The Plate editor instance
- * @param key - The property key to update
- * @param value - The new value for the property
- */
+
 export function handleNodePropertyUpdate(
   editor: MyEditor,
   key: string,
@@ -335,13 +322,13 @@ export function handleNodePropertyUpdate(
 
   editor.tf.withoutNormalizing(() => {
     if (value === undefined) {
-      // Remove the property by setting it to undefined
+      
       editor.tf.setNodes({ [key]: undefined }, { at: elementPath });
     } else {
-      // Update the node property - convert boolean to string for numbered property
+      
       editor.tf.setNodes({ [key]: value }, { at: elementPath });
     }
-    // Force update all the siblings so that the UI is updated
+    
     element.children.forEach((child) => {
       editor.tf.setNodes(
         { lastUpdate: Date.now() },

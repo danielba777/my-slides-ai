@@ -1,6 +1,6 @@
 import { type Font, type FourFonts, type Variant } from "../types";
 
-// Helper to get the sprite number for a given font index
+
 export function getSpriteNumber(index: number): number {
   return Math.floor(index / 200) + 1;
 }

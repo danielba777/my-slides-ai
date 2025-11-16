@@ -4,7 +4,7 @@ import { db } from "@/server/db";
 import { planFromPrice, resetAllCredits } from "@/server/billing";
 import { carryOverCreditsOnPlanChange } from "@/server/billing";
 
-// 🧩 Idempotenz-Tabelle prüfen und markieren
+
 async function isAlreadyProcessed(eventId: string) {
   const found = await db.processedWebhook.findUnique({ where: { id: eventId } });
   return !!found;
@@ -34,10 +34,10 @@ export async function POST(req: Request) {
   }
 
   try {
-    // Handle only relevant events
+    
     switch (event.type) {
       case "invoice.payment_succeeded": {
-        // 🧩 Doppel-Events vermeiden (Stripe Retries)
+        
         if (await isAlreadyProcessed(event.id)) {
           console.log(`[webhook] Skipping duplicate event ${event.id}`);
           return new NextResponse("OK", { status: 200 });
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
-        // Stripe-Typen für InvoiceLineItem haben nicht immer 'price' getypt → defensiv über 'any'
+        
         const firstLine: any = invoice.lines?.data?.[0] ?? null;
         const priceId: string | null =
           firstLine?.price?.id ??
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
           where: { stripeCustomerId: customerId },
           select: { id: true },
         });
-        // 🧩 Fallback: Customer unbekannt → Sync anstoßen
+        
         if (!user?.id) {
           console.warn(`[webhook] ⚠️ Unknown Stripe customer ${customerId}, triggering resync job`);
           fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/billing/sync?customerId=${customerId}`, { method: "POST" })
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
         }
 
         await db.$transaction(async (tx) => {
-          // 1) User-Plan & planRenewsAt konsistent setzen
+          
           await tx.user.update({
             where: { id: user.id },
             data: {
@@ -80,7 +80,7 @@ export async function POST(req: Request) {
             },
           });
 
-          // 2) Credits intelligent neu berechnen (Carry-Over statt Hard-Reset)
+          
           const prevUser = await tx.user.findUnique({
             where: { id: user.id },
             select: { plan: true },
@@ -136,7 +136,7 @@ export async function POST(req: Request) {
             return new NextResponse("OK", { status: 200 });
           }
 
-          // Einige Stripe-Typdefinitionen expose'n 'current_period_end' nicht explizit → schmaler Cast
+          
           const subAny = sub as Stripe.Subscription & { current_period_end?: number };
           const nextPeriodEnd =
             subAny.current_period_end ?? Math.floor(Date.now() / 1000);
@@ -179,10 +179,10 @@ export async function POST(req: Request) {
       stack: (err as Error)?.stack,
     });
 
-    // 🧩 optional: Logging zu Sentry
+    
     if (process.env.SENTRY_DSN) {
       try {
-        // String-Literal vermeiden, damit TS keine Typauflösung des Moduls verlangt
+        
         const mod = "@sentry/nextjs";
         const S: any = await import(mod as any);
         S.captureException(err, {
