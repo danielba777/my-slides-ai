@@ -49,7 +49,7 @@ const PresentationEditorStaticView = React.memo(
       [],
     );
 
-    // Keep value in sync without recreating editor
+    
     useEffect(() => {
       if (!initialContent?.content) return;
       editor.tf.setValue(initialContent.content);

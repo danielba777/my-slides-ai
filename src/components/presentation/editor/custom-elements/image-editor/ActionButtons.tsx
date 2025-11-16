@@ -67,7 +67,7 @@ export function ActionButtons({
   };
   return (
     <div className="flex gap-2">
-      {/* Upload Button - Direct Action */}
+      {}
       <Button
         variant="outline"
         size="sm"
@@ -83,7 +83,7 @@ export function ActionButtons({
         {isUploading ? `${progress}%` : "Upload"}
       </Button>
 
-      {/* Crop Button - Mode Toggle */}
+      {}
       <Button
         variant={currentMode === "crop" ? "default" : "outline"}
         size="sm"
@@ -101,7 +101,7 @@ export function ActionButtons({
         Crop
       </Button>
 
-      {/* Hidden file input */}
+      {}
       <input
         ref={fileInputRef}
         type="file"

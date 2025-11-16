@@ -1,4 +1,4 @@
-/* eslint-disable react/display-name */
+
 import type * as React from "react";
 
 import {

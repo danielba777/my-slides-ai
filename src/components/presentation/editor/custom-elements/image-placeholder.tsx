@@ -37,7 +37,7 @@ export default function ImagePlaceholder({
   const setSlides = usePresentationState((s) => s.setSlides);
   const slides = usePresentationState((s) => s.slides);
 
-  // Image source state
+  
   const {
     imageSource,
     setImageSource,
@@ -96,7 +96,7 @@ export default function ImagePlaceholder({
         className,
       )}
     >
-      {/* Main placeholder area */}
+      {}
       <div className="relative h-full flex flex-col items-center justify-center p-8 gap-6">
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
@@ -166,7 +166,7 @@ export default function ImagePlaceholder({
                 </div>
 
                 <div className="space-y-3">
-                  {/* Image Source Selection */}
+                  {}
                   <ImageSourceSelector
                     imageSource={imageSource}
                     imageModel={imageModel}
@@ -214,7 +214,7 @@ export default function ImagePlaceholder({
         </div>
       </div>
 
-      {/* Hidden file input */}
+      {}
       <input
         ref={fileInputRef}
         type="file"

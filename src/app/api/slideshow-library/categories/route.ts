@@ -7,27 +7,30 @@ const API_BASE_URL =
 
 export async function GET() {
   try {
-    const response = await fetch(`${API_BASE_URL}/slideshow-library/posts`, { 
-      cache: "no-store" 
+    // Fetch all posts without pagination to get all categories
+    const response = await fetch(`${API_BASE_URL}/slideshow-library/posts?limit=10000`, {
+      cache: "no-store"
     });
-    
+
     if (!response.ok) {
       throw new Error("Failed to fetch posts");
     }
-    
-    const posts = await response.json();
-    
-    // Extrahiere alle eindeutigen Kategorien aus allen Posts
+
+    const data = await response.json();
+
+    // Handle both array and object response formats
+    const posts = Array.isArray(data) ? data : (data.posts || []);
+
     const categoriesSet = new Set<string>();
-    
+
     for (const post of posts) {
       if (Array.isArray(post.categories)) {
         post.categories.forEach((category: string) => categoriesSet.add(category));
       }
     }
-    
+
     const categories = Array.from(categoriesSet).sort();
-    
+
     return NextResponse.json(categories, {
       headers: {
         "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",

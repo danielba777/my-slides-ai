@@ -43,7 +43,7 @@ import {
   type ParagraphElement,
 } from "./types";
 
-// Type guards for text nodes
+
 interface TextNode {
   text: string;
   bold?: boolean;
@@ -51,7 +51,7 @@ interface TextNode {
   underline?: boolean;
   strikethrough?: boolean;
   generating?: boolean;
-  // Optional marks from font plugins
+  
   fontFamily?: string;
   fontSize?: number | string;
   color?: string;
@@ -92,12 +92,12 @@ export class PlateJSToPPTXConverter {
   private pptx: PptxGenJS;
   private currentSlide: PptxGenJS.Slide | null = null;
 
-  // Layout constants
+  
   private readonly SLIDE_WIDTH = 10;
   private readonly SLIDE_HEIGHT = 5.625;
   private readonly MARGIN = 0.5;
 
-  // Theme defaults (mirror src/styles/presentation.css light variables)
+  
   private THEME: ThemeColors = {
     primary: "3B82F6",
     secondary: "1F2937",
@@ -108,7 +108,7 @@ export class PlateJSToPPTXConverter {
     muted: "6B7280",
   };
 
-  // SVG definitions from the PlateJS components
+  
   private readonly SVG_DEFINITIONS = {
     arrow: {
       path: "M0,90L45,108L90,90L90,0L45,18L0,0Z",
@@ -159,9 +159,9 @@ export class PlateJSToPPTXConverter {
   private isLightColor(hex: string): boolean {
     const rgb = this.hexToRgb(hex);
     if (!rgb) return false;
-    // Perceived luminance
+    
     const lum = 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b;
-    return lum > 186; // common threshold
+    return lum > 186; 
   }
 
   public async convertToPPTX(
@@ -176,7 +176,7 @@ export class PlateJSToPPTXConverter {
   private async processSlide(slide: PlateSlide) {
     this.currentSlide = this.pptx.addSlide();
 
-    // Add root image first (no margins/padding as requested)
+    
     if (slide.rootImage) {
       if (slide.rootImage.useGrid && slide.rootImage.gridImages) {
         await this.addGridImages(slide.rootImage.gridImages);
@@ -185,10 +185,10 @@ export class PlateJSToPPTXConverter {
       }
     }
 
-    // Calculate content area based on layout
+    
     const contentArea = this.calculateContentArea(slide);
 
-    // Process slide content
+    
     await this.processElements(slide.content, contentArea, slide.alignment);
   }
 
@@ -231,7 +231,7 @@ export class PlateJSToPPTXConverter {
         h: cellHeight,
       };
 
-      // Apply crop settings if available
+      
       const cropSettings = img.cropSettings;
       const objectFit = cropSettings?.objectFit || "cover";
 
@@ -261,26 +261,26 @@ export class PlateJSToPPTXConverter {
 
     const imageOptions: PptxGenJS.ImageProps = {
       path: imagePath,
-      x: 0, // No margins as requested
-      y: 0, // No padding as requested
+      x: 0, 
+      y: 0, 
       w: this.SLIDE_WIDTH,
       h: this.SLIDE_HEIGHT,
     };
 
-    // Apply sizing based on objectFit setting
-    // Default behavior: object-fit "cover" with centered object-position if no cropSettings
+    
+    
     const cropSettings = rootImage.cropSettings;
     const objectFit = cropSettings?.objectFit || "cover";
     const objectPosition = cropSettings?.objectPosition || { x: 0.5, y: 0.5 };
 
-    // Apply sizing according to official PptxGenJS documentation
+    
     if (
       typeof imageOptions.w === "number" &&
       typeof imageOptions.h === "number"
     ) {
       switch (objectFit) {
         case "contain":
-          // contain: shrinks image to fit completely within area, preserving ratio
+          
           imageOptions.sizing = {
             type: "contain",
             w: imageOptions.w,
@@ -288,7 +288,7 @@ export class PlateJSToPPTXConverter {
           };
           break;
         case "cover":
-          // cover: shrinks image to completely fill area, crops excess, preserving ratio
+          
           imageOptions.sizing = {
             type: "cover",
             w: imageOptions.w,
@@ -296,17 +296,17 @@ export class PlateJSToPPTXConverter {
           };
           break;
         case "fill":
-          // fill: no sizing property = default stretch behavior
+          
           break;
         default:
-          // Use crop with positioning offsets
+          
           imageOptions.sizing = {
             type: "crop",
             w: imageOptions.w,
             h: imageOptions.h,
-            // x, y are positions relative to the source image for cropping
-            x: objectPosition.x * imageOptions.w * 0.1, // Adjust multiplier as needed
-            y: objectPosition.y * imageOptions.h * 0.1, // Adjust multiplier as needed
+            
+            x: objectPosition.x * imageOptions.w * 0.1, 
+            y: objectPosition.y * imageOptions.h * 0.1, 
           };
           break;
       }
@@ -324,10 +324,10 @@ export class PlateJSToPPTXConverter {
     area: { x: number; y: number; w: number; h: number },
     alignment?: "start" | "center" | "end",
   ) {
-    // Measure total height first to position the block (slide-level alignment)
+    
     const totalHeight = await this.measureElements(elements, area.w);
 
-    // Determine starting Y based on slide alignment (center entire block)
+    
     let startY = area.y;
     if (alignment === "center") {
       startY = area.y + Math.max(0, (area.h - totalHeight) / 2);
@@ -506,7 +506,7 @@ export class PlateJSToPPTXConverter {
           measureOnly,
         );
       default:
-        // Handle unknown elements as paragraphs
+        
         return this.addParagraph(
           element as ParagraphElement,
           x,
@@ -530,7 +530,7 @@ export class PlateJSToPPTXConverter {
 
     const runs = this.extractTextRuns(element);
     const textOptions = this.getTextOptions(element, fontSize);
-    // Use accent color for headings to mimic gradient accent
+    
     textOptions.color = this.THEME.accent;
 
     if (runs.length > 0) {
@@ -578,7 +578,7 @@ export class PlateJSToPPTXConverter {
 
     const runs = this.extractTextRuns(element);
     const textOptions = this.getTextOptions(element, 14);
-    // Decide paragraph/body text color: force dark text on light backgrounds
+    
     const darkFallback = (this.THEME.secondary || "1F2937").replace("#", "");
     const paragraphColor = this.isLightColor(this.THEME.background)
       ? darkFallback
@@ -644,7 +644,7 @@ export class PlateJSToPPTXConverter {
       const bulletY = y + rowIndex * 1.5;
 
       if (!measureOnly) {
-        // Add bullet number box
+        
         this.currentSlide?.addShape(this.pptx.ShapeType.rect, {
           x: bulletX,
           y: bulletY,
@@ -654,7 +654,7 @@ export class PlateJSToPPTXConverter {
           line: { width: 0 },
         });
 
-        // Add bullet number
+        
         this.currentSlide?.addText((i + 1).toString(), {
           x: bulletX,
           y: bulletY,
@@ -667,7 +667,7 @@ export class PlateJSToPPTXConverter {
           valign: "middle",
         });
 
-        // Add bullet content
+        
         const bulletRuns = this.extractTextRuns(bullet);
         const bulletText = this.extractText(bullet);
         if (bulletRuns.length > 0) {
@@ -807,11 +807,11 @@ export class PlateJSToPPTXConverter {
         | TVisualizationListItemElement;
 
       if (!measureOnly) {
-        // Create and add arrow SVG
+        
         const arrowSvg = this.createArrowSVG(this.THEME.primary);
         await this.addSVGToSlide(arrowSvg, x + 0.5, currentY, 1, 0.6);
 
-        // Add content
+        
         const itemText = this.extractText(item);
         this.currentSlide?.addText(itemText, {
           x: x + 1.8,
@@ -856,15 +856,15 @@ export class PlateJSToPPTXConverter {
       const levelX = startX + (baseWidth - levelWidth) / 2;
       const levelY = y + i * 0.8;
 
-      // Create pyramid level shape using clip path algorithm from PyramidItem
+      
       const increment = (baseWidth * 0.8) / (2 * items.length);
       let clipPath: string;
 
       if (i === 0) {
-        // First layer is a triangle
+        
         clipPath = `polygon(50% 0%, ${50 - increment}% 100%, ${50 + increment}% 100%)`;
       } else {
-        // For other layers
+        
         const prevXOffset = increment * i;
         const currentXOffset = increment * (i + 1);
         const prevBottomLeft = 50 - prevXOffset;
@@ -875,7 +875,7 @@ export class PlateJSToPPTXConverter {
       }
 
       if (!measureOnly) {
-        // Create SVG for pyramid level
+        
         const pyramidSvg = this.createPyramidLevelSVG(
           levelWidth * 72,
           0.6 * 72,
@@ -885,7 +885,7 @@ export class PlateJSToPPTXConverter {
         );
         await this.addSVGToSlide(pyramidSvg, levelX, levelY, levelWidth, 0.6);
 
-        // Add content text
+        
         const itemText = this.extractText(item);
         this.currentSlide?.addText(itemText, {
           x: levelX + 0.7,
@@ -953,7 +953,7 @@ export class PlateJSToPPTXConverter {
       let currentY = y;
 
       if (!measureOnly) {
-        // Draw vertical line
+        
         this.currentSlide?.addShape(this.pptx.ShapeType.line, {
           x: lineX,
           y: y,
@@ -966,7 +966,7 @@ export class PlateJSToPPTXConverter {
       for (let i = 0; i < items.length; i++) {
         const item = items[i]!;
         if (!measureOnly) {
-          // Add timeline circle with number
+          
           this.currentSlide?.addShape(this.pptx.ShapeType.ellipse, {
             x: lineX - 0.15,
             y: currentY,
@@ -976,7 +976,7 @@ export class PlateJSToPPTXConverter {
             line: { width: 3, color: "FFFFFF" },
           });
 
-          // Add number
+          
           this.currentSlide?.addText((i + 1).toString(), {
             x: lineX - 0.15,
             y: currentY,
@@ -989,7 +989,7 @@ export class PlateJSToPPTXConverter {
             valign: "middle",
           });
 
-          // Add content box
+          
           this.currentSlide?.addShape(this.pptx.ShapeType.rect, {
             x: x + 0.8,
             y: currentY - 0.2,
@@ -999,7 +999,7 @@ export class PlateJSToPPTXConverter {
             line: { width: 4, color: this.THEME.primary },
           });
 
-          // Add content text
+          
           const itemText = this.extractText(item);
           this.currentSlide?.addText(itemText, {
             x: x + 0.9,
@@ -1018,11 +1018,11 @@ export class PlateJSToPPTXConverter {
 
       return currentY - y + 0.3;
     } else {
-      // Double-sided vertical timeline
+      
       let currentY = y;
 
       if (!measureOnly) {
-        // Draw vertical line
+        
         this.currentSlide?.addShape(this.pptx.ShapeType.line, {
           x: x + width / 2,
           y: y,
@@ -1037,7 +1037,7 @@ export class PlateJSToPPTXConverter {
         const isEven = (i + 1) % 2 === 0;
 
         if (!measureOnly) {
-          // Add timeline circle
+          
           this.currentSlide?.addShape(this.pptx.ShapeType.ellipse, {
             x: x + width / 2 - 0.15,
             y: currentY,
@@ -1048,7 +1048,7 @@ export class PlateJSToPPTXConverter {
           });
         }
 
-        // Add content box (alternating sides)
+        
         const contentX = isEven ? x + width * 0.55 : x;
         const contentW = width * 0.4;
 
@@ -1063,7 +1063,7 @@ export class PlateJSToPPTXConverter {
           });
         }
 
-        // Add content text
+        
         const itemText = this.extractText(item);
         if (!measureOnly) {
           this.currentSlide?.addText(itemText, {
@@ -1097,7 +1097,7 @@ export class PlateJSToPPTXConverter {
       const itemWidth = width / items.length;
 
       if (!measureOnly) {
-        // Draw horizontal line
+        
         this.currentSlide?.addShape(this.pptx.ShapeType.line, {
           x: x,
           y: lineY,
@@ -1112,7 +1112,7 @@ export class PlateJSToPPTXConverter {
         const itemX = x + i * itemWidth + itemWidth / 2;
 
         if (!measureOnly) {
-          // Add timeline circle
+          
           this.currentSlide?.addShape(this.pptx.ShapeType.ellipse, {
             x: itemX - 0.15,
             y: lineY - 0.15,
@@ -1124,7 +1124,7 @@ export class PlateJSToPPTXConverter {
         }
 
         if (!measureOnly) {
-          // Add content box below
+          
           this.currentSlide?.addShape(this.pptx.ShapeType.rect, {
             x: itemX - itemWidth * 0.4,
             y: lineY + 0.5,
@@ -1135,7 +1135,7 @@ export class PlateJSToPPTXConverter {
           });
         }
 
-        // Add content text
+        
         const itemText = this.extractText(item);
         if (!measureOnly) {
           this.currentSlide?.addText(itemText, {
@@ -1152,12 +1152,12 @@ export class PlateJSToPPTXConverter {
 
       return 2.5;
     } else {
-      // Double-sided horizontal timeline
+      
       const lineY = y + 1.5;
       const itemWidth = width / items.length;
 
       if (!measureOnly) {
-        // Draw horizontal line
+        
         this.currentSlide?.addShape(this.pptx.ShapeType.line, {
           x: x,
           y: lineY,
@@ -1173,7 +1173,7 @@ export class PlateJSToPPTXConverter {
         const isAbove = i % 2 === 0;
 
         if (!measureOnly) {
-          // Add timeline circle
+          
           this.currentSlide?.addShape(this.pptx.ShapeType.ellipse, {
             x: itemX - 0.2,
             y: lineY - 0.2,
@@ -1184,7 +1184,7 @@ export class PlateJSToPPTXConverter {
           });
         }
 
-        // Add number
+        
         this.currentSlide?.addText((i + 1).toString(), {
           x: itemX - 0.2,
           y: lineY - 0.2,
@@ -1197,7 +1197,7 @@ export class PlateJSToPPTXConverter {
           valign: "middle",
         });
 
-        // Add content box above/below alternating
+        
         const boxY = isAbove ? lineY - 1 : lineY + 0.5;
 
         if (!measureOnly) {
@@ -1211,7 +1211,7 @@ export class PlateJSToPPTXConverter {
           });
         }
 
-        // Add content text
+        
         const itemText = this.extractText(item);
         if (!measureOnly) {
           this.currentSlide?.addText(itemText, {
@@ -1248,7 +1248,7 @@ export class PlateJSToPPTXConverter {
     const radius = Math.min(width / 3, 1.2);
 
     if (!measureOnly) {
-      // Add center cycle wheel SVG
+      
       const cycleWheelSvg = this.createCycleWheelSVG(this.THEME.primary);
       await this.addSVGToSlide(
         cycleWheelSvg,
@@ -1259,7 +1259,7 @@ export class PlateJSToPPTXConverter {
       );
     }
 
-    // Position items around circle
+    
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const angle = (2 * Math.PI * i) / items.length - Math.PI / 2;
@@ -1267,7 +1267,7 @@ export class PlateJSToPPTXConverter {
       const itemY = centerY + radius * Math.sin(angle);
 
       if (!measureOnly) {
-        // Add item circle
+        
         this.currentSlide?.addShape(this.pptx.ShapeType.ellipse, {
           x: itemX - 0.2,
           y: itemY - 0.2,
@@ -1277,7 +1277,7 @@ export class PlateJSToPPTXConverter {
           line: { width: 1, color: "FFFFFF" },
         });
 
-        // Add number
+        
         this.currentSlide?.addText((i + 1).toString(), {
           x: itemX - 0.2,
           y: itemY - 0.2,
@@ -1290,7 +1290,7 @@ export class PlateJSToPPTXConverter {
           valign: "middle",
         });
 
-        // Add content text
+        
         const itemText = this.extractText(item);
         const textRadius = radius + 0.5;
         const textX = centerX + textRadius * Math.cos(angle) - 0.8;
@@ -1334,7 +1334,7 @@ export class PlateJSToPPTXConverter {
       const stepWidth = baseWidth + i * increment;
 
       if (!measureOnly) {
-        // Add step rectangle
+        
         this.currentSlide?.addShape(this.pptx.ShapeType.rect, {
           x: x,
           y: currentY,
@@ -1344,7 +1344,7 @@ export class PlateJSToPPTXConverter {
           line: { width: 1, color: "2F4F4F" },
         });
 
-        // Add number
+        
         this.currentSlide?.addText((i + 1).toString(), {
           x: x + 0.1,
           y: currentY + 0.1,
@@ -1357,7 +1357,7 @@ export class PlateJSToPPTXConverter {
           valign: "middle",
         });
 
-        // Add content
+        
         const itemText = this.extractText(item);
         this.currentSlide?.addText(itemText, {
           x: x + stepWidth + 0.2,
@@ -1400,7 +1400,7 @@ export class PlateJSToPPTXConverter {
       const itemY = y + rowIndex * 1.5;
 
       if (!measureOnly) {
-        // Add icon placeholder
+        
         this.currentSlide?.addShape(this.pptx.ShapeType.ellipse, {
           x: itemX + columnWidth / 2 - 0.3,
           y: itemY,
@@ -1410,7 +1410,7 @@ export class PlateJSToPPTXConverter {
           line: { width: 1, color: "FFFFFF" },
         });
 
-        // Add icon text/content
+        
         const itemText = this.extractText(item);
         this.currentSlide?.addText(itemText, {
           x: itemX,
@@ -1437,7 +1437,7 @@ export class PlateJSToPPTXConverter {
     measureOnly = false,
   ): Promise<number> {
     const imageUrl: string | undefined = (element as Partial<ImageElement>).url;
-    const height = 2; // Default image height
+    const height = 2; 
 
     if (!measureOnly && imageUrl && this.currentSlide) {
       try {
@@ -1449,8 +1449,8 @@ export class PlateJSToPPTXConverter {
           h: height,
         };
 
-        // Apply sizing based on objectFit setting (based on official PptxGenJS docs)
-        // Default behavior: object-fit "cover" with centered object-position if no cropSettings
+        
+        
         const cropSettings = (
           element as unknown as { cropSettings?: ImageCropSettings }
         ).cropSettings;
@@ -1460,10 +1460,10 @@ export class PlateJSToPPTXConverter {
           y: 0.5,
         };
 
-        // Apply sizing according to official PptxGenJS documentation
+        
         switch (objectFit) {
           case "contain":
-            // contain: shrinks image to fit completely within area, preserving ratio
+            
             imageOptions.sizing = {
               type: "contain",
               w: width,
@@ -1471,7 +1471,7 @@ export class PlateJSToPPTXConverter {
             };
             break;
           case "cover":
-            // cover: shrinks image to completely fill area, crops excess, preserving ratio
+            
             imageOptions.sizing = {
               type: "cover",
               w: width,
@@ -1479,17 +1479,17 @@ export class PlateJSToPPTXConverter {
             };
             break;
           case "fill":
-            // fill: no sizing property = default stretch behavior
+            
             break;
           default:
-            // Use crop with positioning offsets
+            
             imageOptions.sizing = {
               type: "crop",
               w: width,
               h: height,
-              // x, y are positions relative to the source image for cropping
-              x: objectPosition.x * width * 0.1, // Adjust multiplier as needed
-              y: objectPosition.y * height * 0.1, // Adjust multiplier as needed
+              
+              x: objectPosition.x * width * 0.1, 
+              y: objectPosition.y * height * 0.1, 
             };
             break;
         }
@@ -1502,7 +1502,7 @@ export class PlateJSToPPTXConverter {
     return height + 0.2;
   }
 
-  // SVG Creation Methods
+  
   private createArrowSVG(fillColor: string): string {
     const { path, viewBox } = this.SVG_DEFINITIONS.arrow;
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">
@@ -1549,7 +1549,7 @@ export class PlateJSToPPTXConverter {
     if (!this.currentSlide) return;
 
     try {
-      // Convert SVG to data URL
+      
       const svgDataUrl = `data:image/svg+xml;base64,${btoa(svgContent)}`;
 
       this.currentSlide.addImage({
@@ -1561,7 +1561,7 @@ export class PlateJSToPPTXConverter {
       });
     } catch (error) {
       console.warn("Failed to add SVG:", error);
-      // Fallback to basic shape if SVG fails
+      
       this.currentSlide?.addShape(this.pptx.ShapeType.rect, {
         x,
         y,
@@ -1572,7 +1572,7 @@ export class PlateJSToPPTXConverter {
     }
   }
 
-  // Helper Methods
+  
   private extractText(element: unknown): string {
     const isTextNode = (n: unknown): n is TextNode => {
       if (!n || typeof n !== "object") return false;
@@ -1606,7 +1606,7 @@ export class PlateJSToPPTXConverter {
       color: this.THEME.text,
     };
 
-    // Extract text styling from first text node
+    
     if (
       "children" in element &&
       element.children &&
@@ -1632,14 +1632,14 @@ export class PlateJSToPPTXConverter {
         }
         if (typeof firstChild.color === "string") {
           const raw = (firstChild.color as string).trim();
-          // Only accept direct hex; ignore CSS variables like var(--presentation-text)
+          
           const hexMatch = raw.match(/^#?[0-9A-Fa-f]{6}$/);
           if (hexMatch) options.color = raw.replace("#", "");
         }
       }
     }
 
-    // Ensure default TikTok Sans fallback if not set via marks
+    
     if (!options.fontFace) options.fontFace = "TikTok Sans";
 
     return options;
@@ -1666,11 +1666,11 @@ export class PlateJSToPPTXConverter {
         if (node.italic) runOptions.italic = true;
         if (node.underline) runOptions.underline = { style: "sng" };
         if (node.strikethrough) runOptions.strike = true;
-        // Font family per-run
+        
         if (typeof node.fontFamily === "string" && node.fontFamily.trim()) {
           runOptions.fontFace = node.fontFamily.trim();
         }
-        // Font size per-run
+        
         if (
           typeof node.fontSize === "number" ||
           typeof node.fontSize === "string"
@@ -1678,13 +1678,13 @@ export class PlateJSToPPTXConverter {
           const parsed = this.parseFontSizeToPoints(node.fontSize);
           if (parsed) runOptions.fontSize = parsed;
         }
-        // Text color per-run (hex only)
+        
         if (typeof node.color === "string") {
           const raw = node.color.trim();
           const hexMatch = raw.match(/^#?[0-9A-Fa-f]{6}$/);
           if (hexMatch) runOptions.color = raw.replace("#", "");
         }
-        // Background highlight per-run
+        
         if (typeof node.backgroundColor === "string") {
           const raw = node.backgroundColor.trim();
           const hexMatch = raw.match(/^#?[0-9A-Fa-f]{6}$/);
@@ -1704,12 +1704,12 @@ export class PlateJSToPPTXConverter {
     return runs;
   }
 
-  // Convert font size mark (px or pt) to points for PptxGenJS
+  
   private parseFontSizeToPoints(value: number | string): number | null {
     if (typeof value === "number") {
-      // Heuristic: If value is large (>= 72), assume px and convert to pt
+      
       if (value >= 72) return Math.round((value * 3) / 4);
-      return value; // assume pt
+      return value; 
     }
     const v = value.trim();
     if (!v) return null;
@@ -1720,7 +1720,7 @@ export class PlateJSToPPTXConverter {
     const numMatch = v.match(/^(\d+(?:\.\d+)?)/);
     if (numMatch) {
       const n = parseFloat(numMatch[1]!);
-      // Default assume pt if no unit
+      
       return n;
     }
     return null;
@@ -1744,7 +1744,7 @@ export class PlateJSToPPTXConverter {
   }
 }
 
-// Usage function
+
 export async function convertPlateJSToPPTX(
   presentationData: PresentationData,
   theme?: Partial<ThemeColors>,
@@ -1752,7 +1752,7 @@ export async function convertPlateJSToPPTX(
   const converter = new PlateJSToPPTXConverter(theme);
   const pptx = await converter.convertToPPTX(presentationData);
   const output = await pptx.write({ outputType: "arraybuffer" });
-  // Type guards: library type says it can be string | ArrayBuffer | Blob | Uint8Array
+  
   if (output instanceof ArrayBuffer) return output;
   if (output instanceof Uint8Array) {
     const view = output;
@@ -1761,13 +1761,13 @@ export async function convertPlateJSToPPTX(
     return ab;
   }
   if (typeof output === "string") {
-    // base64 or binarystring; convert to ArrayBuffer
+    
     const view = new TextEncoder().encode(output);
     const ab = new ArrayBuffer(view.byteLength);
     new Uint8Array(ab).set(view);
     return ab;
   }
-  // Blob fallback
+  
   const arrayBuf = await (output as Blob).arrayBuffer();
   return arrayBuf;
 }

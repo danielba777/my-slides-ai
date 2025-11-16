@@ -16,9 +16,7 @@ export interface UseDragNodeOptions
   orientation?: "vertical" | "horizontal";
 }
 
-/**
- * `useDrag` hook to drag a node from the editor. `item` with `id` is required.
- */
+
 export const useDragNode = (
   editor: PlateEditor,
   { element: staleElement, item, orientation, ...options }: UseDragNodeOptions,

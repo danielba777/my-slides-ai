@@ -1,35 +1,20 @@
-// --- Security headers (CSP funktionsfähig & Scanner-kompatibel) ---
 const ONE_YEAR = 31536000;
 const isProd = process.env.NODE_ENV === "production";
 
-// Hinweis:
-// - Wir erlauben bewusst 'unsafe-inline' und 'unsafe-eval' in script-src,
-// damit Next.js + deine Libs (z.B. Framer Motion) zuverlässig rendern.
-// - Scanner erwarten _vorhandene_ CSP-Header; eine zu strikte CSP hat dir die App gebrochen.
-// - Falls du später weiter abhärten willst, können wir Nonces/Hashes einführen.
 const CSP = [
   "default-src 'self'",
-  // Skripte: Next/Framer/Hydration brauchen inline/eval in deinem aktuellen Setup
   "script-src 'self' https: blob: 'unsafe-inline' 'unsafe-eval'",
-  // Styles: Tailwind/inline kritisch, daher 'unsafe-inline'
   "style-src 'self' https: 'unsafe-inline'",
-  // Medien & Bilder (Next/Image, UploadThing-CDNs, eigene Files)
   "img-src 'self' https: data: blob:",
   "media-src 'self' https: blob:",
-  // Schriften
   "font-src 'self' https: data:",
-  // API/SSR/HMR/Realtime
   "connect-src 'self' https: wss: ws: https://*.amplitude.com https://*.amplitude.eu https://cdn.eu.amplitude.com https://api.eu.amplitude.com https://api-sr.eu.amplitude.com",
-  // Frames nur von sicheren Quellen (z.B. eigene Seiten, evtl. externe UIs)
   "frame-src 'self' https:",
-  // Worker (Next/Image, Offscreen etc.)
   "worker-src 'self' blob:",
-  // Sichere Defaults
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'self'",
-  // Mixed-Content nur in Production automatisch upgraden (vermeidet localhost-Timeouts)
   ...(isProd ? ["upgrade-insecure-requests"] : []),
 ].join("; ");
 
@@ -55,7 +40,6 @@ const config = {
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
       { protocol: "https", hostname: "placehold.co" },
-      // TikTok CDN (diverse pXX-Subdomains; nötig für Hero-Slides)
       {
         protocol: "https",
         hostname: "*.tiktokcdn-eu.com",

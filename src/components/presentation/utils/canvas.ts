@@ -74,38 +74,32 @@ function pickFontSize(charCount: number): number {
   return 72;
 }
 
-/**
- * Applies TikTok-style text styling to a Canvas text node.
- * Can apply either outline (stroke) or highlight-box background.
- * @param node - The text node to style
- * @param styleMode - "outline" for stroke effect, "highlight" for background box
- * @returns The styled text node
- */
+
 export function applyTikTokTextStyle(
   node: Partial<CanvasTextNode>,
   styleMode: "outline" | "highlight" = "outline",
 ): Partial<CanvasTextNode> {
   if (styleMode === "outline") {
-    // TikTok Outline/Stroke style: White text with black outline
+    
     return {
       ...node,
-      fill: TIKTOK_TEXT_COLOR, // White text
-      stroke: TIKTOK_OUTLINE_COLOR, // Black outline
-      strokeWidth: TIKTOK_OUTLINE_WIDTH, // 7px outline
+      fill: TIKTOK_TEXT_COLOR, 
+      stroke: TIKTOK_OUTLINE_COLOR, 
+      strokeWidth: TIKTOK_OUTLINE_WIDTH, 
     };
   } else {
-    // TikTok Highlight-Box style: Black text on white rounded box
+    
     return {
       ...node,
-      fill: TIKTOK_OUTLINE_COLOR, // Black text (#000000)
+      fill: TIKTOK_OUTLINE_COLOR, 
       background: {
         enabled: true,
-        mode: TIKTOK_BACKGROUND_MODE, // "block"
-        color: TIKTOK_TEXT_COLOR, // White background (#ffffff)
-        opacity: TIKTOK_BACKGROUND_OPACITY, // 1
-        paddingX: TIKTOK_BACKGROUND_PADDING_X, // 29px horizontal (0.4em at 72px)
-        paddingY: TIKTOK_BACKGROUND_PADDING_Y, // 14px vertical (0.2em at 72px)
-        radius: TIKTOK_BACKGROUND_RADIUS, // 22px rounded corners (0.3em at 72px)
+        mode: TIKTOK_BACKGROUND_MODE, 
+        color: TIKTOK_TEXT_COLOR, 
+        opacity: TIKTOK_BACKGROUND_OPACITY, 
+        paddingX: TIKTOK_BACKGROUND_PADDING_X, 
+        paddingY: TIKTOK_BACKGROUND_PADDING_Y, 
+        radius: TIKTOK_BACKGROUND_RADIUS, 
       },
     };
   }
@@ -116,7 +110,7 @@ export function applyBackgroundImageToCanvas(
   imageUrl?: string | null,
   gridImages?: Array<{ url?: string }> | null,
 ): CanvasDoc {
-  // Starte IMMER vom bestehenden Canvas und erhalte ALLE Nicht-Image-Nodes
+  
   const base: CanvasDoc = {
     version: canvas?.version ?? 1,
     width: canvas?.width ?? CANVAS_WIDTH,
@@ -129,7 +123,7 @@ export function applyBackgroundImageToCanvas(
     previewDataUrl: canvas?.previewDataUrl,
   };
 
-  // Remove all existing background images (including grid images)
+  
   const withoutBg = base.nodes.filter(
     (n: any) =>
       !(
@@ -139,25 +133,25 @@ export function applyBackgroundImageToCanvas(
       ),
   );
 
-  // Handle grid layout
+  
   if (gridImages && Array.isArray(gridImages) && gridImages.length > 0) {
     const gridNodes: any[] = [];
-    // Berechne exakte Zellgrößen für 2x2 Grid
-    // WICHTIG: Alle Zellen MÜSSEN exakt gleich groß sein
+    
+    
     const cellWidth = base.width / 2;
     const cellHeight = base.height / 2;
 
-    // Grid-Layout: 4 Zellen in 2x2 Anordnung
-    // Zelle 0: Oben Links
-    // Zelle 1: Oben Rechts
-    // Zelle 2: Unten Links
-    // Zelle 3: Unten Rechts
+    
+    
+    
+    
+    
 
     const positions = [
-      { x: 0, y: 0, width: cellWidth, height: cellHeight }, // Oben Links
-      { x: cellWidth, y: 0, width: cellWidth, height: cellHeight }, // Oben Rechts
-      { x: 0, y: cellHeight, width: cellWidth, height: cellHeight }, // Unten Links
-      { x: cellWidth, y: cellHeight, width: cellWidth, height: cellHeight }, // Unten Rechts
+      { x: 0, y: 0, width: cellWidth, height: cellHeight }, 
+      { x: cellWidth, y: 0, width: cellWidth, height: cellHeight }, 
+      { x: 0, y: cellHeight, width: cellWidth, height: cellHeight }, 
+      { x: cellWidth, y: cellHeight, width: cellWidth, height: cellHeight }, 
     ];
 
     for (let i = 0; i < 4; i++) {
@@ -178,7 +172,7 @@ export function applyBackgroundImageToCanvas(
     };
   }
 
-  // Handle single image
+  
   if (!imageUrl) {
     return {
       ...base,
@@ -196,7 +190,7 @@ export function applyBackgroundImageToCanvas(
     url: imageUrl,
   };
 
-  // Prüfe Idempotenz: existiert bereits der gleiche BG?
+  
   const prevBg = base.nodes.find(
     (n: any) => n?.type === "image" && n?.id === "canvas-background-image",
   ) as any;
@@ -205,12 +199,12 @@ export function applyBackgroundImageToCanvas(
     const sameSize =
       prevBg.width === imageNode.width && prevBg.height === imageNode.height;
     if (sameUrl && sameSize) {
-      // nichts ändern
+      
       return { ...base, nodes: base.nodes };
     }
   }
 
-  // BG-Image immer als unterstes Element einfügen
+  
   const mergedNodes = [imageNode, ...withoutBg];
   return { ...base, nodes: mergedNodes };
 }
@@ -232,18 +226,18 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
     previewDataUrl: slide.canvas?.previewDataUrl,
   };
 
-  // 🔒 WICHTIG: Wenn bereits ein Canvas mit Nodes existiert, NIEMALS neu aufbauen.
-  // Das verhindert, dass Text/Elemente beim Rendern "zurückspringen".
-  // ABER: Wir müssen alte "kombinierte" Text-Nodes in separate Nodes aufsplitten
+  
+  
+  
   if (Array.isArray(slide.canvas?.nodes) && slide.canvas!.nodes.length > 0) {
     const hasMultiLineTextNode = slide.canvas.nodes.some((node) => {
       if (node.type !== "text") return false;
       const text = (node as any).text || (node as any).content || "";
-      // Prüfe ob es ein Multi-Line Text mit Bullets ist
+      
       return text.includes("\n") && (text.includes("•") || text.includes("-"));
     });
 
-    // Wenn ein Multi-Line Text-Node gefunden wurde, splitte ihn auf
+    
     if (hasMultiLineTextNode) {
       console.log(
         "🔄 Migration: Splitting multi-line text node into separate elements",
@@ -260,7 +254,7 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
         const textNode = node as any;
         const text = textNode.text || textNode.content || "";
 
-        // Prüfe ob dies ein Multi-Line Node mit Bullets ist
+        
         if (
           text.includes("\n") &&
           (text.includes("•") || text.includes("-")) &&
@@ -268,13 +262,13 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
         ) {
           hasProcessedMultiLine = true;
 
-          // Splitte in Zeilen
+          
           const lines = text
             .split("\n")
             .map((l: string) => l.trim())
             .filter(Boolean);
 
-          // Erkenne Titel und Bullets
+          
           const hasTitle =
             lines.length > 0 &&
             !lines[0]?.startsWith("•") &&
@@ -284,9 +278,9 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
 
           const baseNx = textNode.nx ?? 0.5;
           const textColor = textNode.fill || chooseTextColor(base.bg);
-          const textWidth = textNode.width ?? Math.round(width * 0.7);
+          const textWidth = textNode.width ?? 1000;
 
-          // Erstelle Titel-Node
+          
           if (title) {
             newNodes.push({
               id: `text-title-${nanoid()}`,
@@ -304,7 +298,7 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
             });
           }
 
-          // Erstelle separate Bullet-Nodes
+          
           if (bulletPoints.length > 0) {
             const startY = title ? 0.4 : 0.3;
             const bulletSpacing = 0.08;
@@ -329,7 +323,7 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
             });
           }
         } else {
-          // Behalte andere Text-Nodes unverändert
+          
           newNodes.push(node);
         }
       });
@@ -359,13 +353,13 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
   if (segments.length > 0) {
     const content = segments.join("\n\n");
 
-    // Versuche, den Content in Titel und Bullet Points zu splitten
+    
     const lines = content
       .split("\n")
       .map((l) => l.trim())
       .filter(Boolean);
 
-    // Erkenne: Erste Zeile = Titel, Rest = Bullet Points
+    
     const hasTitle =
       lines.length > 0 &&
       !lines[0]?.startsWith("•") &&
@@ -373,27 +367,27 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
     const title = hasTitle ? lines[0] : null;
     const bulletPoints = hasTitle ? lines.slice(1) : lines;
 
-    const textWidth = Math.round(width * 0.7);
+    const textWidth = 1000;
     const alignment = "center";
     const textColor = chooseTextColor(base.bg);
 
-    // Falls Position noch nicht gesetzt: zentriert platzieren (normalisierte Koordinaten 0-1)
+    
     const baseNx = slide.position?.x != null ? slide.position.x / width : 0.5;
     const baseNy = slide.position?.y != null ? slide.position.y / height : 0.5;
 
     if (title) {
-      // Titel-Node (größer, oben)
+      
       base.nodes.push({
         id: `text-title-${nanoid()}`,
         type: "text",
         x: resolveX(baseNx, width),
         y: resolveY(0.25, height),
         nx: baseNx,
-        ny: 0.25, // Weiter oben positionieren
+        ny: 0.25, 
         width: textWidth,
         text: title,
         fontFamily: "Inter",
-        fontSize: pickFontSize(title.length) + 10, // Etwas größer für Titel
+        fontSize: pickFontSize(title.length) + 10, 
         align: alignment,
         fill: textColor,
       });
@@ -405,10 +399,10 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
     }
 
     if (bulletPoints.length > 0) {
-      // Erstelle für jeden Bullet Point ein eigenes Text-Element
-      const startY = title ? 0.4 : 0.3; // Start-Y-Position
-      const bulletSpacing = 0.08; // Abstand zwischen Bullets (8% der Höhe)
-      const bulletFontSize = 50; // Kleinere Schriftgröße für Bullets
+      
+      const startY = title ? 0.4 : 0.3; 
+      const bulletSpacing = 0.08; 
+      const bulletFontSize = 50; 
 
       bulletPoints.forEach((bullet, index) => {
         const bulletY = startY + index * bulletSpacing;
@@ -424,7 +418,7 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
           text: bullet,
           fontFamily: "Inter",
           fontSize: bulletFontSize,
-          align: "left", // Linksbündig für Bullet Points
+          align: "left", 
           fill: textColor,
         });
       });
@@ -437,7 +431,7 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
       }
     }
 
-    // Fallback: Wenn keine Struktur erkannt wurde, verwende den gesamten Content
+    
     if (base.nodes.length === 0) {
       base.nodes.push({
         id: `text-${nanoid()}`,
@@ -469,9 +463,9 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
 }
 
 export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
-  // 🔧 FIX: Korrigiere falsche Canvas-Größen (z.B. 1920 statt 1620)
+  
   if (slide.canvas) {
-    const correctHeight = CANVAS_HEIGHT; // 1620 für 2:3 Format
+    const correctHeight = CANVAS_HEIGHT; 
     if (slide.canvas.height !== correctHeight) {
       console.warn(
         `⚠️ Korrigiere Canvas-Höhe von ${slide.canvas.height} auf ${correctHeight}`,
@@ -506,7 +500,7 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
     };
   }
 
-  // MIGRATION: Splitte Multi-Line Text-Nodes mit Bullets in separate Nodes
+  
   const hasMultiLineTextNode = nodes.some((node) => {
     if (node.type !== "text") return false;
     const text = (node as any).text || (node as any).content || "";
@@ -531,7 +525,7 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
       const textNode = node as any;
       const text = textNode.text || textNode.content || "";
 
-      // Prüfe ob dies ein Multi-Line Node mit Bullets ist
+      
       if (
         text.includes("\n") &&
         (text.includes("•") || text.includes("-")) &&
@@ -540,13 +534,13 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
         hasProcessedMultiLine = true;
         console.log("  ✂️ Splitting text node:", text.substring(0, 50) + "...");
 
-        // Splitte in Zeilen
+        
         const lines = text
           .split("\n")
           .map((l: string) => l.trim())
           .filter(Boolean);
 
-        // Erkenne Titel und Bullets
+        
         const hasTitle =
           lines.length > 0 &&
           !lines[0]?.startsWith("•") &&
@@ -558,9 +552,9 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
         const textColor =
           textNode.fill ||
           chooseTextColor(slide.canvas?.bg ?? DEFAULT_CANVAS.bg);
-        const textWidth = textNode.width ?? Math.round(width * 0.7);
+        const textWidth = textNode.width ?? 1000;
 
-        // Erstelle Titel-Node
+        
         if (title) {
           console.log("  📝 Creating title node:", title);
           newNodes.push({
@@ -579,7 +573,7 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
           });
         }
 
-        // Erstelle separate Bullet-Nodes
+        
         if (bulletPoints.length > 0) {
           const startY = title ? 0.4 : 0.3;
           const bulletSpacing = 0.08;
@@ -608,7 +602,7 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
           });
         }
       } else {
-        // Behalte andere Text-Nodes unverändert
+        
         newNodes.push(node);
       }
     });
@@ -622,28 +616,28 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
     };
   }
 
-  // Konvertiere alte absolute x/y Koordinaten zu normalisierten nx/ny Koordinaten
-  // Dies stellt sicher, dass alle Texte vertikal und horizontal mittig sind
+
+
   if (slide.canvas?.nodes) {
     const updatedNodes = slide.canvas.nodes.map((node) => {
       if (node.type !== "text") return node;
       const textNode = node as any;
 
-      // Wenn bereits nx/ny vorhanden sind, nichts ändern
-      if (textNode.nx != null && textNode.ny != null) {
-        return node;
-      }
 
-      // Für alle Text-Nodes ohne nx/ny: Setze auf Mitte (0.5, 0.5)
-      // Dies migriert alte Slides mit top-left Positionierung zur Zentrierung
-      return {
+      const hasNormalizedCoords = textNode.nx != null && textNode.ny != null;
+
+
+      const updated = {
         ...textNode,
-        nx: 0.5, // Horizontal mittig
-        ny: 0.5, // Vertikal mittig
-        // Behalte alte x/y für Fallback-Kompatibilität, falls benötigt
-        x: textNode.x,
+        width: 1000, // Force all text nodes to have 1000px width
+        align: "center", // Force center alignment
+        nx: hasNormalizedCoords ? textNode.nx : 0.5,
+        ny: hasNormalizedCoords ? textNode.ny : 0.5,
+        x: hasNormalizedCoords ? textNode.x : Math.round(0.5 * (slide.canvas?.width ?? 1080)),
         y: textNode.y,
       };
+
+      return updated;
     });
 
     slide = {
@@ -673,12 +667,7 @@ export function ensureSlidesHaveCanvas(slides: PlateSlide[]): PlateSlide[] {
   return slides.map((slide) => ensureSlideCanvas(slide));
 }
 
-/**
- * Applies TikTok text styling to all text nodes in a slide's canvas.
- * @param slide - The slide to apply styling to
- * @param styleMode - "outline" for stroke effect, "highlight" for background box
- * @returns The slide with styled text nodes
- */
+
 export function applySlideTikTokStyle(
   slide: PlateSlide,
   styleMode: "outline" | "highlight" = "outline",

@@ -79,7 +79,7 @@ export default function RadarChartElement(
             <ChartTooltip content={<ChartTooltipContent />} />
           </RadarChart>
         </ChartContainer>
-        {/* non-editable */}
+        {}
       </div>
     </PlateElement>
   );

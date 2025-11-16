@@ -161,7 +161,7 @@ function SlidePreviewBase({
   );
 }
 
-// moved to hooks/presentation/previewSignature
+
 
 const MemoPreviewItem = React.memo(
   function PreviewItem({
@@ -181,14 +181,14 @@ const MemoPreviewItem = React.memo(
     return (
       <SlidePreviewCard index={index} isActive={isActive} onClick={handleClick}>
         {slide.canvas?.previewDataUrl ? (
-          // vorhandenes Snapshot-Bild anzeigen
+          
           <img
             src={slide.canvas.previewDataUrl}
             alt={`Slide ${index + 1}`}
             className="block w-full"
           />
         ) : (
-          // Fallback: schmaler Platzhalter
+          
           <div className="flex h-[180px] w-full items-center justify-center border text-xs text-muted-foreground">
             Kein Vorschaubild
           </div>

@@ -1,4 +1,4 @@
-// apps/dashboard/src/app/(components)/SlideCanvas.tsx
+
 "use client";
 
 import { loadImageDecoded } from "@/canvas/konva-helpers";
@@ -30,8 +30,8 @@ import React, {
   useState,
 } from "react";
 
-// UI-Event aus der Toolbar:
-// window.dispatchEvent(new CustomEvent("canvas:text-bg", { detail: { enabled: boolean, mode: "block" | "blob" } }))
+
+
 type TextBgMode = "block" | "blob";
 
 type TextLayer = {
@@ -62,37 +62,40 @@ export type SlideCanvasHandle = {
 };
 
 type Props = {
-  imageUrl: string; // "" = schwarz
+  imageUrl: string; 
   layout: SlideTextElement[];
   onLayoutChange?: (next: SlideTextElement[]) => void;
-  /* ➕ neu: zusätzliche Overlay-Images (Logo etc.) */
+  
   overlays?: CanvasImageNode[];
-  /* ➕ neu: Callback, wenn Overlays (Position/Größe) geändert wurden */
+  
   onOverlaysChange?: (next: CanvasImageNode[]) => void;
-  /* ➕ neu: Toolbar Sichtbarkeit steuern */
+  
   showToolbar?: boolean;
-  /* ➕ neu: Overlay für Edit-Modus */
+  
   overlayContent?: React.ReactNode;
-  /* ➕ neu: Callback zum Schließen der Toolbar */
+  
   onCloseToolbar?: () => void;
-  /** Wenn true, sind Interaktionen deaktiviert (nur Anzeige) */
+  
   readOnly?: boolean;
 };
 
 const W = 1080;
-const H = 1620; // 2:3 aspect ratio
+const H = 1620;
 const PADDING = 8;
 const BASE_FONT_PX = 72;
-// Zusätzlicher Puffer für Descender (z. B. g, y, p, q, j), damit beim Export nichts abgeschnitten wird
-const DESCENT_PAD = Math.ceil(BASE_FONT_PX * 0.25); // ~25 % der Basis-Fonthöhe
-// Mindestabstand zwischen Textboxen (skaliert leicht mit Basisgröße)
-// halbierter Gap, damit die Boxen dichter beieinander liegen (User-Wunsch)
+const SAFE_AREA_TOP = 100; // Safe area at top
+const SAFE_AREA_BOTTOM = 100; // Safe area at bottom
+const TEXT_WIDTH = 1000; // Almost full width text blocks
+
+const DESCENT_PAD = Math.ceil(BASE_FONT_PX * 0.25); 
+
+
 const MIN_TEXT_GAP = Math.max(1, Math.round(BASE_FONT_PX * 0.015));
 
-// Feste Opazität für das globale Abdunkeln (lesbarer TikTok-Look)
-const DIM_OVERLAY_OPACITY = 0.28; // muss mit Preview übereinstimmen
 
-// +// Einheitliches Text-Baseline-Verhalten, damit Export == Preview
+const DIM_OVERLAY_OPACITY = 0.28; 
+
+
 const TEXT_BASELINE = "middle";
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -177,22 +180,22 @@ function drawRoundedRect(
   ctx.closePath();
 }
 
-// Export aspect ratio for responsive containers (2:3 format)
+
 export const ASPECT_RATIO = 2 / 3;
 
-/** Build outer-only text outline via multiple text-shadows (no inner stroke) */
+
 function buildOuterTextShadow(px: number, color: string): string {
   const r = Math.max(0, Math.round(px));
   if (r <= 0) return "none";
   const steps: string[] = [];
-  // ring aus Offsets (Manhattan-Kreis + Diagonalen)
+  
   for (let y = -r; y <= r; y++) {
     for (let x = -r; x <= r; x++) {
       const d = Math.hypot(x, y);
       if (d > 0 && d <= r + 0.01) steps.push(`${x}px ${y}px 0 ${color}`);
     }
   }
-  // Fallback falls zu groß: cap bei 400 shadows
+  
   if (steps.length > 400) {
     const filtered: string[] = [];
     let c = 0;
@@ -204,7 +207,7 @@ function buildOuterTextShadow(px: number, color: string): string {
   return steps.join(", ");
 }
 
-/** Helper: stabile Signatur für Layouts */
+
 function layoutSignature(l: SlideTextElement[]): string {
   return JSON.stringify(
     l.map((x) => ({
@@ -220,7 +223,7 @@ function layoutSignature(l: SlideTextElement[]): string {
       z: x.zIndex ?? 0,
       a: x.align ?? "center",
       wt: x.weight ?? "regular",
-      // folgende drei sind optional, können in deinem types.ts fehlen -> runtime-optional
+      
       it: (x as any).italic ?? false,
       oe: (x as any).outlineEnabled ?? false,
       ow: (x as any).outlineWidth ?? TIKTOK_OUTLINE_WIDTH,
@@ -241,7 +244,7 @@ function layoutSignature(l: SlideTextElement[]): string {
   );
 }
 
-/** Fonts laden (wichtig, sonst variieren Messwerte) */
+
 async function waitFontsReady() {
   try {
     const d: any = document;
@@ -249,7 +252,7 @@ async function waitFontsReady() {
   } catch {}
 }
 
-/** Gemeinsame Text-Messfunktion - nutzt neue Utility für konsistente Ergebnisse */
+
 function computeWrappedLinesWithDOM(
   layer: TextLayer & {
     italic?: boolean;
@@ -258,7 +261,7 @@ function computeWrappedLinesWithDOM(
   const weight =
     layer.weight === "bold" ? 700 : layer.weight === "semibold" ? 600 : 400;
 
-  // WICHTIG: Layout/Wrap passiert vor transform:scale → immer mit Basis-Font messen
+  
   const baseFontPx = BASE_FONT_PX;
   const lineHeightPx = baseFontPx * (layer.lineHeight ?? 1.12);
 
@@ -279,7 +282,7 @@ function computeWrappedLinesWithDOM(
   return result.lines;
 }
 
-/** Höhe automatisch bestimmen (lokal) – direkt über measureWrappedText (ohne Scale) */
+
 function computeAutoHeightForLayer(
   layerBase: TextLayer & { italic?: boolean },
   _lines?: string[],
@@ -291,7 +294,7 @@ function computeAutoHeightForLayer(
         ? 600
         : 400;
 
-  // Wrap/Höhe werden mit unskaliertem Font berechnet – Skalierung passiert via transform
+  
   const baseFontPx = BASE_FONT_PX;
   const lineHeightPx = baseFontPx * (layerBase.lineHeight ?? 1.12);
   const m = measureWrappedText({
@@ -310,7 +313,7 @@ function computeAutoHeightForLayer(
   return Math.max(40, Math.ceil(m.totalHeight));
 }
 
-/** Mapping: Props-Layout -> interne TextLayer (mit optionalen Editor-Feldern) */
+
 function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
   autoHeight?: boolean;
   italic?: boolean;
@@ -318,7 +321,7 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
   outlineWidth?: number;
   outlineColor?: string;
 })[] {
-  return layout.map((el, i) => {
+  const layers = layout.map((el, i) => {
     const id = el.id ?? `layer-${i}`;
     const tmp: TextLayer & {
       autoHeight?: boolean;
@@ -328,10 +331,10 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
       outlineColor?: string;
     } = {
       id,
-      x: (el.x ?? 0.5) * W,
+      x: W / 2, // Always center horizontally
       y: (el.y ?? 0.5) * H,
-      width: el.maxWidth ?? el.width ?? 400,
-      height: (el as any).maxHeight ?? 0, // 0 = auto
+      width: TEXT_WIDTH,
+      height: (el as any).maxHeight ?? 0,
       rotation: el.rotation ?? 0,
       scale: el.scale ?? 1,
       fontFamily: el.fontFamily ?? "Inter, system-ui, sans-serif",
@@ -344,7 +347,7 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
           : el.weight === "semibold"
             ? "semibold"
             : "regular",
-      align: el.align ?? "left",
+      align: el.align ?? "center",
       color: (el as any).color ?? TIKTOK_TEXT_COLOR,
       content: el.content ?? "",
       zIndex: el.zIndex ?? i,
@@ -367,7 +370,7 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
     };
 
     if (!tmp.height || tmp.height <= 0) {
-      // Auto-Höhe initial
+
       const lines = computeWrappedLinesWithDOM(tmp);
       tmp.height = Math.ceil(computeAutoHeightForLayer(tmp, lines));
       tmp.autoHeight = true;
@@ -375,9 +378,85 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
 
     return tmp;
   });
+
+  // Apply dynamic font size and spacing based on number of text blocks
+  if (layers.length > 1) {
+    const sorted = [...layers].sort((a, b) => a.y - b.y);
+
+    // Calculate dynamic font size based on number of blocks
+    let fontScale = 1;
+    if (sorted.length > 10) {
+      fontScale = 0.65; // Very small for many blocks
+    } else if (sorted.length > 7) {
+      fontScale = 0.75; // Smaller for 8-10 blocks
+    } else if (sorted.length > 5) {
+      fontScale = 0.85; // Slightly smaller for 6-7 blocks
+    } else if (sorted.length > 3) {
+      fontScale = 0.9; // Almost normal for 4-5 blocks
+    }
+
+    // Apply font scale to all layers and recalculate heights
+    sorted.forEach((layer) => {
+      layer.fontSize = BASE_FONT_PX * (layer.scale ?? 1) * fontScale;
+      // Recalculate height with new font size
+      if (layer.autoHeight) {
+        const lines = computeWrappedLinesWithDOM(layer);
+        layer.height = Math.ceil(computeAutoHeightForLayer(layer, lines));
+      }
+    });
+
+    // Calculate available space within safe areas
+    const safeAreaHeight = H - SAFE_AREA_TOP - SAFE_AREA_BOTTOM;
+    const totalTextHeight = sorted.reduce((sum, layer) => sum + (layer.height ?? 0), 0);
+    const availableSpace = safeAreaHeight - totalTextHeight;
+    const numGaps = sorted.length - 1;
+
+    // Calculate dynamic gap - very compact spacing
+    let dynamicGap = MIN_TEXT_GAP;
+    if (sorted.length > 3) {
+      // For more than 3 text blocks, use minimal spacing
+      dynamicGap = Math.max(MIN_TEXT_GAP, Math.min(10, availableSpace / numGaps));
+    } else {
+      // For 2-3 blocks, use moderate spacing
+      const calculatedGap = availableSpace / numGaps;
+      dynamicGap = Math.max(MIN_TEXT_GAP, Math.min(calculatedGap, BASE_FONT_PX * 0.2));
+    }
+
+    // Position first block at top of safe area
+    const firstBlock = sorted[0];
+    if (firstBlock) {
+      const firstHalf = (firstBlock.height ?? 0) / 2;
+      firstBlock.y = SAFE_AREA_TOP + firstHalf;
+    }
+
+    // Position remaining blocks with dynamic gap
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1];
+      const cur = sorted[i];
+      const prevBottom = prev.y + (prev.height ?? 0) / 2;
+      const curHalf = (cur.height ?? 0) / 2;
+      cur.y = Math.round(prevBottom + dynamicGap + curHalf);
+    }
+
+    // Update original layers array with new positions, heights, and font sizes
+    const updateMap = new Map(sorted.map((l) => [l.id, { y: l.y, height: l.height, fontSize: l.fontSize }]));
+    layers.forEach((layer) => {
+      const updates = updateMap.get(layer.id);
+      if (updates) {
+        layer.y = updates.y;
+        layer.height = updates.height;
+        layer.fontSize = updates.fontSize;
+      }
+    });
+  } else if (layers.length === 1) {
+    // Center single text block vertically
+    layers[0].y = H / 2;
+  }
+
+  return layers;
 }
 
-/** Mapping: interne TextLayer -> Props-Layout */
+
 function mapLayersToLayout(
   textLayers: (TextLayer & {
     italic?: boolean;
@@ -407,7 +486,7 @@ function mapLayersToLayout(
         : layer.weight === "semibold"
           ? ("semibold" as const)
           : ("regular" as const),
-    // extra zurückgeben, falls Parent sie speichern möchte
+    
     ...(layer.italic !== undefined ? { italic: layer.italic as any } : {}),
     ...(layer.outlineEnabled !== undefined
       ? { outlineEnabled: layer.outlineEnabled as any }
@@ -442,8 +521,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dimBg, setDimBg] = React.useState(false);
 
-  // --- Globaler State für Dim-Overlay ---
-  // Feld heißt in der State-Definition 'editingOverlaySlideId'
+  
+  
   const dimOverlaySlideId = usePresentationState(
     (s) => s.editingOverlaySlideId,
   );
@@ -451,7 +530,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     (s) => s.setEditingOverlaySlideId,
   );
 
-  // Sicherer Wrapper: nur aufrufen, wenn wirklich eine Funktion übergeben wurde
+  
   const onLayout = useCallback(
     (next: SlideTextElement[]) => {
       if (typeof onLayoutChange === "function") {
@@ -461,7 +540,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     [onLayoutChange],
   );
 
-  // === Helpers: aktives/editiertes Layer finden & patchen ===
+  
   const getActiveId = () => isEditingRef.current ?? activeLayerId;
   const applyToActive = (updater: (l: TextLayer) => TextLayer) => {
     const id = getActiveId();
@@ -481,7 +560,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const setAlign = (align: "left" | "center" | "right") => {
     applyToActive((l) => ({ ...l, align }));
   };
-  // Wir koppeln Schriftgröße an scale → BASE_FONT_PX \* scale
+  
   const setFontScale = (scale: number) => {
     const s = Math.max(0.2, Math.min(4, Number.isFinite(scale) ? scale : 1));
     applyToActive((l) => ({ ...l, scale: s }));
@@ -493,27 +572,37 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     applyToActive((l) => ({ ...l, outlineEnabled: true, outlineColor: color }));
   };
 
-  /**
-   * - Verhindert Überlappungen vertikal benachbarter Text-Layer.
-   * - Annahmen:
-   * - - Rotation ~ 0 (gilt bei uns)
-   * - - width/height sind gesetzt (Auto-Height ist bereits berechnet)
-   */
+  
   const enforceMinVerticalSpacing = useCallback((layers: TextLayer[]) => {
     const next = [...layers].sort((a, b) => a.y - b.y);
+
+    // Calculate dynamic gap based on number of text blocks
+    let dynamicGap = MIN_TEXT_GAP;
+    if (next.length > 3) {
+      // For more than 3 text blocks, use minimal spacing
+      dynamicGap = MIN_TEXT_GAP;
+    } else if (next.length > 1) {
+      // For 2-3 blocks, calculate normal gap
+      const totalTextHeight = next.reduce((sum, layer) => sum + (layer.height ?? 0), 0);
+      const availableSpace = H - (PADDING * 2) - totalTextHeight;
+      const numGaps = next.length - 1;
+      const calculatedGap = availableSpace / numGaps;
+      dynamicGap = Math.max(MIN_TEXT_GAP, Math.min(calculatedGap, BASE_FONT_PX * 0.5));
+    }
+
     for (let i = 1; i < next.length; i++) {
       const prev = next[i - 1];
       const cur = next[i];
-      // Nur Text-Layer betrachten
-      // (bei dir sind es hier ohnehin Text-Layer in diesem Array)
-      // Guard gegen 'possibly undefined'
+
+
+
       if (!prev || !cur) {
         return;
       }
       const prevTop = prev.y - (prev.height ?? 0) / 2;
       const prevBottom = prev.y + (prev.height ?? 0) / 2;
       const curTop = cur.y - (cur.height ?? 0) / 2;
-      const neededTop = prevBottom + MIN_TEXT_GAP;
+      const neededTop = prevBottom + dynamicGap;
       if (curTop < neededTop) {
         const curHalf = (cur?.height ?? 0) / 2;
         const newY = neededTop + curHalf;
@@ -522,12 +611,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         }
       }
     }
-    // ursprüngliche Reihenfolge zurückgeben, aber mit aktualisierten y
+
     const map = new Map(next.map((l) => [l.id, l.y]));
     return layers.map((l) => (map.has(l.id) ? { ...l, y: map.get(l.id)! } : l));
   }, []);
 
-  // === Text hinzufügen ===
+  
   const addNewTextLayer = () => {
     const id =
       typeof crypto !== "undefined" && crypto.randomUUID
@@ -554,8 +643,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       x: centerX,
       y: centerY,
       rotation: 0,
-      width: Math.round(W * 0.7),
-      height: 0, // auto
+      width: TEXT_WIDTH,
+      height: 0, 
       zIndex: (textLayers.at(-1)?.zIndex ?? 0) + 1,
       color: TIKTOK_TEXT_COLOR,
       autoHeight: true,
@@ -569,11 +658,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     setTextLayers((prev) => [...prev, initial]);
     commitActiveLayer(id);
     setIsEditing(id);
-    // Cursor zurück in den Editor
+    
     setTimeout(() => editorActiveRef.current?.focus(), 0);
   };
 
-  // Reagiert auf globales "Text +"
+  
   useEffect(() => {
     const handler = () => {
       addNewTextLayer();
@@ -582,7 +671,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     return () => window.removeEventListener("canvas:add-text", handler);
   }, []);
 
-  // BG pan/zoom state (Canvas-Einheiten)
+  
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [bgSelected, setBgSelected] = useState(false);
@@ -593,7 +682,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const isPanning = useRef(false);
   const lastPoint = useRef({ x: 0, y: 0 });
 
-  // ---------- Overlays: lokaler State + Naturgrößen-Cache ----------
+  
   const [overlayNodes, setOverlayNodes] = useState<CanvasImageNode[]>(
     () => overlays,
   );
@@ -616,7 +705,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             img.onerror = () => res();
             img.src = n.url;
           });
-          // zweiter Load um natürliche Größe sicher zu greifen
+          
           const img2 = new Image();
           img2.src = n.url;
           const w = (img2 as any).naturalWidth || 1;
@@ -642,7 +731,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     [onOverlaysChange],
   );
 
-  // ---------- Dragging (Overlay verschieben) ----------
+  
   const dragRef = useRef<{
     id: string | null;
     startX: number;
@@ -708,7 +797,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     [commitOverlays, overlayNodes],
   );
 
-  // Text layers — lokale Source of Truth
+  
   const [textLayers, setTextLayers] = useState<
     (TextLayer & {
       autoHeight?: boolean;
@@ -719,20 +808,20 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     })[]
   >([]);
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
-  // Aktuelle Auswahl als Ref, damit Keydown (Capture) IMMER die sichtbare Auswahl löscht (keine stale Closure)
+  
   const activeLayerIdRef = useRef<string | null>(null);
   const commitActiveLayer = useCallback((id: string | null) => {
     setActiveLayerId(id);
     activeLayerIdRef.current = id;
   }, []);
 
-  // State ↔ Ref synchron halten
+  
   useEffect(() => {
     activeLayerIdRef.current = activeLayerId;
   }, [activeLayerId]);
 
-  // Edit / Interaction
-  const [isEditing, setIsEditing] = useState<string | null>(null); // grüner Modus (Editor)
+  
+  const [isEditing, setIsEditing] = useState<string | null>(null); 
   const isEditingRef = useRef<string | null>(null);
   const toolbarMouseDownRef = useRef(false);
   const editorActiveRef = useRef<HTMLTextAreaElement | null>(null);
@@ -755,7 +844,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const interactionStart = useRef<any>(null);
   const isInteracting = useRef(false);
 
-  // Prop-Sync Kontrolle
+  
   const lastSentLayoutSigRef = useRef<string>("");
   const layoutSig = useMemo(() => layoutSignature(layout), [layout]);
 
@@ -765,11 +854,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       !isInteracting.current &&
       !isEditingRef.current;
     if (fromParent) setTextLayers(mapLayoutToLayers(layout) as any);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [layoutSig]);
 
-  // Wenn Text-Layer entstehen/ändern (z. B. 4 Prompts → 4 Boxen),
-  // gleiche automatisch vertikal auf Abstand aus.
+  
+  
   useEffect(() => {
     setTextLayers(((prev) => {
       if (!prev || prev.length <= 1) return prev;
@@ -791,36 +880,36 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     })[]);
   }, [
     enforceMinVerticalSpacing,
-    /* Trigger bei Layout-Änderungen: */ textLayers.length,
+     textLayers.length,
   ]);
 
-  // Preview size
+  
   const [previewSize, setPreviewSize] = useState({
     w: 420,
     h: Math.round(420 * (H / W)),
   });
 
-  // Initial (einmal) setzen
+  
   useEffect(() => {
     setTextLayers(mapLayoutToLayers(layout) as any);
-    /* mount */
-  }, []); // eslint-disable-line
+    
+  }, []); 
 
-  // Preview Box dynamisch anpassen
+  
   useEffect(() => {
     function fit() {
       const parent = wrapRef.current?.parentElement;
       if (!parent) return;
       const containerWidth = parent.clientWidth;
-      // Grundbreite begrenzen
+      
       let w = Math.max(420, Math.min(containerWidth - 8, 540));
       let h = Math.round(w * (H / W));
-      // Zusätzlich: nie höher als 72% der Fensterhöhe
+      
       const MAX_VH = 0.76;
       const maxH = Math.floor(window.innerHeight * MAX_VH);
       if (h > maxH) {
         h = maxH;
-        w = Math.round(h * (W / H)); // Seitenverhältnis 9:16 beibehalten
+        w = Math.round(h * (W / H)); 
       }
       setPreviewSize({ w, h });
     }
@@ -829,7 +918,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     return () => window.removeEventListener("resize", fit);
   }, []);
 
-  // Cursor → Canvas-Koordinaten
+  
   const pixelToCanvas = (clientX: number, clientY: number) => {
     if (!wrapRef.current) return { x: 0, y: 0 };
     const rect = wrapRef.current.getBoundingClientRect();
@@ -841,8 +930,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     };
   };
 
-  // === WHEEL: DOM-Listener mit passive:false, damit Seite NICHT scrollt ===
-  // Nur zoomen, wenn das Bild selektiert ist
+  
+  
   const wheelHandler = useCallback(
     (e: WheelEvent) => {
       if (isEditingRef.current) return;
@@ -852,28 +941,28 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const canvasY = (e.clientY - rect.top) * (H / rect.height);
       const factor = e.deltaY < 0 ? 1.06 : 0.94;
 
-      // 🔍 1) Wenn ein Overlay-Image selektiert ist → das Bild selbst zoomen
+      
       if (activeLayerId && overlayNodes.some((n) => n.id === activeLayerId)) {
         e.preventDefault();
         e.stopPropagation();
         commitOverlays(
           overlayNodes.map((n) => {
             if (n.id !== activeLayerId) return n;
-            // Zoomen um den Cursor: Breite/Höhe skalieren
+            
             const cx = n.x + n.width / 2;
             const cy = n.y + n.height / 2;
             const nextW = clamp(n.width * factor, 40, W * 2);
             const scale = nextW / n.width;
             const nextH = clamp(n.height * scale, 40, H * 2);
-            // optional: leichtes "Pivot"-Gefühl — hier belassen wir x/y konstant (einfach)
+            
             return { ...n, width: nextW, height: nextH, x: n.x, y: n.y };
           }),
         );
         return;
       }
 
-      // 🔍 2) BG-Zoom DEAKTIVIERT (Hintergrundbild ist fixiert im Cover-Modus)
-      // Hintergrundbild kann nicht mehr gezoomt werden
+      
+      
       return;
     },
     [activeLayerId, overlayNodes, commitOverlays],
@@ -886,46 +975,46 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     return () => el.removeEventListener("wheel", wheelHandler as any);
   }, [wheelHandler]);
 
-  // BG pan (DEAKTIVIERT - Hintergrundbild ist fixiert)
+  
   const onBGPointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
-    // 1) Klicks auf Text- oder Handle-Flächen: NICHT den Editor schließen
+    
     if (
       target.closest('[data-role="text-layer"]') ||
       target.closest('[data-role="handle"]')
     ) {
       return;
     }
-    // 2) Toolbar-Interaktionen: ebenfalls NICHT schließen
+    
     if (toolbarMouseDownRef.current) {
       return;
     }
-    // 3) ECHTER Hintergrundklick → Editor schließen (KEIN Panning mehr)
+    
     if (isEditingRef.current) {
       setIsEditing(null);
     }
     setActiveLayerId(null);
-    setBgSelected(false); // Hintergrundbild kann nicht mehr selektiert werden
-    // isPanning und pointer capture NICHT mehr aktivieren
+    setBgSelected(false); 
+    
   };
 
   const onBGPointerMove = (e: React.PointerEvent) => {
-    // Panning deaktiviert
+    
     return;
   };
 
   const onBGPointerUp = (e: React.PointerEvent) => {
-    // Panning deaktiviert
+    
     return;
   };
 
-  // Canvas-Hintergrund-Klick: Auswahl aufheben (State + Ref immer gemeinsam!)
+  
   const handleCanvasDeselect = () => {
     commitActiveLayer(null);
     setIsEditing(null);
   };
 
-  // GLOBAL pointerup → Interaktion beenden & Parent syncen
+  
   useEffect(() => {
     const onWindowPointerUp = () => {
       if (!isInteracting.current) return;
@@ -940,15 +1029,15 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     return () => window.removeEventListener("pointerup", onWindowPointerUp);
   }, [textLayers, onLayout]);
 
-  // Layer Interaktionen
+  
   const selectLayer = (layerId: string, e: React.PointerEvent) => {
-    // Wenn ein ANDERER Layer im Edit-Modus ist, erst sauber schließen,
-    // damit keine Blur/Focus-Races auftreten und States stabil bleiben.
+    
+    
     if (isEditingRef.current && isEditingRef.current !== layerId) {
       setIsEditing(null);
     }
     if (isEditingRef.current === layerId) {
-      // Im Editor-Modus: nichts blockieren, damit der Cursor/Selektion im Text funktioniert
+      
       commitActiveLayer(layerId);
       return;
     }
@@ -967,7 +1056,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
   const startResize = (layerId: string, mode: any, e: React.PointerEvent) => {
     if (isEditingRef.current === layerId) {
-      // Im Editor-Modus für diese Box: nicht resizen!
+      
       e.stopPropagation();
       e.preventDefault();
       commitActiveLayer(layerId);
@@ -1039,11 +1128,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         if (l.id !== activeLayerId) return l;
 
         if (mode === "resize-left" || mode === "resize-right") {
-          // Horizontal resize – Höhe SOFORT neu berechnen (live wrap)
+          
           const dx = now.x - start.x;
           const delta = mode === "resize-left" ? -dx : dx;
           const nextW = Math.max(40, layerStart.width + delta);
-          // Immer Auto-Höhe bei horizontalem Resize → direkte Anpassung bei Zeilenumbruch
+          
           const computedHeight = Math.ceil(
             computeAutoHeightForLayer({
               ...l,
@@ -1070,7 +1159,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             Math.round(layerStart.height * s),
           );
 
-          // Mindesthöhe basierend auf Content-Höhe sicherstellen (Messung ohne Scale)
+          
           const weight =
             l.weight === "bold" ? 700 : l.weight === "semibold" ? 600 : 400;
 
@@ -1097,12 +1186,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           );
           const height = Math.max(Math.ceil(requestedHeight), minHeight);
 
-          // Manuelles Höhziehen deaktiviert Auto-Fit
+          
           return { ...l, height, autoHeight: false };
         }
 
-        // === Corner resize: scale ONLY the text (hug width), auto-height ===
-        // Need to implement rotatePoint function here
+        
+        
         const rotatePoint = (x: number, y: number, angle: number) => {
           const cos = Math.cos(angle);
           const sin = Math.sin(angle);
@@ -1127,7 +1216,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
         const nextScale = Math.max(0.2, layerStart.scale * s);
 
-        // Breite bleibt fix – Text soll Box nicht aufblasen
+        
         const keepW = Math.max(40, layerStart.width);
         const temp = {
           ...l,
@@ -1135,7 +1224,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           width: keepW,
         } as TextLayer & { autoHeight?: boolean };
 
-        // Höhe immer neu aus Text berechnen (hug content)
+        
         const lines = computeWrappedLinesWithDOM({
           ...temp,
           italic: (temp as any).italic,
@@ -1166,7 +1255,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     } catch {}
   };
 
-  // Edit-Modus
+  
   const onDoubleClick = (layerId: string) => setIsEditing(layerId);
 
   const onTextareaChange = (
@@ -1194,7 +1283,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   };
 
   const onTextBlur = (layerId: string) => {
-    // Wenn die Toolbar geklickt wurde, Editor NICHT schließen – stattdessen zurückfokussieren
+    
     if (toolbarMouseDownRef.current) {
       setTimeout(() => editorActiveRef.current?.focus(), 0);
       return;
@@ -1206,7 +1295,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     onLayout(newLayout);
   };
 
-  // Delete/Backspace: selektierten Text-Layer löschen (Capture-Phase, global)
+  
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const ae = document.activeElement as HTMLElement | null;
@@ -1221,8 +1310,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const isDeleteKey =
         e.key === "Delete" ||
         e.key === "Backspace" ||
-        // Mac: "Entfernen" ist oft Backspace; Fn+Backspace sendet "Delete".
-        // Wir erlauben außerdem Meta/Ctrl+Backspace, solange kein Input fokussiert ist.
+        
+        
         ((e.metaKey || e.ctrlKey) && e.key === "Backspace");
 
       if (
@@ -1235,7 +1324,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         e.stopPropagation();
         setTextLayers((prev) => {
           const updated = prev.filter((l) => l.id !== selectedId);
-          // sofortiger Parent-Sync
+          
           const newLayout = mapLayersToLayout(updated as any);
           const sig = layoutSignature(newLayout);
           lastSentLayoutSigRef.current = sig;
@@ -1245,13 +1334,13 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         });
       }
     };
-    // Capture-Phase, damit uns kein onKeyDownCapture davor blockt
+    
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-    // WICHTIG: keine Abhängigkeit von activeLayerId, sonst bekommt der Listener wieder eine neue (stale) Closure.
+    
   }, [onLayout]);
 
-  // Debounced Parent-Sync
+  
   const layoutChangeTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   useEffect(() => {
     if (isInteracting.current || isEditingRef.current) return;
@@ -1268,9 +1357,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     return () =>
       layoutChangeTimeoutRef.current &&
       clearTimeout(layoutChangeTimeoutRef.current);
-  }, [textLayers, onLayout]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [textLayers, onLayout]); 
 
-  // Export PNG — 1:1 wie Preview + Outline
+  
   const exportPNG = useCallback(async (): Promise<Blob> => {
     await waitFontsReady();
 
@@ -1279,23 +1368,23 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     canvas.width = W;
     canvas.height = H;
 
-    // BG
+    
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, W, H);
 
-    // Zeichenoberfläche vorbereiten (avoid name clash with existing `canvas`)
+    
     const offscreenCanvas = document.createElement("canvas");
     offscreenCanvas.width = W;
     offscreenCanvas.height = H;
     const exportCtx = offscreenCanvas.getContext("2d")!;
 
-    // WICHTIG für identische Vertikal-Ausrichtung wie im Preview
+    
     exportCtx.textBaseline = TEXT_BASELINE as CanvasTextBaseline;
     exportCtx.textAlign = "left";
 
-    // 1) Hintergrund zeichnen
+    
     if (imageUrl) {
-      // Cover Fit wie im Preview (scale + center)
+      
       const img = await loadImageDecoded(imageUrl);
       const fit = fitCover(W, H, img.naturalWidth, img.naturalHeight);
       exportCtx.save();
@@ -1308,10 +1397,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       exportCtx.fillRect(0, 0, W, H);
     }
 
-    // 1.5) Dim-Overlay NUR auf den Background anwenden (vor Overlays/Text)
-    // Quelle: globales Event setzt lokalen State 'dimBg' im Canvas
-    // -> beim Export lesen wir denselben State und legen ein halbtransparentes Schwarz darüber
-    // Hinweis: Eigene/Overlay-Bilder werden danach gezeichnet und sind NICHT mit abgedunkelt.
+    
+    
+    
+    
     if (dimBg) {
       exportCtx.save();
       exportCtx.fillStyle = `rgba(0,0,0,${DIM_OVERLAY_OPACITY})`;
@@ -1319,19 +1408,19 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       exportCtx.restore();
     }
 
-  // 2) ➕ Overlay-Bilder (z. B. "Personal Images") zeichnen
-  // -> über dem Background (inkl. Dim), aber UNTER dem Text
+  
+  
   for (const n of overlayNodes) {
       const isGridImage = n.id.startsWith("canvas-grid-image-");
       let left: number, top: number, w: number, h: number;
       if (isGridImage) {
-        // Grid-Bilder: exakt auf Zellgröße
+        
         left = n.x;
         top = n.y;
         w = n.width;
         h = n.height;
       } else {
-        // Normale Overlays (Logos/Personal): contain-fit wie in der Preview
+        
         const nat = natSizeMap[n.id] || { w: 1, h: 1 };
         const f = fitContain(n.width, n.height, nat.w, nat.h);
         left = Math.round(n.x + f.x);
@@ -1353,21 +1442,21 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       });
     }
 
-    // 3) Text zeichnen (liegt ÜBER den Overlays)
-  // (… bestehender Text-Render-Code bleibt unverändert …)
+    
+  
     const sorted = [...textLayers].sort((a, b) => a.zIndex - b.zIndex);
     for (const layer of sorted) {
       if (!layer.content) continue;
 
-      // Check if background is enabled to adjust line height
+      
       const bgConfigCheck = layer.background;
       const bgEnabledCheck =
         (bgConfigCheck?.enabled ?? false) || (bgConfigCheck?.opacity ?? 0) > 0;
-      // For TikTok backgrounds: line-height 1.4 allows boxes to touch without gaps or overlap
-      // 1.4 = base 1.0 + 2 * 0.2em padding compensation
+      
+      
       const effectiveLineHeight = bgEnabledCheck ? 1.4 : (layer.lineHeight ?? 1.12);
 
-      // Text messen (liefert u.a. lines & widths)
+      
       const measure = measureWrappedText({
         text: String(layer.content ?? ""),
         fontFamily: layer.fontFamily ?? "Inter",
@@ -1396,7 +1485,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           ? layer.height
           : Math.max(
               1,
-              // computeAutoHeight(...) liefert bereits gerundete Höhe aus der DOM-Messung
+              
               computeAutoHeightForLayer(
                 { ...layer, italic: (layer as any).italic },
                 lines,
@@ -1430,7 +1519,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         x: boxLeft,
         y: boxTop,
         width: layer.width,
-        // exakt wie Preview: keine zusätzliche Descender-Reserve
+        
         height: layerHeight,
       };
 
@@ -1443,10 +1532,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       (exportCtx as any).fontKerning = "normal";
 
       exportCtx.fillStyle = layer.color;
-      // Exakt wie im Preview: Baseline auf "middle", damit die Zeilen mittig zur Zeilenhöhe ausgerichtet sind
+      
       exportCtx.textBaseline = TEXT_BASELINE as CanvasTextBaseline;
 
-      // benutze exakt die DOM-berechnete Line-Höhe (wie im Preview gemessen)
+      
       const lineMeasure = measureWrappedText({
         text: String(layer.content ?? ""),
         fontFamily: layer.fontFamily ?? "Inter",
@@ -1461,14 +1550,14 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         paddingPx: PADDING,
       });
       const lineHeightPx = lineMeasure.lineHeight;
-      // Baseline "middle": erste Zeile genau mittig in ihrer Box starten
+      
       let y = boxTop + PADDING + lineHeightPx / 2;
 
       const bgConfig = layer.background;
       const bgEnabled =
         (bgConfig?.enabled ?? false) || (bgConfig?.opacity ?? 0) > 0;
 
-      // Helper function to draw background box for a single line
+      
       const drawLineBackground = (
         lineText: string,
         lineY: number,
@@ -1490,7 +1579,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         );
         const fill = toCssColor(bgConfig?.color, bgConfig?.opacity);
 
-        // Measure the actual width of this specific line
+        
         exportCtx.save();
         exportCtx.font = `${italic ? "italic " : ""}${weight} ${BASE_FONT_PX}px ${layer.fontFamily}`;
 
@@ -1506,7 +1595,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           }
         }
 
-        // Calculate box position based on text alignment
+        
         const textW = Math.max(0, layer.width - 2 * PADDING);
         let boxX: number;
 
@@ -1515,7 +1604,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         } else if (layer.align === "right") {
           boxX = boxLeft + PADDING + textW - lineWidth - padX;
         } else {
-          // center
+          
           boxX = boxLeft + PADDING + (textW - lineWidth) / 2 - padX;
         }
 
@@ -1541,7 +1630,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         exportCtx.restore();
       };
 
-      // Keep backgroundRect for overflow calculations (use first line dimensions as approximation)
+      
       let backgroundRect: {
         x: number;
         y: number;
@@ -1665,7 +1754,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       exportCtx.clip();
 
-      // Hilfsfunktionen
+      
       const perGlyph = (
         cb: (ch: string, x: number, y: number) => void,
         text: string,
@@ -1701,7 +1790,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         const ox = off.getContext("2d")!;
 
         ox.font = exportCtx.font;
-        // Auch im Offscreen-Stroke identisches Baseline-Verhalten
+        
         ox.textBaseline = TEXT_BASELINE as CanvasTextBaseline;
 
         (ox as any).fontKerning = "normal";
@@ -1785,7 +1874,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       const drawFillLine = (raw: string, yPos: number) => {
         const textW = Math.max(0, layer.width - 2 * PADDING);
-        // Soft Shadow wie im Preview: "0 2px 8px rgba(0,0,0,0.8)"
+        
         exportCtx.save();
         exportCtx.shadowColor = "rgba(0,0,0,0.8)";
         exportCtx.shadowOffsetX = 0;
@@ -1828,11 +1917,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       for (const raw of lines) {
         if (y - (boxTop + PADDING) > contentHeight + 1) break;
-        // Draw background box for this line (TikTok-style: per-line boxes)
+        
         drawLineBackground(raw, y, lineHeightPx);
-        // Outline außen-only
+        
         drawOuterStrokeLine(raw, y);
-        // Normales Füllen
+        
         drawFillLine(raw, y);
         y += lineHeightPx;
       }
@@ -1841,7 +1930,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       exportCtx.restore();
     }
 
-    // (kein Overlay-Rendering mehr NACH dem Text – Overlays wurden bereits davor gezeichnet)
+    
 
     return new Promise<Blob>((resolve, reject) => {
       offscreenCanvas.toBlob(
@@ -1869,7 +1958,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     [textLayers, exportPNG, activeLayerId],
   );
 
-  // Render
+  
   const scaleFactor = previewSize.w / W;
   const active = textLayers.find((l) => l.id === activeLayerId) as
     | (TextLayer & {
@@ -1883,13 +1972,13 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     addNewTextLayer();
   }, [textLayers]);
 
-  // Nimmt Patches aus der Toolbar entgegen und mapped sie auf das aktive Layer
+  
   const handleToolbarPatch = useCallback(
     (patch: Partial<SlideTextElement>) => {
-      // 1) Hintergrund
+      
       if (patch.background) {
         applyToActive((l) => {
-          // Typisierung für Hintergrund-Werte, damit TS nicht mehr über '{}' meckert
+          
           type BgPatch = {
             opacity?: number;
             paddingX?: number;
@@ -1934,7 +2023,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         });
       }
 
-      // 2) Typografie / Layout
+      
       if (typeof patch.lineHeight === "number") {
         applyToActive((l) => ({ ...l, lineHeight: patch.lineHeight! }));
       }
@@ -1944,7 +2033,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       if (patch.align) {
         applyToActive((l) => ({ ...l, align: patch.align as any }));
       }
-      // Toolbar liefert "fontSize" → mappen auf scale (BASE_FONT_PX * scale)
+      
       if (
         typeof (patch as any).fontSize === "number" &&
         Number.isFinite((patch as any).fontSize)
@@ -1956,7 +2045,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         applyToActive((l) => ({ ...l, scale: nextScale }));
       }
 
-      // Farben
+      
       if (typeof (patch as any).fill === "string") {
         const c = (patch as any).fill as string;
         applyToActive((l) => ({ ...l, color: c }));
@@ -2002,12 +2091,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         }));
       }
 
-      // Bold / Italic (Toolbar nutzt fontWeight / fontStyle)
+      
       if (typeof (patch as any).fontWeight === "string") {
         const isBold = ((patch as any).fontWeight as string) === "bold";
         applyToActive((l) => ({ ...l, weight: isBold ? "bold" : "regular" }));
       }
-      // Support direct 'weight' (needed for Bold button in toolbar)
+      
       if (typeof (patch as any).weight === "string") {
         const w = (patch as any).weight as any;
         applyToActive((l) => ({
@@ -2023,7 +2112,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     [applyToActive],
   );
 
-  // --- UI-States: werden aus dem aktiven Layer gespiegelt ---
+  
   const [uiBold, setUiBold] = useState(false);
   const [uiItalic, setUiItalic] = useState(false);
   const [uiAlign, setUiAlign] = useState<"left" | "center" | "right">("left");
@@ -2060,7 +2149,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     }));
   };
 
-  // Werte synchronisieren, wenn aktiver Layer wechselt oder verändert wird
+  
   useEffect(() => {
     if (!active) return;
     const isBold = active.weight === "bold";
@@ -2090,7 +2179,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     textLayers,
   ]);
 
-  // Änderungen aus Inputs -> Layer + UI-State spiegeln
+  
   const handleScaleChange = (value: number) => {
     if (!Number.isFinite(value)) return;
     const s = Math.max(0.2, Math.min(4, value));
@@ -2109,7 +2198,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     setUiOutlineWidth(v);
     applyToActive((l) => ({ ...l, outlineEnabled: v > 0, outlineWidth: v }));
   };
-  // UI-Handler klar benennen, um Namenskollisionen mit den Canvas-Actions zu vermeiden
+  
   const setTextColorUI = (color: string) => {
     setUiTextColor(color);
     applyToActive((l) => ({ ...(l as any), color }));
@@ -2129,8 +2218,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
   return (
     <>
-      {/* === Toolbar-Bereich: Immer gerendert für konsistente Höhe === */}
-      {/* Wir messen die Canvas-Shell (wrapRef) und setzen diese Breite als maxWidth der Toolbar. */}
+      {}
+      {}
       <ToolbarSizedByCanvas wrapRef={wrapRef}>
         {showToolbar ? (
           <LegacyEditorToolbar
@@ -2141,8 +2230,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               active
                 ? ({
                     id: active.id,
-                    // Werte so liefern, wie die Toolbar sie erwartet:
-                    // fontSize = BASE_FONT_PX * scale
+                    
+                    
                     fontSize: Math.round(
                       BASE_FONT_PX *
                         (Number.isFinite(active.scale) ? active.scale : 1),
@@ -2150,16 +2239,16 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                     lineHeight: active.lineHeight,
                     letterSpacing: active.letterSpacing,
                     align: active.align,
-                    // Farbe(n)
-                    // Toolbar liest 'fill' für Textfarbe
+                    
+                    
                     fill: (active as any).color ?? TIKTOK_TEXT_COLOR,
-                    // Toolbar liest 'stroke' + 'strokeWidth' für Kontur
+                    
                     stroke:
                       (active as any).outlineColor ?? TIKTOK_OUTLINE_COLOR,
                     outlineColor:
                       (active as any).outlineColor ?? TIKTOK_OUTLINE_COLOR,
                     strokeWidth: (active as any).outlineWidth ?? 0,
-                    // Bold / Italic
+                    
                     fontWeight:
                       active.weight === "bold"
                         ? ("bold" as any)
@@ -2167,7 +2256,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                     fontStyle: (active as any).italic
                       ? ("italic" as any)
                       : ("normal" as any),
-                    // Hintergrund
+                    
                     background: active.background,
                   } as unknown as SlideTextElement)
                 : null
@@ -2175,9 +2264,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             onChangeSelectedText={handleToolbarPatch}
             onClose={onCloseToolbar}
           >
-            {/* === BEGIN: LEGACY CONTROLS (NEU ANGERICHTET) === */}
+            {}
 
-            {/* --- ZEILE 1: Typo & Ausrichtung & Größe --- */}
+            {}
             <div className="flex items-center gap-2">
               <button
                 onClick={toggleBoldUI}
@@ -2209,7 +2298,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               </button>
             </div>
 
-            {/* Ausrichtung mit "mehrzeiligen" Icons */}
+            {}
             <div
               className="flex items-center gap-2"
               aria-label="Textausrichtung"
@@ -2258,7 +2347,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               </button>
             </div>
 
-            {/* Größe × (Scale) */}
+            {}
             <div className="flex items-center gap-2">
               <label className="text-xs text-muted-foreground">Größe ×</label>
               <input
@@ -2274,11 +2363,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               />
             </div>
 
-            {/* Zeilenumbruch zu Zeile 2 */}
+            {}
             <div className="basis-full h-0" />
 
-            {/* --- ZEILE 2: Abstände & Farben --- */}
-            {/* Zeilenhöhe (Input) */}
+            {}
+            {}
             <div className="flex items-center gap-2">
               <label className="text-xs text-muted-foreground">
                 Zeilenhöhe
@@ -2294,7 +2383,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               />
             </div>
 
-            {/* Kontur-Schalter */}
+            {}
             <div className="flex items-center gap-2">
               <label className="text-xs text-muted-foreground">Kontur an</label>
               <input
@@ -2305,7 +2394,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               />
             </div>
 
-            {/* Konturbreite (Slider) */}
+            {}
             <div className="flex items-center gap-2">
               <label className="text-xs text-muted-foreground">
                 Konturbreite
@@ -2322,7 +2411,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               />
             </div>
 
-            {/* Textfarbe */}
+            {}
             <div className="flex items-center gap-2">
               <label className="text-xs text-muted-foreground">Text</label>
               <input
@@ -2333,7 +2422,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               />
             </div>
 
-            {/* Konturfarbe */}
+            {}
             <div className="flex items-center gap-2">
               <label className="text-xs text-muted-foreground">Kontur</label>
               <input
@@ -2345,15 +2434,15 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               />
             </div>
 
-            {/* === END: LEGACY CONTROLS === */}
+            {}
           </LegacyEditorToolbar>
         ) : (
-          // Leerer Platzhalter, damit alle Slides die gleiche Höhe haben
+          
           <div className="w-full" />
         )}
       </ToolbarSizedByCanvas>
 
-      {/* Canvas-Shell */}
+      {}
       <div
         ref={wrapRef}
         className="slide-shell relative mx-auto overflow-hidden border shadow-lg select-none bg-[#00B140]"
@@ -2364,7 +2453,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           aspectRatio: "9 / 16",
           touchAction: "none",
           userSelect: "none",
-          // ❗ Harte Sperre aller Pointer-Events, wenn readOnly=true
+          
           pointerEvents: readOnly ? "none" : "auto",
         }}
         onPointerDown={onBGPointerDown}
@@ -2402,18 +2491,18 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                   try {
                     const n = e.currentTarget as HTMLImageElement;
                     setImageNatural({ w: n.naturalWidth, h: n.naturalHeight });
-                    // Cover-Mode: Bild füllt Canvas komplett (nicht contain)
+                    
                     const coverScale = Math.max(
                       W / n.naturalWidth,
                       H / n.naturalHeight,
                     );
                     setScale(coverScale);
-                    // Offset auf 0 setzen für zentriertes Bild
+                    
                     setOffset({ x: 0, y: 0 });
                   } catch {}
                 }}
               />
-              {/* Hintergrund-Overlay deaktiviert - Bild ist fixiert */}
+              {}
               {false && bgSelected && imageNatural && (
                 <div
                   className="absolute left-1/2 top-1/2 pointer-events-none"
@@ -2436,7 +2525,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             <div className="absolute inset-0 bg-black" />
           )}
 
-          {/* Per-slide dim overlay: liegt ÜBER dem Background <img>, aber UNTER allen Overlays/Text */}
+          {}
           {dimBg && (
             <div
               className="absolute inset-0 pointer-events-none"
@@ -2444,13 +2533,12 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             />
           )}
 
-          {/* ➕ Overlay-Images (klick-selektierbar & dragbar)
-              Selektionsrahmen entspricht exakt dem sichtbaren (contain-gefitteten) Bild */}
+          {}
           {overlayNodes.map((node) => {
             const isActive = activeLayerId === node.id;
             const isGridImage = node.id.startsWith("canvas-grid-image-");
 
-            // Grid-Bilder: Direkt auf exakte Zellgröße skalieren
+            
             if (isGridImage) {
               return (
                 <div
@@ -2498,7 +2586,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               );
             }
 
-            // Für andere Overlay-Bilder (z.B. Logos) fitContain verwenden
+            
             const nat = natSizeMap[node.id] || { w: 1, h: 1 };
             const fit = fitContain(node.width, node.height, nat.w, nat.h);
             const left = Math.round(fit.x);
@@ -2563,7 +2651,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                   ? 600
                   : 400;
             const background = layer.background;
-            // Kein Toggle mehr nötig: Opazität steuert Sichtbarkeit
+            
             const bgEnabled =
               (background?.enabled ?? false) || (background?.opacity ?? 0) > 0;
             const bgPadX = Math.max(
@@ -2583,7 +2671,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
             return (
               <div key={layer.id}>
-                {/* TEXT-BOX (border-box) */}
+                {}
                 <div
                   data-role="text-layer"
                   className={`absolute rounded-lg ${isActive ? "ring-2 ring-blue-500/80" : ""} ${isCurrentEditing ? "ring-2 ring-green-500/90" : ""} shadow-sm`}
@@ -2603,15 +2691,15 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                       : "transparent",
                   }}
                   onPointerDown={(e) => {
-                    // Im Editor-Modus keine Pointer-Blockade → Mausplatzierung/Markieren funktioniert
+                    
                     if (isCurrentEditing) return;
-                    // Klick auf Text → Bild-Selektion aufheben, Scroll-Zoom hat dann KEINE Wirkung
+                    
                     setBgSelected(false);
                     selectLayer(layer.id, e);
                   }}
                   onDoubleClick={() => onDoubleClick(layer.id)}
                 >
-                  {/* === Edge guide lines that follow the box (inside the same transform) === */}
+                  {}
                   {isActive && !isCurrentEditing && (
                     <>
                       <div
@@ -2658,7 +2746,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                           fontStyle: (layer as any).italic
                             ? "italic"
                             : "normal",
-                          lineHeight: bgEnabled ? 1.4 : layer.lineHeight, // TikTok: 1.4 for seamless box connection
+                          lineHeight: bgEnabled ? 1.4 : layer.lineHeight, 
                           letterSpacing: `${layer.letterSpacing}px`,
                           textAlign: layer.align as any,
                           whiteSpace: "pre-wrap",
@@ -2666,13 +2754,13 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                           overflowWrap: "normal",
                           boxSizing: "border-box",
                           fontKerning: "normal" as any,
-                          /* TikTok-style per-line backgrounds (only visible when bgEnabled) */
+                          
                           ...(bgEnabled ? {
-                            padding: "0.2em 0.4em", // TikTok standard padding
-                            borderRadius: bgMode === "blob" ? "0.45em" : "0.3em", // TikTok standard: 0.3em
+                            padding: "0.2em 0.4em", 
+                            borderRadius: bgMode === "blob" ? "0.45em" : "0.3em", 
                             backgroundColor: bgColor,
                           } : {}),
-                          /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
+                          
                           textShadow:
                             (layer as any).outlineEnabled &&
                             ((layer as any).outlineWidth || 0) > 0
@@ -2697,7 +2785,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                             ? "italic"
                             : "normal",
                           textAlign: layer.align,
-                          lineHeight: bgEnabled ? 1.4 : layer.lineHeight, // TikTok: 1.4 for seamless box connection
+                          lineHeight: bgEnabled ? 1.4 : layer.lineHeight, 
                           letterSpacing: `${layer.letterSpacing}px`,
                           whiteSpace: "pre-wrap",
                           wordBreak: "normal",
@@ -2710,15 +2798,15 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                           style={{
                             color: layer.color,
                             display: "inline",
-                            /* TikTok-style per-line backgrounds */
+                            
                             ...(bgEnabled ? {
                               background: bgColor,
-                              padding: "0.2em 0.4em", // TikTok standard: 0.2em vertical, 0.4em horizontal
-                              borderRadius: bgMode === "blob" ? "0.45em" : "0.3em", // TikTok standard: 0.3em
+                              padding: "0.2em 0.4em", 
+                              borderRadius: bgMode === "blob" ? "0.45em" : "0.3em", 
                               boxDecorationBreak: "clone" as any,
                               WebkitBoxDecorationBreak: "clone" as any,
                             } : {}),
-                            /* nur außen: Outline-Ring + bestehender Soft-Shadow kombiniert */
+                            
                             textShadow:
                               (layer as any).outlineEnabled &&
                               ((layer as any).outlineWidth || 0) > 0
@@ -2737,13 +2825,13 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                       </div>
                     )}
                   </div>
-                  {/* === Handles (größer + modernere Hitbox) INSIDE der Box === */}
+                  {}
                   {isActive && !isCurrentEditing && (
                     <div
                       className="absolute inset-0 overflow-visible"
                       style={{ pointerEvents: "none", overflow: "visible" }}
                     >
-                      {/* ---- Ecken (größere Handles) ---- */}
+                      {}
                       <div
                         data-role="handle"
                         title="Größe proportional ändern"
@@ -2789,7 +2877,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                         <div className="h-8 w-8 rounded-full bg-white border border-blue-500 shadow-sm pointer-events-none" />
                       </div>
 
-                      {/* ---- Seiten (größere Balken-Handles) ---- */}
+                      {}
                       <div
                         data-role="handle"
                         title="Breite ändern (links)"
@@ -2856,19 +2944,19 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           />
         </div>
 
-        {/* Overlay Content (z.B. Edit-Buttons) */}
+        {}
         {overlayContent && (
           <div className="absolute inset-0 z-50">{overlayContent}</div>
         )}
       </div>
-      {/* ^ obere Canvas-Hülle */}
+      {}
     </>
   );
 });
 
 export default SlideCanvas;
 
-// ---------- Helper: Toolbar an Canvas-Breite koppeln ----------
+
 function ToolbarSizedByCanvas({
   wrapRef,
   children,
@@ -2886,7 +2974,7 @@ function ToolbarSizedByCanvas({
       if (rect?.width) setMaxW(Math.max(0, Math.floor(rect.width)));
     });
     ro.observe(el);
-    // Initial messen
+    
     setMaxW(el.getBoundingClientRect?.().width || undefined);
     return () => ro.disconnect();
   }, [wrapRef]);
@@ -2897,7 +2985,7 @@ function ToolbarSizedByCanvas({
       style={{
         display: "flex",
         justifyContent: "center",
-        minHeight: "120px", // Feste Höhe für den Platzhalter (angepasst an Toolbar-Höhe)
+        minHeight: "120px", 
       }}
     >
       <div

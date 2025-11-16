@@ -16,11 +16,11 @@ import { Skeleton } from "../ui/skeleton";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 export function getInitials(name: string): string {
-  // Split the name by spaces to get individual words
+  
   const words = name.split(" ");
-  // Map over the words array, extracting the first letter of each word and converting it to uppercase
+  
   const initials = words.map((word) => word.charAt(0).toUpperCase());
-  // Join the initials into a single string
+  
   return initials.join("");
 }
 

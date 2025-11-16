@@ -14,7 +14,7 @@ export function ArrowItemStatic(
 
   return (
     <div className={cn("group/arrow-item relative mb-2 ml-4 flex  gap-6")}>
-      {/* Chevron icon column */}
+      {}
       <div className="flex h-full basis-24 shrink-0 items-center justify-center">
         <svg className="relative -top-4 z-50 aspect-square overflow-visible">
           <path
@@ -28,7 +28,7 @@ export function ArrowItemStatic(
         </svg>
       </div>
 
-      {/* Content column */}
+      {}
       <SlateElement {...props}>{props.children}</SlateElement>
     </div>
   );

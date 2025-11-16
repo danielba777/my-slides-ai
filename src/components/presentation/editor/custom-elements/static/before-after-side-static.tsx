@@ -11,7 +11,7 @@ export function BeforeAfterSideStatic(props: SlateElementProps) {
   const index = (path?.at(-1) as number) ?? 0;
   const gridColumn = index % 2 === 0 ? 1 : 3;
 
-  // Get parent element for color
+  
   const parentPath = PathApi.parent(path);
   const parentElement = NodeApi.get(props.editor, parentPath);
 

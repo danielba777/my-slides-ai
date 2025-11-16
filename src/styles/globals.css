@@ -58,7 +58,7 @@
 
 @layer base {
   :root {
-    --background: 60 13% 95%; /* #F3F4EF */
+    --background: 60 13% 95%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 3.9%;
@@ -83,7 +83,7 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
-    --sidebar-background: 60 11% 91%; /* #EEEFE8 */
+    --sidebar-background: 60 11% 91%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 0 0% 100%;
     --sidebar-primary-foreground: 240 5.9% 10%;
@@ -138,23 +138,20 @@
   }
 }
 
-/* Smooth scrolling for anchor links */
 html {
   scroll-behavior: smooth;
 }
 
-/* If you have a fixed navbar, this helps with margin-offset when scrolling */
 [id] {
-  scroll-margin-top: 96px; /* adjust to your navbar height */
+  scroll-margin-top: 96px;
 }
 
-/* z. B. in globals.css */
+
 .svg-deco,
 .svg-deco svg * {
   fill: #444577 !important;
 }
 
-/* Center all text in Plate.js editor elements */
 [data-slate-editor="true"] h1,
 [data-slate-editor="true"] h2,
 [data-slate-editor="true"] h3,
@@ -165,7 +162,6 @@ html {
   text-align: center !important;
 }
 
-/* Also center in static/preview mode */
 [data-slate-node="element"][data-slate-type="h1"],
 [data-slate-node="element"][data-slate-type="h2"],
 [data-slate-node="element"][data-slate-type="h3"],

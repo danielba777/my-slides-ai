@@ -17,7 +17,7 @@ export default function SettingsDemoVideos() {
   const [demos, setDemos] = useState<DemoVideo[]>([]);
   const [state, setState] = useState<DemoState>("loading");
   const [uploading, setUploading] = useState(false);
-  // Client-seitig generierte Poster (erstes Frame)
+  
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
 
   const { startUpload } = useUploadThing("editorUploader");
@@ -26,7 +26,7 @@ export default function SettingsDemoVideos() {
     void loadDemos();
   }, []);
 
-  // Hilfsfunktion: erstes Frame als DataURL erzeugen
+  
   const generateFirstFrame = async (url: string): Promise<string> => {
     return new Promise((resolve, reject) => {
       try {
@@ -38,10 +38,10 @@ export default function SettingsDemoVideos() {
         video.playsInline = true;
         const onLoaded = async () => {
           try {
-            // auf 0s seeken; manche Browser feuern erst nach ready
+            
             video.currentTime = 0;
           } catch {
-            /* noop */
+            
           }
         };
         const onSeeked = () => {
@@ -54,12 +54,12 @@ export default function SettingsDemoVideos() {
           resolve(canvas.toDataURL("image/jpeg", 0.8));
           video.removeEventListener("loadeddata", onLoaded);
           video.removeEventListener("seeked", onSeeked);
-          // Aufräumen
+          
           video.src = "";
         };
         video.addEventListener("loadeddata", onLoaded, { once: true });
         video.addEventListener("seeked", onSeeked, { once: true });
-        // Fallback: falls 'seeked' nicht kommt
+        
         setTimeout(() => {
           if (video.readyState >= 2) {
             onSeeked();
@@ -71,7 +71,7 @@ export default function SettingsDemoVideos() {
     });
   };
 
-  // Für Demos ohne thumbnailUrl ein Poster generieren
+  
   useEffect(() => {
     const run = async () => {
       const items = demos.filter(
@@ -82,12 +82,12 @@ export default function SettingsDemoVideos() {
           const dataUrl = await generateFirstFrame(d.videoUrl!);
           setThumbs((prev) => ({ ...prev, [d.id]: dataUrl }));
         } catch {
-          // Ignorieren – dann bleibt der Platzhalter
+          
         }
       }
     };
     if (demos.length > 0) void run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [demos]);
 
   const loadDemos = async () => {
@@ -136,7 +136,7 @@ export default function SettingsDemoVideos() {
       if (!uploadedUrl) {
         throw new Error("Upload failed");
       }
-      // Save as user demo directly
+      
       const response = await fetch("/api/ugc/demos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -186,7 +186,7 @@ export default function SettingsDemoVideos() {
     <div className="space-y-6 px-1 sm:px-2 lg:px-0">
       <Card className="rounded-2xl border bg-card shadow-sm">
         <CardContent className="p-6 md:p-8">
-          {/* Header wie „Personal" */}
+          {}
           <div className="mb-2">
             <h2 className="text-xl md:text-2xl font-semibold">Demo Videos</h2>
             <p className="text-sm text-muted-foreground">
@@ -202,7 +202,7 @@ export default function SettingsDemoVideos() {
             </Badge>
           </div>
 
-          {/* Tile view similar to Hook+Demo (slightly larger) */}
+          {}
           {state === "loading" ? (
             <div className="flex h-28 items-center justify-center">
               <Spinner className="h-6 w-6" />
@@ -216,7 +216,7 @@ export default function SettingsDemoVideos() {
                     className="group relative aspect-[9/16] h-[180px] overflow-hidden rounded-xl border bg-black text-white"
                     title={demo.name || "Demo"}
                   >
-                    {/* Immer ein Thumbnail zeigen: DB-Thumbnail oder clientseitig generiertes erstes Frame */}
+                    {}
                     {(demo as any).thumbnailUrl || thumbs[demo.id] ? (
                       <img
                         src={(demo as any).thumbnailUrl || thumbs[demo.id]}
@@ -228,7 +228,7 @@ export default function SettingsDemoVideos() {
                         Loading…
                       </div>
                     )}
-                    {/* Delete & External Link */}
+                    {}
                     <div className="absolute inset-x-2 bottom-2 flex items-center justify-between gap-2">
                       <a
                         href={demo.videoUrl}
@@ -251,7 +251,7 @@ export default function SettingsDemoVideos() {
                   </div>
                 ))}
 
-                {/* Upload placeholder tile */}
+                {}
                 <button
                   type="button"
                   onClick={handleSelectFile}
@@ -271,7 +271,7 @@ export default function SettingsDemoVideos() {
         </CardContent>
       </Card>
 
-      {/* No second list below the card needed */}
+      {}
       {state === "loading" ? (
         <div className="flex items-center justify-center py-10">
           <Spinner className="h-8 w-8" />

@@ -1,4 +1,4 @@
-// components/export-ppt-button.tsx
+
 "use client";
 
 import { exportPresentation } from "@/app/_actions/presentation/exportPresentationActions";
@@ -36,7 +36,7 @@ export function ExportButton({
     try {
       setIsExporting(true);
 
-      // Build theme colors to pass to server (always use LIGHT palette for PPT)
+      
       const themeColors = (() => {
         if (customThemeData) {
           const colors = customThemeData.colors.light;
@@ -73,7 +73,7 @@ export function ExportButton({
       );
 
       if (result.success && result.data) {
-        // Create blob from base64 data
+        
         const byteCharacters = atob(result.data);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -84,7 +84,7 @@ export function ExportButton({
           type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         });
 
-        // Create download link
+        
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
@@ -92,7 +92,7 @@ export function ExportButton({
         document.body.appendChild(link);
         link.click();
 
-        // Clean up
+        
         URL.revokeObjectURL(url);
         document.body.removeChild(link);
 

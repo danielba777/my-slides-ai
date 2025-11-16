@@ -1,4 +1,4 @@
-// src/server/vendors/fal.ts
+
 import { fal } from "@fal-ai/client";
 
 function ensureFalKey() {
@@ -11,7 +11,7 @@ function ensureFalKey() {
   return key;
 }
 
-// Einmalig konfigurieren (keine baseUrl überschreiben!)
+
 export function getFal() {
   const key = ensureFalKey();
   fal.config({ credentials: key });
@@ -21,17 +21,17 @@ export function getFal() {
 export type PikaImageToVideoInput = {
   image_url: string;
   prompt: string;
-  duration?: number; // default 5
+  duration?: number; 
   resolution?: "720p" | "1080p";
   aspect_ratio?: "16:9" | "9:16" | "1:1" | "4:5" | "5:4" | "3:2" | "2:3";
   mode?: "std" | "pro";
 };
 
-// Ein Helper, den du überall serverseitig aufrufen kannst
+
 export async function pikaImageToVideo(input: PikaImageToVideoInput) {
   const sdk = getFal();
 
-  // Minimalvalidierung
+  
   if (!input?.image_url) throw new Error("image_url fehlt");
   if (!input?.prompt) throw new Error("prompt fehlt");
 
@@ -48,17 +48,17 @@ export async function pikaImageToVideo(input: PikaImageToVideoInput) {
     },
     logs: true,
     onQueueUpdate: (update) => {
-      // optional: Logs in Server-Konsole sichtbar machen
+      
       if (update.status === "IN_PROGRESS" && Array.isArray(update.logs)) {
         for (const log of update.logs) console.log("[fal][pika]", log.message);
       }
     },
   });
 
-  // Erfolgsformat laut Doku: result.data.video.url
+  
   const videoUrl = result?.data?.video?.url as string | undefined;
   if (!videoUrl) {
-    // bessere Fehlermeldung für typische Fälle
+    
     throw new Error(
       "Pika hat kein 'video.url' geliefert. Prüfe Input (image_url/prompt) oder Fal-Dashboard Logs.",
     );
@@ -66,8 +66,8 @@ export async function pikaImageToVideo(input: PikaImageToVideoInput) {
   return { requestId: result.requestId, videoUrl };
 }
 
-// ---- Abwärtskompatibler Wrapper für bestehende Aufrufer ----
-// Signatur wie früher: createPikaImageToVideo(imageUrl, prompt, { durationSeconds, resolution, aspectRatio, mode })
+
+
 export async function createPikaImageToVideo(
   imageUrl: string,
   prompt: string,
@@ -83,7 +83,7 @@ export async function createPikaImageToVideo(
     prompt,
     duration: Math.min(Math.max(opts?.durationSeconds ?? 5, 1), 10),
     resolution: opts?.resolution ?? "720p",
-    // Pika v2.2 image-to-video ignoriert aspect_ratio/mode häufig; wir reichen sie durch, falls Fal sie künftig nutzt.
+    
     aspect_ratio: opts?.aspectRatio ?? "9:16",
     mode: opts?.mode ?? "std",
   });

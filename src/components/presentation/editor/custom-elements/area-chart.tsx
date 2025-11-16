@@ -84,7 +84,7 @@ export default function AreaChartElement(props: PlateElementProps<TChartNode>) {
             <ChartTooltip content={<ChartTooltipContent />} />
           </AreaChart>
         </ChartContainer>
-        {/* non-editable */}
+        {}
       </div>
     </PlateElement>
   );

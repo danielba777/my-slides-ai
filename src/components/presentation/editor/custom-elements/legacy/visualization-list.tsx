@@ -9,7 +9,7 @@ import { type TTimelineGroupElement } from "../../plugins/timeline-plugin";
 import ArrowList from "../arrow-list";
 import Pyramid from "../pyramid";
 import Timeline from "../timeline";
-// Main visualization list component with withRef pattern
+
 export const VisualizationListElement = ({
   element,
   className,

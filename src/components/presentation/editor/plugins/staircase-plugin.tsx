@@ -4,7 +4,7 @@ import Staircase from "../custom-elements/staircase";
 import { StairItem } from "../custom-elements/staircase-item";
 import { STAIR_ITEM, STAIRCASE_GROUP } from "../lib";
 
-// Create plugin for staircase group (container)
+
 export const StaircaseGroupPlugin = createTPlatePlugin({
   key: STAIRCASE_GROUP,
   node: {
@@ -18,7 +18,7 @@ export const StaircaseGroupPlugin = createTPlatePlugin({
   },
 });
 
-// Create plugin for stair item
+
 export const StairItemPlugin = createTPlatePlugin({
   key: STAIR_ITEM,
   node: {
@@ -29,10 +29,10 @@ export const StairItemPlugin = createTPlatePlugin({
   },
 });
 
-// Type definitions
+
 export interface TStairGroupElement extends TElement {
   type: typeof STAIRCASE_GROUP;
-  totalChildren?: number; // Store the count on the staircase element
+  totalChildren?: number; 
 }
 
 export interface TStairItemElement extends TElement {

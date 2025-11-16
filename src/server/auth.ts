@@ -39,7 +39,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         token.isAdmin = user.role === "ADMIN";
       }
 
-      // Handle updates
+      
       if (trigger === "update" && (session as Session)?.user) {
         const user = await db.user.findUnique({
           where: { id: token.id as string },

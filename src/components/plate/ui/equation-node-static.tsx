@@ -38,7 +38,7 @@ export function EquationElementStatic(
       >
         {element.texExpression.length > 0 ? (
           <span
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: This is safe
+            
             dangerouslySetInnerHTML={{
               __html: html,
             }}
@@ -91,7 +91,7 @@ export function InlineEquationElementStatic(
             props.element.texExpression.length === 0 && "hidden",
             "font-mono leading-none",
           )}
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: This is safe
+          
           dangerouslySetInnerHTML={{ __html: html }}
         />
       </div>

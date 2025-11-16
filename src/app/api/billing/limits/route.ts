@@ -8,6 +8,5 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const limits = await getUsageLimits(session.user.id);
-  // Diese Werte sind NUR für Buttons/Preflights gedacht.
   return NextResponse.json(limits);
 }

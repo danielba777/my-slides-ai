@@ -14,7 +14,7 @@ interface GenerateFromTemplateRequest {
   slides: Slide[];
   language: string;
   tone?: string;
-  variety?: number; // 0-100: how much content should differ from template
+  variety?: number; 
 }
 
 const xmlGenerationTemplate = `You are an expert at creating TikTok slideshows based on templates.
@@ -136,7 +136,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Sort slides by index
+    
     const sortedSlides = [...slides].sort(
       (a, b) => (a.slideIndex ?? 0) - (b.slideIndex ?? 0),
     );
@@ -159,7 +159,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Step 1: Use OpenAI Vision API to extract text from all slides
+    
     const visionContent: Array<
       | { type: "text"; text: string }
       | { type: "image_url"; image_url: { url: string; detail?: string } }
@@ -186,7 +186,7 @@ Continue for all ${imageUrls.length} slides. Extract the text EXACTLY as it appe
       },
     ];
 
-    // Add all slide images
+    
     for (const url of imageUrls) {
       visionContent.push({
         type: "image_url",
@@ -197,7 +197,7 @@ Continue for all ${imageUrls.length} slides. Extract the text EXACTLY as it appe
       });
     }
 
-    // Call OpenAI Vision API to extract text
+    
     const openaiApiKey = process.env.OPENAI_API_KEY;
     if (!openaiApiKey) {
       return NextResponse.json(
@@ -223,7 +223,7 @@ Continue for all ${imageUrls.length} slides. Extract the text EXACTLY as it appe
               content: visionContent,
             },
           ],
-          max_tokens: 4000, // Increased for longer text extraction
+          max_tokens: 4000, 
         }),
       },
     );
@@ -266,7 +266,7 @@ Continue for all ${imageUrls.length} slides. Extract the text EXACTLY as it appe
       );
     }
 
-    // Check if the response indicates inability to process images
+    
     if (
       extractedText.toLowerCase().includes("unable to extract") ||
       extractedText.toLowerCase().includes("cannot extract") ||
@@ -286,7 +286,7 @@ Continue for all ${imageUrls.length} slides. Extract the text EXACTLY as it appe
       );
     }
 
-    // Step 2: Use the extracted text to generate XML presentation
+    
     const currentDate = new Date().toLocaleDateString("en-US", {
       weekday: "long",
       year: "numeric",
@@ -294,7 +294,7 @@ Continue for all ${imageUrls.length} slides. Extract the text EXACTLY as it appe
       day: "numeric",
     });
 
-    // Generate variety-based instructions
+    
     let varietyInstructions = "";
     if (variety === 0) {
       varietyInstructions = "Recreate each slide in XML format, preserving the EXACT text content from the original. Copy the wording word-for-word.";
@@ -304,7 +304,7 @@ Continue for all ${imageUrls.length} slides. Extract the text EXACTLY as it appe
       varietyInstructions = "Create a slideshow with MODERATE changes. Keep the same topics and structure but rewrite about 50% of the content with new wording. The message should be similar but expressed differently.";
     } else if (variety === 75) {
       varietyInstructions = "Create a slideshow with SIGNIFICANT differences. Use the extracted text as inspiration but change most of the content (75%). Keep the same structure and number of slides, but present the information in a notably different way.";
-    } else { // variety === 100
+    } else { 
       varietyInstructions = "Create a COMPLETELY DIFFERENT slideshow. Use the extracted text only to understand the structure (how many slides, what elements per slide). Generate entirely new content on a different topic, but maintain the exact same structure (same number of slides, same H1/P layout per slide).";
     }
 
@@ -343,7 +343,7 @@ Continue for all ${imageUrls.length} slides. Extract the text EXACTLY as it appe
       },
     });
 
-    // Use toTextStreamResponse instead of toDataStreamResponse to return plain text
+    
     return result.toTextStreamResponse();
   } catch (error) {
     console.error("Error in template-based presentation generation:", error);

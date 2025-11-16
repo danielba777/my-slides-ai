@@ -107,8 +107,8 @@ export default function FileUpload({
     };
   };
 
-  // feel free to mode all these functions to separate utils
-  // here is just for simplicity
+  
+  
 
   const removeFile = (file: File) => {
     setFiles((prevUploadProgress) => {
@@ -161,7 +161,7 @@ export default function FileUpload({
           case "mov":
             acc["video/quicktime"] = [".mov"];
             break;
-          // Add more cases for other file types as needed
+          
         }
         return acc;
       },

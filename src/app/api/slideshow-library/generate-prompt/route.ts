@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prepare the image URLs for analysis
+    
     const imageUrls = slides
       .filter((slide) => slide.imageUrl)
       .sort((a, b) => (a.slideIndex ?? 0) - (b.slideIndex ?? 0))
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call OpenAI Vision API to analyze the slides
+    
     const openaiApiKey = process.env.OPENAI_API_KEY;
     if (!openaiApiKey) {
       console.error("OPENAI_API_KEY is not configured");
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the messages for the vision API
+    
     const content: Array<
       | { type: "text"; text: string }
       | { type: "image_url"; image_url: { url: string; detail?: string } }
@@ -93,7 +93,7 @@ Example 3: I want 7 slides about 'romantic promises' with the first slide text s
       },
     ];
 
-    // Add all slide images
+    
     for (const url of imageUrls) {
       content.push({
         type: "image_url",
@@ -153,7 +153,7 @@ Example 3: I want 7 slides about 'romantic promises' with the first slide text s
       );
     }
 
-    // Save the prompt to the backend
+    
     const apiBaseUrl = env.SLIDESCOCKPIT_API;
     const saveResponse = await fetch(
       `${apiBaseUrl}/slideshow-library/posts/${postId}/prompt`,
@@ -168,7 +168,7 @@ Example 3: I want 7 slides about 'romantic promises' with the first slide text s
 
     if (!saveResponse.ok) {
       console.error("Failed to save prompt to backend");
-      // Continue anyway, we can still return the prompt to the user
+      
     }
 
     return NextResponse.json({ prompt: generatedPrompt });

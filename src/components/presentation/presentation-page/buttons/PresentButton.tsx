@@ -14,7 +14,7 @@ export function PresentButton() {
     (s) => s.isGeneratingOutline,
   );
 
-  // Check if generation is in progress
+  
   const isGenerating = isGeneratingPresentation || isGeneratingOutline;
 
   return (

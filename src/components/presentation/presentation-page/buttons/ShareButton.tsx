@@ -44,7 +44,7 @@ export function ShareButton() {
     onSuccess: (_data, variables) => {
       setIsPublic(variables);
       if (variables) {
-        // Create share link
+        
         const baseUrl = window.location.origin;
         const shareUrl = `${baseUrl}/presentation/share/${currentPresentationId}`;
         setShareLink(shareUrl);
@@ -75,7 +75,7 @@ export function ShareButton() {
       setCopied(true);
       toast.success("Link copied to clipboard!");
 
-      // Reset the copied state after 2 seconds
+      
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("Failed to copy link");

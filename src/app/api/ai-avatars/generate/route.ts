@@ -17,14 +17,14 @@ async function ensureUserExists(userId: string, session: any) {
   });
 
   if (!existingUser) {
-    // Create user in database
+    
     await db.user.create({
       data: {
         id: userId,
         name: session.user.name,
         email: session.user.email,
         image: session.user.image,
-        hasAccess: true, // Give new users access by default
+        hasAccess: true, 
       },
     });
   }
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 
     const userId = session.user.id;
 
-    // Ensure user exists in database
+    
     await ensureUserExists(userId, session);
 
     const { prompt, styleId, quality } = (await request.json()) as {
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
       quality === "high" || quality === "basic" ? quality : "high";
     const apiKey = env.THREE02_AI_KEY;
 
-    // DEBUG: Log environment variable status
+    
     console.log("[AI Avatar DEBUG] THREE02_AI_KEY status:", {
       exists: apiKey !== undefined,
       isEmpty: apiKey === "",
@@ -150,7 +150,7 @@ async function processGenerationJob({
 }) {
   const randomSeed = Math.floor(Math.random() * 1_000_000);
   const creditCost = quality === "basic" ? 1 : 2;
-  // Vor Start atomar Credits abziehen (1 bei basic, 2 bei high)
+  
   try {
     await ensureAndConsumeCredits(userId, { kind: "ai", cost: creditCost });
   } catch (e: any) {
@@ -428,7 +428,7 @@ async function downloadImageWithRetry(url: string, maxRetries = 3): Promise<Arra
         throw new Error(`Failed to download image after ${maxRetries} attempts (last status: ${response.status})`);
       }
 
-      // Wait before retry (exponential backoff)
+      
       await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
 
     } catch (error) {
@@ -436,7 +436,7 @@ async function downloadImageWithRetry(url: string, maxRetries = 3): Promise<Arra
       if (attempt === maxRetries) {
         throw error;
       }
-      // Wait before retry
+      
       await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
     }
   }
@@ -458,7 +458,7 @@ async function persistGeneratedImage({
   userId: string;
   jobId: string;
 }): Promise<PersistedImage> {
-  // Download the image first with retry logic
+  
   let imageBuffer: ArrayBuffer;
   try {
     imageBuffer = await downloadImageWithRetry(sourceUrl);
@@ -477,7 +477,7 @@ async function persistGeneratedImage({
     }
   }
 
-  // Send to API with image buffer
+  
   const formData = new FormData();
   formData.append('prompt', prompt);
   formData.append('rawImageUrl', rawImageUrl || '');

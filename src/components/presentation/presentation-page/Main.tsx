@@ -51,7 +51,7 @@ export default function PresentationPage() {
   const setLanguage = usePresentationState((s) => s.setLanguage);
   const setImageSetId = usePresentationState((s) => s.setImageSetId);
   const theme = usePresentationState((s) => s.theme);
-  // Track the theme value as it exists in the database to avoid redundant saves on hydration
+  
   const dbThemeRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -64,7 +64,7 @@ export default function PresentationPage() {
     console.log("Current Slide Index", currentSlideIndex);
   }, [currentSlideIndex]);
 
-  // Use React Query to fetch presentation data
+  
   const { data: presentationData, isLoading } = useQuery({
     queryKey: ["presentation", id],
     queryFn: async () => {
@@ -77,7 +77,7 @@ export default function PresentationPage() {
     enabled: !!id && !isGeneratingPresentation && shouldFetchData,
   });
 
-  // Create a debounced function to update the theme in the database
+  
   const debouncedThemeUpdate = useCallback(
     debounce((presentationId: string, newTheme: string) => {
       updatePresentationTheme(presentationId, newTheme)
@@ -95,40 +95,40 @@ export default function PresentationPage() {
     [],
   );
 
-  // Update presentation state when data is fetched
+  
   useEffect(() => {
-    // Skip if we're coming from the generation page
+    
     if (isGeneratingPresentation || !shouldFetchData) {
       return;
     }
 
     if (presentationData) {
-      // Record the theme as it exists in the DB so initial hydration doesn't trigger a save
+      
       dbThemeRef.current = presentationData.presentation?.theme ?? null;
       setCurrentPresentation(presentationData.id, presentationData.title);
       setPresentationInput(
         presentationData.presentation?.prompt ?? presentationData.title,
       );
 
-      // Load all content from the database
+      
       const presentationContent = presentationData.presentation
         ?.content as unknown as {
         slides: PlateSlide[];
         config: Record<string, unknown>;
       };
 
-      // Set slides
+      
       setSlides(ensureSlidesHaveCanvas(presentationContent?.slides ?? []));
 
-      // Falls bei der Generierung eine Kategorie gewählt und in content.config.imageSetId persistiert wurde,
-      // direkt in den globalen State übernehmen, damit „Random image from current category" sofort aktiv ist.
+      
+      
       const persistedImageSetId =
         (presentationContent?.config as any)?.imageSetId ?? null;
       if (persistedImageSetId && typeof persistedImageSetId === "string") {
         setImageSetId(persistedImageSetId);
       }
 
-      // If there's no thumbnail yet, derive from first available rootImage or first img element
+      
       const currentThumb = presentationData.thumbnailUrl;
       if (!currentThumb) {
         const slides = presentationContent?.slides ?? [];
@@ -174,42 +174,42 @@ export default function PresentationPage() {
         }
       }
 
-      // Background override (optional persisted field)
+      
       if (presentationContent?.config?.backgroundOverride !== undefined) {
         const { setConfig } = usePresentationState.getState();
         setConfig(presentationContent.config as Record<string, unknown>);
       }
 
-      // Set outline
+      
       if (presentationData.presentation?.outline) {
         setOutline(presentationData.presentation.outline);
       }
 
-      // Set theme if available
+      
       if (presentationData?.presentation?.theme) {
         const themeId = presentationData.presentation.theme;
 
-        // Check if this is a predefined theme
+        
         if (themeId in themes) {
-          // Use predefined theme
+          
           setTheme(themeId as Themes);
         } else {
-          // If not in predefined themes, treat as custom theme
+          
           void getCustomThemeById(themeId)
             .then((result) => {
               if (result.success && result.theme) {
-                // Set the theme with the custom theme data
+                
                 const themeData = result.theme.themeData;
                 setTheme(themeId, themeData as unknown as ThemeProperties);
               } else {
-                // Fallback to default theme if custom theme not found
+                
                 console.warn("Custom theme not found:", themeId);
                 setTheme("mystique");
               }
             })
             .catch((error) => {
               console.error("Failed to load custom theme:", error);
-              // Fallback to default theme on error
+              
               setTheme("mystique");
             });
         }
@@ -227,12 +227,12 @@ export default function PresentationPage() {
         }
       }
 
-      // Set presentationStyle if available
+      
       if (presentationData?.presentation?.presentationStyle) {
         setPresentationStyle(presentationData.presentation.presentationStyle);
       }
 
-      // Set language if available
+      
       if (presentationData.presentation?.language) {
         setLanguage(presentationData.presentation.language);
       }
@@ -252,28 +252,28 @@ export default function PresentationPage() {
     setImageSetId,
   ]);
 
-  // Update theme when it changes (but not on initial hydration)
+  
   useEffect(() => {
     if (!id || isLoading || !theme) return;
-    // If we don't yet know the DB theme, skip until hydration sets it
+    
     if (dbThemeRef.current === null) return;
-    // Skip if the current theme matches the DB state (hydration)
+    
     if (theme === dbThemeRef.current) return;
 
-    // Persist the new theme and update our DB baseline to prevent repeat writes
+    
     dbThemeRef.current = theme as string;
     debouncedThemeUpdate(id, theme as string);
   }, [theme, id, debouncedThemeUpdate, isLoading]);
 
-  // Set theme variables when theme changes
+  
   useEffect(() => {
     if (theme && resolvedTheme) {
       const state = usePresentationState.getState();
-      // Check if we have custom theme data
+      
       if (state.customThemeData) {
         setThemeVariables(state.customThemeData, resolvedTheme === "dark");
       }
-      // Otherwise try to use a predefined theme
+      
       else if (typeof theme === "string" && theme in themes) {
         const currentTheme = themes[theme as keyof typeof themes];
         if (currentTheme) {
@@ -283,7 +283,7 @@ export default function PresentationPage() {
     }
   }, [theme, resolvedTheme]);
 
-  // Get the current theme data
+  
   const currentThemeData = (() => {
     const state = usePresentationState.getState();
     if (state.customThemeData) {

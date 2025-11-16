@@ -16,7 +16,7 @@ interface PresentationLayoutProps {
   themeData?: ThemeProperties;
   isShared?: boolean;
   hideSidebar?: boolean;
-  fixedBackgroundColor?: string; // Neue Prop für feste Hintergrundfarbe
+  fixedBackgroundColor?: string; 
 }
 
 export function PresentationLayout({
@@ -29,13 +29,13 @@ export function PresentationLayout({
 }: PresentationLayoutProps) {
   const isPresenting = usePresentationState((s) => s.isPresenting);
 
-  // Sidebar interactions moved to SlidePreview
+  
 
   if (isLoading) {
     return <LoadingState />;
   }
 
-  // Hide sidebar in shared mode and when presenting
+  
   const showSidebar = !hideSidebar && !isShared && !isPresenting;
 
   const backgroundElement = fixedBackgroundColor ? (
@@ -44,7 +44,7 @@ export function PresentationLayout({
         {themeData && <CustomThemeFontLoader themeData={themeData} />}
         <div className="flex h-full">
           {showSidebar && <SlidePreview showSidebar={showSidebar} />}
-          {/* Main Presentation Content - Scrollable */}
+          {}
           <div className="presentation-slides flex max-h-full flex-1 items-start overflow-x-auto overflow-y-hidden pb-20">
             {children}
           </div>
@@ -57,7 +57,7 @@ export function PresentationLayout({
         {themeData && <CustomThemeFontLoader themeData={themeData} />}
         <div className="flex h-full">
           {showSidebar && <SlidePreview showSidebar={showSidebar} />}
-          {/* Main Presentation Content - Scrollable */}
+          {}
           <div className="presentation-slides flex max-h-full flex-1 items-start overflow-x-auto overflow-y-hidden pb-20">
             {children}
           </div>

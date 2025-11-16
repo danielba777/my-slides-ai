@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: This use requires any */
+
 import {
   type DropTargetHookSpec,
   type DropTargetMonitor,
@@ -27,26 +27,20 @@ export type CanDropCallback = (args: {
 
 export interface UseDropNodeOptions
   extends DropTargetHookSpec<DragItemNode, unknown, { isOver: boolean }> {
-  /** The node to which the drop line is attached. */
+  
   element: TElement;
 
-  /** The reference to the node being dragged. */
+  
   nodeRef: any;
 
-  /** The reference to the multiple preview element */
+  
   multiplePreviewRef: any;
 
   orientation?: "vertical" | "horizontal";
-  /**
-   * Intercepts the drop handling. If `false` is returned, the default drop
-   * behavior is called after. If `true` is returned, the default behavior is
-   * not called.
-   */
+  
   canDropNode?: CanDropCallback;
 
-  /**
-   * Handler for custom drop behavior
-   */
+  
   onDropHandler?: (
     editor: PlateEditor,
     props: {
@@ -58,25 +52,7 @@ export interface UseDropNodeOptions
   ) => boolean | undefined;
 }
 
-/**
- * `useDrop` hook to drop a node on the editor.
- * Supports multi-directional drops without orientation constraint.
- *
- * On drop:
- * - Get hover direction (top, bottom, left, right), return early if undefined
- * - For vertical (top/bottom): reorder nodes
- * - For horizontal (left/right): create columns
- * - DragPath: find node with id = dragItem.id, return early if not found
- * - Focus editor
- * - Move or insert nodes based on direction
- *
- * On hover:
- * - Get drop line direction
- * - If differs from dropLine, setDropLine is called
- *
- * Collect:
- * - IsOver: true if mouse is over the block
- */
+
 export const useDropNode = (
   editor: PlateEditor,
   {
@@ -96,7 +72,7 @@ export const useDropNode = (
       }),
     }),
     drop: (dragItem, monitor) => {
-      // Don't call onDropNode if this is a file drop
+      
       if (!(dragItem as ElementDragItemNode).id) {
         const result = getDropPath(editor, {
           canDropNode,

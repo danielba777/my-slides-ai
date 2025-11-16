@@ -11,7 +11,6 @@ import { stripe } from "@/server/stripe";
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 
-// Kleine Helper, um leere/kaputte Zeiten zu vermeiden
 function dateFromUnix(sec?: number | null) {
   return sec ? new Date(sec * 1000) : new Date();
 }
@@ -28,7 +27,6 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 1) User + Customer
     const user = await db.user.findUnique({
       where: { id: session.user.id },
       select: {
@@ -49,23 +47,19 @@ export async function POST() {
       );
     }
 
-    // 2) Subscriptions aus Stripe lesen
     const subs = await stripe.subscriptions.list({
       customer: user.stripeCustomerId,
       status: "all",
-      // WICHTIG: bei list → "data.items.data.price" expanden
       expand: ["data.items.data.price"],
       limit: 10,
     });
 
     const subscriptionData = subs.data as SubscriptionWithPeriods[];
-    // aktive / relevante Sub finden
     const active = subscriptionData.find((s): s is SubscriptionWithPeriods =>
       isActiveStripeSubscriptionStatus(s.status),
     );
 
     if (!active) {
-      // Kein aktives Abo -> FREE (5/0) hart setzen und Altstände aufräumen
       await db.user.update({
         where: { id: user.id },
         data: { plan: null, planRenewsAt: null },
@@ -78,7 +72,7 @@ export async function POST() {
         await tx.creditBalance.create({
           data: {
             userId: user.id,
-            credits: FREE_SLIDESHOW_QUOTA, // 5
+            credits: FREE_SLIDESHOW_QUOTA,
             aiCredits: 0,
             usedCredits: 0,
             usedAiCredits: 0,
@@ -89,8 +83,6 @@ export async function POST() {
       return NextResponse.json({ synced: true, plan: null });
     }
 
-    // 3) Plan aus Price-ID ableiten (ENV müssen korrekt gesetzt sein)
-    // Nach dem Expand ist price ein Objekt
     const firstItem = active.items?.data?.[0];
     const rawPrice = firstItem?.price;
     const priceId =
@@ -121,7 +113,6 @@ export async function POST() {
     const periodEnd = dateFromUnix(active.current_period_end ?? null);
     const status = mapStripeSubscriptionStatus(active.status);
 
-    // 4) Subscription upsert
     await db.subscription.upsert({
       where: { stripeSubscriptionId: active.id },
       create: {
@@ -138,7 +129,6 @@ export async function POST() {
       },
     });
 
-    // 5) Credits & User-Plan via Carry-Over/Reset setzen (hart neu schreiben)
     await db.$transaction(async (tx) => {
       const oldPlan =
         (

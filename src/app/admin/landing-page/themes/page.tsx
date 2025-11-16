@@ -34,6 +34,7 @@ interface LandingPageTheme {
 export default function LandingPageThemesPage() {
   const [themes, setThemes] = useState<LandingPageTheme[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [postCounts, setPostCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     loadThemes();
@@ -48,6 +49,9 @@ export default function LandingPageThemesPage() {
       if (response.ok) {
         const data = await response.json();
         setThemes(data);
+
+        // Load post counts for each category
+        loadPostCounts(data);
       } else {
         toast.error("Fehler beim Laden der Themes");
       }
@@ -57,6 +61,33 @@ export default function LandingPageThemesPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const loadPostCounts = async (themesList: LandingPageTheme[]) => {
+    const counts: Record<string, number> = {};
+
+    // Load counts for all categories in parallel
+    await Promise.all(
+      themesList.map(async (theme) => {
+        try {
+          const response = await fetch(
+            `/api/slideshow-library/posts?category=${theme.category}&limit=1`,
+            { cache: "no-store" }
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            // Extract totalCount from response
+            counts[theme.category] = data.totalCount || 0;
+          }
+        } catch (error) {
+          console.error(`Error loading count for ${theme.category}:`, error);
+          counts[theme.category] = 0;
+        }
+      })
+    );
+
+    setPostCounts(counts);
   };
 
   const deleteTheme = async (id: string) => {
@@ -137,11 +168,12 @@ export default function LandingPageThemesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[20%]">Kategorie</TableHead>
-                    <TableHead className="w-[35%]">Hero Title</TableHead>
-                    <TableHead className="w-[30%]">Hero Subtitle</TableHead>
+                    <TableHead className="w-[18%]">Kategorie</TableHead>
+                    <TableHead className="w-[10%]">Posts</TableHead>
+                    <TableHead className="w-[30%]">Hero Title</TableHead>
+                    <TableHead className="w-[25%]">Hero Subtitle</TableHead>
                     <TableHead className="w-[8%]">Status</TableHead>
-                    <TableHead className="w-[7%] text-right">Aktionen</TableHead>
+                    <TableHead className="w-[9%] text-right">Aktionen</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -151,6 +183,22 @@ export default function LandingPageThemesPage() {
                         <Badge variant="outline" className="font-mono">
                           {theme.category}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="align-middle">
+                        {postCounts[theme.category] !== undefined ? (
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-xs">
+                              {postCounts[theme.category]}
+                            </Badge>
+                            {(postCounts[theme.category] ?? 0) < 224 && (
+                              <span className="text-xs text-amber-600" title="Weniger als 224 Posts (Hero Section benötigt 224)">
+                                ⚠️
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <Spinner className="h-4 w-4" />
+                        )}
                       </TableCell>
                       <TableCell className="align-middle">
                         <span className="font-medium line-clamp-2">

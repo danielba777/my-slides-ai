@@ -8,10 +8,7 @@ import { type DragItemNode } from "@platejs/dnd";
 import { type UseDropNodeOptions } from "../hooks";
 import { getHoverDirection } from "./getHoverDirection";
 
-/**
- * Callback called on drag and drop a node with id.
- * Returns the drop path and direction for both vertical and horizontal drops.
- */
+
 export const getDropPath = (
   editor: PlateEditor,
   {
@@ -26,7 +23,7 @@ export const getDropPath = (
   } & Pick<UseDropNodeOptions, "canDropNode" | "element" | "nodeRef">,
 ) => {
   const { orientation } = editor.getOptions(MultiDndPlugin);
-  // Get direction without orientation constraint for multi-directional support
+  
   const direction = getHoverDirection({
     dragItem,
     element,
@@ -46,8 +43,8 @@ export const getDropPath = (
 
     if (!hoveredPath) return;
 
-    // If dragPath is found, we're moving an existing node
-    // If not, we're inserting a new node (e.g., from external source)
+    
+    
     if (dragPath) {
       dragEntry = [dragItem.element, dragPath];
     }
@@ -59,7 +56,7 @@ export const getDropPath = (
 
   if (!dropEntry) return;
 
-  // Only check canDropNode if we have a dragEntry (for existing nodes)
+  
   if (
     canDropNode &&
     dragEntry &&
@@ -71,9 +68,9 @@ export const getDropPath = (
   const dragPath = dragEntry?.[1];
   const hoveredPath = dropEntry[1];
 
-  // For left/right direction, return early since we'll handle column creation
+  
   if (direction === "left" || direction === "right") {
-    // Include isExternalNode flag if dragPath is not available
+    
     return {
       direction,
       dragPath,
@@ -83,22 +80,22 @@ export const getDropPath = (
     };
   }
 
-  // Handle top/bottom drops for vertical reordering
+  
   let dropPath: Path | undefined;
 
   if (direction === "bottom") {
-    // Insert after hovered node
+    
     dropPath = hoveredPath;
 
-    // If the dragged node is already right after hovered node, no change
+    
     if (dragPath && PathApi.equals(dragPath, PathApi.next(dropPath))) return;
   }
 
   if (direction === "top") {
-    // Insert before hovered node
+    
     dropPath = [...hoveredPath.slice(0, -1), hoveredPath.at(-1)! - 1];
 
-    // If the dragged node is already right before hovered node, no change
+    
     if (dragPath && PathApi.equals(dragPath, dropPath)) return;
   }
 
@@ -110,7 +107,7 @@ export const getDropPath = (
     PathApi.isSibling(dragPath, dropPath);
   const to = before ? dropPath : PathApi.next(dropPath);
 
-  // Include isExternalNode flag if dragPath is not available
+  
   return {
     direction,
     dragPath,

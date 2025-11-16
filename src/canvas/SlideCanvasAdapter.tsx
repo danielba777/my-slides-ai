@@ -41,12 +41,12 @@ type ExtendedCanvasTextNode = CanvasTextNode & {
 };
 
 const W = 1080;
-const H = 1620; // 2:3 aspect ratio
+const H = 1620; 
 const BASE_FONT_PX = 72;
 
 function normToPxX(v: number | undefined) {
   if (v == null) return undefined;
-  // Heuristik: wenn 0..1 → normiert
+  
   return v >= 0 && v <= 1 ? Math.round(v * W) : Math.round(v);
 }
 function normToPxY(v: number | undefined) {
@@ -62,11 +62,11 @@ function pxToNormY(v: number | undefined) {
 }
 
 export type SlideCanvasAdapterHandle = {
-  /** Liefert einen PNG-Blob der aktuellen Canvas in voller Auflösung */
+  
   exportPNG: () => Promise<Blob>;
-  /** Fokussiert den ersten Text im Canvas */
+  
   focusFirstText: () => void;
-  /** Entfernt den Fokus von allen Texten */
+  
   clearTextFocus: () => void;
 };
 
@@ -76,7 +76,7 @@ type Props = {
   showToolbar?: boolean;
   overlayContent?: React.ReactNode;
   onCloseToolbar?: () => void;
-  /** Wenn true, sind Interaktionen (Klicken/Selektieren) deaktiviert */
+  
   readOnly?: boolean;
 };
 
@@ -85,7 +85,7 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
     { doc, onChange, showToolbar = true, overlayContent, onCloseToolbar, readOnly = false },
     ref,
   ) => {
-    // LegacyCanvas kann bereits PNG exportieren – wir reichen dessen Ref durch
+    
     const legacyRef = useRef<any>(null);
 
     useImperativeHandle(ref, () => ({
@@ -93,7 +93,7 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
         if (legacyRef.current?.exportPNG) {
           return legacyRef.current.exportPNG();
         }
-        // Fallback: leeres Bild (sollte in Praxis nicht passieren)
+        
         return new Blob([], { type: "image/png" });
       },
       focusFirstText: () => {
@@ -115,7 +115,7 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
       return img?.url ?? "";
     }, [doc]);
 
-    // ✅ Alle zusätzlichen (Overlay-)Bilder neben dem Hintergrund
+    
     const overlayImages = useMemo<CanvasImageNode[]>(() => {
       return doc.nodes.filter(
         (n): n is CanvasImageNode =>
@@ -128,9 +128,9 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
         (n): n is ExtendedCanvasTextNode => n.type === "text",
       );
       return texts.map((t, i) => {
-        // accept both legacy "text" and newer "content" fields for text nodes
+
         const rawContent: string = t.content ?? t.text ?? "";
-        const widthPx = t.width ?? Math.round(W * 0.7);
+        const widthPx = t.width ?? 1000;
         const lineCount =
           rawContent.trim().length > 0 ? rawContent.split(/\r?\n/).length : 1;
         const approxHeightPx =
@@ -151,17 +151,16 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
               ? normToPxY(t.y)
               : undefined;
 
-        // Positionslogik: nx/ny (normiert) > x/y (px, legacy = top-left)
-        const xPx =
-          normalizedXPx ??
-          (typeof t.x === "number" ? t.x + widthPx / 2 : Math.round(W * 0.5));
+
+
+        const xPx = Math.round(W * 0.5); // Always center horizontally
         const yPx =
           normalizedYPx ??
           (typeof t.y === "number"
             ? t.y + approxHeightPx / 2
             : Math.round(H * 0.5));
 
-        // scale aus fontSize ableiten (Basis 72px)
+        
         const scale =
           typeof t.fontSize === "number" && t.fontSize > 0
             ? t.fontSize / BASE_FONT_PX
@@ -169,7 +168,7 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
               ? t.scale
               : 1;
 
-        // Gewicht mappen
+        
         const weight =
           t.weight === "bold"
             ? "bold"
@@ -184,14 +183,14 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
           y: yPx / H,
           rotation: t.rotation ?? 0,
           scale,
-          maxWidth: t.width ?? Math.round(W * 0.7),
+          maxWidth: t.width ?? 1000,
           ...(t.height ? { maxHeight: t.height } : {}),
           lineHeight: t.lineHeight ?? 1.12,
           letterSpacing: t.letterSpacing ?? 0,
           zIndex: t.zIndex ?? i,
           align: (t.align as any) ?? "center",
           weight,
-          // Extras (optional unterstützt vom Legacy-Canvas):
+          
           ...(t.italic !== undefined ? { italic: t.italic } : {}),
           ...(t.outlineEnabled !== undefined
             ? { outlineEnabled: t.outlineEnabled }
@@ -210,10 +209,10 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
 
     const handleLayoutChange = useCallback(
       (next: SlideTextElement[]) => {
-        // Text-Nodes im doc anhand Reihenfolge/Zuweisung updaten
+        
         const newNodes = doc.nodes.map((n) => ({ ...n }));
 
-        // 1) Existierende Textknoten updaten (in Reihenfolge)
+        
         let ti = 0;
         for (let i = 0; i < newNodes.length; i++) {
           const node = newNodes[i];
@@ -221,12 +220,12 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
 
           const src = next[ti];
           if (!src) {
-            break; // keine weitere Quelle – restliche Textknoten bleiben wie sie sind
+            break; 
           }
           ti += 1;
 
           const pxX = Math.round((src.x ?? 0.5) * W);
-          const pxY = Math.round((src.y ?? 0.5) * H); // Vertikal mittig
+          const pxY = Math.round((src.y ?? 0.5) * H); 
 
           const target = node as ExtendedCanvasTextNode;
           target.x = pxX;
@@ -248,11 +247,11 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
               : src.weight === "semibold"
                 ? "semibold"
                 : "regular";
-          // write both fields for compatibility across canvas implementations
+          
           target.content = src.content ?? target.content ?? "";
           target.text = src.content ?? target.text ?? "";
 
-          // Extras
+          
           if ((src as any).italic !== undefined)
             target.italic = (src as any).italic;
           if ((src as any).outlineEnabled !== undefined)
@@ -268,8 +267,8 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
               .background as SlideTextElement["background"];
         }
 
-        // 2) Falls Legacy-Canvas MEHR Text-Layer hat als doc-Textknoten:
-        //    fehlende Textknoten APPENDEN, damit der zweite (dritte, …) Text bestehen bleibt.
+        
+        
         const existingTextCount = newNodes.filter(
           (n) => n.type === "text",
         ).length;
@@ -291,8 +290,8 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
               type: "text",
               x: pxX,
               y: pxY,
-              nx: pxToNormX(pxX), // Normalisierte Koordinaten
-              ny: pxToNormY(pxY), // Normalisierte Koordinaten
+              nx: pxToNormX(pxX), 
+              ny: pxToNormY(pxY), 
               rotation: src.rotation ?? 0,
               width: src.maxWidth ?? Math.round(W * 0.7),
               text: src.content ?? "",
@@ -303,7 +302,7 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
               align: src.align ?? "center",
               weight,
               color: (src as any).color ?? "#ffffff",
-              // erweiterte Felder für Legacy-Canvas-Kompatibilität
+              
               content: src.content ?? "",
               scale: src.scale ?? 1,
               height: (src as any).maxHeight ?? undefined,
@@ -318,8 +317,8 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
           }
         }
 
-        // 3) Überschüssige Textknoten **nach ID** entfernen (nicht "von hinten"),
-        //    damit genau der vom Canvas gelöschte Layer verschwindet.
+        
+        
         const keepIds = new Set(next.map((t) => t.id));
         for (let i = newNodes.length - 1; i >= 0; i--) {
           const n = newNodes[i] as any;

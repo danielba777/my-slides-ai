@@ -65,16 +65,16 @@ const ProseMirrorEditor: React.FC<ProseMirrorEditorProps> = ({
     const start = view.coordsAtPos(from);
     const end = view.coordsAtPos(to);
 
-    // Calculate position relative to the editor
+    
     const selectionTop = Math.min(start.top, end.top);
     const selectionLeft = (start.left + end.left) / 2;
 
-    // Clear any existing timeout
+    
     if (toolbarTimeoutRef.current) {
       clearTimeout(toolbarTimeoutRef.current);
     }
 
-    // Set a new timeout for showing the toolbar
+    
     toolbarTimeoutRef.current = setTimeout(() => {
       setToolbarState({
         isVisible: true,
@@ -87,7 +87,7 @@ const ProseMirrorEditor: React.FC<ProseMirrorEditorProps> = ({
   useEffect(() => {
     if (!editorRef.current) return;
 
-    // Add global styles to remove ProseMirror focus outline
+    
     const style = document.createElement("style");
     style.textContent = `
       .ProseMirror {
@@ -143,13 +143,13 @@ const ProseMirrorEditor: React.FC<ProseMirrorEditorProps> = ({
       },
       handleDOMEvents: {
         blur: (_view, event) => {
-          // Check if the related target (where focus is going) is part of our toolbar
+          
           const relatedTarget = event.relatedTarget as HTMLElement;
           if (
             relatedTarget?.closest('[role="menu"]') ??
             relatedTarget?.closest(".floating-toolbar")
           ) {
-            // If clicking toolbar or dropdown, don't hide
+            
             return false;
           }
 
@@ -185,7 +185,7 @@ const ProseMirrorEditor: React.FC<ProseMirrorEditorProps> = ({
     };
   }, [isEditing, updateToolbarPosition]);
 
-  // Update content when it changes externally
+  
   useEffect(() => {
     if (viewRef.current) {
       const currentContent = defaultMarkdownSerializer.serialize(

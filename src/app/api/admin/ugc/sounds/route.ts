@@ -2,11 +2,6 @@ import { NextResponse } from "next/server";
 import { env } from "@/env";
 import { auth } from "@/server/auth";
 
-// POST multipart/form-data
-// fields:
-//  - sound (audio/*)  REQUIRED
-//  - cover (image/*)  OPTIONAL
-//  - name (string)    OPTIONAL - custom display name
 export async function POST(req: Request) {
   const t0 = Date.now();
   const session = await auth();
@@ -31,7 +26,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No sound file" }, { status: 400 });
     }
 
-    // ----- Dateinamen bauen (S3 Keys) -----
     const original = (sound.name || "sound.mp3").toLowerCase();
     const ext = original.includes(".") ? original.split(".").pop()! : "mp3";
     const baseSlug = (displayName || original)
@@ -45,7 +39,6 @@ export async function POST(req: Request) {
     const coverExt = coverIsFile ? ((cover as File).name.split(".").pop() || "jpg").toLowerCase() : "jpg";
     const coverKey = coverIsFile ? `${soundKey}.cover.${coverExt}` : null;
 
-    // ----- Presign für Sound holen -----
     const presignUrl = `${env.SLIDESCOCKPIT_API}/sounds/presign?key=${encodeURIComponent(soundKey)}&contentType=${encodeURIComponent((sound as File).type || "audio/mpeg")}`;
     console.log("[SoundsUpload][POST] presign(sound) →", presignUrl);
     const presignRes = await fetch(presignUrl, {
@@ -63,7 +56,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // ----- Upload Sound (PUT) -----
     const putSound = await fetch(presign.uploadUrl, {
       method: "PUT",
       headers: { "Content-Type": (sound as File).type || "audio/mpeg" },
@@ -78,7 +70,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // ----- Optional: Presign & Upload Cover -----
     let coverPublicUrl: string | null = null;
     if (coverIsFile && coverKey) {
       const presignCoverUrl = `${env.SLIDESCOCKPIT_API}/sounds/presign?key=${encodeURIComponent(coverKey)}&contentType=${encodeURIComponent((cover as File).type || "image/jpeg")}`;

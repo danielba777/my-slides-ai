@@ -82,7 +82,7 @@ export default function ScatterPlotElement(
             <ChartTooltip content={<ChartTooltipContent />} />
           </ScatterChart>
         </ChartContainer>
-        {/* non-editable */}
+        {}
       </div>
     </PlateElement>
   );

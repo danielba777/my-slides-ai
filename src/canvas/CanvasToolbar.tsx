@@ -196,25 +196,25 @@ export default function CanvasToolbar({
     <TooltipProvider delayDuration={150} skipDelayDuration={0}>
       <div
         className={cn(
-          // Container wie Side-Menü: Card-Optik, Blur, Theme-Variablen
+          
           "grid grid-cols-[auto,1fr] items-start gap-3 rounded-2xl border border-border/80 bg-background/95 p-3 shadow-xl backdrop-blur",
-          // Breite etwas größer, da jetzt 2 Spalten
+          
           "w-[420px]",
           className,
         )}
       >
-        {/* Linke Spalte: Immer sichtbarer Add-Text Button */}
+        {}
         <div className="flex flex-col">
           <button
             type="button"
             onClick={onAddText}
             className={cn(
-              // groß, klar, wie im Side-Menü
+              
               "inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-medium",
               "bg-primary text-primary-foreground hover:opacity-90 transition",
-              // keine Ringe/Outlines
+              
               "focus-visible:outline-none focus-visible:ring-0",
-              // full width of left column
+              
               "w-[90px]",
             )}
             aria-label="New Text Field"
@@ -225,9 +225,9 @@ export default function CanvasToolbar({
           </button>
         </div>
 
-        {/* Rechte Spalte: Alle weiteren Controls, sauber gestapelt */}
+        {}
         <div className="flex flex-col gap-3">
-          {/* Datei-Eingabe unsichtbar halten */}
+          {}
           <input
             ref={fileInputRef}
             type="file"
@@ -236,7 +236,7 @@ export default function CanvasToolbar({
             onChange={handleFileChange}
           />
 
-          {/* Top action bar: Insert Image, Duplicate, Snapshot, Delete */}
+          {}
           <div className="flex flex-wrap items-center gap-2">
             <ToolbarIconButton
               icon={ImagePlus}
@@ -262,7 +262,7 @@ export default function CanvasToolbar({
             />
           </div>
 
-          {/* Text Formatting (only active when text is selected) */}
+          {}
           <div className="flex items-center gap-2">
             <ToolbarIconButton
               icon={Bold}
@@ -309,7 +309,7 @@ export default function CanvasToolbar({
             />
           </div>
 
-          {/* Colors & Layers */}
+          {}
           <div className="flex items-center gap-2">
             <Label
               htmlFor={colorInputId}
@@ -353,7 +353,7 @@ export default function CanvasToolbar({
             />
           </div>
 
-          {/* Typography & Dimensions */}
+          {}
           <div className="flex items-center gap-2">
             <Label className="text-xs text-muted-foreground">Size</Label>
             <Input

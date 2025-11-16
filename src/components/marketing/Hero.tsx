@@ -69,7 +69,8 @@ export function MarketingHero({
         const data = (await response.json()) as unknown;
         if (!Array.isArray(data)) return;
 
-        const collected = new Set<string>();
+        // When category is set, allow duplicates. Otherwise deduplicate.
+        const collected: string[] = [];
 
         for (const post of data as HeroPost[]) {
           if (!post?.slides?.length) continue;
@@ -78,24 +79,34 @@ export function MarketingHero({
             (slide) => !!slide?.imageUrl,
           );
           if (!firstSlideWithImage?.imageUrl) continue;
-          collected.add(firstSlideWithImage.imageUrl);
+
+          // If category is set, allow duplicates by always adding
+          // If no category, deduplicate using Set logic
+          if (category) {
+            collected.push(firstSlideWithImage.imageUrl);
+          } else {
+            if (!collected.includes(firstSlideWithImage.imageUrl)) {
+              collected.push(firstSlideWithImage.imageUrl);
+            }
+          }
         }
 
-        if (!collected.size) return;
+        if (!collected.length) return;
 
-        const deduped = Array.from(collected);
-        for (let index = deduped.length - 1; index > 0; index--) {
+        // Shuffle the images
+        const shuffled = [...collected];
+        for (let index = shuffled.length - 1; index > 0; index--) {
           const swapIndex = Math.floor(Math.random() * (index + 1));
-          const current = deduped[index];
-          const swap = deduped[swapIndex];
+          const current = shuffled[index];
+          const swap = shuffled[swapIndex];
           if (current === undefined || swap === undefined) {
             continue;
           }
-          deduped[index] = swap;
-          deduped[swapIndex] = current;
+          shuffled[index] = swap;
+          shuffled[swapIndex] = current;
         }
 
-        setPosterImages(deduped);
+        setPosterImages(shuffled);
       } catch (error) {
         if ((error as Error).name === "AbortError") {
           return;
@@ -129,7 +140,7 @@ export function MarketingHero({
     const perRow = HERO_POSTERS_PER_ROW;
     const totalRows = HERO_POSTER_ROWS;
 
-    // Until we have real images, render nothing (no placeholders).
+    
     if (!posterImages.length) return [];
 
     const rows: string[][] = [];
@@ -141,12 +152,12 @@ export function MarketingHero({
     return rows;
   }, [posterImages]);
 
-  // TikTok-Bilder NICHT über next/image rendern (Host-Whitelist von Next schlägt oft zu).
-  // Alles andere weiter mit next/image (Optimierung bleibt erhalten).
+  
+  
   const isTikTokCdn = (urlStr: string) => {
     try {
       const u = new URL(urlStr);
-      // Beispiele: p16-pu-sign-no.tiktokcdn-eu.com, p19-common-sign-useastred.tiktokcdn-eu.com, ...
+      
       return /(^|\.)tiktokcdn(?:-eu)?\.com$/i.test(u.hostname);
     } catch {
       return false;
@@ -155,7 +166,7 @@ export function MarketingHero({
 
   return (
     <Section className="relative sm:min-h-[55vh] overflow-hidden bg-[#111] py-0">
-      {/* Mobile Header rendered directly in hero */}
+      {}
       <div className="md:hidden absolute inset-x-0 top-0 z-30 px-4 pt-6">
         <div className="flex items-center justify-between text-white">
           <Link href="/" className="flex items-center gap-2">
@@ -174,13 +185,13 @@ export function MarketingHero({
           </button>
         </div>
       </div>
-      {/* Netflix Background - Fixed z-index hierarchy */}
+      {}
       {posterMatrix.length > 0 && (
         <div className="hero-background-container">
-          {/* Gradient Overlay */}
+          {}
           <div className="hero-gradient-overlay" />
 
-          {/* Animated Background */}
+          {}
           <div className="hero-perspective-wrapper">
             <div className="hero-animated-grid">
               {posterMatrix.map((row, rowIndex) => (
@@ -191,7 +202,7 @@ export function MarketingHero({
                       className="hero-image-card"
                     >
                       {isTikTokCdn(imageUrl) ? (
-                        // Fallback auf <img> für TikTok-CDNs → keine Next-Whitelist nötig
+                        
                         <img
                           src={imageUrl}
                           alt=""
@@ -204,12 +215,12 @@ export function MarketingHero({
                           src={imageUrl}
                           alt=""
                           fill
-                          /* Nur für die kleinen Kacheln: extrem klein halten */
+                          
                           sizes="125px"
-                          /* Next darf optimieren -> erzeugt AVIF/WebP automatisch */
+                          
                           quality={60}
-                          // Avoid Next.js runtime error: can't set both priority and loading
-                          // Use priority for first 2 rows, lazy for the rest
+                          
+                          
                           priority={rowIndex < 2}
                           loading={rowIndex < 2 ? undefined : "lazy"}
                           style={{
@@ -253,25 +264,7 @@ export function MarketingHero({
             className="py-2 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight text-white"
           >
             {heroTitle ? (
-              (() => {
-                const words = heroTitle.split(" ");
-
-                if (words.length < 3) {
-                  return <span className="block">{heroTitle}</span>;
-                }
-
-                const lastTwoWords = words.slice(-2).join(" ");
-                const restOfTitle = words.slice(0, -2).join(" ");
-
-                return (
-                  <>
-                    <span className="block sm:inline">{restOfTitle}&nbsp;</span>
-                    <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
-                      {lastTwoWords}
-                    </span>
-                  </>
-                );
-              })()
+              <span className="block">{heroTitle}</span>
             ) : (
               <>
                 <span className="block">

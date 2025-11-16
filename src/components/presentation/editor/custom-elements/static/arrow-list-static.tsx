@@ -6,7 +6,7 @@ export default function ArrowListStatic(
 ) {
   return (
     <div className="my-4 mb-8 flex w-full flex-col overflow-visible">
-      {/* Timeline items container */}
+      {}
       <SlateElement {...props}>{props.children}</SlateElement>
     </div>
   );

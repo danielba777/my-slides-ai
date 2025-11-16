@@ -1,8 +1,8 @@
 import { ImageResponse } from "next/og";
 
-// Route segment config
+
 export const runtime = "edge";
-// 1200 x 630 recommended for OG
+
 export const size = {
   width: 1200,
   height: 630,

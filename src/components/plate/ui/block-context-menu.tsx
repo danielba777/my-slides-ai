@@ -66,7 +66,7 @@ export function BlockContextMenu({ children }: { children: React.ReactNode }) {
     <ContextMenu
       onOpenChange={(open) => {
         if (!open) {
-          // prevent unselect the block selection
+          
           setTimeout(() => {
             api.blockMenu.hide();
           }, 0);
@@ -130,7 +130,7 @@ export function BlockContextMenu({ children }: { children: React.ReactNode }) {
             }}
           >
             Duplicate
-            {/* <ContextMenuShortcut>⌘ + D</ContextMenuShortcut> */}
+            {}
           </ContextMenuItem>
           <ContextMenuSub>
             <ContextMenuSubTrigger>Turn into</ContextMenuSubTrigger>

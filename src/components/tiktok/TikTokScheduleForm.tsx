@@ -222,7 +222,7 @@ export function TikTokScheduleForm({
             rows={4}
           />
         </div>
-        {/* Errors are displayed via toast notifications */}
+        {}
       </CardContent>
       {showRefreshButton && (
         <CardFooter className="flex items-center gap-4">

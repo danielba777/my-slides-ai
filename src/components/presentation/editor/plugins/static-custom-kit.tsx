@@ -140,7 +140,7 @@ export const PresentationStaticCustomKit = [
     key: TIMELINE_ITEM,
     node: { isElement: true, component: TimelineItemStatic },
   }),
-  // Box
+  
   createTPlatePlugin({
     key: BOX_GROUP,
     node: { isElement: true, component: BoxGroupStatic },
@@ -149,7 +149,7 @@ export const PresentationStaticCustomKit = [
     key: BOX_ITEM,
     node: { isElement: true, component: BoxItemStatic },
   }),
-  // Compare
+  
   createTPlatePlugin({
     key: COMPARE_GROUP,
     node: { isElement: true, component: CompareGroupStatic },
@@ -158,7 +158,7 @@ export const PresentationStaticCustomKit = [
     key: COMPARE_SIDE,
     node: { isElement: true, component: CompareSideStatic },
   }),
-  // Before/After
+  
   createTPlatePlugin({
     key: BEFORE_AFTER_GROUP,
     node: { isElement: true, component: BeforeAfterGroupStatic },
@@ -167,7 +167,7 @@ export const PresentationStaticCustomKit = [
     key: BEFORE_AFTER_SIDE,
     node: { isElement: true, component: BeforeAfterSideStatic },
   }),
-  // Pros & Cons
+  
   createTPlatePlugin({
     key: PROS_CONS_GROUP,
     node: { isElement: true, component: ProsConsGroupStatic },
@@ -180,7 +180,7 @@ export const PresentationStaticCustomKit = [
     key: CONS_ITEM,
     node: { isElement: true, component: ConsItemStatic },
   }),
-  // Arrow Vertical
+  
   createTPlatePlugin({
     key: SEQUENCE_ARROW_GROUP,
     node: { isElement: true, component: SequenceArrowStatic },
@@ -189,12 +189,12 @@ export const PresentationStaticCustomKit = [
     key: SEQUENCE_ARROW_ITEM,
     node: { isElement: true, component: SequenceArrowItemStatic },
   }),
-  // Button
+  
   createTPlatePlugin({
     key: BUTTON_ELEMENT,
     node: { isElement: true, component: ButtonStatic },
   }),
-  // Legacy adapters
+  
   createTPlatePlugin({
     key: "visualization-list",
     node: { isElement: true, component: VisualizationListElementStatic },
@@ -211,15 +211,15 @@ export const PresentationStaticCustomKit = [
     PresentationTableCellHeaderElementStatic,
   ),
 
-  // Removed generic chart element router per request
-  // Individual static chart elements
+  
+  
   PieChartStaticPlugin,
   BarChartStaticPlugin,
   AreaChartStaticPlugin,
   RadarChartStaticPlugin,
   ScatterChartStaticPlugin,
   LineChartStaticPlugin,
-  // Leaf for generating caret in static mode
+  
   createTPlatePlugin({
     key: "generating",
     node: { isLeaf: true, component: GeneratingLeafStatic },

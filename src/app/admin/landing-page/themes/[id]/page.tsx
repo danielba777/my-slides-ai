@@ -21,6 +21,9 @@ interface LandingPageTheme {
   description?: string;
   metaTitle?: string;
   metaDescription?: string;
+  displayName?: string;
+  icon?: string;
+  showcaseDescription?: string;
   isActive: boolean;
 }
 
@@ -124,7 +127,7 @@ export default function EditThemePage() {
             <CardTitle>Theme Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Kategorie */}
+            {}
             <div className="space-y-2">
               <Label htmlFor="category">
                 Kategorie <span className="text-destructive">*</span>
@@ -143,7 +146,7 @@ export default function EditThemePage() {
               </p>
             </div>
 
-            {/* Hero Title */}
+            {}
             <div className="space-y-2">
               <Label htmlFor="heroTitle">
                 Hero Title <span className="text-destructive">*</span>
@@ -162,7 +165,7 @@ export default function EditThemePage() {
               </p>
             </div>
 
-            {/* Hero Subtitle */}
+            {}
             <div className="space-y-2">
               <Label htmlFor="heroSubtitle">Hero Subtitle</Label>
               <Textarea
@@ -179,8 +182,61 @@ export default function EditThemePage() {
               </p>
             </div>
 
-            {/* Description */}
-            <div className="space-y-2">
+            <div className="border-t pt-6 space-y-6">
+              <h3 className="text-lg font-semibold">Theme Showcase</h3>
+
+              {}
+              <div className="space-y-2">
+                <Label htmlFor="displayName">Display Name</Label>
+                <Input
+                  id="displayName"
+                  value={formData.displayName || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, displayName: e.target.value })
+                  }
+                  placeholder="z.B. Nutrition & Health"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Der Anzeigename für die Theme Showcase-Sektion auf der Landing Page
+                </p>
+              </div>
+
+              {}
+              <div className="space-y-2">
+                <Label htmlFor="icon">Icon (Emoji)</Label>
+                <Input
+                  id="icon"
+                  value={formData.icon || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, icon: e.target.value })
+                  }
+                  placeholder="z.B. 🔥, 🧠, 💪, 🍎, 📚"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Ein Emoji für das Theme (z.B. 🔥 für Fitness, 🧠 für Studytok, 🍎 für Nutrition)
+                </p>
+              </div>
+
+              {}
+              <div className="space-y-2">
+                <Label htmlFor="showcaseDescription">Showcase Beschreibung</Label>
+                <Textarea
+                  id="showcaseDescription"
+                  value={formData.showcaseDescription || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, showcaseDescription: e.target.value })
+                  }
+                  placeholder="z.B. Create engaging nutrition content that educates and inspires your audience..."
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Kurze Beschreibung für die Theme Showcase Card
+                </p>
+              </div>
+            </div>
+
+            {}
+            <div className="space-y-2 border-t pt-6">
               <Label htmlFor="description">Beschreibung (intern)</Label>
               <Textarea
                 id="description"
@@ -193,7 +249,7 @@ export default function EditThemePage() {
               />
             </div>
 
-            {/* Meta Title */}
+            {}
             <div className="space-y-2">
               <Label htmlFor="metaTitle">SEO Meta Title</Label>
               <Input
@@ -209,7 +265,7 @@ export default function EditThemePage() {
               </p>
             </div>
 
-            {/* Meta Description */}
+            {}
             <div className="space-y-2">
               <Label htmlFor="metaDescription">SEO Meta Description</Label>
               <Textarea
@@ -226,7 +282,7 @@ export default function EditThemePage() {
               </p>
             </div>
 
-            {/* Is Active */}
+            {}
             <div className="flex items-center space-x-2">
               <Switch
                 id="isActive"
@@ -240,7 +296,7 @@ export default function EditThemePage() {
               </Label>
             </div>
 
-            {/* Actions */}
+            {}
             <div className="flex gap-4 pt-4">
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Wird gespeichert..." : "Änderungen speichern"}

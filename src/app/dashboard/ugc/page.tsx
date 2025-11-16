@@ -11,7 +11,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 import { cn } from "@/lib/utils";
-import { createOptimizedVideoUrl, shouldUseDynamicOptimization } from "@/lib/videoOptimizer";
+import {
+  createOptimizedVideoUrl,
+  shouldUseDynamicOptimization,
+} from "@/lib/videoOptimizer";
 import type { DemoVideo, GeneratedVideo, ReactionAvatar } from "@/types/ugc";
 
 type SoundItem = {
@@ -22,18 +25,18 @@ type SoundItem = {
   url?: string;
   coverUrl?: string | null;
 };
-// bessere Icons für vertikale Ausrichtung
+
 import {
   AlignVerticalJustifyCenter,
-  AlignVerticalJustifyStart, // top-alignment icon
+  AlignVerticalJustifyStart,
+  Loader2,
   Music,
   Plus,
   Trash2,
   VideoOff,
   X,
-  Loader2,
 } from "lucide-react";
-// Sound popover (dialog)
+
 import {
   Dialog,
   DialogContent,
@@ -67,8 +70,8 @@ export default function UgcDashboardPage() {
   const [avatars, setAvatars] = useState<ReactionAvatar[]>([]);
   const [avatarsLoading, setAvatarsLoading] = useState(true);
   const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(null);
-  // Community-Tab wird nicht mehr angezeigt
-  const [avatarTab, setAvatarTab] = useState("community"); // bleibt intern, UI blendet "Community" aus
+
+  const [avatarTab, setAvatarTab] = useState("community");
 
   const [demos, setDemos] = useState<DemoVideo[]>([]);
   const [demosLoading, setDemosLoading] = useState(true);
@@ -79,16 +82,16 @@ export default function UgcDashboardPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [hook, setHook] = useState("");
-  // TikTok-like hook overlay position (preview/UI only)
+
   const [hookPosition, setHookPosition] = useState<"middle" | "upper">(
     "middle",
   );
-  // Sound selection state
+
   const [soundOpen, setSoundOpen] = useState(false);
   const [sounds, setSounds] = useState<SoundItem[]>([]);
   const [soundsLoading, setSoundsLoading] = useState(false);
-  const [selectedSound, setSelectedSound] = useState<SoundItem | null>(null); // persistierte Auswahl
-  const [tempSound, setTempSound] = useState<SoundItem | null>(null); // Auswahl im Dialog
+  const [selectedSound, setSelectedSound] = useState<SoundItem | null>(null);
+  const [tempSound, setTempSound] = useState<SoundItem | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -147,7 +150,7 @@ export default function UgcDashboardPage() {
       const raw: ReactionAvatar[] = Array.isArray(data?.avatars)
         ? data.avatars
         : [];
-      // Only show avatars that have a valid hook video
+
       const avatarsData = raw.filter((a) => {
         const v = (a.videoUrl ?? "").trim().toLowerCase();
         return v && v !== "about:blank";
@@ -265,9 +268,12 @@ export default function UgcDashboardPage() {
         maxHeight: 1136,
         quality: 0.6,
         targetBitrate: 500,
-        format: 'mp4'
+        format: "mp4",
       });
-      console.log("[UGC Preview] Using dynamically optimized video:", optimizedUrl);
+      console.log(
+        "[UGC Preview] Using dynamically optimized video:",
+        optimizedUrl,
+      );
       return optimizedUrl;
     }
 
@@ -276,7 +282,6 @@ export default function UgcDashboardPage() {
     return originalUrl;
   }, [selectedAvatar]);
 
-  /** Preview-Reihenfolge: 1) Avatar-Hook  2) Demo */
   const previewSources = useMemo(() => {
     const out: string[] = [];
     if (selectedAvatarVideoUrl) out.push(selectedAvatarVideoUrl);
@@ -290,7 +295,7 @@ export default function UgcDashboardPage() {
           maxHeight: 1136,
           quality: 0.6,
           targetBitrate: 500,
-          format: 'mp4'
+          format: "mp4",
         });
         out.push(optimizedDemoUrl);
       } else {
@@ -307,23 +312,25 @@ export default function UgcDashboardPage() {
 
   const previewVideoKey = `${selectedDemo?.id ?? "none"}:${selectedAvatar?.id ?? "none"}:${selectedAvatarVideoUrl ?? ""}`;
 
-  /** Nahtloser Preview via Doppel-<video>-Overlay */
-  const [activeIdx, setActiveIdx] = useState(0); // welches Video ist sichtbar
-  const [armed, setArmed] = useState(false); // ob der Übergang schon vorbereitet ist
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [armed, setArmed] = useState(false);
   const v0Ref = useRef<HTMLVideoElement | null>(null);
   const v1Ref = useRef<HTMLVideoElement | null>(null);
-  const transitionLeadMs = 80; // ~80ms vor Ende starten wir das zweite Video
+  const transitionLeadMs = 80;
 
   // Loading states for videos
-  const [videoLoadingStates, setVideoLoadingStates] = useState<{[key: string]: boolean}>({});
-  const [videoBufferingStates, setVideoBufferingStates] = useState<{[key: string]: boolean}>({});
+  const [videoLoadingStates, setVideoLoadingStates] = useState<{
+    [key: string]: boolean;
+  }>({});
+  const [videoBufferingStates, setVideoBufferingStates] = useState<{
+    [key: string]: boolean;
+  }>({});
 
   const resetSeamlessPreview = () => {
     setActiveIdx(0);
     setArmed(false);
     if (v0Ref.current) {
       v0Ref.current.currentTime = 0;
-      // Autoplay wird weiter unten via autoPlay gesetzt
     }
     if (v1Ref.current) {
       v1Ref.current.pause();
@@ -335,23 +342,35 @@ export default function UgcDashboardPage() {
   };
 
   const updateVideoLoadingState = (videoKey: string, isLoading: boolean) => {
-    setVideoLoadingStates(prev => ({ ...prev, [videoKey]: isLoading }));
+    setVideoLoadingStates((prev) => ({ ...prev, [videoKey]: isLoading }));
   };
 
-  const updateVideoBufferingState = (videoKey: string, isBuffering: boolean) => {
-    setVideoBufferingStates(prev => ({ ...prev, [videoKey]: isBuffering }));
+  const updateVideoBufferingState = (
+    videoKey: string,
+    isBuffering: boolean,
+  ) => {
+    setVideoBufferingStates((prev) => ({ ...prev, [videoKey]: isBuffering }));
   };
 
   // Check if the currently active video is loading or buffering
   const isCurrentlyLoading = useMemo(() => {
     if (previewSources.length === 0) return false;
 
-    const activeVideoKey = activeIdx === 0 ? `${previewVideoKey}:layer0` : `${previewVideoKey}:layer1`;
+    const activeVideoKey =
+      activeIdx === 0
+        ? `${previewVideoKey}:layer0`
+        : `${previewVideoKey}:layer1`;
     const isLoading = videoLoadingStates[activeVideoKey] || false;
     const isBuffering = videoBufferingStates[activeVideoKey] || false;
 
     return isLoading || isBuffering;
-  }, [activeIdx, previewVideoKey, videoLoadingStates, videoBufferingStates, previewSources.length]);
+  }, [
+    activeIdx,
+    previewVideoKey,
+    videoLoadingStates,
+    videoBufferingStates,
+    previewSources.length,
+  ]);
 
   // Check if we should show loading indicator
   const shouldShowLoadingIndicator = useMemo(() => {
@@ -366,9 +385,7 @@ export default function UgcDashboardPage() {
   }, [previewSources.length, isCurrentlyLoading, videoLoadingStates]);
 
   useEffect(() => {
-    // Bei neuer Auswahl komplett zurücksetzen
     resetSeamlessPreview();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewVideoKey]);
 
   const handleGenerate = async () => {
@@ -385,9 +402,9 @@ export default function UgcDashboardPage() {
           reactionAvatarId: selectedAvatar.id,
           demoVideoId: selectedDemo?.id ?? undefined,
           title: hook.trim() || undefined,
-          overlayText: hook.trim() || undefined, // Hook-Text ins Video brennen
-          overlayPosition: hookPosition, // "upper" | "middle"
-          soundUrl: selectedSound?.ufsUrl || selectedSound?.url, // Sound-URL
+          overlayText: hook.trim() || undefined,
+          overlayPosition: hookPosition,
+          soundUrl: selectedSound?.ufsUrl || selectedSound?.url,
         }),
       });
       const data = await response.json();
@@ -519,11 +536,11 @@ export default function UgcDashboardPage() {
 
       <Card className="rounded-3xl border border-border/60 bg-card/95 shadow-xl">
         <CardContent className="p-5 sm:p-7 lg:p-9">
-          {/* 60% / 40% Layout */}
+          {}
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-start">
-            {/* LEFT: Hook + Avatars + Demos */}
+            {}
             <div className="flex flex-col gap-5">
-              {/* Hook (ohne innere Box) */}
+              {}
               <section className="p-0">
                 <div className="flex items-center justify-between">
                   <div>
@@ -540,7 +557,7 @@ export default function UgcDashboardPage() {
                 </div>
               </section>
 
-              {/* Avatars (ohne Tabs) */}
+              {}
               <section className="p-0">
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -583,7 +600,7 @@ export default function UgcDashboardPage() {
                 </div>
               </section>
 
-              {/* Demos (ohne Box, als 9:16 Cards + Platzhalter rechts) */}
+              {}
               <section className="p-0">
                 <h2 className="text-base font-semibold">3. Demos</h2>
                 <div className="mt-4">
@@ -593,7 +610,7 @@ export default function UgcDashboardPage() {
                     </div>
                   ) : (
                     <>
-                      {/* exakt 1 Zeile sichtbar – horizontal scrollen bei Overflow */}
+                      {}
                       <div className="rounded-2xl border border-border/50 bg-muted/40 overflow-x-auto">
                         <div className="flex flex-nowrap items-center gap-3 p-3">
                           {demos.map((demo) => {
@@ -611,9 +628,8 @@ export default function UgcDashboardPage() {
                                 )}
                                 title={demo.name || "Demo"}
                               >
-                                {/* Thumbnail falls vorhanden, sonst dunkle Fläche */}
+                                {}
                                 {demo.thumbnailUrl ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
                                   <img
                                     src={demo.thumbnailUrl}
                                     alt={demo.name || "Demo"}
@@ -627,7 +643,7 @@ export default function UgcDashboardPage() {
                               </button>
                             );
                           })}
-                          {/* Platzhalter-Kärtchen mit + ganz rechts */}
+                          {}
                           <Link
                             href="/dashboard/account/settings#demos"
                             className="relative aspect-[9/16] h-[120px] rounded-xl border border-dashed border-border/70 bg-background/60 hover:border-foreground/50 hover:bg-background/80 flex items-center justify-center"
@@ -643,15 +659,15 @@ export default function UgcDashboardPage() {
               </section>
             </div>
 
-            {/* RIGHT: Video Preview + Controls (ohne zusätzliche Box) */}
+            {}
             <div className="flex flex-col gap-4">
-              {/* etwas kompakter (ca. -20%) */}
+              {}
               <div className="relative mx-auto aspect-[9/16] w-full max-w-[360px] overflow-hidden rounded-2xl bg-black">
                 {previewSources.length > 0 || previewFallbackImage ? (
                   <>
                     {previewSources.length > 0 ? (
                       <div className="relative h-full w-full">
-                        {/* Layer 0 (Hook) */}
+                        {}
                         <video
                           key={`${previewVideoKey}:layer0`}
                           ref={v0Ref}
@@ -667,7 +683,10 @@ export default function UgcDashboardPage() {
                             willChange: "auto", // Performance hint
                           }}
                           onLoadStart={() => {
-                            console.log("[Video] Layer 0 loading:", previewSources[0]);
+                            console.log(
+                              "[Video] Layer 0 loading:",
+                              previewSources[0],
+                            );
                             const videoKey = `${previewVideoKey}:layer0`;
                             updateVideoLoadingState(videoKey, true);
                             updateVideoBufferingState(videoKey, false);
@@ -695,14 +714,18 @@ export default function UgcDashboardPage() {
                             updateVideoBufferingState(videoKey, false);
                           }}
                           onError={(e) => {
-                            console.error("[Video] Layer 0 error:", e, previewSources[0]);
+                            console.error(
+                              "[Video] Layer 0 error:",
+                              e,
+                              previewSources[0],
+                            );
                             const videoKey = `${previewVideoKey}:layer0`;
                             updateVideoLoadingState(videoKey, false);
                             updateVideoBufferingState(videoKey, false);
                           }}
                           onTimeUpdate={() => {
                             const el = v0Ref.current;
-                            // Wenn nur ein Source vorhanden, kein Seamless nötig
+
                             if (!el || previewSources.length < 2) return;
                             if (
                               !Number.isFinite(el.duration) ||
@@ -712,25 +735,22 @@ export default function UgcDashboardPage() {
                             const remainingMs =
                               (el.duration - el.currentTime) * 1000;
                             if (remainingMs <= transitionLeadMs && !armed) {
-                              // Zweites Video vorbereiten & starten
                               if (v1Ref.current) {
-                                // iOS braucht einen Play-Aufruf, wenn muted + playsInline gesetzt sind
                                 v1Ref.current.play().catch(() => {});
                                 setArmed(true);
-                                // Sofort sichtbar schalten, um den schwarzen Frame zu vermeiden
+
                                 setActiveIdx(1);
                               }
                             }
                           }}
                           onEnded={() => {
-                            // Fallback falls timeupdate knapp verpasst wurde
                             if (previewSources.length > 1 && v1Ref.current) {
                               setActiveIdx(1);
                               v1Ref.current.play().catch(() => {});
                             }
                           }}
                         />
-                        {/* Layer 1 (Demo) */}
+                        {}
                         {previewSources[1] ? (
                           <video
                             key={`${previewVideoKey}:layer1`}
@@ -746,7 +766,10 @@ export default function UgcDashboardPage() {
                               willChange: "auto", // Performance hint
                             }}
                             onLoadStart={() => {
-                              console.log("[Video] Layer 1 loading:", previewSources[1]);
+                              console.log(
+                                "[Video] Layer 1 loading:",
+                                previewSources[1],
+                              );
                               const videoKey = `${previewVideoKey}:layer1`;
                               updateVideoLoadingState(videoKey, true);
                               updateVideoBufferingState(videoKey, false);
@@ -774,16 +797,19 @@ export default function UgcDashboardPage() {
                               updateVideoBufferingState(videoKey, false);
                             }}
                             onError={(e) => {
-                              console.error("[Video] Layer 1 error:", e, previewSources[1]);
+                              console.error(
+                                "[Video] Layer 1 error:",
+                                e,
+                                previewSources[1],
+                              );
                               const videoKey = `${previewVideoKey}:layer1`;
                               updateVideoLoadingState(videoKey, false);
                               updateVideoBufferingState(videoKey, false);
                             }}
                             // nicht autoPlay: wir starten gezielt kurz vor Ende von Layer 0
                             onEnded={() => {
-                              // Für Preview zur Schleife zurück an den Start
                               resetSeamlessPreview();
-                              // Autoplay neu starten
+
                               requestAnimationFrame(() => {
                                 if (v0Ref.current) {
                                   v0Ref.current.play().catch(() => {});
@@ -795,7 +821,7 @@ export default function UgcDashboardPage() {
                       </div>
                     ) : previewFallbackImage ? (
                       <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {}
                         <img
                           src={previewFallbackImage}
                           alt={selectedAvatar?.name ?? "Reaction avatar"}
@@ -803,7 +829,7 @@ export default function UgcDashboardPage() {
                         />
                       </>
                     ) : null}
-                    {/* Hook Overlay (ohne IIFE im style → Parser-sicher) */}
+                    {}
                     {hook.trim().length > 0 && (
                       <div
                         className={cn(
@@ -837,7 +863,9 @@ export default function UgcDashboardPage() {
                         <div className="flex flex-col items-center gap-3 text-white">
                           <Loader2 className="h-8 w-8 animate-spin" />
                           <span className="text-sm font-medium">
-                            {isCurrentlyLoading ? "Buffering..." : "Loading video..."}
+                            {isCurrentlyLoading
+                              ? "Buffering..."
+                              : "Loading video..."}
                           </span>
                         </div>
                       </div>
@@ -853,7 +881,7 @@ export default function UgcDashboardPage() {
                 )}
               </div>
 
-              {/* Hook-Position als Icons (unter dem Video) */}
+              {}
               <div className="flex items-center justify-center gap-2">
                 <Button
                   type="button"
@@ -863,7 +891,7 @@ export default function UgcDashboardPage() {
                   className="rounded-full px-3"
                   title="Center vertically"
                 >
-                  {/* Linkes Icon: vertikal zentriert */}
+                  {}
                   <AlignVerticalJustifyCenter className="h-4 w-4" />
                 </Button>
                 <Button
@@ -874,14 +902,14 @@ export default function UgcDashboardPage() {
                   className="rounded-full px-3"
                   title="Top vertically"
                 >
-                  {/* Rechtes Icon: Top Alignment */}
+                  {}
                   <AlignVerticalJustifyStart className="h-4 w-4" />
                 </Button>
               </div>
 
-              {/* Sound (70%) links, Generate (30%) rechts – gemeinsames Flex-Layout */}
+              {}
               <div className="mt-2 w-full flex items-stretch gap-3">
-                {/* LINKS: Sound – 70% Breite */}
+                {}
                 <div className="min-w-0 basis-[70%]">
                   <Dialog open={soundOpen} onOpenChange={setSoundOpen}>
                     <DialogTrigger asChild>
@@ -890,7 +918,7 @@ export default function UgcDashboardPage() {
                         variant="outline"
                         className="h-12 w-full rounded-full border overflow-hidden px-0 py-0 items-stretch gap-0"
                       >
-                        {/* Bild links, abgerundet; rechte Abschlusslinie */}
+                        {}
                         <div className="relative h-full w-12 self-stretch shrink-0 overflow-hidden rounded-l-full border-r">
                           {selectedSound?.coverUrl ? (
                             <img
@@ -902,7 +930,7 @@ export default function UgcDashboardPage() {
                             <div className="h-full w-full bg-muted" />
                           )}
                         </div>
-                        {/* Text rechts: zentriert & nur Name */}
+                        {}
                         <div className="flex-1 px-3 flex items-center justify-center">
                           <span className="truncate text-base sm:text-lg font-semibold leading-none text-center">
                             {selectedSound ? selectedSound.name : "No sound"}
@@ -910,7 +938,7 @@ export default function UgcDashboardPage() {
                         </div>
                       </Button>
                     </DialogTrigger>
-                    {/* Sound Dialog */}
+                    {}
                     <DialogContent className="max-w-xl">
                       <DialogHeader>
                         <DialogTitle>Choose sound</DialogTitle>
@@ -926,7 +954,7 @@ export default function UgcDashboardPage() {
                           </div>
                         ) : (
                           <div className="grid gap-2 max-h-64 overflow-y-auto">
-                            {/* Special 'No sound' option */}
+                            {}
                             <button
                               onClick={() => {
                                 setTempSound(null);
@@ -969,7 +997,7 @@ export default function UgcDashboardPage() {
                                 key={sound.key}
                                 onClick={() => {
                                   setTempSound(sound);
-                                  // Preview direkt loopen
+
                                   setTimeout(() => {
                                     if (audioRef.current) {
                                       audioRef.current.currentTime = 0;
@@ -1010,14 +1038,14 @@ export default function UgcDashboardPage() {
                                   >
                                     {sound.name}
                                   </div>
-                                  {/* KB-Anzeige entfernt */}
+                                  {}
                                 </div>
                               </button>
                             ))}
                           </div>
                         )}
                       </div>
-                      {/* versteckter Audio-Player für Loop-Preview */}
+                      {}
                       <DialogFooter className="flex items-center justify-between gap-3">
                         <audio
                           ref={audioRef}
@@ -1041,10 +1069,6 @@ export default function UgcDashboardPage() {
                           <Button
                             type="button"
                             onClick={() => {
-                              // Exklusives Verhalten für "No sound":
-                              // - Wenn tempSound === null → immer stumm schalten.
-                              // - Wenn tempSound ein Sound-Objekt ist → diesen übernehmen.
-                              // - Wenn tempSound === undefined → Auswahl unverändert lassen.
                               if (tempSound === null) {
                                 setSelectedSound(null);
                               } else if (typeof tempSound !== "undefined") {
@@ -1060,7 +1084,7 @@ export default function UgcDashboardPage() {
                     </DialogContent>
                   </Dialog>
                 </div>
-                {/* RECHTS: Generate – 30% Breite */}
+                {}
                 <div className="basis-[30%]">
                   <Button
                     onClick={handleGenerate}
@@ -1071,14 +1095,14 @@ export default function UgcDashboardPage() {
                   </Button>
                 </div>
               </div>
-              {/* schließt RIGHT column */}
+              {}
             </div>
           </div>
-          {/* schließt den grid-Container (lg:grid-cols-[...]) */}
+          {}
         </CardContent>
       </Card>
 
-      {/* MY VIDEOS – wie AI Avatars (Kacheln + Aktionen) */}
+      {}
       <section className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -1093,7 +1117,6 @@ export default function UgcDashboardPage() {
             <Spinner className="h-6 w-6" />
           </div>
         ) : videos.length === 0 ? (
-          // Platzhalter-Kacheln wie bei Avataren/Templates
           <div className="rounded-2xl border border-dashed border-border/70 bg-muted/30 p-4">
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -1126,7 +1149,7 @@ export default function UgcDashboardPage() {
                         className="aspect-[9/16] w-full bg-black object-cover"
                       />
                     )}
-                    {/* Hover-Delete oben rechts */}
+                    {}
                     <button
                       title="Delete"
                       onClick={async () => {
@@ -1152,7 +1175,7 @@ export default function UgcDashboardPage() {
                       <Trash2 className="h-4 w-4" />
                     </button>
 
-                    {/* Overlay-Buttons im Bild – wie Recently Created */}
+                    {}
                     <div className="absolute inset-x-2 bottom-2 flex flex-col gap-2">
                       <Link
                         href={video.compositeVideoUrl}

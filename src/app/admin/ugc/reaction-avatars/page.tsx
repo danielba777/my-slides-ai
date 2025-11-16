@@ -55,7 +55,7 @@ export default function ReactionAvatarsAdminPage() {
   const [editThumbnailUploading, setEditThumbnailUploading] = useState(false);
   const [editVideoUploading, setEditVideoUploading] = useState(false);
   const [editing, setEditing] = useState(false);
-  // 302.ai generation UI
+  
   const [generateOpen, setGenerateOpen] = useState(false);
   const [generatePrompt, setGeneratePrompt] = useState("");
   const [generateCount, setGenerateCount] = useState(1);
@@ -73,7 +73,7 @@ export default function ReactionAvatarsAdminPage() {
     return maxOrder + 1;
   }, [avatars]);
 
-  // Beim Öffnen der Seite: zuerst automatisch aus Templates importieren, dann Liste laden.
+  
   useEffect(() => {
     const autoImportAndFetch = async () => {
       try {
@@ -83,7 +83,7 @@ export default function ReactionAvatarsAdminPage() {
           headers: { "Content-Type": "application/json" },
         });
       } catch {
-        // stiller Fail: wenn Import fehlschlägt, zeigen wir einfach den aktuellen Stand
+        
       } finally {
         await fetchAvatars();
       }
@@ -145,7 +145,7 @@ export default function ReactionAvatarsAdminPage() {
       try {
         data = await res.json();
       } catch {
-        // Fallback: Rohtext lesen, falls die Route (z.B. wegen Crash) keinen JSON-Body lieferte
+        
         const raw = await res.text().catch(() => "");
         if (!res.ok) {
           throw new Error(
@@ -154,13 +154,13 @@ export default function ReactionAvatarsAdminPage() {
         }
       }
       if (!res.ok) throw new Error(data?.error || "Generierung fehlgeschlagen");
-      // Sofortige Preview/CTA, falls die API bereits die videoUrl liefert
+      
       if (data?.videoUrl) {
         toast.success(`Video fertig (${data?.usedMode ?? "STD"})`);
       } else {
         toast.success(`Generiert mit fal.ai Pika ${data?.usedMode?.toUpperCase() ?? "STD"}`);
       }
-      // refresh list
+      
       await fetchAvatars();
       setGenerateOpen(false);
       setTargetAvatar(null);
@@ -493,7 +493,7 @@ export default function ReactionAvatarsAdminPage() {
                     </Button>
                   )}
                 <div className="aspect-video overflow-hidden rounded-lg bg-muted">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {}
                   <img
                     src={a.thumbnailUrl}
                     alt={a.name || "Reaction Avatar"}
@@ -528,7 +528,7 @@ export default function ReactionAvatarsAdminPage() {
             {targetAvatar && (
               <div className="flex items-center gap-4">
                 <div className="h-20 w-20 overflow-hidden rounded-lg bg-muted">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {}
                   <img
                     src={targetAvatar.thumbnailUrl}
                     alt={targetAvatar.name ?? "Reaction Avatar"}

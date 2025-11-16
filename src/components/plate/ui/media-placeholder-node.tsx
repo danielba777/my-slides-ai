@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/performance/noImgElement: This is a valid use case */
+
 "use client";
 
 import * as React from "react";
@@ -118,10 +118,10 @@ export const PlaceholderElement = withHOC(
       api.placeholder.removeUploadingFile(element.id as string);
     }, [uploadedFile, element.id]);
 
-    // React dev mode will call React.useEffect twice
+    
     const isReplaced = React.useRef(false);
 
-    /** Paste and drop */
+    
     React.useEffect(() => {
       if (isReplaced.current) return;
 

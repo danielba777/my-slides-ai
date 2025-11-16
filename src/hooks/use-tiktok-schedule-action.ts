@@ -80,7 +80,7 @@ export function useTikTokScheduleAction(
       ...DEFAULT_SCHEDULE_VALUES,
       ...options.defaultValues,
     };
-    // Ensure publishAt always has a value
+    
     if (!merged.publishAt) {
       merged.publishAt = createDefaultPublishAt();
     }

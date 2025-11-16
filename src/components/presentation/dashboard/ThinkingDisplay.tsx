@@ -32,7 +32,7 @@ export function ThinkingDisplay({
   const hasClosingTag = /<\/think>/i.test(thinking);
   const thinkingContent = extractThinkingContent(thinking);
 
-  // Only render when there is actual thinking content, not just loading
+  
   if (!thinkingContent) {
     return null;
   }

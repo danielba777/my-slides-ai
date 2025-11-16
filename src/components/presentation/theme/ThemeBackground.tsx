@@ -21,23 +21,23 @@ export function ThemeBackground({ className, children }: ThemeBackgroundProps) {
   const isDark = resolvedTheme === "dark";
   const [mounted, setMounted] = useState(false);
 
-  // Handle hydration mismatch by only rendering the gradient after mount
+  
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Apply theme variables whenever presentation theme or dark mode changes
+  
   useEffect(() => {
     if (mounted && presentationTheme) {
-      // Check if we're using a custom theme or a predefined theme
+      
       if (customThemeData) {
-        // Use custom theme data
+        
         setThemeVariables(customThemeData, isDark);
       } else if (
         typeof presentationTheme === "string" &&
         presentationTheme in themes
       ) {
-        // Use predefined theme
+        
         setThemeVariables(
           themes[presentationTheme as keyof typeof themes],
           isDark,
@@ -46,7 +46,7 @@ export function ThemeBackground({ className, children }: ThemeBackgroundProps) {
     }
   }, [presentationTheme, customThemeData, isDark, mounted]);
 
-  // Get the current theme colors
+  
   let currentTheme: ThemeProperties | undefined;
   if (customThemeData) {
     currentTheme = customThemeData;
@@ -70,7 +70,7 @@ export function ThemeBackground({ className, children }: ThemeBackgroundProps) {
 
   const colors = isDark ? currentTheme.colors.dark : currentTheme.colors.light;
 
-  // Create gradient styles based on theme colors, allow override
+  
   const defaultBackground = isDark
     ? `
         radial-gradient(circle at 10% 10%, ${colors.primary}20 0%, transparent 30%),

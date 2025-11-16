@@ -5,18 +5,18 @@ import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { z } from "zod";
 
-// Schema for creating/updating a theme
+
 const themeSchema = z.object({
   name: z.string().min(1).max(50),
   description: z.string().optional(),
-  themeData: z.any(), // We'll validate this as ThemeProperties in the function
+  themeData: z.any(), 
   logoUrl: z.string().optional(),
   isPublic: z.boolean().optional().default(false),
 });
 
 export type ThemeFormData = z.infer<typeof themeSchema>;
 
-// Create a new custom theme
+
 export async function createCustomTheme(formData: ThemeFormData) {
   try {
     const session = await auth();
@@ -48,7 +48,7 @@ export async function createCustomTheme(formData: ThemeFormData) {
   } catch (error) {
     console.error("Failed to create custom theme:", error);
 
-    // Log the actual error but return a generic message
+    
     if (error instanceof z.ZodError) {
       return {
         success: false,
@@ -68,7 +68,7 @@ export async function createCustomTheme(formData: ThemeFormData) {
   }
 }
 
-// Update an existing custom theme
+
 export async function updateCustomTheme(
   themeId: string,
   formData: ThemeFormData,
@@ -84,7 +84,7 @@ export async function updateCustomTheme(
 
     const validatedData = themeSchema.parse(formData);
 
-    // Verify ownership
+    
     const existingTheme = await db.customTheme.findUnique({
       where: { id: themeId },
     });
@@ -116,7 +116,7 @@ export async function updateCustomTheme(
   } catch (error) {
     console.error("Failed to update custom theme:", error);
 
-    // Log the actual error but return a generic message
+    
     if (error instanceof z.ZodError) {
       return {
         success: false,
@@ -136,7 +136,7 @@ export async function updateCustomTheme(
   }
 }
 
-// Delete a custom theme
+
 export async function deleteCustomTheme(themeId: string) {
   try {
     const session = await auth();
@@ -147,7 +147,7 @@ export async function deleteCustomTheme(themeId: string) {
       };
     }
 
-    // Verify ownership
+    
     const existingTheme = await db.customTheme.findUnique({
       where: { id: themeId },
     });
@@ -160,7 +160,7 @@ export async function deleteCustomTheme(themeId: string) {
       return { success: false, message: "Not authorized to delete this theme" };
     }
 
-    // Delete logo from uploadthing if exists
+    
     if (existingTheme.logoUrl) {
       try {
         const fileKey = existingTheme.logoUrl.split("/").pop();
@@ -169,7 +169,7 @@ export async function deleteCustomTheme(themeId: string) {
         }
       } catch (deleteError) {
         console.error("Failed to delete theme logo:", deleteError);
-        // Continue with theme deletion even if logo deletion fails
+        
       }
     }
 
@@ -191,7 +191,7 @@ export async function deleteCustomTheme(themeId: string) {
   }
 }
 
-// Get all custom themes for the current user
+
 export async function getUserCustomThemes() {
   try {
     const session = await auth();
@@ -226,7 +226,7 @@ export async function getUserCustomThemes() {
   }
 }
 
-// Get all public themes
+
 export async function getPublicCustomThemes() {
   try {
     const themes = await db.customTheme.findMany({
@@ -260,7 +260,7 @@ export async function getPublicCustomThemes() {
   }
 }
 
-// Get a single theme by ID
+
 export async function getCustomThemeById(themeId: string) {
   try {
     const theme = await db.customTheme.findUnique({

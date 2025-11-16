@@ -1,4 +1,4 @@
-// src/app/admin/slideshows/imagesets/[id]/page.tsx
+
 "use client";
 
 import { Badge } from "@/components/ui/badge";
@@ -70,7 +70,7 @@ export default function ImageSetDetailPage() {
     setIsUploading(true);
     const formData = new FormData();
     Array.from(uploadFiles).forEach((file) => formData.append("images", file));
-    // 👉 Flags gegen serverseitiges Cropping
+    
     formData.append("processing", "none");
     formData.append("fit", "contain");
     formData.append("keepOriginal", "true");
@@ -84,7 +84,7 @@ export default function ImageSetDetailPage() {
       if (response.ok) {
         toast.success(`${uploadFiles.length} Bilder erfolgreich hochgeladen`);
         setUploadFiles(null);
-        // Reset file input
+        
         const fileInput = document.getElementById("images") as HTMLInputElement;
         if (fileInput) fileInput.value = "";
         loadImageSet();
@@ -149,7 +149,7 @@ export default function ImageSetDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header mit Zurück-Button */}
+      {}
       <div className="flex items-center gap-4">
         <Button
           variant="ghost"
@@ -179,7 +179,7 @@ export default function ImageSetDetailPage() {
         </div>
       </div>
 
-      {/* Upload Bereich */}
+      {}
       <Card>
         <CardHeader>
           <CardTitle>Neue Bilder hochladen</CardTitle>
@@ -213,7 +213,7 @@ export default function ImageSetDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Bilder Grid */}
+      {}
       <Card>
         <CardHeader>
           <CardTitle>Bilder ({imageSet.images.length})</CardTitle>
@@ -234,7 +234,7 @@ export default function ImageSetDetailPage() {
                   key={image.id}
                   className="relative group aspect-square rounded-lg overflow-hidden border bg-muted"
                 >
-                  {/* Thumbs vollständig anzeigen, nicht beschneiden */}
+                  {}
                   <img src={image.url} alt={image.filename} className="h-full w-full object-contain" />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
                     <Button

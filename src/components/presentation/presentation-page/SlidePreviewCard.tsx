@@ -19,7 +19,7 @@ export function SlidePreviewCard({
   const [scale, setScale] = useState(0.2);
   const [height, setHeight] = useState<number | undefined>(undefined);
 
-  const BASE_WIDTH = 1024; // Logical slide width to scale from
+  const BASE_WIDTH = 1024; 
 
   useEffect(() => {
     if (!containerRef.current || !contentRef.current) return;
@@ -33,7 +33,7 @@ export function SlidePreviewCard({
         containerRect.width > 0 ? containerRect.width / BASE_WIDTH : 0.2;
       setScale(newScale);
 
-      // After scale is applied, measure scaled height
+      
       requestAnimationFrame(() => {
         if (!contentRef.current) return;
         const rect = contentRef.current.getBoundingClientRect();
@@ -43,7 +43,7 @@ export function SlidePreviewCard({
 
     const resizeObserver = new ResizeObserver(() => update());
     resizeObserver.observe(container);
-    // also observe content in case fonts load and change height
+    
     resizeObserver.observe(content);
 
     update();
@@ -70,7 +70,7 @@ export function SlidePreviewCard({
         style={{
           height: height ?? undefined,
           aspectRatio: height === undefined ? "16/9" : undefined,
-          // scale: height === undefined ? `${scale}` : undefined,
+          
           transition: "height 150ms ease-in-out",
         }}
       >

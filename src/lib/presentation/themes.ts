@@ -440,12 +440,12 @@ export const themes: Record<ThemeName, ThemeProperties> = {
   },
 };
 
-// Function to set CSS variables for a theme
+
 export function setThemeVariables(theme: ThemeProperties, isDark: boolean) {
   const colors = isDark ? theme.colors.dark : theme.colors.light;
   const shadows = isDark ? theme.shadows.dark : theme.shadows.light;
 
-  // Set CSS variables
+  
   document.documentElement.style.setProperty(
     "--presentation-primary",
     colors.primary,

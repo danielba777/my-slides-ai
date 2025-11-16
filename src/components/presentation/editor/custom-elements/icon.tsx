@@ -9,7 +9,7 @@ import {
 } from "platejs/react";
 import { type TIconElement } from "../plugins/icon-plugin";
 
-// Icon component that uses IconPicker
+
 export const Icon = ({
   element,
   className,
@@ -19,7 +19,7 @@ export const Icon = ({
   const { query, name } = element;
   const editor = useEditorRef();
 
-  // Handle icon selection
+  
   const handleIconSelect = (iconName: string) => {
     const path = editor.api.findPath(element);
     if (!path) return;

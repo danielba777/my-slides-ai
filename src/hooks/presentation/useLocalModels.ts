@@ -15,7 +15,7 @@ interface LMStudioResponse {
   data?: Array<{ id: string }>;
 }
 
-// Fetch models from Ollama
+
 async function fetchOllamaModels(): Promise<ModelInfo[]> {
   try {
     const response = await fetch("http://localhost:11434/api/tags");
@@ -39,7 +39,7 @@ async function fetchOllamaModels(): Promise<ModelInfo[]> {
   }
 }
 
-// Fetch models from LM Studio
+
 async function fetchLMStudioModels(): Promise<ModelInfo[]> {
   try {
     const response = await fetch("http://localhost:1234/v1/models");
@@ -62,7 +62,7 @@ async function fetchLMStudioModels(): Promise<ModelInfo[]> {
   }
 }
 
-// Fetch all local models
+
 async function fetchLocalModels(): Promise<ModelInfo[]> {
   const [ollamaModels, lmStudioModels] = await Promise.all([
     fetchOllamaModels(),
@@ -72,7 +72,7 @@ async function fetchLocalModels(): Promise<ModelInfo[]> {
   return [...ollamaModels, ...lmStudioModels];
 }
 
-// Popular downloadable models for Ollama
+
 export const downloadableModels: ModelInfo[] = [
   {
     id: "ollama-llama3.1:8b",
@@ -126,16 +126,16 @@ export const downloadableModels: ModelInfo[] = [
   },
 ];
 
-// Fallback models when no local models are available (same as downloadable for now)
+
 export const fallbackModels: ModelInfo[] = downloadableModels;
 
-// localStorage keys
+
 const MODELS_CACHE_KEY = "presentation-models-cache";
 const SELECTED_MODEL_KEY = "presentation-selected-model";
 const CACHE_EXPIRY_KEY = "presentation-models-cache-expiry";
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 5 * 60 * 1000; 
 
-// localStorage utilities
+
 function getCachedModels(): ModelInfo[] | null {
   try {
     const cached = localStorage.getItem(MODELS_CACHE_KEY);
@@ -158,7 +158,7 @@ function setCachedModels(models: ModelInfo[]): void {
       (Date.now() + CACHE_DURATION).toString(),
     );
   } catch {
-    // Ignore localStorage errors
+    
   }
 }
 
@@ -189,7 +189,7 @@ export function setSelectedModel(modelProvider: string, modelId: string): void {
 export function useLocalModels() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Get cached models for initial load
+  
   const cachedModels = getCachedModels();
 
   const query = useQuery({
@@ -199,7 +199,7 @@ export function useLocalModels() {
       setCachedModels(freshModels);
       return freshModels;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000, 
     retry: 1,
     retryDelay: 1000,
     initialData: cachedModels || undefined,
@@ -215,7 +215,7 @@ export function useLocalModels() {
     },
   });
 
-  // Mark initial load as complete after first render
+  
   useEffect(() => {
     if (isInitialLoad) {
       setIsInitialLoad(false);

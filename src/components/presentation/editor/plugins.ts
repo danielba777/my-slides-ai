@@ -9,7 +9,7 @@ import {
   StaircaseGroupPlugin,
   StairItemPlugin,
 } from "./plugins/staircase-plugin";
-// Create presentation-specific plugins
+
 
 import { AIKit } from "@/components/plate/plugins/ai-kit";
 import { AlignKit } from "@/components/plate/plugins/align-kit";
@@ -37,7 +37,7 @@ import { MathKit } from "@/components/plate/plugins/math-kit";
 import { MentionKit } from "@/components/plate/plugins/mention-kit";
 import { SlashKit } from "@/components/plate/plugins/slash-kit";
 import { SuggestionKit } from "@/components/plate/plugins/suggestion-kit";
-// import { TableKit } from "@/components/plate/plugins/table-kit";
+
 import { TocKit } from "@/components/plate/plugins/toc-kit";
 import { ToggleKit } from "@/components/plate/plugins/toggle-kit";
 import { ArrowListItemPlugin, ArrowListPlugin } from "./plugins/arrow-plugin";
@@ -80,15 +80,15 @@ import {
   SequenceArrowItemPlugin,
 } from "./plugins/sequence-arrow-plugin";
 import { TimelineItemPlugin, TimelinePlugin } from "./plugins/timeline-plugin";
-// import { TablePlugin, TableRowPlugin, TableCellPlugin } from "./plugins/table-plugin";
+
 
 export const presentationPlugins = [
   ...AIKit,
 
-  // Elements
+  
   ...BasicBlocksKit,
   ...CodeBlockKit,
-  // Replace default table with themed presentation table
+  
   ...PresentationTableKit,
   ...ToggleKit,
   ...TocKit,
@@ -100,21 +100,21 @@ export const presentationPlugins = [
   ...LinkKit,
   ...MentionKit,
 
-  // Marks
+  
   ...BasicMarksKit,
   ...FontKit,
 
-  // Block Style
+  
   ...ListKit,
   ...AlignKit,
   ...LineHeightKit,
 
-  // Collaboration
+  
   ...DiscussionKit,
   ...CommentKit,
   ...SuggestionKit,
 
-  // Editing
+  
   ...SlashKit,
   ...AutoformatKit,
   ...CursorOverlayKit,
@@ -122,16 +122,16 @@ export const presentationPlugins = [
   ...DndKit,
   ...ExitBreakKit,
 
-  // Parsers
+  
   ...MarkdownKit,
 
-  // UI
+  
   ...BlockPlaceholderKit,
   ...FixedToolbarKit,
   ...FloatingToolbarKit,
-  // TrailingBlockPlugin,
+  
 
-  // Custom ELements
+  
   VisualizationListPlugin,
   VisualizationItemPlugin,
 
@@ -154,7 +154,7 @@ export const presentationPlugins = [
   PyramidGroupPlugin,
   PyramidItemPlugin,
 
-  // New components
+  
   BoxGroupPlugin,
   BoxItemPlugin,
 
@@ -171,7 +171,7 @@ export const presentationPlugins = [
   SequenceArrowGroupPlugin,
   SequenceArrowItemPlugin,
 
-  // Individual chart elements
+  
   PieChartPlugin,
   BarChartPlugin,
   AreaChartPlugin,

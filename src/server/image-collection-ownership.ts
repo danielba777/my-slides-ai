@@ -1,9 +1,7 @@
 import { db } from "@/server/db";
 import type { User } from "@prisma/client";
 
-/**
- * Liefert alle ImageSet-IDs, die irgendeinem User gehören (private Collections).
- */
+
 export async function getAllOwnedImageSetIds(): Promise<string[]> {
   const rows = await db.userPersonalCollection.findMany({
     select: { imageSetId: true },
@@ -11,9 +9,7 @@ export async function getAllOwnedImageSetIds(): Promise<string[]> {
   return rows.map((r) => r.imageSetId);
 }
 
-/**
- * Liefert alle ImageSet-IDs, die dem angegebenen User gehören.
- */
+
 export async function getOwnedImageSetIds(userId: string | null): Promise<string[]> {
   if (!userId) return [];
   const rows = await db.userPersonalCollection.findMany({
@@ -23,9 +19,7 @@ export async function getOwnedImageSetIds(userId: string | null): Promise<string
   return rows.map((r) => r.imageSetId);
 }
 
-/**
- * Markiert ein Set als private Collection eines Users (idempotent).
- */
+
 export async function markImageSetOwnedByUser(params: {
   imageSetId: string;
   userId: string;
@@ -47,16 +41,12 @@ export async function markImageSetOwnedByUser(params: {
   });
 }
 
-/**
- * Entfernt die Ownership-Markierung (falls je benötigt).
- */
+
 export async function unmarkImageSetOwnedByUser(imageSetId: string) {
   await db.userPersonalCollection.deleteMany({ where: { imageSetId } });
 }
 
-/**
- * Hilfsfunktion im FE: annotiert ein Set mit isOwnedByUser
- */
+
 export function annotateImageSetOwnership<T extends { id: string }>(
   set: T,
   userId: string | null,
@@ -65,9 +55,7 @@ export function annotateImageSetOwnership<T extends { id: string }>(
   return { ...set, isOwnedByUser: Boolean(isOwned && userId) };
 }
 
-/**
- * FE-Check: gehört Set dem User?
- */
+
 export function isImageSetOwnedByUser<T extends { id: string; isOwnedByUser?: boolean }>(
   set: T,
   _userId: string | null,

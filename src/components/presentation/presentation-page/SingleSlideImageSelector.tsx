@@ -70,12 +70,12 @@ export function SingleSlideImageSelector({
   const [activeTab, setActiveTab] = useState<"community" | "mine">("community");
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Drill-down navigation state
+  
   const [drillDownParent, setDrillDownParent] = useState<ImageSet | null>(null);
-  // Alle von irgendeinem User "owned" (private Kollektionen) für Community-Filter
+  
   const [allOwned, setAllOwned] = useState<Set<string>>(new Set());
 
-  const IMAGES_PER_PAGE = 27; // 9 columns x 3 rows
+  const IMAGES_PER_PAGE = 27; 
 
   const loadImageSets = useCallback(async () => {
     try {
@@ -125,11 +125,11 @@ export function SingleSlideImageSelector({
       setPendingSelection(null);
       setSelectedSet(null);
       setCurrentPage(1);
-      setDrillDownParent(null); // Reset drill-down when opening dialog
+      setDrillDownParent(null); 
     }
   }, [isOpen, loadImageSets]);
 
-  // Reset page when changing selected set
+  
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedSet]);
@@ -153,7 +153,7 @@ export function SingleSlideImageSelector({
     );
   }, []);
 
-  // "Mine" = nur echte Ownership ODER AI-Avatar-Kollektionen
+  
   const belongsToUser = useCallback(
     (set: ImageSet) =>
       checkOwnership(set, userId ?? null) || isAiAvatarCollection(set),
@@ -161,20 +161,20 @@ export function SingleSlideImageSelector({
   );
 
   const { communitySets, mySets } = useMemo(() => {
-    // Drilldown: Kinder des Parents
+    
     if (drillDownParent) {
       const children = drillDownParent.children || [];
       const mine = children.filter(belongsToUser);
       const community = children.filter(
         (s) =>
-          !allOwned.has(s.id) && // keine User-Collections (von irgendwem)
-          !looksPersonal(s) &&   // keine "personal" getaggten
-          !isAiAvatarCollection(s), // keine AI-Avatars in Community
+          !allOwned.has(s.id) && 
+          !looksPersonal(s) &&   
+          !isAiAvatarCollection(s), 
       );
       return { communitySets: community, mySets: mine };
     }
 
-    // Top-Level
+    
     const topLevel = imageSets.filter((s) => !s.parentId);
     const mine = topLevel.filter(belongsToUser);
     const community = topLevel.filter(
@@ -216,16 +216,16 @@ export function SingleSlideImageSelector({
 
   const handleSelectSet = (set: ImageSet) => {
     setPendingSelection(null);
-    // Check if this set has children
+    
     const hasChildren =
       (set.children && set.children.length > 0) ||
       (set._count?.children && set._count.children > 0);
 
     if (hasChildren) {
-      // Drill down to show only children
+      
       setDrillDownParent(set);
     } else {
-      // Directly select this set for image browsing
+      
       setSelectedSet(set);
     }
   };
@@ -236,12 +236,12 @@ export function SingleSlideImageSelector({
   };
 
   const getPreviewImages = (set: ImageSet): ImageSetImage[] => {
-    // If this set has its own images, use them
+    
     if (Array.isArray(set.images) && set.images.length > 0) {
       return set.images.slice(0, 5);
     }
 
-    // If this set has children but no own images, use mixed preview
+    
     if (set.children && set.children.length > 0) {
       return getMixedPreviewImages(set);
     }
@@ -250,9 +250,9 @@ export function SingleSlideImageSelector({
   };
 
   const getMixedPreviewImages = (parent: ImageSet): ImageSetImage[] => {
-    // Create a mixed preview from all children
+    
     if (!parent.children || parent.children.length === 0) {
-      // Fallback: use parent's own images if available
+      
       if (Array.isArray(parent.images) && parent.images.length > 0) {
         return parent.images.slice(0, 5);
       }
@@ -265,14 +265,14 @@ export function SingleSlideImageSelector({
     );
 
     if (childrenWithImages.length === 0) {
-      // If no children have images, use parent's own images if available
+      
       if (Array.isArray(parent.images) && parent.images.length > 0) {
         return parent.images.slice(0, 5);
       }
       return [];
     }
 
-    // Distribute images evenly across children (round-robin)
+    
     let childIndex = 0;
     while (
       mixedImages.length < 5 &&
@@ -297,7 +297,7 @@ export function SingleSlideImageSelector({
 
       childIndex++;
 
-      // Break if we've exhausted all images
+      
       if (childIndex >= childrenWithImages.length * 10) break;
     }
 
@@ -326,7 +326,7 @@ export function SingleSlideImageSelector({
     return (
       <ScrollArea className="h-full max-h-full pr-4">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {/* "All Images" Option when drilling down */}
+          {}
           {drillDownParent && (
             <div
               key="all-images"
@@ -370,7 +370,7 @@ export function SingleSlideImageSelector({
             </div>
           )}
 
-          {/* Regular image sets */}
+          {}
           {sets.map((set) => {
             const previewImages = getPreviewImages(set);
 
@@ -422,14 +422,14 @@ export function SingleSlideImageSelector({
   const renderImageSelection = () => {
     if (!selectedSet) return null;
 
-    // Collect all images: either from this set or from all children
+    
     let allImages: ImageSetImage[] = [];
 
     if (Array.isArray(selectedSet.images) && selectedSet.images.length > 0) {
-      // Use own images if available
+      
       allImages = selectedSet.images;
     } else if (selectedSet.children && selectedSet.children.length > 0) {
-      // Collect images from all children
+      
       selectedSet.children.forEach((child) => {
         if (Array.isArray(child.images)) {
           allImages.push(...child.images);
@@ -473,7 +473,7 @@ export function SingleSlideImageSelector({
           </div>
         </div>
 
-        {/* Pagination */}
+        {}
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-4 py-3">
             <Button
@@ -549,7 +549,7 @@ export function SingleSlideImageSelector({
           </div>
         </DialogHeader>
 
-        {/* Scrollbarer Mittelteil */}
+        {}
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 overscroll-contain">
           {selectedSet ? (
             <div className="mt-2">{renderImageSelection()}</div>

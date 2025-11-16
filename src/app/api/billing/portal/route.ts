@@ -10,7 +10,6 @@ export async function POST(req: Request) {
   const user = await db.user.findUnique({ where: { id: session.user.id } });
   let customerId = user?.stripeCustomerId;
   if (!customerId) {
-    // create customer to allow opening the portal
     const customer = await stripe.customers.create({
       email: session.user.email ?? undefined,
       metadata: { userId: session.user.id },
@@ -19,9 +18,6 @@ export async function POST(req: Request) {
     await db.user.update({ where: { id: session.user.id }, data: { stripeCustomerId: customerId } });
   }
 
-  // Build a valid absolute origin:
-  // - Prefer NEXT_PUBLIC_APP_URL if it includes an explicit scheme
-  // - Else fall back to the current request's origin
   const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.trim();
   const hasScheme = !!fromEnv && /^https?:\/\//i.test(fromEnv);
   const origin = (hasScheme ? fromEnv! : new URL(req.url).origin).replace(/\/+$/, "");

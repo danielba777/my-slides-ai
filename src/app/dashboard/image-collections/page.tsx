@@ -73,15 +73,15 @@ export default function ImageCollectionsPage() {
       const ownedIds = new Set<string>(ownedPayload?.ownedIds ?? []);
       const userId = session?.user?.id ?? null;
 
-      // 1) Normale Index-Daten annotieren
+      
       const normalized = Array.isArray(data)
         ? data.map((set) =>
             annotateImageSetOwnership(set, userId, ownedIds.has(set.id)),
           )
         : [];
 
-      // 2) Hardening: Falls der Index owned Sets (kurzzeitig) NICHT liefert,
-      //    holen wir fehlende owned IDs gezielt nach und mergen sie rein.
+      
+      
       const presentIds = new Set(normalized.map((s) => s.id));
       const missingOwnedIds = Array.from(ownedIds).filter(
         (id) => !presentIds.has(id),
@@ -89,7 +89,7 @@ export default function ImageCollectionsPage() {
 
       let recovered: ImageSet[] = [];
       if (missingOwnedIds.length > 0) {
-        // Hole Details pro fehlender ID und markiere sie als owned
+        
         const detailCalls = missingOwnedIds.map(async (id) => {
           try {
             const r = await fetch(`/api/imagesets/${id}`, { cache: "no-store" });
@@ -133,7 +133,7 @@ export default function ImageCollectionsPage() {
       hasPersonalCategoryTag(set.name);
 
     const belongsToUser = (set: ImageSet) =>
-      // Persönliche Sets nur beim Besitzer anzeigen
+      
       isImageSetOwnedByUser(set, userId) || isAiAvatarCollection(set);
 
     return sets
@@ -217,7 +217,7 @@ export default function ImageCollectionsPage() {
     }
   }
 
-  // Edit-Button wird entfernt – Öffnen passiert über Card-Klick
+  
 
   async function createSet() {
     if (!newName.trim()) {
@@ -307,7 +307,7 @@ export default function ImageCollectionsPage() {
                        <div className="truncate text-base font-medium text-foreground">
                          {set.name}
                        </div>
-                       {/* Delete inside the category card header (not floating on the card) */}
+                       {}
                        <button
                          title="Delete collection"
                          onClick={(e) => {
@@ -323,7 +323,7 @@ export default function ImageCollectionsPage() {
 
                   {previewImages.length ? (
                     <div className="overflow-hidden -mx-2">
-                      {/* stretch preview to full card width (cancel inner p-2) */}
+                      {}
                       <div className="grid grid-cols-5 gap-0">
                         {previewImages.map((image, index) => (
                           <div
@@ -360,7 +360,7 @@ export default function ImageCollectionsPage() {
             <button
               type="button"
               onClick={() => setCreating(true)}
-              /* bump only the create-card height to match the preview cards */
+              
               className="group flex w-full items-center justify-center rounded-xl border-2 border-dashed bg-card p-2 text-sm text-muted-foreground transition hover:border-muted-foreground/60 hover:text-foreground min-h-[136px] md:min-h-[168px] lg:min-h-[200px]"
             >
               <div className="flex items-center gap-2">

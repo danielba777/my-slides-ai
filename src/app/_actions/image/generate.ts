@@ -20,10 +20,10 @@ export async function generateImageAction(
   prompt: string,
   model: ImageModelList = "black-forest-labs/FLUX.1-schnell-Free",
 ) {
-  // Get the current session
+  
   const session = await auth();
 
-  // Check if user is authenticated
+  
   if (!session?.user?.id) {
     throw new Error("You must be logged in to generate images");
   }
@@ -31,13 +31,13 @@ export async function generateImageAction(
   try {
     console.log(`Generating image with model: ${model}`);
 
-    // Generate the image using Together AI
+    
     const response = (await together.images.create({
       model: model,
       prompt: prompt,
       width: 1024,
       height: 768,
-      steps: model.includes("schnell") ? 4 : 28, // Fewer steps for schnell models
+      steps: model.includes("schnell") ? 4 : 28, 
       n: 1,
     })) as unknown as {
       id: string;
@@ -56,7 +56,7 @@ export async function generateImageAction(
 
     console.log(`Generated image URL: ${imageUrl}`);
 
-    // Download the image from Together AI URL
+    
     const imageResponse = await fetch(imageUrl);
     if (!imageResponse.ok) {
       throw new Error("Failed to download image from Together AI");
@@ -65,13 +65,13 @@ export async function generateImageAction(
     const imageBlob = await imageResponse.blob();
     const imageBuffer = await imageBlob.arrayBuffer();
 
-    // Generate a filename based on the prompt
+    
     const filename = `${prompt.substring(0, 20).replace(/[^a-z0-9]/gi, "_")}_${Date.now()}.png`;
 
-    // Create a UTFile from the downloaded image
+    
     const utFile = new UTFile([new Uint8Array(imageBuffer)], filename);
 
-    // Upload to UploadThing
+    
     const uploadResult = await utapi.uploadFiles([utFile]);
 
     if (!uploadResult[0]?.data?.ufsUrl) {
@@ -83,10 +83,10 @@ export async function generateImageAction(
     const permanentUrl = uploadResult[0].data.ufsUrl;
     console.log(`Uploaded to UploadThing URL: ${permanentUrl}`);
 
-    // Store in database with the permanent URL
+    
     const generatedImage = await db.generatedImage.create({
       data: {
-        url: permanentUrl, // Store the UploadThing URL instead of the Together AI URL
+        url: permanentUrl, 
         prompt: prompt,
         userId: session.user.id,
       },

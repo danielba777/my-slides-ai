@@ -1,4 +1,4 @@
-// apps/dashboard/src/lib/textMetrics.ts
+
 
 const BASE_FONT_PX = 72;
 const PADDING = 8;
@@ -33,10 +33,7 @@ export interface TextMeasureResult {
   lineHeight: number;
 }
 
-/**
- * Gemeinsame Text-Messroutine für Preview und Export.
- * Liefert konsistente Zeilenumbrüche und Höhen.
- */
+
 export function measureWrappedText(
   options: TextMeasureOptions,
 ): TextMeasureResult {
@@ -57,7 +54,7 @@ export function measureWrappedText(
   const contentWidth = Math.max(0, maxWidthPx - 2 * paddingPx);
 
   if (typeof document === "undefined") {
-    // Fallback fuer SSR
+    
     const fallbackLines = text.split("\n");
     const contentHeight = fallbackLines.length * lineHeightPx;
     const lineBoxes: TextLineBox[] = fallbackLines.map((line, index) => ({
@@ -76,7 +73,7 @@ export function measureWrappedText(
     };
   }
 
-  // DOM-Mess-Container erstellen (entsprechend der Preview-Logik)
+  
   const container = document.createElement("div");
   container.style.position = "fixed";
   container.style.left = "-100000px";
@@ -97,7 +94,7 @@ export function measureWrappedText(
   container.style.letterSpacing = `${letterSpacingPx}px`;
   (container.style as any).fontKerning = "normal";
 
-  // Text in Spans aufteilen für genaue Zeilenmessung
+  
   const paragraphs = text.split("\n");
   const spans: HTMLSpanElement[] = [];
 
@@ -120,7 +117,7 @@ export function measureWrappedText(
 
   document.body.appendChild(container);
 
-  // Zeilen basierend auf offsetTop gruppieren
+  
   const lines: string[] = [];
   if (spans.length === 0) {
     lines.push("");
@@ -165,12 +162,12 @@ export function measureWrappedText(
     };
   })();
 
-  // Container aufräumen
+  
   try {
     document.body.removeChild(container);
   } catch {}
 
-  // Höhen berechnen
+  
   const contentHeight = lines.length * lineHeightPx;
   const totalHeight = Math.ceil(contentHeight + 2 * paddingPx);
   const lineBoxes: TextLineBox[] = lines.map((line, index) => ({
@@ -190,10 +187,7 @@ export function measureWrappedText(
   };
 }
 
-/**
- * Automatische Höhe für Textelement berechnen.
- * Wird von Preview und Export gleichermaßen genutzt.
- */
+
 export function computeAutoHeight(
   options: Omit<TextMeasureOptions, "paddingPx"> & {
     width: number;
@@ -209,9 +203,7 @@ export function computeAutoHeight(
   return Math.max(28, result.totalHeight);
 }
 
-/**
- * Prüft ob die aktuelle Höhe für den Text ausreicht.
- */
+
 export function needsHeightAdjustment(
   options: TextMeasureOptions & { currentHeight: number },
 ): boolean {

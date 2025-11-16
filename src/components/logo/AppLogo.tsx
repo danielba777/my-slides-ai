@@ -8,11 +8,7 @@ import logoDark from "@/assets/logo_dark.png";
 import logoLight from "@/assets/logo_light.png";
 
 interface AppLogoProps {
-  /**
-   * Optional manual override. When provided, `true` forces the dark variant,
-   * `false` forces the light variant. When omitted, the component inverts the
-   * current resolved theme (light theme → dark logo, dark theme → light logo).
-   */
+  
   dark?: boolean;
   size?: number | string;
   className?: string;
@@ -39,8 +35,8 @@ export function AppLogo({
         }
       : {};
 
-  // When `dark` prop is provided, honour it. Otherwise invert the theme:
-  // light mode → dark logo, dark mode → light logo.
+  
+  
   const shouldUseDarkLogo =
     typeof dark === "boolean" ? dark : !isThemeDark || resolvedTheme === undefined;
 
@@ -60,7 +56,7 @@ export function AppLogo({
         alt="SlidesCockpit logo"
         width={750}
         height={750}
-        /* Qualität auf erlaubten Wert; oder prop ganz weglassen */
+        
         quality={75}
         priority={typeof size === "number" && size <= 64}
         className="h-full w-full object-contain"

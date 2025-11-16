@@ -53,7 +53,7 @@ model User {
   ugcVideos      UserUGCVideo[]
   reactionAvatarsCreated ReactionAvatar[] @relation("ReactionAvatarCreatedBy")
 
-  // Billing
+  
   stripeCustomerId String?
   plan             Plan?
   planSince        DateTime?
@@ -178,7 +178,6 @@ model GeneratedImage {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-/// Verknüpft User mit ihren persönlichen Image-Collections (eigene Ordner/Sets)
 model UserPersonalCollection {
   id         String   @id @default(uuid())
   userId     String

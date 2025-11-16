@@ -6,6 +6,7 @@ import { MarketingNavbar } from "@/components/marketing/Navbar";
 import { MarketingPricing } from "@/components/marketing/Pricing";
 import SmoothHashScroll from "@/components/marketing/SmoothHashScroll";
 import { MarketingTestimonials } from "@/components/marketing/Testimonials";
+import { MarketingThemeShowcase } from "@/components/marketing/ThemeShowcase";
 import { MarketingTikTokAutomation } from "@/components/marketing/TikTokAutomation";
 
 interface LandingPageContentProps {
@@ -36,6 +37,7 @@ export function LandingPageContent({
 
           <MarketingTikTokAutomation />
           <MarketingTestimonials />
+          {!category && <MarketingThemeShowcase />}
           <MarketingPricing session={session} />
           <MarketingFAQ />
         </main>

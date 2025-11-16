@@ -27,7 +27,7 @@ export type TChartNode = TElement & {
   options?: Record<string, unknown>;
 };
 
-// Individual chart plugins (editable)
+
 export const PieChartPlugin = createTPlatePlugin({
   key: PIE_CHART_ELEMENT,
   node: {
@@ -88,7 +88,7 @@ export const RadarChartPlugin = createTPlatePlugin({
   },
 });
 
-// Individual chart plugins (static)
+
 export const PieChartStaticPlugin = createTPlatePlugin({
   key: PIE_CHART_ELEMENT,
   node: { isElement: true, component: PieChartStatic },

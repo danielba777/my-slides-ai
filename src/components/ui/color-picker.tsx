@@ -466,12 +466,12 @@ function ColorPicker({
   const [customColor, setCustomColor] = React.useState(value);
   const [localColor, setLocalColor] = React.useState(value);
 
-  // Create a debounced version of onChange
+  
   const debouncedOnChange = React.useMemo(
     () =>
       debounce((color: string) => {
         onChange(color);
-      }, 100), // 100ms delay
+      }, 100), 
     [onChange],
   );
 
@@ -480,7 +480,7 @@ function ColorPicker({
     setLocalColor(value);
   }, [value]);
 
-  // Cleanup debounce on unmount
+  
   React.useEffect(() => {
     return () => {
       debouncedOnChange.cancel();
@@ -488,9 +488,9 @@ function ColorPicker({
   }, [debouncedOnChange]);
 
   const handleColorChange = (color: string) => {
-    setLocalColor(color); // Update local state immediately for UI
+    setLocalColor(color); 
     setCustomColor(color);
-    debouncedOnChange(color); // Debounce the actual onChange call
+    debouncedOnChange(color); 
   };
 
   return (
@@ -516,7 +516,7 @@ function ColorPicker({
         >
           <div className="grid grid-cols-5 gap-2">
             <TooltipProvider>
-              {/* Custom color picker - moved to first position */}
+              {}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="relative">

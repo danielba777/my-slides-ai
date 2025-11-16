@@ -3,16 +3,13 @@
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 
-/**
- * Get a public presentation without requiring authentication
- * This is used for the shared presentation view
- */
+
 export async function getSharedPresentation(id: string) {
   try {
     const presentation = await db.baseDocument.findUnique({
       where: {
         id,
-        isPublic: true, // Only fetch public presentations
+        isPublic: true, 
       },
       include: {
         presentation: {
@@ -54,9 +51,7 @@ export async function getSharedPresentation(id: string) {
   }
 }
 
-/**
- * Toggle the public status of a presentation
- */
+
 export async function togglePresentationPublicStatus(
   id: string,
   isPublic: boolean,
@@ -70,11 +65,11 @@ export async function togglePresentationPublicStatus(
   }
 
   try {
-    // This requires auth and ownership verification
+    
     const presentation = await db.baseDocument.update({
       where: {
         id,
-        userId: session.user.id, // Only the owner can change the public status
+        userId: session.user.id, 
       },
       data: { isPublic },
     });

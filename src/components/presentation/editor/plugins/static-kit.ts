@@ -38,7 +38,7 @@ import {
   TIMELINE_ITEM,
 } from "../lib";
 
-// Components mapping for static rendering
+
 export const PresentationStaticComponents = {
   [ARROW_LIST]: ArrowListStatic,
   [ARROW_LIST_ITEM]: ArrowItemStatic,
@@ -56,11 +56,11 @@ export const PresentationStaticComponents = {
   [TIMELINE_GROUP]: TimelineStatic,
   [TIMELINE_ITEM]: TimelineItemStatic,
   [BUTTON_ELEMENT]: ButtonStatic,
-  // Legacy visualization adapters
+  
   "visualization-list": VisualizationListElementStatic,
   "visualization-item": VisualizationItemElementStatic,
-  // Override image key to use presentation image static with crop support
+  
   [KEYS.img]: PresentationImageElementStatic,
-  // Marks
+  
   generating: GeneratingLeafStatic,
 } as const;

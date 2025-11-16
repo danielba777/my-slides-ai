@@ -13,7 +13,7 @@ export function extractSlideCountFromPrompt(prompt: string): number | null {
     return numeric;
   };
 
-  // Handle ranges like "8-10 slides" -> take the upper bound
+  
   const rangePattern =
     /\b(\d{1,2})\s*[-–—]\s*(\d{1,2})\s*(?:slides?|cards?)\b/g;
   let rangeMatch: RegExpExecArray | null;

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { env } from "@/env";
 import { auth } from "@/server/auth";
 
-// Proxy: Liste der Sounds kommt aus dem entkoppelten API-Projekt
+
 export async function GET() {
   const t0 = Date.now();
   const session = await auth();
@@ -51,7 +51,7 @@ export async function GET() {
       );
     }
     console.log("[SoundsProxy][GET] Upstream success:", logOut);
-    // Normalisieren: API kann {items:[...]} ODER {sounds:[...]} liefern
+    
     const items = Array.isArray(data?.items)
       ? data.items
       : Array.isArray(data?.sounds)
@@ -59,21 +59,21 @@ export async function GET() {
         : Array.isArray(data)
           ? data
           : [];
-    // Hilfsfunktion: sauberen Anzeigenamen ausgeben
+    
     const cleanName = (raw: string): string => {
       try {
         if (!raw) return "Unbenannt";
-        // Falls ein Pfad kommt, nur den Dateinamen nehmen
+        
         const base = raw.split("/").pop() || raw;
-        // Extension entfernen
+        
         const noExt = base.replace(/\.[a-z0-9]+$/i, "");
-        // Führende Zeitstempel/Ziffern + Trenner (z. B. "1699999999999-", "12345_") entfernen
+        
         const noStamp = noExt.replace(/^[\d]+[-_]+/i, "");
-        // Mehrfache Unterstriche/Bindestriche zu Leerzeichen
+        
         const spaced = noStamp.replace(/[-_]+/g, " ");
-        // Aufräumen: trimmen + mehrere Spaces reduzieren
+        
         const pretty = spaced.replace(/\s{2,}/g, " ").trim();
-        // Falls nach dem Cleanen nichts übrig bleibt
+        
         return pretty || "Unbenannt";
       } catch {
         return "Unbenannt";
@@ -81,7 +81,7 @@ export async function GET() {
     };
 
     const normalized = items.map((it: any) => {
-      // Quelle für Name: bevorzugt echtes 'name' Feld, sonst 'filename', sonst 'key'/'url'
+      
       const rawName: string =
         (typeof it?.name === "string" && it.name.trim().length > 0
           ? it.name
@@ -92,7 +92,7 @@ export async function GET() {
 
       return {
         key: String(it.key ?? it.id ?? it.url ?? crypto.randomUUID()),
-        // Wichtig: Name hübsch formatieren (führt deinen Admin-Namen ohne Präfix/Endung)
+        
         name: cleanName(rawName),
         size: Number(it.size ?? 0),
         url: it.url ?? null,

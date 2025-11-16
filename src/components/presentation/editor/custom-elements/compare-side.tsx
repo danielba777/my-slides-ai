@@ -7,7 +7,7 @@ import { PlateElement, type PlateElementProps } from "platejs/react";
 export const CompareSide = (props: PlateElementProps) => {
   const index = props.path.at(-1) ?? 0;
 
-  // Get parent element for color
+  
   const parentPath = PathApi.parent(props.path);
   const parentElement = NodeApi.get(props.editor, parentPath);
 

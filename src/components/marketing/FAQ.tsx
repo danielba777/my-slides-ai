@@ -8,7 +8,7 @@ import {
 import { Section } from "./Section";
 
 export function MarketingFAQ() {
-  // Grouped by category (design stays the same; we only show clear category blocks)
+  
   const categories: {
     title: string;
     items: {

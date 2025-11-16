@@ -72,11 +72,9 @@ export function PresentationControls({
 
   return (
     <div className={cn("grid grid-cols-5 gap-4", className)}>
-      {/* 
-      <ModelPicker shouldShowLabel={shouldShowLabel} />
-      */}
+      {}
 
-      {/* Number of Slides */}
+      {}
       <div>
         {shouldShowLabel && (
           <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -112,7 +110,7 @@ export function PresentationControls({
         </Select>
       </div>
 
-      {/* Language */}
+      {}
       <div>
         {shouldShowLabel && (
           <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -139,51 +137,7 @@ export function PresentationControls({
           </SelectContent>
         </Select>
       </div>
-      {/* 
-      <div>
-        {shouldShowLabel && (
-          <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Bilder-Set
-          </label>
-        )}
-        <Select
-          value={imageSetId || "none"}
-          onValueChange={(value) => {
-            if (value === "none") {
-              setImageSetId(null);
-              setImageSource("stock");
-            } else {
-              setImageSetId(value);
-              setImageSource("imageset");
-            }
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Wähle ein Bilder-Set" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Kein Set (Unsplash/AI)</SelectItem>
-            {imageSets.map((imageSet) => (
-              <SelectItem key={imageSet.id} value={imageSet.id}>
-                {imageSet.name} ({imageSet._count.images} Bilder)
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div>
-        {shouldShowLabel && (
-          <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Page style
-          </label>
-        )}
-        <div className="flex h-10 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-          <Layout className="h-4 w-4" />
-          <span className="truncate">Default</span>
-        </div>
-      </div>
-      */}
+      {}
     </div>
   );
 }

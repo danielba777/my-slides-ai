@@ -14,7 +14,7 @@ export default function TermsOfServicePage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:py-12">
-      {/* Back */}
+      {}
       <div className="mb-6">
         <Link
           href="/"
@@ -25,7 +25,7 @@ export default function TermsOfServicePage() {
         </Link>
       </div>
 
-      {/* Heading */}
+      {}
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
         Terms of Service
       </h1>
@@ -33,7 +33,7 @@ export default function TermsOfServicePage() {
         Last updated: {lastUpdated}
       </p>
 
-      {/* Body */}
+      {}
       <div className="prose prose-neutral mt-8 max-w-none prose-headings:scroll-mt-24">
         <p>
           Welcome to SlidesCockpit. By accessing or using our service at{" "}

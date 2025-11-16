@@ -27,8 +27,8 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
-// Nicht exportieren, sonst verletzt es die erlaubten Next.js App-Exports
-// und triggert den TS2344-Fehler (.next/types/... checkFields).
+
+
 const PRESENTATION_GENERATION_COOKIE = "presentation_generation_pending";
 
 function hasPendingCookie() {
@@ -48,7 +48,7 @@ function clearPendingCookie() {
 }
 
 function makeCanvasFromText(text: string, w = 1080, h = 1620): CanvasDoc {
-  // 2:3 aspect ratio
+
   const nx = 0.5;
   const ny = 0.5;
   return {
@@ -62,11 +62,13 @@ function makeCanvasFromText(text: string, w = 1080, h = 1620): CanvasDoc {
         type: "text",
         x: Math.round(nx * w),
         y: Math.round(ny * h),
-        nx, // Horizontal mittig (normalisierte Koordinaten)
-        ny, // Vertikal mittig (normalisierte Koordinaten)
+        nx,
+        ny,
+        width: 1000, // Full width text
         text,
         fontFamily: "Inter",
         fontSize: 72,
+        align: "center", // Center aligned
         fill: "#111",
       },
     ],
@@ -102,13 +104,13 @@ export default function PresentationGenerateWithIdPage() {
     theme: selectedTheme,
   } = usePresentationState();
 
-  // Track if this is a fresh navigation or a revisit
+  
   const initialLoadComplete = useRef(false);
   const generationStarted = useRef(false);
   const slidesGenerationTriggered = useRef(false);
   const templateGenerationStarted = useRef(false);
 
-  // Use React Query to fetch presentation data
+  
   const { data: presentationData, isLoading: isLoadingPresentation } = useQuery(
     {
       queryKey: ["presentation", id],
@@ -123,7 +125,7 @@ export default function PresentationGenerateWithIdPage() {
     },
   );
 
-  // Function to clear the cookie
+  
   const clearPresentationCookie = () => {
     if (typeof document === "undefined") return;
 
@@ -133,19 +135,19 @@ export default function PresentationGenerateWithIdPage() {
     document.cookie = `${PRESENTATION_GENERATION_COOKIE}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; ${domain !== "localhost" ? `domain=${domain}; ` : ""}`;
   };
 
-  // Clear legacy cookie name if vorhanden (Abwärtskompatibilität)
+  
   useEffect(() => {
-    // früherer Name beibehalten:
+    
     clearPresentationCookie();
   }, []);
 
-  // Template-based generation effect
+  
   useEffect(() => {
     if (!isTemplateMode || templateGenerationStarted.current) {
       return;
     }
 
-    // Try to get template from sessionStorage
+    
     const pendingTemplateJson = sessionStorage.getItem('pendingTemplate');
     if (!pendingTemplateJson) {
       console.error('No pending template found in sessionStorage');
@@ -163,7 +165,7 @@ export default function PresentationGenerateWithIdPage() {
     state.setIsGeneratingOutline(true);
 
     try {
-      // Parse template from sessionStorage
+      
       const template = JSON.parse(pendingTemplateJson) as {
         id: string;
         slides: Array<{ id: string; imageUrl: string; slideIndex?: number }>;
@@ -176,7 +178,7 @@ export default function PresentationGenerateWithIdPage() {
       const variety = template.variety ?? 0;
       console.log('Starting template generation with', template.slides.length, 'slides, variety:', variety);
 
-      // Call the generate-from-template API
+      
       const response = await fetch("/api/presentation/generate-from-template", {
         method: "POST",
         headers: {
@@ -203,7 +205,7 @@ export default function PresentationGenerateWithIdPage() {
 
       console.log('Streaming XML response...');
 
-      // Stream and parse the XML response
+      
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       const parser = new SlideParser();
@@ -221,7 +223,7 @@ export default function PresentationGenerateWithIdPage() {
       console.log('XML content received, length:', xmlContent.length);
       console.log('XML preview:', xmlContent.substring(0, 500));
 
-      // Parse the complete XML to slides
+      
       const parsedSlides = parser.parseChunk(xmlContent);
 
       console.log('Parsed slides:', parsedSlides.length);
@@ -230,19 +232,19 @@ export default function PresentationGenerateWithIdPage() {
         throw new Error("No slides generated from template");
       }
 
-      // Apply TikTok styling to all slides
+      
       console.log('Applying TikTok text styling...');
       const slidesWithTikTokStyle = parsedSlides.map((slide, index) => {
-        // First slide gets highlight-box style, rest get outline style
+        
         const styleMode = index === 0 ? "highlight" : "outline";
         return applySlideTikTokStyle(slide, styleMode);
       });
 
-      // Load images for each slide from the imageset
+      
       console.log('Loading images for slides from imageset...');
       const slidesWithImages = await Promise.all(
         slidesWithTikTokStyle.map(async (slide) => {
-          // Extract heading text to use as query
+          
           const heading = slide.content.find((node) => node.type === "h1");
           const query = heading
             ? ((heading as any).children?.[0]?.text || "").split(/\s+/).slice(0, 10).join(" ")
@@ -262,7 +264,7 @@ export default function PresentationGenerateWithIdPage() {
 
           console.log('Loaded image for slide:', imageUrl);
 
-          // Ensure slide has canvas and apply image
+          
           const slideWithCanvas = ensureSlideCanvas(slide);
           const canvasWithBg = applyBackgroundImageToCanvas(slideWithCanvas.canvas, imageUrl);
 
@@ -285,7 +287,7 @@ export default function PresentationGenerateWithIdPage() {
         return heading ? (heading as any).children?.[0]?.text || "Untitled" : "Untitled";
       }));
 
-      // Set thumbnail from first slide with image
+      
       const firstSlideWithImage = slidesWithImages.find((slide) => slide.rootImage?.url);
       if (firstSlideWithImage?.rootImage?.url) {
         state.setThumbnailUrl(firstSlideWithImage.rootImage.url);
@@ -293,7 +295,7 @@ export default function PresentationGenerateWithIdPage() {
 
       console.log('Saving presentation...');
 
-      // Save presentation
+      
       await updatePresentation({
         id,
         content: {
@@ -313,36 +315,36 @@ export default function PresentationGenerateWithIdPage() {
 
       console.log('Presentation saved, clearing template data and redirecting...');
 
-      // Clear the template from sessionStorage
+      
       sessionStorage.removeItem('pendingTemplate');
 
       state.setIsGeneratingOutline(false);
 
-      // Redirect to editor
+      
       router.push(`/dashboard/slideshows/${id}`);
     } catch (error) {
       console.error("Template generation error:", error);
       toast.error(error instanceof Error ? error.message : "Failed to generate presentation from template");
       state.setIsGeneratingOutline(false);
 
-      // Clear the template from sessionStorage
+      
       sessionStorage.removeItem('pendingTemplate');
 
       router.push("/dashboard/slideshows");
     }
   };
 
-  // This effect handles the immediate startup of generation upon first mount
-  // only if we're coming fresh from the dashboard (isGeneratingOutline === true)
+  
+  
   useEffect(() => {
-    // Skip if this is template mode
+    
     if (isTemplateMode) return;
 
-    // Only run once on initial page load
+    
     if (initialLoadComplete.current) return;
     initialLoadComplete.current = true;
 
-    // Start, wenn Store-Flag ODER Pending-Cookie gesetzt ist
+    
     if (
       (isGeneratingOutline || hasPendingCookie()) &&
       !generationStarted.current
@@ -350,22 +352,19 @@ export default function PresentationGenerateWithIdPage() {
       console.log("Starting outline generation after navigation");
       generationStarted.current = true;
 
-      // Give the component time to fully mount and establish connections
-      // before starting the generation process
+      
+      
       setTimeout(() => {
         setShouldStartOutlineGeneration(true);
-        // Cookie ist verbraucht
+        
         clearPendingCookie();
       }, 100);
     }
   }, [isGeneratingOutline, setShouldStartOutlineGeneration, isTemplateMode]);
 
-  /**
-   * Sobald die Outline fertig ist, direkt die Slides generieren
-   * und auf die Slides-Page weiterleiten — ohne dass die Outline-Seite sichtbar wird.
-   */
+  
   useEffect(() => {
-    if (isTemplateMode) return; // Skip if template mode
+    if (isTemplateMode) return; 
     if (slidesGenerationTriggered.current) return;
     const outlineReady =
       !isGeneratingOutline && Array.isArray(outline) && outline.length > 0;
@@ -375,7 +374,7 @@ export default function PresentationGenerateWithIdPage() {
     }
   }, [outline, isGeneratingOutline, isGeneratingPresentation, isTemplateMode]);
 
-  // Update presentation state when data is fetched
+  
   useEffect(() => {
     if (presentationData && !isLoadingPresentation && !isGeneratingOutline) {
       setCurrentPresentation(presentationData.id, presentationData.title);
@@ -387,7 +386,7 @@ export default function PresentationGenerateWithIdPage() {
         setOutline(presentationData.presentation.outline);
       }
 
-      // Load search results if available
+      
       if (presentationData.presentation?.searchResults) {
         try {
           const searchResults = Array.isArray(
@@ -403,38 +402,38 @@ export default function PresentationGenerateWithIdPage() {
         }
       }
 
-      // Set theme if available
+      
       if (presentationData.presentation?.theme) {
         const themeId = presentationData.presentation.theme;
 
-        // Check if this is a predefined theme
+        
         if (themeId in themes) {
-          // Use predefined theme
+          
           setTheme(themeId as Themes);
         } else {
-          // If not in predefined themes, treat as custom theme
+          
           void getCustomThemeById(themeId)
             .then((result) => {
               if (result.success && result.theme) {
-                // Set the theme with the custom theme data
+                
                 const themeData = result.theme
                   .themeData as unknown as ThemeProperties;
                 setTheme(themeId, themeData);
               } else {
-                // Fallback to default theme if custom theme not found
+                
                 console.warn("Custom theme not found:", themeId);
                 setTheme("mystique");
               }
             })
             .catch((error) => {
               console.error("Failed to load custom theme:", error);
-              // Fallback to default theme on error
+              
               setTheme("mystique");
             });
         }
       }
 
-      // Set presentationStyle if available
+      
       if (presentationData.presentation?.presentationStyle) {
         setPresentationStyle(presentationData.presentation.presentationStyle);
       }
@@ -451,7 +450,7 @@ export default function PresentationGenerateWithIdPage() {
         }
       }
 
-      // Set language if available
+      
       if (presentationData.presentation?.language) {
         setLanguage(presentationData.presentation.language);
       }
@@ -528,9 +527,9 @@ export default function PresentationGenerateWithIdPage() {
     state.setPresentationThinking("");
     state.setShouldStartPresentationGeneration(false);
 
-    // Canvas-only: jedes Outline-Item wird ein Canvas-Slide
-    const chosenWidth = 1080; // TODO: aus Preset/Wizard holen
-    const chosenHeight = 1920; // TODO: aus Preset/Wizard holen
+    
+    const chosenWidth = 1080; 
+    const chosenHeight = 1920; 
 
     const slides: PlateSlide[] = await Promise.all(
       state.outline.map(async (item) => {
@@ -566,13 +565,13 @@ export default function PresentationGenerateWithIdPage() {
             ? { x: firstTextNode.x, y: firstTextNode.y }
             : undefined,
           canvas: canvasWithBg,
-          // Wichtig: rootImage direkt beim Generieren setzen, wenn aus Imageset generiert wurde,
-          // damit der Shuffle-Button („Random image from current category") sofort aktiv ist.
+          
+          
           rootImage: imageUrl
             ? {
                 query: query,
                 url: imageUrl,
-                // Merke die Quelle (nur informativ, wird andernorts ggf. genutzt)
+                
                 source:
                   imageSource === "imageset"
                     ? "imageset"
@@ -581,7 +580,7 @@ export default function PresentationGenerateWithIdPage() {
                       : imageSource === "ai"
                         ? "ai"
                         : "unknown",
-                // Falls Imageset gewählt war, hänge die Kategorie an die Slide
+                
                 imageSetId:
                   imageSource === "imageset" && selectedImageSetId
                     ? selectedImageSetId
@@ -609,14 +608,14 @@ export default function PresentationGenerateWithIdPage() {
     try {
       await updatePresentation({
         id,
-        // WICHTIG: Das gewählte ImageSet (falls vorhanden) auf Content-Ebene persistieren,
-        // damit die Editor-Seite es beim Laden in den State übernehmen kann.
+        
+        
         content: {
           slides,
           config: {
             theme: state.theme,
-            // persist presentation-level imageSetId, damit Shuffle sofort weiß,
-            // aus welchem Set random Bilder gezogen werden dürfen
+            
+            
             imageSetId:
               imageSource === "imageset" && selectedImageSetId
                 ? selectedImageSetId
@@ -642,7 +641,7 @@ export default function PresentationGenerateWithIdPage() {
     }
   };
 
-  // Immer Ladezustand anzeigen, während automatisch generiert wird
+  
   if (isLoadingPresentation) return <LoadingStateWithFixedBackground />;
   return <LoadingStateWithFixedBackground />;
 }

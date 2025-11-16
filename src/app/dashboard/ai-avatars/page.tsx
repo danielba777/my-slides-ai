@@ -488,7 +488,7 @@ export default function AiAvatarDashboardPage() {
           </div>
         )}
 
-        {/* Simple text toggle instead of Tabbar */}
+        {}
         <div className="px-6">
           <div className="flex items-center gap-4 text-xl font-semibold text-zinc-500">
             <button
@@ -520,7 +520,7 @@ export default function AiAvatarDashboardPage() {
           </div>
         </div>
 
-        {/* Content sections */}
+        {}
         <div className="px-6">
           {activeTab === "recent" && (
             <div className="mt-4">

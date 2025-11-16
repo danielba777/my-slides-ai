@@ -18,8 +18,8 @@ export interface CheckLoadedOptions {
   timeout?: number;
 }
 
-// Check whether a font family is loaded using the browser fonts api.
-// Returns (true) if font family is loaded. Throws error if not loaded within timeout.
+
+
 export async function checkLoaded({
   fontFamily,
   fontStyle,
@@ -27,7 +27,7 @@ export async function checkLoaded({
   timeout = 500,
 }: CheckLoadedOptions): Promise<boolean> {
   const start = Date.now();
-  // ref: https://stackoverflow.com/a/56239226
+  
   let timeoutId: ReturnType<typeof setTimeout>;
 
   return new Promise((resolve, reject) => {
@@ -38,7 +38,7 @@ export async function checkLoaded({
           if (now - start >= timeout) {
             reject(new Error(`Font not loaded within ${timeout} ms`));
           } else {
-            // ref: https://developer.mozilla.org/en-US/docs/Web/API/FontFaceSet/check
+            
             const loaded = document.fonts.check(
               `${fontStyle ?? ""} ${fontWeight ?? ""} 0 ${fontFamily}`,
             );

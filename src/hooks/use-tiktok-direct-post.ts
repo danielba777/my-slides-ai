@@ -46,7 +46,7 @@ export interface UseTikTokDirectPostResult {
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   handleSubmit: () => Promise<TikTokDirectPostResult | null>;
   reset: (values?: Partial<TikTokDirectPostPayload>) => void;
-  // For compatibility with TikTokPostForm
+  
   accounts: ReturnType<typeof useTikTokAccounts>["accounts"];
   accountsLoading: ReturnType<typeof useTikTokAccounts>["loading"];
   refreshAccounts: ReturnType<typeof useTikTokAccounts>["refresh"];
@@ -71,7 +71,7 @@ export function useTikTokDirectPost(
   const [result, setResult] = useState<TikTokDirectPostResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Get accounts from separate hook for compatibility
+  
   const { accounts, loading: accountsLoading, refresh: refreshAccounts } = useTikTokAccounts();
 
   const updateField = useCallback(
@@ -86,7 +86,7 @@ export function useTikTokDirectPost(
   );
 
   const handleSubmit = useCallback(async () => {
-    // Validate required fields
+    
     if (!form.openId.trim()) {
       setError("Please select a TikTok account");
       return null;
@@ -124,7 +124,7 @@ export function useTikTokDirectPost(
       const data = (await response.json()) as TikTokDirectPostResult;
       setResult(data);
 
-      // Show info toast for processing status - UI will handle the rest
+      
       if (data.status === "inbox") {
         toast.success("Post sent to TikTok inbox for review");
         toast("Please note: It may take a few minutes for your post to appear on TikTok");

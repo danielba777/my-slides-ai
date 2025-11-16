@@ -26,7 +26,7 @@ export default function CreateSlideshowPostPage() {
   const router = useRouter();
   const prepared = useSlideshowPostState((state) => state.prepared);
 
-  // Use the new direct post hook
+  
   const directPostAction = useTikTokDirectPost({
     defaultValues: {
       caption: "",
@@ -35,7 +35,7 @@ export default function CreateSlideshowPostPage() {
     },
   });
 
-  // Keep schedule action for scheduling functionality
+  
   const scheduleAction = useTikTokScheduleAction({
     defaultValues: {
       caption: "",
@@ -44,7 +44,7 @@ export default function CreateSlideshowPostPage() {
     },
   });
 
-  // Get accounts from separate hook
+  
   const { accounts, loading: accountsLoading, refresh: refreshAccounts } = useTikTokAccounts();
 
   const updateDirectPostField = directPostAction.updateField;
@@ -64,7 +64,7 @@ export default function CreateSlideshowPostPage() {
   } | null>(null);
   const [tiktokMetadata, setTiktokMetadata] = useState<any>(null);
 
-  // Check if metadata is valid (privacy level selected)
+  
   const [isMetadataValid, setIsMetadataValid] = useState(true);
   const [privacySelectionMissing, setPrivacySelectionMissing] = useState(true);
   const [brandDisclosureMissing, setBrandDisclosureMissing] = useState(false);
@@ -73,7 +73,7 @@ export default function CreateSlideshowPostPage() {
   const noAccountsToastShown = useRef(false);
   const noSlidesToastShown = useRef(false);
 
-  // Update metadata validity when global state changes
+  
   useEffect(() => {
     const checkMetadataStatus = () => {
       let privacyMissing = true;
@@ -94,7 +94,7 @@ export default function CreateSlideshowPostPage() {
     };
 
     checkMetadataStatus();
-    // Set up interval to check for changes
+    
     const interval = setInterval(checkMetadataStatus, 100);
     return () => clearInterval(interval);
   }, []);
@@ -227,7 +227,7 @@ export default function CreateSlideshowPostPage() {
       return;
     }
 
-    // Check if privacy level is selected before posting
+    
     const metadata = typeof window !== 'undefined' ? (window as any).__tiktokMetadata : null;
     if (!metadata || !metadata.privacyLevel) {
       toast.error("Please select who can see this post before posting.");
@@ -249,7 +249,7 @@ export default function CreateSlideshowPostPage() {
           router.push("/dashboard/posts/scheduled");
         }
       } else {
-        // Apply metadata from global state before submitting
+        
         if (typeof window !== 'undefined' && (window as any).__tiktokMetadata) {
           const metadata = (window as any).__tiktokMetadata;
           updateDirectPostField("privacyLevel", metadata.privacyLevel);
@@ -262,18 +262,18 @@ export default function CreateSlideshowPostPage() {
 
         const result = await directPostAction.handleSubmit();
         if (result && result.publishId) {
-          // Show loading screen for processing immediately
+          
           setPostingData({
             publishId: result.publishId,
             caption: directPostAction.form.caption,
           });
-          redirected = true; // Prevent error fallback
+          redirected = true; 
         }
       }
     } catch (error) {
       console.error("[CreateSlideshowPostPage] Submission failed", error);
 
-      // Show error as toast
+      
       const errorMessage = error instanceof Error ? error.message : "Failed to post to TikTok";
       toast.error(errorMessage);
 
@@ -314,7 +314,7 @@ export default function CreateSlideshowPostPage() {
     setFinalizingMode(null);
     setPostingData(null);
 
-    // Auto-redirect handled by TikTokPostingLoader component
+    
   };
 
   const handlePostingError = (error: string) => {
@@ -566,7 +566,7 @@ export default function CreateSlideshowPostPage() {
         </div>
       </div>
 
-      {/* TikTok Posting Loader - Integrated into page */}
+      {}
       {postingData && (
         <div className="fixed inset-0 top-0 left-0 w-full h-full bg-background/95 backdrop-blur-sm z-50">
           <div className="flex flex-col items-center justify-center min-h-screen p-8">

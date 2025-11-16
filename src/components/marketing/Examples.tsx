@@ -19,11 +19,11 @@ function PlaceholderSlide() {
           "radial-gradient(120% 120% at 50% 0%, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.35) 40%, rgba(0,0,0,0.04) 100%), linear-gradient(180deg, rgba(240,240,240,0.65) 0%, rgba(230,230,230,0.35) 100%)",
       }}
     >
-      {/* glass grid */}
+      {}
       <div className="pointer-events-none absolute inset-0 opacity-[0.15] [background-image:linear-gradient(to_right,rgba(0,0,0,.35)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,.35)_1px,transparent_1px)] [background-size:14px_14px]" />
-      {/* shine */}
+      {}
       <div className="pointer-events-none absolute -left-1/2 top-0 h-full w-[200%] rotate-[12deg] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.45),transparent)] animate-[sheen_2.8s_ease-in-out_infinite]" />
-      {/* center mark */}
+      {}
       <div className="absolute inset-0 grid place-items-center">
         <div className="rounded-lg bg-black/30 px-2 py-1 text-[10px] font-medium text-white">
           Slide Placeholder

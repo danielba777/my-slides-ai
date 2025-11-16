@@ -7,8 +7,8 @@ const PUBLIC_FILE = /\.[^/]+$/;
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
-  // Allow any request that clearly targets a static asset (e.g. /hero-demo.gif, /assets/..)
-  // so marketing media can load without triggering auth redirects.
+  
+  
   if (PUBLIC_FILE.test(path)) {
     return NextResponse.next();
   }
@@ -17,9 +17,9 @@ export async function middleware(request: NextRequest) {
   const isAuthPage = path.startsWith("/auth");
   const isAdminPath = path.startsWith("/admin");
 
-  // --- Allowlist for crawlers/static machine-readable files ---
-  // Make sitemap & robots always public and bypass any auth redirects.
-  // Handles both GET and HEAD correctly so Content-Type from the route is preserved.
+  
+  
+  
   if (
     path === "/sitemap.xml" ||
     path === "/robots.txt"
@@ -27,7 +27,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // If user is on auth page but already signed in, redirect to home page
+  
   if (isAuthPage && session) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
@@ -77,7 +77,7 @@ export async function middleware(request: NextRequest) {
     path.startsWith("/integrations/social/tiktok") ||
     isThemePage;
 
-  // If user is not authenticated and trying to access a protected route, redirect to sign-in
+  
   if (
     !session &&
     !isAuthPage &&
@@ -93,12 +93,12 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isAdminPath) {
-    // First check isAdmin property (preferred method)
+    
     if (session?.user?.isAdmin) {
       return NextResponse.next();
     }
 
-    // Fallback to email-based check for backward compatibility
+    
     const allowedEmails = env.ADMIN_ALLOWED_EMAILS
       ? env.ADMIN_ALLOWED_EMAILS.split(",")
           .map((email) => email.trim().toLowerCase())
@@ -114,7 +114,7 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Add routes that should be protected by authentication
+
 export const config = {
   matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

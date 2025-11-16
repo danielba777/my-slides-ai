@@ -17,31 +17,27 @@ const requireFromNode = <T>(moduleId: string): T => {
   return nodeRequire(moduleId) as T;
 };
 
-/**
- * Some Linux images mount node_modules with noexec.
- * We copy the packaged binary to a temp folder and chmod +x,
- * then spawn from there.
- */
+
 function ensureExecutable(tempKey: "ffmpeg" | "ffprobe", sourcePath: string): string {
   try {
-    // If it already has execute permission, keep it.
+    
     fs.accessSync(sourcePath, fs.constants.X_OK);
     return sourcePath;
   } catch {
-    // Fall through to copy & chmod.
+    
   }
   const fileName = `${tempKey}-${basename(sourcePath)}`;
   const targetDir = join(tmpdir(), "slidescockpit-binaries");
   const targetPath = join(targetDir, fileName);
   try {
     fs.mkdirSync(targetDir, { recursive: true });
-    // Only copy if not present or size differs
+    
     let needsCopy = true;
     try {
       const [srcStat, dstStat] = [fs.statSync(sourcePath), fs.statSync(targetPath)];
       if (srcStat.size === dstStat.size) needsCopy = false;
     } catch {
-      // copy
+      
     }
     if (needsCopy) {
       fs.copyFileSync(sourcePath, targetPath);
@@ -49,7 +45,7 @@ function ensureExecutable(tempKey: "ffmpeg" | "ffprobe", sourcePath: string): st
     fs.chmodSync(targetPath, 0o755);
     return targetPath;
   } catch (err) {
-    // As a last resort, return source (may still fail on noexec)
+    
     console.warn(`[UGC][binaries] Failed to stage ${tempKey} to tmp:`, err);
     return sourcePath;
   }
@@ -78,26 +74,22 @@ const getFfprobePath = () => {
   return cachedFfprobePath;
 };
 
-/**
- * FFmpeg akzeptiert am stabilsten einen absoluten fontfile-Pfad.
- * Auf Windows müssen Backslashes in Slashes umgewandelt und das Laufwerk "C:" als "C\\:" escaped werden.
- */
+
 function normalizeForFfmpegFontfile(p: string) {
   let out = p.replace(/\\/g, "/");
-  // Windows-Laufwerk wie C: -> C\:
   out = out.replace(/^([A-Za-z]):\//, "$1\\:/");
   return out;
 }
 
 function resolveTikTokFontPath(): string | null {
-  // Optional: explizit via ENV setzen
+  
   const envPath = process.env.TIKTOK_FONT_PATH;
   if (envPath && fs.existsSync(envPath)) return envPath;
 
   const candidates = [
-    // Tatsächlicher Pfad im Repo (entspricht app/layout.tsx)
+    
     join(process.cwd(), "src", "app", "fonts", "tiktok", "TikTokTextBold.otf"),
-    // Fallbacks für ältere Layouts / lokale Tests
+    
     join(process.cwd(), "src", "fonts", "tiktok", "TikTokTextBold.otf"),
     join(process.cwd(), "src", "fonts", "TikTokTextBold.otf"),
     join(process.cwd(), "public", "fonts", "TikTokTextBold.otf"),
@@ -114,7 +106,7 @@ const runFfmpeg = async (args: string[]) => {
     const { stdout, stderr } = await execFileAsync(getFfmpegPath(), args, {
       windowsHide: true,
     });
-    // viele Builds loggen nur auf stderr; zur Diagnose mehr Kontext anzeigen
+    
     if (stderr && stderr.trim().length > 0) {
       const tail = stderr.split("\n").slice(-30).join("\n");
       console.debug("[UGC][ffmpeg] tail stderr:\n" + tail);
@@ -131,7 +123,7 @@ const runFfmpeg = async (args: string[]) => {
       "Video processing failed";
     const trimmed =
       rawStderr.length > 4000 ? rawStderr.slice(-4000) : rawStderr;
-    // args und letzter Teil des stderr mit ausgeben
+    
     console.error("[UGC][ffmpeg] Command failed", {
       args,
       error: rawMsg,
@@ -173,7 +165,7 @@ const toAbsoluteUrl = (maybeUrl: string): string => {
   return new URL(maybeUrl, base).toString();
 };
 
-/** Liefert true, wenn URL zur eigenen App gehört (localhost, NEXTAUTH_URL, NEXT_PUBLIC_APP_URL, VERCEL_URL). */
+
 const isAppLocalUrl = (inputUrl: string) => {
   try {
     const abs = toAbsoluteUrl(inputUrl);
@@ -198,7 +190,7 @@ const isAppLocalUrl = (inputUrl: string) => {
   }
 };
 
-/** Mappt URL/Pfad auf eine potentielle Datei unter /public und kopiert sie nach destinationPath. */
+
 const tryCopyFromPublic = async (inputUrlOrPath: string, destinationPath: string) => {
   const pathname = /^https?:\/\//i.test(inputUrlOrPath)
     ? new URL(inputUrlOrPath).pathname
@@ -209,7 +201,7 @@ const tryCopyFromPublic = async (inputUrlOrPath: string, destinationPath: string
     await fsAsync.copyFile(diskPath, destinationPath);
     return;
   } catch (err: any) {
-    // Zusätzlicher Versuch für gängige Monorepo-Struktur (optional, schadet nicht)
+    
     const altDiskPath = join(process.cwd(), relative);
     try {
       await fsAsync.copyFile(altDiskPath, destinationPath);
@@ -222,13 +214,12 @@ const tryCopyFromPublic = async (inputUrlOrPath: string, destinationPath: string
 };
 
 const downloadToFile = async (url: string, filePath: string) => {
-  // 1) App-interne oder relative URLs -> direkt von Disk lesen, um Auth-/HTML-Probleme zu vermeiden
   if (!/^https?:\/\//i.test(url) || isAppLocalUrl(url)) {
     await tryCopyFromPublic(url, filePath);
     return;
   }
 
-  // 2) Extern (z. B. UploadThing) per fetch laden
+  
   const absolute = toAbsoluteUrl(url);
   const response = await fetch(absolute, { redirect: "follow" });
   if (!response.ok) {
@@ -239,7 +230,7 @@ const downloadToFile = async (url: string, filePath: string) => {
   const looksLikeHtml = ct.includes("text/html");
   const looksLikeSignin = finalUrl.includes("/auth/signin");
   if (looksLikeHtml || looksLikeSignin) {
-    // Fallback auf public-Datei (falls die App URL geschützt ist)
+    
     await tryCopyFromPublic(finalUrl, filePath);
     return;
   }
@@ -290,20 +281,20 @@ const normalizeVideo = async (
   const { hasAudio, durationMs } = await probeVideo(sourcePath);
   const args: string[] = ["-y"];
 
-  // Einheitliche 9:16-Normalisierung – sicher mit ganzzahligen Werten
+  
   const filter = [
-    // Skaliere Video proportional, sodass die Höhe exakt 1920 wird
-    // Danach wird Breite auf 1080 gecroppt (kein Stretch, kein Padding)
+    
+    
     "scale=-1:1920:flags=lanczos",
-    // Falls das Video schmaler oder breiter ist, auf 1080x1920 beschneiden
+    
     "crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2",
-    // Sicheres Seitenverhältnis & Farbraum
+    
     "setsar=1",
     "fps=30",
     "format=yuv420p"
   ].join(",");
 
-  // 🧩 Final fix: filter nach allen Inputs mit -filter_complex anwenden (robust & korrekt)
+  
   if (hasAudio) {
     args.push(
       "-i",
@@ -440,14 +431,14 @@ const captureThumbnail = async (videoPath: string, destinationPath: string) => {
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 const uploadBuffer = async (buf: Buffer, key: string, mimeType: string = "video/mp4"): Promise<string> => {
-  // Sprechender Dateiname + korrekter MIME-Type
+  
   const extension = mimeType === "video/mp4" ? ".mp4" : ".jpg";
   const filename = `${key}${extension}`;
-  // In Node keine Web-File-API nutzen: UploadThing erwartet UTFile (server)
-  // Buffer -> Uint8Array, damit der Konstruktor sauber typisiert ist
+  
+  
   const utFile = new UTFile([new Uint8Array(buf)], filename, { type: mimeType });
 
-  // Retry mit Exponential Backoff bei Pool/Rate/Server-Fehlern
+  
   const maxAttempts = 5;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -465,7 +456,7 @@ const uploadBuffer = async (buf: Buffer, key: string, mimeType: string = "video/
         message.includes("rate limit") ||
         message.includes("ECONNRESET") ||
         message.includes("ETIMEDOUT") ||
-        message.includes("5") || // 5xx
+        message.includes("5") || 
         message.includes("429");
 
       if (attempt < maxAttempts && shouldRetry) {
@@ -481,7 +472,7 @@ const uploadBuffer = async (buf: Buffer, key: string, mimeType: string = "video/
       throw new Error("UploadThing upload failed");
     }
   }
-  // sollte nie erreicht werden
+  
   throw new Error("UploadThing upload failed");
 };
 
@@ -491,7 +482,7 @@ export interface ComposeOptions {
   userId: string;
   overlayText?: string;
   overlayPosition?: "upper" | "middle";
-  soundUrl?: string; // optionaler, vom Frontend gewählter Sound
+  soundUrl?: string; 
 }
 
 export interface ComposeResult {
@@ -538,7 +529,7 @@ export async function composeReactionDemoVideo({
       concatenatedPath,
     );
 
-    // Optional: Hook-Text wie in der Preview einbrennen
+    
     let finalVideoPath = concatenatedPath;
     if (overlayText && overlayText.trim().length > 0) {
       const outPath = join(tempDir, `ugc-final-overlay-${randomUUID()}.mp4`);
@@ -548,23 +539,18 @@ export async function composeReactionDemoVideo({
       } else {
         console.log("[UGC][compose] Using TikTok font:", resolvedFontPath);
       }
-      // Positionierung: upper ≈ 18% von oben, middle = Vertikalmitte
+      
       const yExprRaw =
         overlayPosition === "middle"
           ? "(h-text_h)/2"
-          : "max((h*0.18)-(text_h/2),20)"; // ohne Leerzeichen
-      // In älteren FFmpeg-Builds müssen Kommas in Ausdrücken geescaped werden
+          : "max((h*0.18)-(text_h/2),20)"; 
+      
       const yExprEsc = yExprRaw.replace(/,/g, "\\,");
 
-  /**
-       * 1:1 wie im Preview:
-       * Preview nutzt ~ 54px (Bold), Stroke ~ 3px, Shadow-Offset ~ 2px @ 1080x1920.
-       * Da wir immer 9:16 mit 1920 Höhe rendern, setzen wir die Werte numerisch
-       * (ohne Expressions), damit ältere FFmpeg-Builds nicht aussteigen.
-       */
+  
       const OUTPUT_WIDTH = 1080;
       const OUTPUT_HEIGHT = 1920;
-      const scaleFactor = OUTPUT_HEIGHT / 1920; // = 1 bei 1080x1920
+      const scaleFactor = OUTPUT_HEIGHT / 1920; 
       const fontSizePx = Math.round(54 * scaleFactor);
       const borderW = Math.max(1, Math.round(3 * scaleFactor));
       const shadowOff = Math.max(1, Math.round(2 * scaleFactor));
@@ -576,7 +562,7 @@ export async function composeReactionDemoVideo({
       const ffBorder = `:bordercolor=black:borderw=${borderW}`;
       const ffShadow = `:shadowcolor=black@0.65:shadowx=${shadowOff}:shadowy=${shadowOff}`;
 
-      // Achtung: text muss vorher ffmpeg-sicher escaped sein (Quotes/Colon/Newlines)
+      
       const escapeDrawtext = (s: string) =>
         s
           .replace(/\\/g, "\\\\")

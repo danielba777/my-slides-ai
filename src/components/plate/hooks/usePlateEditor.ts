@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: This use requires any */
+
 import React from "react";
 
 import { MarkdownPlugin } from "@platejs/markdown";
@@ -11,37 +11,7 @@ import {
   type TPlateEditor,
 } from "platejs/react";
 
-/**
- * Creates a memoized Plate editor for React components.
- *
- * This hook creates a fully configured Plate editor instance that is memoized
- * based on the provided dependencies. It's optimized for React components to
- * prevent unnecessary re-creation of the editor on every render.
- *
- * Examples:
- *
- * ```ts
- * const editor = usePlateEditor({
- *   plugins: [ParagraphPlugin, HeadingPlugin],
- *   value: [{ type: 'p', children: [{ text: 'Hello world!' }] }],
- * });
- *
- * // Editor with custom dependencies
- * const editor = usePlateEditor(
- *   {
- *     plugins: [ParagraphPlugin],
- *     enabled,
- *   },
- *   [enabled]
- * ); // Re-create when enabled changes
- * ```
- *
- * @param options - Configuration options for creating the Plate editor
- * @param deps - Additional dependencies for the useMemo hook (default: [])
- * @see {@link createPlateEditor} for detailed information on React editor creation and configuration.
- * @see {@link createSlateEditor} for a non-React version of editor creation.
- * @see {@link withPlate} for the underlying React-specific enhancement function.
- */
+
 export function usePlateEditor<
   V extends Value = Value,
   P extends AnyPluginConfig = PlateCorePlugin,
