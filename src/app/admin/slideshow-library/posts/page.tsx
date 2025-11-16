@@ -112,13 +112,27 @@ export default function SlideshowPostsPage() {
       );
       if (response.ok) {
         const data = await response.json();
-        setPosts(data);
+
+        // Handle different response formats
+        let postsData: SlideshowPost[] = [];
+        if (Array.isArray(data)) {
+          postsData = data;
+        } else if (data && Array.isArray(data.posts)) {
+          postsData = data.posts;
+        } else if (data && typeof data === 'object') {
+          console.error("Unexpected API response format:", data);
+          toast.error("Ungültiges Datenformat vom Server erhalten");
+        }
+
+        setPosts(postsData);
       } else {
         toast.error("Fehler beim Laden der Posts");
+        setPosts([]);
       }
     } catch (error) {
       console.error("Error loading posts:", error);
       toast.error("Fehler beim Laden der Posts");
+      setPosts([]);
     } finally {
       setIsLoading(false);
     }
