@@ -14,9 +14,14 @@ export async function GET(request: NextRequest) {
 
     let posts: Array<unknown> = [];
 
-    // If category filter is specified, try to get category-specific posts first
+    // If category filter is specified, fetch category posts and repeat them if needed
     if (category) {
-      const categoryParams = new URLSearchParams({ limit, shuffle, category });
+      // Fetch all available posts from this category (use high limit)
+      const categoryParams = new URLSearchParams({
+        limit: "10000", // Fetch all available posts from category
+        shuffle,
+        category
+      });
       const categoryResponse = await fetch(
         `${API_BASE_URL}/slideshow-library/posts?${categoryParams.toString()}`,
         { cache: "no-store" },
@@ -28,41 +33,23 @@ export async function GET(request: NextRequest) {
           | { posts?: Array<unknown> }
           | null;
 
-        posts = Array.isArray(categoryRaw)
+        const categoryPosts = Array.isArray(categoryRaw)
           ? categoryRaw
           : Array.isArray(categoryRaw?.posts)
             ? categoryRaw.posts ?? []
             : [];
-      }
 
-      // If we don't have enough posts from the category, fetch additional posts without category filter
-      const requestedLimit = parseInt(limit, 10);
-      if (posts.length < requestedLimit) {
-        const remainingNeeded = requestedLimit - posts.length;
-        const fallbackParams = new URLSearchParams({
-          limit: remainingNeeded.toString(),
-          shuffle,
-        });
+        // If we have posts, repeat them to reach the requested limit
+        if (categoryPosts.length > 0) {
+          const requestedLimit = parseInt(limit, 10);
+          posts = [];
 
-        const fallbackResponse = await fetch(
-          `${API_BASE_URL}/slideshow-library/posts?${fallbackParams.toString()}`,
-          { cache: "no-store" },
-        );
-
-        if (fallbackResponse.ok) {
-          const fallbackRaw = (await fallbackResponse.json()) as
-            | Array<unknown>
-            | { posts?: Array<unknown> }
-            | null;
-
-          const fallbackPosts = Array.isArray(fallbackRaw)
-            ? fallbackRaw
-            : Array.isArray(fallbackRaw?.posts)
-              ? fallbackRaw.posts ?? []
-              : [];
-
-          // Combine category posts with fallback posts
-          posts = [...posts, ...fallbackPosts];
+          // Repeat posts until we reach the requested limit
+          while (posts.length < requestedLimit) {
+            const remaining = requestedLimit - posts.length;
+            const postsToAdd = categoryPosts.slice(0, Math.min(remaining, categoryPosts.length));
+            posts = [...posts, ...postsToAdd];
+          }
         }
       }
     } else {
