@@ -80,7 +80,7 @@ const avatarItems: SidebarItem[] = [
 const ugcItems: SidebarItem[] = [
   {
     title: "Hook + Demo",
-    url: "/dashboard/ugc",
+    url: "/admin/ugc/reaction-avatars",
     icon: Clapperboard,
   },
 ];

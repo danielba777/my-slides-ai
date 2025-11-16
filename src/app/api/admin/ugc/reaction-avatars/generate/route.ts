@@ -1,44 +1,48 @@
 import { randomUUID } from "crypto";
-import { promises as fs } from "fs";
 import { NextResponse } from "next/server";
-import path from "path";
 
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { createPikaImageToVideo } from "@/server/vendors/fal";
 
-const HOOKS_FOLDER = path.join(
-  process.cwd(),
-  "public",
-  "ugc",
-  "reaction-hooks",
-);
-const HOOKS_PREFIX = "/ugc/reaction-hooks";
-
-const ensureHooksFolder = async () => {
-  await fs.mkdir(HOOKS_FOLDER, { recursive: true });
-};
-
 const toFileName = (avatarId: string) => `${avatarId}-${randomUUID()}.mp4`;
 
-const downloadHookVideo = async (videoUrl: string, filePath: string) => {
+const uploadVideoToFileServer = async (videoUrl: string, fileName: string): Promise<string> => {
+  // 1. Get presigned URL from slidescockpit-api
+  const apiBaseUrl = process.env.SLIDESCOCKPIT_API_BASE_URL ?? "http://localhost:3001";
+  const presignResponse = await fetch(`${apiBaseUrl}/files/presign?key=ugc/reaction-hooks/${fileName}&contentType=video/mp4`);
+
+  if (!presignResponse.ok) {
+    throw new Error(`Failed to get upload URL: ${presignResponse.status}`);
+  }
+
+  const presignData = await presignResponse.json();
+  if (!presignData.uploadUrl) {
+    throw new Error("No upload URL received");
+  }
+
+  // 2. Download video from fal.ai
   const response = await fetch(videoUrl);
   if (!response.ok) {
-    throw new Error(
-      `Download failed: ${response.status} ${response.statusText}`,
-    );
+    throw new Error(`Failed to download video: ${response.status}`);
   }
-  const arrayBuffer = await response.arrayBuffer();
-  await fs.writeFile(filePath, Buffer.from(arrayBuffer));
-};
 
-const removePreviousHookVideo = async (videoUrl?: string | null) => {
-  if (!videoUrl || !videoUrl.startsWith(HOOKS_PREFIX)) {
-    return;
+  const videoBuffer = await response.arrayBuffer();
+
+  // 3. Upload to S3
+  const uploadResponse = await fetch(presignData.uploadUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "video/mp4",
+    },
+    body: videoBuffer,
+  });
+
+  if (!uploadResponse.ok) {
+    throw new Error(`Failed to upload video: ${uploadResponse.status}`);
   }
-  const relative = videoUrl.slice(HOOKS_PREFIX.length).replace(/^[/\\]/, "");
-  const filePath = path.join(HOOKS_FOLDER, relative);
-  await fs.unlink(filePath).catch(() => {});
+
+  return presignData.publicUrl;
 };
 
 export async function POST(req: Request) {
@@ -90,8 +94,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Avatars not found" }, { status: 404 });
     }
 
-    await ensureHooksFolder();
-
     const results: Array<{ id: string; videoUrl: string }> = [];
 
     for (const avatar of avatars) {
@@ -110,22 +112,18 @@ export async function POST(req: Request) {
       }
 
       if (!latestUrl) {
-        throw new Error("Kling returned no video URL");
+        throw new Error("fal.ai returned no video URL");
       }
 
-      await removePreviousHookVideo(avatar.videoUrl);
-
       const fileName = toFileName(avatar.id);
-      const filePath = path.join(HOOKS_FOLDER, fileName);
-      await downloadHookVideo(latestUrl, filePath);
-      const localUrl = `${HOOKS_PREFIX}/${fileName}`;
+      const fileServerUrl = await uploadVideoToFileServer(latestUrl, fileName);
 
       await db.reactionAvatar.update({
         where: { id: avatar.id },
-        data: { videoUrl: localUrl },
+        data: { videoUrl: fileServerUrl },
       });
 
-      results.push({ id: avatar.id, videoUrl: localUrl });
+      results.push({ id: avatar.id, videoUrl: fileServerUrl });
     }
 
     if (results.length === 0) {

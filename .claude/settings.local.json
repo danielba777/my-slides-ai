@@ -6,7 +6,9 @@
       "Bash(echo:*)",
       "Bash(curl:*)",
       "Bash(pnpm add:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(pnpm db:studio:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

@@ -212,18 +212,19 @@ enum DocumentType {
 }
 
 model ReactionAvatar {
-  id           String   @id @default(cuid())
-  name         String
-  description  String?
-  thumbnailUrl String
-  videoUrl     String
-  order        Int      @default(0)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  createdById  String?
-  createdBy    User?    @relation("ReactionAvatarCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  ugcVideos    UserUGCVideo[]
+  id               String   @id @default(cuid())
+  name             String
+  description      String?
+  thumbnailUrl     String
+  videoUrl         String   // Original high-quality video for download
+  previewVideoUrl  String?  // Optimized low-quality video for dashboard preview
+  order            Int      @default(0)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdById      String?
+  createdBy        User?    @relation("ReactionAvatarCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  ugcVideos        UserUGCVideo[]
 }
 
 model UserDemoVideo {

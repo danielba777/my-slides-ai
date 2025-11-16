@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 import { cn } from "@/lib/utils";
+import { createOptimizedVideoUrl, shouldUseDynamicOptimization } from "@/lib/videoOptimizer";
 import type { DemoVideo, GeneratedVideo, ReactionAvatar } from "@/types/ugc";
 
 type SoundItem = {
@@ -30,6 +31,7 @@ import {
   Trash2,
   VideoOff,
   X,
+  Loader2,
 } from "lucide-react";
 // Sound popover (dialog)
 import {
@@ -249,19 +251,52 @@ export default function UgcDashboardPage() {
     if (!selectedAvatar) {
       return null;
     }
-    const candidate = selectedAvatar.videoUrl?.trim();
-    if (!candidate || candidate.toLowerCase() === "about:blank") {
+
+    // Get the original video URL
+    const originalUrl = selectedAvatar.videoUrl?.trim();
+    if (!originalUrl || originalUrl.toLowerCase() === "about:blank") {
       return null;
     }
-    return candidate;
+
+    // Check if we should use dynamic optimization
+    if (shouldUseDynamicOptimization(originalUrl)) {
+      const optimizedUrl = createOptimizedVideoUrl(originalUrl, {
+        maxWidth: 640,
+        maxHeight: 1136,
+        quality: 0.6,
+        targetBitrate: 500,
+        format: 'mp4'
+      });
+      console.log("[UGC Preview] Using dynamically optimized video:", optimizedUrl);
+      return optimizedUrl;
+    }
+
+    // Use original URL if no optimization needed
+    console.log("[UGC Preview] Using original video:", originalUrl);
+    return originalUrl;
   }, [selectedAvatar]);
 
   /** Preview-Reihenfolge: 1) Avatar-Hook  2) Demo */
   const previewSources = useMemo(() => {
     const out: string[] = [];
     if (selectedAvatarVideoUrl) out.push(selectedAvatarVideoUrl);
+
+    // Also optimize demo videos
     const demoVideo = selectedDemo?.videoUrl?.trim();
-    if (demoVideo) out.push(demoVideo);
+    if (demoVideo) {
+      if (shouldUseDynamicOptimization(demoVideo)) {
+        const optimizedDemoUrl = createOptimizedVideoUrl(demoVideo, {
+          maxWidth: 640,
+          maxHeight: 1136,
+          quality: 0.6,
+          targetBitrate: 500,
+          format: 'mp4'
+        });
+        out.push(optimizedDemoUrl);
+      } else {
+        out.push(demoVideo);
+      }
+    }
     return out;
   }, [selectedAvatarVideoUrl, selectedDemo]);
 
@@ -279,6 +314,10 @@ export default function UgcDashboardPage() {
   const v1Ref = useRef<HTMLVideoElement | null>(null);
   const transitionLeadMs = 80; // ~80ms vor Ende starten wir das zweite Video
 
+  // Loading states for videos
+  const [videoLoadingStates, setVideoLoadingStates] = useState<{[key: string]: boolean}>({});
+  const [videoBufferingStates, setVideoBufferingStates] = useState<{[key: string]: boolean}>({});
+
   const resetSeamlessPreview = () => {
     setActiveIdx(0);
     setArmed(false);
@@ -290,7 +329,41 @@ export default function UgcDashboardPage() {
       v1Ref.current.pause();
       v1Ref.current.currentTime = 0;
     }
+    // Reset loading states when selection changes
+    setVideoLoadingStates({});
+    setVideoBufferingStates({});
   };
+
+  const updateVideoLoadingState = (videoKey: string, isLoading: boolean) => {
+    setVideoLoadingStates(prev => ({ ...prev, [videoKey]: isLoading }));
+  };
+
+  const updateVideoBufferingState = (videoKey: string, isBuffering: boolean) => {
+    setVideoBufferingStates(prev => ({ ...prev, [videoKey]: isBuffering }));
+  };
+
+  // Check if the currently active video is loading or buffering
+  const isCurrentlyLoading = useMemo(() => {
+    if (previewSources.length === 0) return false;
+
+    const activeVideoKey = activeIdx === 0 ? `${previewVideoKey}:layer0` : `${previewVideoKey}:layer1`;
+    const isLoading = videoLoadingStates[activeVideoKey] || false;
+    const isBuffering = videoBufferingStates[activeVideoKey] || false;
+
+    return isLoading || isBuffering;
+  }, [activeIdx, previewVideoKey, videoLoadingStates, videoBufferingStates, previewSources.length]);
+
+  // Check if we should show loading indicator
+  const shouldShowLoadingIndicator = useMemo(() => {
+    // Show loading if we have video sources but current video is loading
+    if (previewSources.length > 0 && isCurrentlyLoading) return true;
+
+    // Show loading briefly when we first have video sources (initial load)
+    const hasVideoSources = previewSources.length > 0;
+    const hasLoadingState = Object.keys(videoLoadingStates).length > 0;
+
+    return hasVideoSources && !hasLoadingState;
+  }, [previewSources.length, isCurrentlyLoading, videoLoadingStates]);
 
   useEffect(() => {
     // Bei neuer Auswahl komplett zurücksetzen
@@ -587,7 +660,46 @@ export default function UgcDashboardPage() {
                           autoPlay
                           muted
                           playsInline
-                          preload="auto"
+                          preload="metadata"
+                          style={{
+                            objectFit: "cover",
+                            WebkitOptimizedInlineVideo: true, // Safari optimization
+                            willChange: "auto", // Performance hint
+                          }}
+                          onLoadStart={() => {
+                            console.log("[Video] Layer 0 loading:", previewSources[0]);
+                            const videoKey = `${previewVideoKey}:layer0`;
+                            updateVideoLoadingState(videoKey, true);
+                            updateVideoBufferingState(videoKey, false);
+                          }}
+                          onLoadedData={() => {
+                            console.log("[Video] Layer 0 loaded data");
+                            const videoKey = `${previewVideoKey}:layer0`;
+                            updateVideoLoadingState(videoKey, false);
+                          }}
+                          onCanPlay={() => {
+                            console.log("[Video] Layer 0 can play");
+                            const videoKey = `${previewVideoKey}:layer0`;
+                            updateVideoLoadingState(videoKey, false);
+                            updateVideoBufferingState(videoKey, false);
+                          }}
+                          onWaiting={() => {
+                            console.log("[Video] Layer 0 buffering...");
+                            const videoKey = `${previewVideoKey}:layer0`;
+                            updateVideoBufferingState(videoKey, true);
+                          }}
+                          onPlaying={() => {
+                            console.log("[Video] Layer 0 playing");
+                            const videoKey = `${previewVideoKey}:layer0`;
+                            updateVideoLoadingState(videoKey, false);
+                            updateVideoBufferingState(videoKey, false);
+                          }}
+                          onError={(e) => {
+                            console.error("[Video] Layer 0 error:", e, previewSources[0]);
+                            const videoKey = `${previewVideoKey}:layer0`;
+                            updateVideoLoadingState(videoKey, false);
+                            updateVideoBufferingState(videoKey, false);
+                          }}
                           onTimeUpdate={() => {
                             const el = v0Ref.current;
                             // Wenn nur ein Source vorhanden, kein Seamless nötig
@@ -627,7 +739,46 @@ export default function UgcDashboardPage() {
                             className={`absolute inset-0 h-full w-full object-cover ${activeIdx === 1 ? "opacity-100" : "opacity-0"}`}
                             muted
                             playsInline
-                            preload="auto"
+                            preload="none"
+                            style={{
+                              objectFit: "cover",
+                              WebkitOptimizedInlineVideo: true, // Safari optimization
+                              willChange: "auto", // Performance hint
+                            }}
+                            onLoadStart={() => {
+                              console.log("[Video] Layer 1 loading:", previewSources[1]);
+                              const videoKey = `${previewVideoKey}:layer1`;
+                              updateVideoLoadingState(videoKey, true);
+                              updateVideoBufferingState(videoKey, false);
+                            }}
+                            onLoadedData={() => {
+                              console.log("[Video] Layer 1 loaded data");
+                              const videoKey = `${previewVideoKey}:layer1`;
+                              updateVideoLoadingState(videoKey, false);
+                            }}
+                            onCanPlay={() => {
+                              console.log("[Video] Layer 1 can play");
+                              const videoKey = `${previewVideoKey}:layer1`;
+                              updateVideoLoadingState(videoKey, false);
+                              updateVideoBufferingState(videoKey, false);
+                            }}
+                            onWaiting={() => {
+                              console.log("[Video] Layer 1 buffering...");
+                              const videoKey = `${previewVideoKey}:layer1`;
+                              updateVideoBufferingState(videoKey, true);
+                            }}
+                            onPlaying={() => {
+                              console.log("[Video] Layer 1 playing");
+                              const videoKey = `${previewVideoKey}:layer1`;
+                              updateVideoLoadingState(videoKey, false);
+                              updateVideoBufferingState(videoKey, false);
+                            }}
+                            onError={(e) => {
+                              console.error("[Video] Layer 1 error:", e, previewSources[1]);
+                              const videoKey = `${previewVideoKey}:layer1`;
+                              updateVideoLoadingState(videoKey, false);
+                              updateVideoBufferingState(videoKey, false);
+                            }}
                             // nicht autoPlay: wir starten gezielt kurz vor Ende von Layer 0
                             onEnded={() => {
                               // Für Preview zur Schleife zurück an den Start
@@ -656,7 +807,7 @@ export default function UgcDashboardPage() {
                     {hook.trim().length > 0 && (
                       <div
                         className={cn(
-                          "pointer-events-none absolute left-1/2 w-[86%] -translate-x-1/2 text-white",
+                          "pointer-events-none absolute left-1/2 w-[86%] -translate-x-1/2 text-white z-10",
                           hookPosition === "middle"
                             ? "top-1/2 -translate-y-1/2"
                             : "top-[18%]",
@@ -677,6 +828,18 @@ export default function UgcDashboardPage() {
                         >
                           {hook}
                         </span>
+                      </div>
+                    )}
+
+                    {/* Loading Overlay */}
+                    {shouldShowLoadingIndicator && (
+                      <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                        <div className="flex flex-col items-center gap-3 text-white">
+                          <Loader2 className="h-8 w-8 animate-spin" />
+                          <span className="text-sm font-medium">
+                            {isCurrentlyLoading ? "Buffering..." : "Loading video..."}
+                          </span>
+                        </div>
                       </div>
                     )}
                   </>
