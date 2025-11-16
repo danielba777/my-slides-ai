@@ -69,7 +69,8 @@ export function MarketingHero({
         const data = (await response.json()) as unknown;
         if (!Array.isArray(data)) return;
 
-        const collected = new Set<string>();
+        // When category is set, allow duplicates. Otherwise deduplicate.
+        const collected: string[] = [];
 
         for (const post of data as HeroPost[]) {
           if (!post?.slides?.length) continue;
@@ -78,24 +79,34 @@ export function MarketingHero({
             (slide) => !!slide?.imageUrl,
           );
           if (!firstSlideWithImage?.imageUrl) continue;
-          collected.add(firstSlideWithImage.imageUrl);
+
+          // If category is set, allow duplicates by always adding
+          // If no category, deduplicate using Set logic
+          if (category) {
+            collected.push(firstSlideWithImage.imageUrl);
+          } else {
+            if (!collected.includes(firstSlideWithImage.imageUrl)) {
+              collected.push(firstSlideWithImage.imageUrl);
+            }
+          }
         }
 
-        if (!collected.size) return;
+        if (!collected.length) return;
 
-        const deduped = Array.from(collected);
-        for (let index = deduped.length - 1; index > 0; index--) {
+        // Shuffle the images
+        const shuffled = [...collected];
+        for (let index = shuffled.length - 1; index > 0; index--) {
           const swapIndex = Math.floor(Math.random() * (index + 1));
-          const current = deduped[index];
-          const swap = deduped[swapIndex];
+          const current = shuffled[index];
+          const swap = shuffled[swapIndex];
           if (current === undefined || swap === undefined) {
             continue;
           }
-          deduped[index] = swap;
-          deduped[swapIndex] = current;
+          shuffled[index] = swap;
+          shuffled[swapIndex] = current;
         }
 
-        setPosterImages(deduped);
+        setPosterImages(shuffled);
       } catch (error) {
         if ((error as Error).name === "AbortError") {
           return;
@@ -253,25 +264,7 @@ export function MarketingHero({
             className="py-2 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight text-white"
           >
             {heroTitle ? (
-              (() => {
-                const words = heroTitle.split(" ");
-
-                if (words.length < 3) {
-                  return <span className="block">{heroTitle}</span>;
-                }
-
-                const lastTwoWords = words.slice(-2).join(" ");
-                const restOfTitle = words.slice(0, -2).join(" ");
-
-                return (
-                  <>
-                    <span className="block sm:inline">{restOfTitle}&nbsp;</span>
-                    <span className="block sm:inline sm:whitespace-nowrap bg-gradient-to-r from-indigo-500 via-blue-300 to-blue-100 bg-clip-text text-transparent drop-shadow-sm">
-                      {lastTwoWords}
-                    </span>
-                  </>
-                );
-              })()
+              <span className="block">{heroTitle}</span>
             ) : (
               <>
                 <span className="block">
