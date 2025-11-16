@@ -75,10 +75,10 @@ export async function POST(request: Request) {
         : DEFAULT_STYLE_ID;
     const effectiveQuality: "basic" | "high" =
       quality === "high" || quality === "basic" ? quality : "high";
-    const apiKey = env["302AI_KEY"];
+    const apiKey = env.THREE02_AI_KEY;
 
     // DEBUG: Log environment variable status
-    console.log("[AI Avatar DEBUG] 302AI_KEY status:", {
+    console.log("[AI Avatar DEBUG] THREE02_AI_KEY status:", {
       exists: apiKey !== undefined,
       isEmpty: apiKey === "",
       type: typeof apiKey,
