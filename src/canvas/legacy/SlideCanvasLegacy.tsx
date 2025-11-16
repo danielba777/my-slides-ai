@@ -433,6 +433,7 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
     for (let i = 1; i < sorted.length; i++) {
       const prev = sorted[i - 1];
       const cur = sorted[i];
+      if (!prev || !cur) continue;
       const prevBottom = prev.y + (prev.height ?? 0) / 2;
       const curHalf = (cur.height ?? 0) / 2;
       cur.y = Math.round(prevBottom + dynamicGap + curHalf);
@@ -450,7 +451,10 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
     });
   } else if (layers.length === 1) {
     // Center single text block vertically
-    layers[0].y = H / 2;
+    const singleLayer = layers[0];
+    if (singleLayer) {
+      singleLayer.y = H / 2;
+    }
   }
 
   return layers;

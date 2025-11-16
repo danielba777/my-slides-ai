@@ -15,7 +15,9 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp, InfoIcon, Settings } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import { getTikTokComplianceMessage } from "@/components/tiktok/TikTokComplianceMessage";
 
 interface TikTokConfigProps {
   title?: string;
@@ -74,6 +76,10 @@ export function TikTokConfig({
   const [privacyOptions, setPrivacyOptions] = useState<string[]>([
     ...DEFAULT_PRIVACY_OPTIONS,
   ]);
+  const complianceMessage = useMemo(
+    () => getTikTokComplianceMessage(metadata),
+    [metadata],
+  );
 
   
   useEffect(() => {
@@ -447,6 +453,12 @@ export function TikTokConfig({
                     />
                   </div>
                 </div>
+
+                {complianceMessage && (
+                  <p className="text-xs text-muted-foreground">
+                    {complianceMessage}
+                  </p>
+                )}
               </div>
             )}
           </div>

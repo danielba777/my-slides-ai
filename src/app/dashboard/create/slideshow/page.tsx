@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { TikTokPostForm } from "@/components/tiktok/TikTokPostForm";
 import { TikTokScheduleForm } from "@/components/tiktok/TikTokScheduleForm";
+import { getTikTokComplianceMessage } from "@/components/tiktok/TikTokComplianceMessage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,9 +19,6 @@ import { useTikTokAccounts } from "@/hooks/use-tiktok-accounts";
 import { TikTokPostingLoader } from "@/components/tiktok/TikTokPostingLoader";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
-
-const MUSIC_USAGE_URL = "https://www.tiktok.com/legal/page/global/music-usage-confirmation/en";
-const BRANDED_CONTENT_URL = "https://www.tiktok.com/legal/page/global/bc-policy/en";
 
 export default function CreateSlideshowPostPage() {
   const router = useRouter();
@@ -173,54 +171,10 @@ export default function CreateSlideshowPostPage() {
   })();
   const isPrimaryActionDisabled = Boolean(primaryActionDisabledReason);
   const primaryActionTooltip = isPrimaryActionDisabled ? primaryActionDisabledReason : null;
-  const complianceMessage = useMemo(() => {
-    if (!tiktokMetadata || !tiktokMetadata.isCommercialContent) {
-      return null;
-    }
-    const brandOption = tiktokMetadata.brandOption;
-    if (brandOption === "BRANDED_CONTENT" || brandOption === "BOTH") {
-      return (
-        <>
-          By posting, you agree to TikTok&apos;s{" "}
-          <a
-            href={BRANDED_CONTENT_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sky-500 underline"
-          >
-            Branded Content Policy
-          </a>{" "}
-          and{" "}
-          <a
-            href={MUSIC_USAGE_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sky-500 underline"
-          >
-            Music Usage Confirmation
-          </a>
-          .
-        </>
-      );
-    }
-    if (brandOption === "YOUR_BRAND") {
-      return (
-        <>
-          By posting, you agree to TikTok&apos;s{" "}
-          <a
-            href={MUSIC_USAGE_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sky-500 underline"
-          >
-            Music Usage Confirmation
-          </a>
-          .
-        </>
-      );
-    }
-    return null;
-  }, [tiktokMetadata]);
+  const complianceMessage = useMemo(
+    () => getTikTokComplianceMessage(tiktokMetadata),
+    [tiktokMetadata],
+  );
 
   const handlePrimaryAction = async () => {
     if (scheduleEnabled && !scheduledAt) {
