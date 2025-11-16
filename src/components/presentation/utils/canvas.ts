@@ -278,7 +278,7 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
 
           const baseNx = textNode.nx ?? 0.5;
           const textColor = textNode.fill || chooseTextColor(base.bg);
-          const textWidth = textNode.width ?? Math.round(width * 0.7);
+          const textWidth = textNode.width ?? 1000;
 
           
           if (title) {
@@ -367,7 +367,7 @@ export function buildCanvasDocFromSlide(slide: PlateSlide): {
     const title = hasTitle ? lines[0] : null;
     const bulletPoints = hasTitle ? lines.slice(1) : lines;
 
-    const textWidth = Math.round(width * 0.7);
+    const textWidth = 1000;
     const alignment = "center";
     const textColor = chooseTextColor(base.bg);
 
@@ -552,7 +552,7 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
         const textColor =
           textNode.fill ||
           chooseTextColor(slide.canvas?.bg ?? DEFAULT_CANVAS.bg);
-        const textWidth = textNode.width ?? Math.round(width * 0.7);
+        const textWidth = textNode.width ?? 1000;
 
         
         if (title) {
@@ -616,28 +616,28 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
     };
   }
 
-  
-  
+
+
   if (slide.canvas?.nodes) {
     const updatedNodes = slide.canvas.nodes.map((node) => {
       if (node.type !== "text") return node;
       const textNode = node as any;
 
-      
-      if (textNode.nx != null && textNode.ny != null) {
-        return node;
-      }
 
-      
-      
-      return {
+      const hasNormalizedCoords = textNode.nx != null && textNode.ny != null;
+
+
+      const updated = {
         ...textNode,
-        nx: 0.5, 
-        ny: 0.5, 
-        
-        x: textNode.x,
+        width: 1000, // Force all text nodes to have 1000px width
+        align: "center", // Force center alignment
+        nx: hasNormalizedCoords ? textNode.nx : 0.5,
+        ny: hasNormalizedCoords ? textNode.ny : 0.5,
+        x: hasNormalizedCoords ? textNode.x : Math.round(0.5 * (slide.canvas?.width ?? 1080)),
         y: textNode.y,
       };
+
+      return updated;
     });
 
     slide = {

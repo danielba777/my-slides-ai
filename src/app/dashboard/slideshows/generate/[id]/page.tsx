@@ -48,7 +48,7 @@ function clearPendingCookie() {
 }
 
 function makeCanvasFromText(text: string, w = 1080, h = 1620): CanvasDoc {
-  
+
   const nx = 0.5;
   const ny = 0.5;
   return {
@@ -62,11 +62,13 @@ function makeCanvasFromText(text: string, w = 1080, h = 1620): CanvasDoc {
         type: "text",
         x: Math.round(nx * w),
         y: Math.round(ny * h),
-        nx, 
-        ny, 
+        nx,
+        ny,
+        width: 1000, // Full width text
         text,
         fontFamily: "Inter",
         fontSize: 72,
+        align: "center", // Center aligned
         fill: "#111",
       },
     ],
