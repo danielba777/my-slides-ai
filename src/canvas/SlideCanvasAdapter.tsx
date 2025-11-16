@@ -128,9 +128,9 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
         (n): n is ExtendedCanvasTextNode => n.type === "text",
       );
       return texts.map((t, i) => {
-        
+
         const rawContent: string = t.content ?? t.text ?? "";
-        const widthPx = t.width ?? Math.round(W * 0.7);
+        const widthPx = t.width ?? 1000;
         const lineCount =
           rawContent.trim().length > 0 ? rawContent.split(/\r?\n/).length : 1;
         const approxHeightPx =
@@ -151,10 +151,9 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
               ? normToPxY(t.y)
               : undefined;
 
-        
-        const xPx =
-          normalizedXPx ??
-          (typeof t.x === "number" ? t.x + widthPx / 2 : Math.round(W * 0.5));
+
+
+        const xPx = Math.round(W * 0.5); // Always center horizontally
         const yPx =
           normalizedYPx ??
           (typeof t.y === "number"
@@ -184,7 +183,7 @@ const SlideCanvasAdapter = forwardRef<SlideCanvasAdapterHandle, Props>(
           y: yPx / H,
           rotation: t.rotation ?? 0,
           scale,
-          maxWidth: t.width ?? Math.round(W * 0.7),
+          maxWidth: t.width ?? 1000,
           ...(t.height ? { maxHeight: t.height } : {}),
           lineHeight: t.lineHeight ?? 1.12,
           letterSpacing: t.letterSpacing ?? 0,

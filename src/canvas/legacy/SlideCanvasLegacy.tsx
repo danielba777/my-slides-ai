@@ -80,9 +80,12 @@ type Props = {
 };
 
 const W = 1080;
-const H = 1620; 
+const H = 1620;
 const PADDING = 8;
 const BASE_FONT_PX = 72;
+const SAFE_AREA_TOP = 100; // Safe area at top
+const SAFE_AREA_BOTTOM = 100; // Safe area at bottom
+const TEXT_WIDTH = 1000; // Almost full width text blocks
 
 const DESCENT_PAD = Math.ceil(BASE_FONT_PX * 0.25); 
 
@@ -318,7 +321,7 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
   outlineWidth?: number;
   outlineColor?: string;
 })[] {
-  return layout.map((el, i) => {
+  const layers = layout.map((el, i) => {
     const id = el.id ?? `layer-${i}`;
     const tmp: TextLayer & {
       autoHeight?: boolean;
@@ -328,10 +331,10 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
       outlineColor?: string;
     } = {
       id,
-      x: (el.x ?? 0.5) * W,
+      x: W / 2, // Always center horizontally
       y: (el.y ?? 0.5) * H,
-      width: el.maxWidth ?? el.width ?? 400,
-      height: (el as any).maxHeight ?? 0, 
+      width: TEXT_WIDTH,
+      height: (el as any).maxHeight ?? 0,
       rotation: el.rotation ?? 0,
       scale: el.scale ?? 1,
       fontFamily: el.fontFamily ?? "Inter, system-ui, sans-serif",
@@ -344,7 +347,7 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
           : el.weight === "semibold"
             ? "semibold"
             : "regular",
-      align: el.align ?? "left",
+      align: el.align ?? "center",
       color: (el as any).color ?? TIKTOK_TEXT_COLOR,
       content: el.content ?? "",
       zIndex: el.zIndex ?? i,
@@ -367,7 +370,7 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
     };
 
     if (!tmp.height || tmp.height <= 0) {
-      
+
       const lines = computeWrappedLinesWithDOM(tmp);
       tmp.height = Math.ceil(computeAutoHeightForLayer(tmp, lines));
       tmp.autoHeight = true;
@@ -375,6 +378,82 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
 
     return tmp;
   });
+
+  // Apply dynamic font size and spacing based on number of text blocks
+  if (layers.length > 1) {
+    const sorted = [...layers].sort((a, b) => a.y - b.y);
+
+    // Calculate dynamic font size based on number of blocks
+    let fontScale = 1;
+    if (sorted.length > 10) {
+      fontScale = 0.65; // Very small for many blocks
+    } else if (sorted.length > 7) {
+      fontScale = 0.75; // Smaller for 8-10 blocks
+    } else if (sorted.length > 5) {
+      fontScale = 0.85; // Slightly smaller for 6-7 blocks
+    } else if (sorted.length > 3) {
+      fontScale = 0.9; // Almost normal for 4-5 blocks
+    }
+
+    // Apply font scale to all layers and recalculate heights
+    sorted.forEach((layer) => {
+      layer.fontSize = BASE_FONT_PX * (layer.scale ?? 1) * fontScale;
+      // Recalculate height with new font size
+      if (layer.autoHeight) {
+        const lines = computeWrappedLinesWithDOM(layer);
+        layer.height = Math.ceil(computeAutoHeightForLayer(layer, lines));
+      }
+    });
+
+    // Calculate available space within safe areas
+    const safeAreaHeight = H - SAFE_AREA_TOP - SAFE_AREA_BOTTOM;
+    const totalTextHeight = sorted.reduce((sum, layer) => sum + (layer.height ?? 0), 0);
+    const availableSpace = safeAreaHeight - totalTextHeight;
+    const numGaps = sorted.length - 1;
+
+    // Calculate dynamic gap - very compact spacing
+    let dynamicGap = MIN_TEXT_GAP;
+    if (sorted.length > 3) {
+      // For more than 3 text blocks, use minimal spacing
+      dynamicGap = Math.max(MIN_TEXT_GAP, Math.min(10, availableSpace / numGaps));
+    } else {
+      // For 2-3 blocks, use moderate spacing
+      const calculatedGap = availableSpace / numGaps;
+      dynamicGap = Math.max(MIN_TEXT_GAP, Math.min(calculatedGap, BASE_FONT_PX * 0.2));
+    }
+
+    // Position first block at top of safe area
+    const firstBlock = sorted[0];
+    if (firstBlock) {
+      const firstHalf = (firstBlock.height ?? 0) / 2;
+      firstBlock.y = SAFE_AREA_TOP + firstHalf;
+    }
+
+    // Position remaining blocks with dynamic gap
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1];
+      const cur = sorted[i];
+      const prevBottom = prev.y + (prev.height ?? 0) / 2;
+      const curHalf = (cur.height ?? 0) / 2;
+      cur.y = Math.round(prevBottom + dynamicGap + curHalf);
+    }
+
+    // Update original layers array with new positions, heights, and font sizes
+    const updateMap = new Map(sorted.map((l) => [l.id, { y: l.y, height: l.height, fontSize: l.fontSize }]));
+    layers.forEach((layer) => {
+      const updates = updateMap.get(layer.id);
+      if (updates) {
+        layer.y = updates.y;
+        layer.height = updates.height;
+        layer.fontSize = updates.fontSize;
+      }
+    });
+  } else if (layers.length === 1) {
+    // Center single text block vertically
+    layers[0].y = H / 2;
+  }
+
+  return layers;
 }
 
 
@@ -496,19 +575,34 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   
   const enforceMinVerticalSpacing = useCallback((layers: TextLayer[]) => {
     const next = [...layers].sort((a, b) => a.y - b.y);
+
+    // Calculate dynamic gap based on number of text blocks
+    let dynamicGap = MIN_TEXT_GAP;
+    if (next.length > 3) {
+      // For more than 3 text blocks, use minimal spacing
+      dynamicGap = MIN_TEXT_GAP;
+    } else if (next.length > 1) {
+      // For 2-3 blocks, calculate normal gap
+      const totalTextHeight = next.reduce((sum, layer) => sum + (layer.height ?? 0), 0);
+      const availableSpace = H - (PADDING * 2) - totalTextHeight;
+      const numGaps = next.length - 1;
+      const calculatedGap = availableSpace / numGaps;
+      dynamicGap = Math.max(MIN_TEXT_GAP, Math.min(calculatedGap, BASE_FONT_PX * 0.5));
+    }
+
     for (let i = 1; i < next.length; i++) {
       const prev = next[i - 1];
       const cur = next[i];
-      
-      
-      
+
+
+
       if (!prev || !cur) {
         return;
       }
       const prevTop = prev.y - (prev.height ?? 0) / 2;
       const prevBottom = prev.y + (prev.height ?? 0) / 2;
       const curTop = cur.y - (cur.height ?? 0) / 2;
-      const neededTop = prevBottom + MIN_TEXT_GAP;
+      const neededTop = prevBottom + dynamicGap;
       if (curTop < neededTop) {
         const curHalf = (cur?.height ?? 0) / 2;
         const newY = neededTop + curHalf;
@@ -517,7 +611,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         }
       }
     }
-    
+
     const map = new Map(next.map((l) => [l.id, l.y]));
     return layers.map((l) => (map.has(l.id) ? { ...l, y: map.get(l.id)! } : l));
   }, []);
@@ -549,7 +643,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       x: centerX,
       y: centerY,
       rotation: 0,
-      width: Math.round(W * 0.7),
+      width: TEXT_WIDTH,
       height: 0, 
       zIndex: (textLayers.at(-1)?.zIndex ?? 0) + 1,
       color: TIKTOK_TEXT_COLOR,
