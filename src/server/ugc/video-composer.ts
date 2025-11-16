@@ -543,11 +543,6 @@ export async function composeReactionDemoVideo({
     if (overlayText && overlayText.trim().length > 0) {
       const outPath = join(tempDir, `ugc-final-overlay-${randomUUID()}.mp4`);
       const resolvedFontPath = resolveTikTokFontPath();
-      if (!resolvedFontPath) {
-        console.warn("[UGC][compose] TikTok font NOT FOUND – FFmpeg will fallback. Check font path packaging.");
-      } else {
-        console.log("[UGC][compose] Using TikTok font:", resolvedFontPath);
-      }
       // Positionierung: upper ≈ 18% von oben, middle = Vertikalmitte
       const yExprRaw =
         overlayPosition === "middle"
@@ -585,7 +580,6 @@ export async function composeReactionDemoVideo({
           .replace(/%/g, "\\%");
       const escapedText = escapeDrawtext(overlayText);
       const drawText = `drawtext=text='${escapedText}'${ffFontfile}:fontcolor=white${ffFontsize}${ffBorder}${ffShadow}:x=(w-text_w)/2:y=${yExprEsc}:line_spacing=0:fix_bounds=1`;
-      console.debug("[UGC][ffmpeg] using -vf:", drawText);
       await runFfmpeg([
         "-y",
         "-i",
@@ -644,15 +638,10 @@ export async function composeReactionDemoVideo({
             videoWithSoundPath,
           ]);
           finalVideoWithSoundPath = videoWithSoundPath;
-          console.log("[UGC][compose] Using background sound:", effectiveSoundUrl);
-        } else {
-          console.warn("[UGC][compose] Failed to fetch soundUrl:", effectiveSoundUrl, res.status);
         }
-      } catch (err) {
-        console.error("[UGC][compose] Error processing sound:", err);
+      } catch {
+        // Error processing sound
       }
-    } else {
-      console.log("[UGC][compose] No sound provided, creating silent video");
     }
 
     const [videoBuffer, thumbnailBuffer] = await Promise.all([

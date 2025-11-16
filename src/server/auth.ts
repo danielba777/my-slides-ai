@@ -44,7 +44,6 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         const user = await db.user.findUnique({
           where: { id: token.id as string },
         });
-        console.log("Session", session, user);
         if (session) {
           token.name = (session as Session).user.name;
           token.image = (session as Session).user.image;

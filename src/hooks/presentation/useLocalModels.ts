@@ -33,8 +33,7 @@ async function fetchOllamaModels(): Promise<ModelInfo[]> {
       name: model.name,
       provider: "ollama" as const,
     }));
-  } catch (error) {
-    console.log("Ollama not available:", error);
+  } catch {
     return [];
   }
 }
@@ -49,15 +48,13 @@ async function fetchLMStudioModels(): Promise<ModelInfo[]> {
     if (!data.data || !Array.isArray(data.data)) {
       return [];
     }
-    console.log("lmstudio models", data);
 
     return data.data.map((model) => ({
       id: `lmstudio-${model.id}`,
       name: model.id,
       provider: "lmstudio" as const,
     }));
-  } catch (error) {
-    console.log("LM Studio not available:", error);
+  } catch {
     return [];
   }
 }
@@ -168,10 +165,8 @@ export function getSelectedModel(): {
 } | null {
   try {
     const selected = localStorage.getItem(SELECTED_MODEL_KEY);
-    console.log("Getting selected model from localStorage:", selected);
     return selected ? JSON.parse(selected) : null;
-  } catch (error) {
-    console.error("Error getting selected model from localStorage:", error);
+  } catch {
     return null;
   }
 }
@@ -180,9 +175,8 @@ export function setSelectedModel(modelProvider: string, modelId: string): void {
   try {
     const data = { modelProvider, modelId };
     localStorage.setItem(SELECTED_MODEL_KEY, JSON.stringify(data));
-    console.log("Saved model to localStorage:", data);
-  } catch (error) {
-    console.error("Error saving model to localStorage:", error);
+  } catch {
+    // Ignore localStorage errors
   }
 }
 

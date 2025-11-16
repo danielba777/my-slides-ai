@@ -153,15 +153,13 @@ export function PresentationItem({
         );
       }
 
-      console.log(response);
       // Route based on content status
       if (Object.keys(response?.presentation?.content ?? {}).length > 0) {
         router.push(`/dashboard/slideshows/${presentation.id}`);
       } else {
         router.push(`/dashboard/slideshows/generate/${presentation.id}`);
       }
-    } catch (error) {
-      console.error("Failed to navigate:", error);
+    } catch {
       toast.error("Failed to open presentation");
     } finally {
       setIsNavigating(false);

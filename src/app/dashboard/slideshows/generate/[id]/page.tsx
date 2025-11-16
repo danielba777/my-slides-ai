@@ -174,7 +174,6 @@ export default function PresentationGenerateWithIdPage() {
       };
 
       const variety = template.variety ?? 0;
-      console.log('Starting template generation with', template.slides.length, 'slides, variety:', variety);
 
       // Call the generate-from-template API
       const response = await fetch("/api/presentation/generate-from-template", {
@@ -192,16 +191,12 @@ export default function PresentationGenerateWithIdPage() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API error response:', errorText);
         throw new Error(`Failed to generate presentation from template: ${response.status}`);
       }
 
       if (!response.body) {
         throw new Error("No response body");
       }
-
-      console.log('Streaming XML response...');
 
       // Stream and parse the XML response
       const reader = response.body.getReader();
@@ -218,20 +213,14 @@ export default function PresentationGenerateWithIdPage() {
         xmlContent += chunk;
       }
 
-      console.log('XML content received, length:', xmlContent.length);
-      console.log('XML preview:', xmlContent.substring(0, 500));
-
       // Parse the complete XML to slides
       const parsedSlides = parser.parseChunk(xmlContent);
-
-      console.log('Parsed slides:', parsedSlides.length);
 
       if (parsedSlides.length === 0) {
         throw new Error("No slides generated from template");
       }
 
       // Apply TikTok styling to all slides
-      console.log('Applying TikTok text styling...');
       const slidesWithTikTokStyle = parsedSlides.map((slide, index) => {
         // First slide gets highlight-box style, rest get outline style
         const styleMode = index === 0 ? "highlight" : "outline";
@@ -239,7 +228,6 @@ export default function PresentationGenerateWithIdPage() {
       });
 
       // Load images for each slide from the imageset
-      console.log('Loading images for slides from imageset...');
       const slidesWithImages = await Promise.all(
         slidesWithTikTokStyle.map(async (slide) => {
           // Extract heading text to use as query
@@ -249,18 +237,14 @@ export default function PresentationGenerateWithIdPage() {
             : "slideshow";
 
           if (!query) {
-            console.log('No query for slide, skipping image');
             return ensureSlideCanvas(slide);
           }
 
           const imageUrl = await getImageForSlide(query, state);
 
           if (!imageUrl) {
-            console.log('No image loaded for query:', query);
             return ensureSlideCanvas(slide);
           }
-
-          console.log('Loaded image for slide:', imageUrl);
 
           // Ensure slide has canvas and apply image
           const slideWithCanvas = ensureSlideCanvas(slide);
@@ -291,8 +275,6 @@ export default function PresentationGenerateWithIdPage() {
         state.setThumbnailUrl(firstSlideWithImage.rootImage.url);
       }
 
-      console.log('Saving presentation...');
-
       // Save presentation
       await updatePresentation({
         id,
@@ -311,8 +293,6 @@ export default function PresentationGenerateWithIdPage() {
         thumbnailUrl: firstSlideWithImage?.rootImage?.url,
       });
 
-      console.log('Presentation saved, clearing template data and redirecting...');
-
       // Clear the template from sessionStorage
       sessionStorage.removeItem('pendingTemplate');
 
@@ -321,7 +301,6 @@ export default function PresentationGenerateWithIdPage() {
       // Redirect to editor
       router.push(`/dashboard/slideshows/${id}`);
     } catch (error) {
-      console.error("Template generation error:", error);
       toast.error(error instanceof Error ? error.message : "Failed to generate presentation from template");
       state.setIsGeneratingOutline(false);
 
@@ -347,7 +326,6 @@ export default function PresentationGenerateWithIdPage() {
       (isGeneratingOutline || hasPendingCookie()) &&
       !generationStarted.current
     ) {
-      console.log("Starting outline generation after navigation");
       generationStarted.current = true;
 
       // Give the component time to fully mount and establish connections

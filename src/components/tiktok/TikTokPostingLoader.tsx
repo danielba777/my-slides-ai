@@ -54,8 +54,6 @@ export function TikTokPostingLoader({
         setStatus(data);
         setPollCount(prev => prev + 1);
 
-        console.log(`[TikTokPostingLoader] Poll ${pollCount + 1}:`, data);
-
         // Check if we have a final status
         if (data.status === "success" || data.status === "inbox" || data.status === "failed") {
           setLoading(false);
@@ -70,7 +68,6 @@ export function TikTokPostingLoader({
         }
 
       } catch (err) {
-        console.error("[TikTokPostingLoader] Poll error:", err);
         const errorMessage = err instanceof Error ? err.message : "Failed to check post status";
         setError(errorMessage);
         setLoading(false);

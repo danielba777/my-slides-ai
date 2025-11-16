@@ -4,8 +4,8 @@ if (!globalThis.redis) {
   const url = process.env.REDIS_URL ?? "redis://localhost:6379";
   const client = createClient({ url });
 
-  client.on("error", (err) => console.error("[redis] Error:", err));
-  client.connect().then(() => console.log("[redis] Connected:", url));
+  client.on("error", () => {});
+  client.connect();
 
   globalThis.redis = client;
 }

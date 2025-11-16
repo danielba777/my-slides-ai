@@ -64,7 +64,6 @@ export const PresentationImageElement = withHOC(
         const container = document.querySelector(".presentation-slides");
         const isEditorReadOnly = !container?.contains(imageRef?.current);
         // Prevent image generation in read-only mode
-        console.log(isEditorReadOnly, hasHandledGenerationRef.current);
         if (isEditorReadOnly) {
           return;
         }

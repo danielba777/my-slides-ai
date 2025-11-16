@@ -483,8 +483,4 @@ export async function resetAllCredits(
       resetsAt: nextResetAt,
     },
   });
-
-  console.log(
-    `[resetAllCredits] ✅ balance reset for ${plan} → slides=${slides}, ai=${ai}`
-  );
 }

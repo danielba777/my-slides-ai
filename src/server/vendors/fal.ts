@@ -47,12 +47,6 @@ export async function pikaImageToVideo(input: PikaImageToVideoInput) {
       mode: input.mode ?? "std",
     },
     logs: true,
-    onQueueUpdate: (update) => {
-      // optional: Logs in Server-Konsole sichtbar machen
-      if (update.status === "IN_PROGRESS" && Array.isArray(update.logs)) {
-        for (const log of update.logs) console.log("[fal][pika]", log.message);
-      }
-    },
   });
 
   // Erfolgsformat laut Doku: result.data.video.url

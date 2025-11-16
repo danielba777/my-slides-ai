@@ -60,10 +60,6 @@ export default function PresentationPage() {
     }
   }, [isGeneratingPresentation]);
 
-  useEffect(() => {
-    console.log("Current Slide Index", currentSlideIndex);
-  }, [currentSlideIndex]);
-
   // Use React Query to fetch presentation data
   const { data: presentationData, isLoading } = useQuery({
     queryKey: ["presentation", id],
@@ -81,16 +77,8 @@ export default function PresentationPage() {
   const debouncedThemeUpdate = useCallback(
     debounce((presentationId: string, newTheme: string) => {
       updatePresentationTheme(presentationId, newTheme)
-        .then((result) => {
-          if (result.success) {
-            console.log("Theme updated in database");
-          } else {
-            console.error("Failed to update theme:", result.message);
-          }
-        })
-        .catch((error) => {
-          console.error("Error updating theme:", error);
-        });
+        .then(() => {})
+        .catch(() => {});
     }, 600),
     [],
   );
