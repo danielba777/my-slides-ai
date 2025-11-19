@@ -123,8 +123,6 @@ const baseStyles = `
 `;
 
 marked.use({
-  mangle: false,
-  headerIds: false,
   breaks: true,
 });
 
