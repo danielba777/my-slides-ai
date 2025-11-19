@@ -193,14 +193,14 @@ export class VideoOptimizer {
    */
   static checkHardwareAccelerationSupport(): boolean {
     const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    const gl = (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')) as WebGLRenderingContext | null;
 
     if (!gl) return false;
 
-    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info') as WEBGL_debug_renderer_info | null;
     if (!debugInfo) return false;
 
-    const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+    const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) as string;
     // Check for hardware accelerated renderers
     return /nvidia|amd|radeon|intel.*hd|apple|mali|adreno|tegra/i.test(renderer);
   }

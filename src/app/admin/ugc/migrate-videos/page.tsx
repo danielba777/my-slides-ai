@@ -18,6 +18,14 @@ type MigrationResult = {
   error?: string;
 };
 
+type MigrationAuthDetails = {
+  hasSession: boolean;
+  isAdmin?: boolean;
+  isAllowed: boolean;
+  userEmail: string;
+  allowedEmails: string[];
+};
+
 type MigrationResponse = {
   success: boolean;
   summary: {
@@ -27,6 +35,16 @@ type MigrationResponse = {
   };
   results: MigrationResult[];
   message: string;
+  error?: string;
+  details?: MigrationAuthDetails;
+};
+
+type VerificationAvatar = {
+  id: string;
+  name: string;
+  videoStatus: "FILESERVER" | "LOCAL" | "NONE";
+  isActive: boolean;
+  willShowInDashboard: boolean;
 };
 
 type VerificationResponse = {
@@ -39,21 +57,16 @@ type VerificationResponse = {
     fileserverVideos: number;
     noVideos: number;
   };
-  avatars: Array<{
-    id: string;
-    name: string;
-    videoStatus: "FILESERVER" | "LOCAL" | "NONE";
-    isActive: boolean;
-    willShowInDashboard: boolean;
-  }>;
+  avatars: VerificationAvatar[];
   dashboardReady: {
     count: number;
-    avatars: Array<any>;
+    avatars: VerificationAvatar[];
   };
   recommendations: {
     success: boolean;
     message: string;
   };
+  error?: string;
 };
 
 export default function MigrateVideosPage() {

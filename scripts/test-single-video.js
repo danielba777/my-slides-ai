@@ -19,6 +19,10 @@ function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
 }
 
+function formatError(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 async function testSingleVideo() {
   log('🧪 SICHERHEITSTEST - Nur EINE Datei', 'blue');
   log('=' .repeat(50), 'blue');
@@ -55,7 +59,7 @@ async function testSingleVideo() {
       return;
     }
   } catch (error) {
-    log(`❌ slidescockpit-api nicht erreichbar: ${error.message}`, 'red');
+    log(`❌ slidescockpit-api nicht erreichbar: ${formatError(error)}`, 'red');
     log('💡 Stelle sicher, dass die API auf http://localhost:3001 läuft', 'yellow');
     return;
   }
@@ -70,7 +74,7 @@ async function testSingleVideo() {
       return;
     }
   } catch (error) {
-    log(`❌ Next.js App nicht erreichbar: ${error.message}`, 'red');
+    log(`❌ Next.js App nicht erreichbar: ${formatError(error)}`, 'red');
     log('💡 Stelle sicher, dass die App auf http://localhost:3000 läuft', 'yellow');
     return;
   }
@@ -84,7 +88,7 @@ async function testSingleVideo() {
     const data = await response.json();
     avatars = data.avatars;
   } catch (error) {
-    log(`❌ Konnte Avatars nicht laden: ${error.message}`, 'red');
+    log(`❌ Konnte Avatars nicht laden: ${formatError(error)}`, 'red');
     return;
   }
 
@@ -123,24 +127,12 @@ async function testSingleVideo() {
 }
 
 main().catch(error => {
-  log(`❌ Skript Fehler: ${error.message}`, 'red');
+  log(`❌ Skript Fehler: ${formatError(error)}`, 'red');
 });
 
 async function main() {
-  // Installiere node-fetch falls nicht vorhanden
-  try {
-    require('node-fetch');
-  } catch (error) {
-    log('📦 Installiere node-fetch...', 'blue');
-    const { spawn } = require('child_process');
-    await new Promise((resolve, reject) => {
-      const npm = spawn('npm', ['install', 'node-fetch'], { stdio: 'inherit' });
-      npm.on('close', (code) => {
-        if (code === 0) resolve();
-        else reject(new Error('npm install failed'));
-      });
-    });
-    log('✅ node-fetch installiert', 'green');
+  if (typeof fetch !== 'function') {
+    throw new Error('Global fetch API nicht verfügbar. Bitte Node.js 18+ verwenden.');
   }
 
   await testSingleVideo();

@@ -1,4 +1,4 @@
-import type { CanvasDoc } from "@/lib/types";
+import type { CanvasDoc } from "@/canvas/types";
 
 /**
  * Stellt sicher, dass ein Canvas-Dokument alle notwendigen Felder hat.

@@ -3,7 +3,8 @@
 import { Button } from "@/components/ui/button";
 import { usePresentationState } from "@/states/presentation-state";
 import { ensureCanvas } from "@/lib/canvasUtils";
-import type { CanvasDoc, SlideTextElement } from "@/lib/types";
+import type { CanvasDoc } from "@/canvas/types";
+import type { SlideTextElement } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 

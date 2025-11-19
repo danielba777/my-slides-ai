@@ -5,6 +5,17 @@ import path from "path";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 
+type MigrationResult = {
+  fileName: string;
+  avatarId: string;
+  oldUrl?: string;
+  newUrl?: string;
+  size?: number;
+  sizeMB?: string;
+  error?: string;
+  status: "success" | "failed";
+};
+
 export async function POST(req: Request) {
   console.log("[Migrate] Starting migration request...");
 
@@ -124,7 +135,7 @@ export async function POST(req: Request) {
       }, { status: 500 });
     }
 
-    const results = [];
+    const results: MigrationResult[] = [];
     let successCount = 0;
     let failureCount = 0;
 

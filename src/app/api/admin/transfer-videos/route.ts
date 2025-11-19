@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "fs";
+import { promises as fs, existsSync } from "fs";
 import path from "path";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
+
+type TransferFileResult = {
+  fileName: string;
+  avatarId: string;
+  size: number;
+  sizeMB: string;
+  message: string;
+};
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -14,7 +22,7 @@ export async function POST(req: Request) {
     const LOCAL_HOOKS_DIR = path.join(process.cwd(), "public", "ugc", "reaction-hooks");
 
     // Check if directory exists
-    if (!fs.existsSync(LOCAL_HOOKS_DIR)) {
+    if (!existsSync(LOCAL_HOOKS_DIR)) {
       return NextResponse.json({ error: "Local hooks directory not found" }, { status: 404 });
     }
 
@@ -38,7 +46,7 @@ export async function POST(req: Request) {
       }
     });
 
-    const results = [];
+    const results: TransferFileResult[] = [];
 
     for (const [fileName, avatarId] of fileNameToAvatarId) {
       const filePath = path.join(LOCAL_HOOKS_DIR, fileName);
