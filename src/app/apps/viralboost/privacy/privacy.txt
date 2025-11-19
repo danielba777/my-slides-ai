@@ -1,0 +1,247 @@
+# **Privacy Policy**
+
+**Last updated April 2, 2025**
+
+This privacy notice for **A&B Business** (doing business as **ViralBoost**) describes how and why we collect, store, use, and/or process your information when you use our services. If you do not agree with our policies and practices, please do not use our Services.
+If you have any questions or concerns, please contact us at **[info@slidescockpit.com](mailto:info@slidescockpit.com)**.
+
+---
+
+## **1. What information do we collect?**
+
+### **Personal information you disclose to us**
+
+Using ViralBoost is generally possible without providing personal data. If personal data (such as name, address, or email address) is collected, it is done voluntarily whenever possible. We do not share this data with third parties without your explicit consent.
+
+If a contractual relationship is established, modified, or requested, or if you send an inquiry, we collect and use the personal data required to respond (inventory data).
+We also collect, process, and use personal data necessary to enable the use of the service (usage data).
+
+Personal data is stored only as long as necessary for its purpose (processing requests or handling contracts), taking legal retention periods into account.
+
+We may be obligated to share data with authorities in specific cases, for example for criminal prosecution, hazard prevention, legal obligations of constitutional protection authorities, the Military Counterintelligence Service, or enforcement of intellectual property rights.
+
+We point out that Internet data transmission (e.g., email communication) can have security vulnerabilities, and complete protection against third-party access is not possible.
+
+The use of contact data published due to imprint obligations for sending unsolicited advertising is prohibited unless an existing business relationship or explicit consent exists.
+A&B Business and any third parties mentioned on this website reserve the right to take legal action against unsolicited advertising.
+
+---
+
+### **Information automatically collected**
+
+We automatically collect certain information when you visit, use, or navigate the Services. This information does not reveal your specific identity (such as your name) but may include:
+
+* IP address (anonymized)
+* Device and browser characteristics
+* Operating system
+* Language settings
+* Country & approximate location
+* Device name
+* Referring URLs
+* Usage activity (e.g., timestamps, pages viewed, features used)
+* Technical diagnostics (e.g., system activity, crash logs, hardware settings)
+
+This information is needed for:
+
+* security
+* reliable operation of our Services
+* internal analytics and performance monitoring
+
+Like many businesses, we use cookies and similar technologies.
+
+---
+
+### **The information we collect includes:**
+
+#### **Log and Usage Data**
+
+This includes diagnostic, usage, and performance information collected automatically by our servers when you interact with our Services.
+This data may include:
+
+* anonymized IP address
+* browser type and device information
+* features used and actions taken
+* timestamps
+* crash reports (“crash dumps”)
+* hardware and system activity
+
+---
+
+## **2. How do we process your information?**
+
+We process your personal information for purposes including:
+
+* **Marketing & promotional communication**
+  (only if permitted by your preferences; you may opt out at any time)
+
+* **Measuring effectiveness of marketing campaigns**
+  to improve relevant communication and product development.
+
+---
+
+## **3. What legal bases do we rely on? (EU/UK GDPR)**
+
+If you are located in the EEA or UK, we may process your information based on:
+
+### **Consent**
+
+When you give us permission for a specific purpose.
+You may withdraw consent at any time.
+
+### **Legitimate Interests**
+
+When processing is necessary for our business interests, such as:
+
+* sending users information about offers
+* supporting product development and marketing
+
+…but only when these interests do not outweigh your rights.
+
+### **Legal Obligations**
+
+When required to comply with law, such as:
+
+* cooperating with authorities
+* defending legal claims
+* complying with documentation requirements
+
+### **Vital Interests**
+
+When necessary to protect your life or someone else’s safety.
+
+---
+
+## **4. Do we use cookies and other tracking technologies?**
+
+Yes. We may use cookies, web beacons, pixels, or similar technologies to store or access information.
+
+---
+
+## **5. Tools and services for analytics & marketing**
+
+### **Google Analytics**
+
+This website uses Google Analytics provided by:
+
+**Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Ireland**
+
+Google Analytics helps us analyze user behavior, including:
+
+* page views
+* session duration
+* device types & operating systems
+* user paths
+* mouse/scroll/click behavior (in some cases)
+
+Google Analytics may use:
+
+* cookies
+* device fingerprinting
+* machine learning models to refine analytics
+
+Data is typically transmitted to Google servers in the USA.
+Use of Google Analytics is based on your consent (Art. 6(1)(a) GDPR and § 25(1) TTDSG).
+You may withdraw your consent at any time.
+
+Data transfer to the USA is based on the EU Standard Contractual Clauses:
+([https://privacy.google.com/businesses/controllerterms/mccs/](https://privacy.google.com/businesses/controllerterms/mccs/))
+
+---
+
+## **6. How long do we keep your information?**
+
+We retain personal information only as long as necessary for the purposes described here, unless a longer retention period is required by law (e.g., tax or accounting rules).
+
+When no ongoing business need exists, we will:
+
+* delete the data, or
+* anonymize it, or
+* securely store it until deletion is possible (e.g., in backup archives)
+
+---
+
+## **7. Children’s Privacy**
+
+ViralBoost is not intended for children under 13.
+If we learn we collected information from a child under 13 without parental consent, we will delete it.
+
+In some regions, a higher minimum age may apply due to local laws.
+
+---
+
+## **8. What information do we share and with whom?**
+
+We only share:
+
+* **Limited, non-personally identifiable information** with **Google Analytics**
+* Aggregated or pseudonymized data with partners (e.g., analytics tools)
+
+We **do not share personal information that directly identifies you** (e.g., name, email).
+
+Third-party apps or websites integrated with ViralBoost may collect data under their own policies.
+
+---
+
+## **9. What are your privacy rights?**
+
+Depending on your location (EEA/UK/Switzerland/Canada), you may have the right to:
+
+* access your personal information
+* correct inaccurate data
+* request deletion
+* restrict processing
+* data portability (if applicable)
+* object to processing
+* opt out of marketing communications
+
+We respond to all requests in accordance with applicable laws.
+
+You may also submit complaints to your local data protection authority.
+
+### **Withdrawing consent**
+
+You may withdraw consent at any time using the contact details below.
+
+### **Opting out of marketing**
+
+You may unsubscribe from marketing emails at any time by contacting us.
+
+### **Cookies**
+
+You may disable or delete cookies in your browser settings.
+Disabling cookies may affect certain features.
+
+---
+
+## **10. Updates to this Privacy Policy**
+
+We may update this policy from time to time.
+The updated version will have an updated “Revised” date.
+Material changes may be announced in the app or via direct notification.
+
+---
+
+## **11. How can you contact us about this policy?**
+
+If you have any questions or comments about this Privacy Policy, contact us at:
+
+**A&B Business**
+Dorstener Str. 1
+40472 Düsseldorf
+Germany
+
+**Email:** [info@slidescockpit.com](mailto:info@slidescockpit.com)
+
+---
+
+## **12. How can you review, update, or delete your data?**
+
+If applicable laws grant you this right, you may request to:
+
+* review
+* update
+* delete
+
+the personal data we have collected about you.
+
+Contact: **[info@slidescockpit.com](mailto:info@slidescockpit.com)**
