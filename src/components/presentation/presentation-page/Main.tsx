@@ -51,7 +51,7 @@ export default function PresentationPage() {
   const setLanguage = usePresentationState((s) => s.setLanguage);
   const setImageSetId = usePresentationState((s) => s.setImageSetId);
   const theme = usePresentationState((s) => s.theme);
-  
+
   const dbThemeRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -64,7 +64,6 @@ export default function PresentationPage() {
     console.log("Current Slide Index", currentSlideIndex);
   }, [currentSlideIndex]);
 
-  
   const { data: presentationData, isLoading } = useQuery({
     queryKey: ["presentation", id],
     queryFn: async () => {
@@ -77,7 +76,6 @@ export default function PresentationPage() {
     enabled: !!id && !isGeneratingPresentation && shouldFetchData,
   });
 
-  
   const debouncedThemeUpdate = useCallback(
     debounce((presentationId: string, newTheme: string) => {
       updatePresentationTheme(presentationId, newTheme)
@@ -95,40 +93,32 @@ export default function PresentationPage() {
     [],
   );
 
-  
   useEffect(() => {
-    
     if (isGeneratingPresentation || !shouldFetchData) {
       return;
     }
 
     if (presentationData) {
-      
       dbThemeRef.current = presentationData.presentation?.theme ?? null;
       setCurrentPresentation(presentationData.id, presentationData.title);
       setPresentationInput(
         presentationData.presentation?.prompt ?? presentationData.title,
       );
 
-      
       const presentationContent = presentationData.presentation
         ?.content as unknown as {
         slides: PlateSlide[];
         config: Record<string, unknown>;
       };
 
-      
       setSlides(ensureSlidesHaveCanvas(presentationContent?.slides ?? []));
 
-      
-      
       const persistedImageSetId =
         (presentationContent?.config as any)?.imageSetId ?? null;
       if (persistedImageSetId && typeof persistedImageSetId === "string") {
         setImageSetId(persistedImageSetId);
       }
 
-      
       const currentThumb = presentationData.thumbnailUrl;
       if (!currentThumb) {
         const slides = presentationContent?.slides ?? [];
@@ -174,42 +164,34 @@ export default function PresentationPage() {
         }
       }
 
-      
       if (presentationContent?.config?.backgroundOverride !== undefined) {
         const { setConfig } = usePresentationState.getState();
         setConfig(presentationContent.config as Record<string, unknown>);
       }
 
-      
       if (presentationData.presentation?.outline) {
         setOutline(presentationData.presentation.outline);
       }
 
-      
       if (presentationData?.presentation?.theme) {
         const themeId = presentationData.presentation.theme;
 
-        
         if (themeId in themes) {
-          
           setTheme(themeId as Themes);
         } else {
-          
           void getCustomThemeById(themeId)
             .then((result) => {
               if (result.success && result.theme) {
-                
                 const themeData = result.theme.themeData;
                 setTheme(themeId, themeData as unknown as ThemeProperties);
               } else {
-                
                 console.warn("Custom theme not found:", themeId);
                 setTheme("mystique");
               }
             })
             .catch((error) => {
               console.error("Failed to load custom theme:", error);
-              
+
               setTheme("mystique");
             });
         }
@@ -227,12 +209,10 @@ export default function PresentationPage() {
         }
       }
 
-      
       if (presentationData?.presentation?.presentationStyle) {
         setPresentationStyle(presentationData.presentation.presentationStyle);
       }
 
-      
       if (presentationData.presentation?.language) {
         setLanguage(presentationData.presentation.language);
       }
@@ -252,29 +232,24 @@ export default function PresentationPage() {
     setImageSetId,
   ]);
 
-  
   useEffect(() => {
     if (!id || isLoading || !theme) return;
-    
+
     if (dbThemeRef.current === null) return;
-    
+
     if (theme === dbThemeRef.current) return;
 
-    
     dbThemeRef.current = theme as string;
     debouncedThemeUpdate(id, theme as string);
   }, [theme, id, debouncedThemeUpdate, isLoading]);
 
-  
   useEffect(() => {
     if (theme && resolvedTheme) {
       const state = usePresentationState.getState();
-      
+
       if (state.customThemeData) {
         setThemeVariables(state.customThemeData, resolvedTheme === "dark");
-      }
-      
-      else if (typeof theme === "string" && theme in themes) {
+      } else if (typeof theme === "string" && theme in themes) {
         const currentTheme = themes[theme as keyof typeof themes];
         if (currentTheme) {
           setThemeVariables(currentTheme, resolvedTheme === "dark");
@@ -283,7 +258,6 @@ export default function PresentationPage() {
     }
   }, [theme, resolvedTheme]);
 
-  
   const currentThemeData = (() => {
     const state = usePresentationState.getState();
     if (state.customThemeData) {
@@ -306,7 +280,7 @@ export default function PresentationPage() {
       hideSidebar
       fixedBackgroundColor="#F3F4EF"
     >
-      <div className="mx-auto w-full max-w-none px-8 pt-4">
+      <div className="mx-auto w-full max-w-none px-8 pt-[-0.5rem]">
         <PresentationSlidesView
           isGeneratingPresentation={isGeneratingPresentation}
         />

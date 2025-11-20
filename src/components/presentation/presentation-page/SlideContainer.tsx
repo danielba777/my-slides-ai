@@ -181,7 +181,7 @@ export function SlideContainer({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "group/card-container relative z-10 grid w-full place-items-center pb-2",
+        "group/card-container relative z-10 grid w-full place-items-center",
         isDragging && "z-50 opacity-50",
         dragTransparent && "opacity-30",
         isPresenting && "fixed inset-0 pb-0",

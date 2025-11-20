@@ -726,7 +726,7 @@ export const PresentationSlidesView = ({
                   <div
                     key={slide.id}
                     className={cn(
-                      "absolute mb-8 transition-transform duration-300 ease-in-out",
+                      "absolute mb-4 transition-transform duration-300 ease-in-out",
                       isActive ? "drop-shadow-xl" : "drop-shadow-md",
                     )}
                     style={{

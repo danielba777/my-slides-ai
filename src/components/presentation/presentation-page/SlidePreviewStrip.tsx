@@ -30,7 +30,7 @@ export function SlidePreviewStrip({
   }, [currentSlideIndex, slides.length]);
 
   return (
-    <div className="px-6 pb-4 pt-2 flex justify-center">
+    <div className="px-6 pb-0 pt-0 flex justify-center">
       <div
         ref={containerRef}
         className="flex items-center justify-center gap-2 overflow-x-auto"
