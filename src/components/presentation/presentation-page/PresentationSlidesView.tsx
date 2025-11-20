@@ -305,6 +305,7 @@ const SlideFrame = memo(function SlideFrame({
             <div
               className={cn(
                 `slide-container-${index}`,
+                "relative", 
                 isPresenting && "h-screen w-screen",
               )}
               onMouseEnter={() =>
@@ -323,7 +324,7 @@ const SlideFrame = memo(function SlideFrame({
                 <SlideCanvas
                   ref={canvasRef}
                   doc={docWithBg}
-                  showToolbar={isEditingText}
+                  showToolbar={false}
                   readOnly={disableInteractions}
                   overlayContent={(() => {
                     const showHover =
@@ -333,6 +334,32 @@ const SlideFrame = memo(function SlideFrame({
                       !editingSlideId &&
                       editingOverlaySlideId !== slide.id;
                     const inOverlayEdit = editingOverlaySlideId === slide.id;
+                    if (isEditingText) {
+                      return (
+                        <div className="absolute top-4 right-4 z-10">
+                          <button
+                            onClick={() => setEditingSlideId(null)}
+                            className="flex items-center justify-center w-10 h-10 rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600 transition-colors"
+                            aria-label="Accept changes"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-6 w-6"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      );
+                    }
                     if (inOverlayEdit) {
                       return (
                         <>
@@ -528,7 +555,7 @@ const SlideFrame = memo(function SlideFrame({
                 
                 <SlideCanvas
                   doc={docWithBg}
-                  showToolbar={isEditingText}
+                  showToolbar={false}
                   readOnly={disableInteractions}
                   overlayContent={
                     !isPresenting &&

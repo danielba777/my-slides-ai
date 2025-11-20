@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { usePresentationState } from "@/states/presentation-state";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { OutlineIcon } from "@/components/icons/OutlineIcon";
 import {
   ArrowRight,
   GripVertical,
@@ -57,6 +58,8 @@ export function SlideContainer({
   const setCurrentSlideIndex = usePresentationState(
     (s) => s.setCurrentSlideIndex,
   );
+  const slides = usePresentationState((s) => s.slides);
+  const setSlides = usePresentationState((s) => s.setSlides);
   
   
   const currentSlide = usePresentationState((s) => s.slides[index]);
@@ -92,7 +95,6 @@ export function SlideContainer({
   }, [isDragging]);
 
   const { addSlide, deleteSlideAt } = useSlideOperations();
-  const setSlides = usePresentationState((s) => s.setSlides);
   const presentationImageSetId = usePresentationState((s) => s.imageSetId);
   const [isShuffling, setIsShuffling] = useState(false);
   const activeImageSetId =
@@ -150,6 +152,32 @@ export function SlideContainer({
     }
   };
 
+  const toggleOutline = () => {
+    const currentSlide = slides[currentSlideIndex];
+    if (!currentSlide || !currentSlide.canvas) return;
+
+    const newNodes = currentSlide.canvas.nodes.map((node) => {
+      if (node.type === "text") {
+        return {
+          ...node,
+          outlineEnabled: !(node as any).outlineEnabled,
+        };
+      }
+      return node;
+    });
+
+    const newSlides = [...slides];
+    newSlides[currentSlideIndex] = {
+      ...currentSlide,
+      canvas: {
+        ...currentSlide.canvas,
+        nodes: newNodes,
+      },
+    };
+
+    setSlides(newSlides);
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -204,6 +232,17 @@ export function SlideContainer({
               >
                 <GripVertical className="h-4 w-4" />
               </button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className={ACTION_BUTTON_CLASSES}
+                onClick={toggleOutline}
+                aria-label="Toggle Outline"
+                title="Toggle Outline"
+              >
+                <OutlineIcon className="h-4 w-4" />
+              </Button>
 
               {}
               <PersonalImagePickerButton index={index} />
