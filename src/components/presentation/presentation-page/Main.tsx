@@ -306,7 +306,7 @@ export default function PresentationPage() {
       hideSidebar
       fixedBackgroundColor="#F3F4EF"
     >
-      <div className="mx-auto w-full max-w-none px-8 pt-16">
+      <div className="mx-auto w-full max-w-none px-8 pt-4">
         <PresentationSlidesView
           isGeneratingPresentation={isGeneratingPresentation}
         />

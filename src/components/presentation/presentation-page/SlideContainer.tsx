@@ -2,6 +2,7 @@
 
 import { loadImageDecoded } from "@/canvas/konva-helpers";
 import type { CanvasDoc } from "@/canvas/types";
+import { OutlineIcon } from "@/components/icons/OutlineIcon";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +20,6 @@ import { cn } from "@/lib/utils";
 import { usePresentationState } from "@/states/presentation-state";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { OutlineIcon } from "@/components/icons/OutlineIcon";
 import {
   ArrowRight,
   GripVertical,
@@ -60,8 +60,7 @@ export function SlideContainer({
   );
   const slides = usePresentationState((s) => s.slides);
   const setSlides = usePresentationState((s) => s.setSlides);
-  
-  
+
   const currentSlide = usePresentationState((s) => s.slides[index]);
   const {
     attributes,
@@ -131,7 +130,6 @@ export function SlideContainer({
       const updated = state.slides.slice();
       const idx = updated.findIndex((slideItem) => slideItem.id === id);
       if (idx >= 0) {
-        
         const prevRoot = updated[idx]?.rootImage ?? { query: "" };
         updated[idx] = {
           ...(updated[idx] as any),
@@ -183,7 +181,7 @@ export function SlideContainer({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "group/card-container relative z-10 grid w-full place-items-center pb-6",
+        "group/card-container relative z-10 grid w-full place-items-center pb-2",
         isDragging && "z-50 opacity-50",
         dragTransparent && "opacity-30",
         isPresenting && "fixed inset-0 pb-0",
@@ -212,12 +210,23 @@ export function SlideContainer({
 
         {}
 
-        {children}
+        <div className="relative">
+          {children}
+          {index !== currentSlideIndex && !isPresenting && (
+            <div
+              className="absolute inset-0 z-10 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCurrentSlideIndex(index);
+              }}
+            />
+          )}
+        </div>
 
         {}
-        {!isPresenting && !isReadOnly && (
+        {!isPresenting && !isReadOnly && index === currentSlideIndex && (
           <div
-            className={cn("z-[1001] mt-3 w-full")}
+            className={cn("z-[1001] mt-1 w-full")}
             aria-label="Slide toolbar"
           >
             <div className="mx-auto flex w-full max-w-[760px] flex-wrap items-center justify-center gap-3 py-3">
@@ -341,7 +350,6 @@ export function SlideContainer({
   );
 }
 
-
 function PersonalImagePickerButton({ index }: { index: number }) {
   const [open, setOpen] = useState(false);
   const slides = usePresentationState((s) => s.slides);
@@ -368,17 +376,13 @@ function PersonalImagePickerButton({ index }: { index: number }) {
     const updated = slides.slice();
     if (!updated[index]) return;
 
-    
     const slide = updated[index]!;
     const canvas = ensureCanvas(slide.canvas as CanvasDoc | undefined);
 
-    
     const nodesWithoutOld = canvas.nodes.filter(
       (n: any) => !(n?.type === "image" && n?.id === "user-overlay-image"),
     );
 
-    
-    
     let natW = canvas.width;
     let natH = canvas.height;
     try {
@@ -386,7 +390,6 @@ function PersonalImagePickerButton({ index }: { index: number }) {
       natW = img.naturalWidth || natW;
       natH = img.naturalHeight || natH;
     } catch {
-      
       natW = Math.round(canvas.width * 0.5);
       natH = Math.round(canvas.height * 0.5);
     }
@@ -404,21 +407,21 @@ function PersonalImagePickerButton({ index }: { index: number }) {
       width: finalW,
       height: finalH,
       url: imageUrl,
-      
+
       cropX: 0,
       cropY: 0,
       cropWidth: natW,
       cropHeight: natH,
-      fit: "contain",            
-      preserveAspectRatio: true, 
-      clipToCanvas: false,       
-      mask: false,               
+      fit: "contain",
+      preserveAspectRatio: true,
+      clipToCanvas: false,
+      mask: false,
     };
 
     const nextCanvas: CanvasDoc = {
       ...canvas,
       nodes: [...nodesWithoutOld, personalNode],
-      
+
       selection: ["user-overlay-image"],
     };
 
@@ -427,20 +430,16 @@ function PersonalImagePickerButton({ index }: { index: number }) {
     setOpen(false);
   };
 
-  
-  
-  
   useEffect(() => {
-    const sel = (slides[index]?.canvas as CanvasDoc | undefined)?.selection ?? [];
+    const sel =
+      (slides[index]?.canvas as CanvasDoc | undefined)?.selection ?? [];
     const overlaySelected = sel.includes("user-overlay-image");
     if (!overlaySelected) return;
     const onWheel = (e: WheelEvent) => {
-      
       e.preventDefault();
     };
     window.addEventListener("wheel", onWheel, { passive: false });
     return () => window.removeEventListener("wheel", onWheel as any, false);
-    
   }, [(slides[index]?.canvas as any)?.selection]);
 
   const onMainButtonClick = () => {
@@ -454,7 +453,6 @@ function PersonalImagePickerButton({ index }: { index: number }) {
       );
 
     if (hasPersonal) {
-      
       const ensured = ensureCanvas(c);
       const next: CanvasDoc = { ...ensured, selection: ["user-overlay-image"] };
       const updated = slides.slice();
@@ -463,7 +461,7 @@ function PersonalImagePickerButton({ index }: { index: number }) {
       setEditingOverlaySlideId(slide.id);
       return;
     }
-    
+
     setOpen(true);
   };
 
@@ -474,8 +472,8 @@ function PersonalImagePickerButton({ index }: { index: number }) {
         size="icon"
         className={ACTION_BUTTON_CLASSES}
         onClick={onMainButtonClick}
-        aria-label="Personal Images"
-        title="Personal Images"
+        aria-label="Overlay Image"
+        title="Overlay Image"
       >
         <ImageIcon className="h-4 w-4" />
       </Button>

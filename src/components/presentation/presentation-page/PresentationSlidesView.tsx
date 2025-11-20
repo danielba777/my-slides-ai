@@ -69,12 +69,14 @@ const SlideFrame = memo(function SlideFrame({
   isPresenting,
   slidesCount,
   isReadOnly = false,
+  isActive,
 }: {
   slide: any;
   index: number;
   isPresenting: boolean;
   slidesCount: number;
   isReadOnly?: boolean;
+  isActive: boolean;
 }) {
   const safeCanvas: CanvasDoc = (slide.canvas as CanvasDoc | undefined) ?? {
     version: DEFAULT_CANVAS.version,
@@ -309,6 +311,7 @@ const SlideFrame = memo(function SlideFrame({
                 isPresenting && "h-screen w-screen",
               )}
               onMouseEnter={() =>
+                isActive &&
                 !isPresenting &&
                 !isReadOnly &&
                 !editingSlideId &&
@@ -328,6 +331,7 @@ const SlideFrame = memo(function SlideFrame({
                   readOnly={disableInteractions}
                   overlayContent={(() => {
                     const showHover =
+                      isActive &&
                       !isPresenting &&
                       !isReadOnly &&
                       isHovering &&
@@ -438,12 +442,14 @@ const SlideFrame = memo(function SlideFrame({
                           {}
                           <button
                             onClick={() => {
-                              setEditingSlideId(slide.id);
-                              setIsHovering(false);
-                              
-                              setTimeout(() => {
-                                canvasRef.current?.focusFirstText();
-                              }, 100);
+                              if (isActive) {
+                                setEditingSlideId(slide.id);
+                                setIsHovering(false);
+                                
+                                setTimeout(() => {
+                                  canvasRef.current?.focusFirstText();
+                                }, 100);
+                              }
                             }}
                             className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
                           >
@@ -455,12 +461,14 @@ const SlideFrame = memo(function SlideFrame({
                           {}
                           <button
                             onClick={() => {
-                              if (slide.rootImage?.useGrid) {
-                                setIsMultiImageSelectorOpen(true);
-                              } else {
-                                setIsImageSelectorOpen(true);
+                              if (isActive) {
+                                if (slide.rootImage?.useGrid) {
+                                  setIsMultiImageSelectorOpen(true);
+                                } else {
+                                  setIsImageSelectorOpen(true);
+                                }
+                                setIsHovering(false);
                               }
-                              setIsHovering(false);
                             }}
                             className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
                           >
@@ -478,8 +486,10 @@ const SlideFrame = memo(function SlideFrame({
                           {slide.rootImage && (
                             <button
                               onClick={() => {
-                                toggleGridMode();
-                                setIsHovering(false);
+                                if (isActive) {
+                                  toggleGridMode();
+                                  setIsHovering(false);
+                                }
                               }}
                               className="absolute bottom-4 right-4 flex items-center gap-2 bg-white/90 hover:bg-white text-gray-900 px-4 py-2 rounded-lg transition-all backdrop-blur-sm pointer-events-auto cursor-pointer shadow-lg"
                             >
@@ -566,8 +576,10 @@ const SlideFrame = memo(function SlideFrame({
                         {}
                         <button
                           onClick={() => {
-                            setEditingSlideId(slide.id);
-                            setIsHovering(false);
+                            if (isActive) {
+                              setEditingSlideId(slide.id);
+                              setIsHovering(false);
+                            }
                           }}
                           className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer border-b border-white/20 group"
                         >
@@ -579,8 +591,10 @@ const SlideFrame = memo(function SlideFrame({
                         {}
                         <button
                           onClick={() => {
-                            setIsImageSelectorOpen(true);
-                            setIsHovering(false);
+                            if (isActive) {
+                              setIsImageSelectorOpen(true);
+                              setIsHovering(false);
+                            }
                           }}
                           className="flex-1 flex items-center justify-center gap-2 bg-black/50 hover:bg-black/60 transition-all backdrop-blur-sm pointer-events-auto cursor-pointer group"
                         >
@@ -703,7 +717,7 @@ export const PresentationSlidesView = ({
               title="AI is thinking about your presentation..."
             />
 
-            <div className="relative px-6 py-4 h-[900px] flex items-start justify-center overflow-x-hidden overflow-y-visible">
+            <div className="relative px-6 pt-0 h-[900px] flex items-start justify-center overflow-x-hidden overflow-y-visible">
               {items.map((slide, index) => {
                 const offset = index - currentSlideIndex;
                 const isActive = offset === 0;
@@ -733,6 +747,7 @@ export const PresentationSlidesView = ({
                       slidesCount={items.length}
                       isPresenting={isPresenting}
                       isReadOnly={false}
+                      isActive={isActive}
                     />
                   </div>
                 );
