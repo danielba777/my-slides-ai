@@ -3,6 +3,15 @@ import { randomUUID } from "crypto";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 
+type OptimizationResult = {
+  avatarId: string;
+  name: string;
+  originalUrl?: string;
+  previewUrl?: string;
+  error?: string;
+  status: "success" | "failed";
+};
+
 // Simple video optimization using FFmpeg-like approach
 // For production, you might want to use a proper video processing service
 
@@ -50,7 +59,7 @@ export async function POST(req: Request) {
     }
 
     const API_BASE_URL = process.env.SLIDESCOCKPIT_API_BASE_URL ?? "http://localhost:3001";
-    const results = [];
+    const results: OptimizationResult[] = [];
     let successCount = 0;
     let failureCount = 0;
 

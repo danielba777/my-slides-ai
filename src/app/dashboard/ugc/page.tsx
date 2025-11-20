@@ -679,7 +679,6 @@ export default function UgcDashboardPage() {
                           preload="metadata"
                           style={{
                             objectFit: "cover",
-                            WebkitOptimizedInlineVideo: true, // Safari optimization
                             willChange: "auto", // Performance hint
                           }}
                           onLoadStart={() => {
@@ -760,11 +759,10 @@ export default function UgcDashboardPage() {
                             muted
                             playsInline
                             preload="none"
-                            style={{
-                              objectFit: "cover",
-                              WebkitOptimizedInlineVideo: true, // Safari optimization
-                              willChange: "auto", // Performance hint
-                            }}
+                              style={{
+                                objectFit: "cover",
+                                willChange: "auto", // Performance hint
+                              }}
                             onLoadStart={() => {
                               console.log(
                                 "[Video] Layer 1 loading:",

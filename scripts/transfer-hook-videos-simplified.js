@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const fetch = require('node-fetch');
 
 // Konfiguration
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3001';
@@ -18,6 +17,10 @@ const colors = {
 
 function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
+}
+
+function formatError(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function uploadVideoToServer(fileName) {
@@ -54,7 +57,7 @@ async function uploadVideoToServer(fileName) {
       method: 'PUT',
       headers: {
         'Content-Type': 'video/mp4',
-        'Content-Length': videoBuffer.length,
+        'Content-Length': videoBuffer.length.toString(),
       },
       body: videoBuffer,
     });
@@ -67,7 +70,7 @@ async function uploadVideoToServer(fileName) {
     return presignData.publicUrl;
 
   } catch (error) {
-    log(`❌ Upload Fehler: ${error.message}`, 'red');
+    log(`❌ Upload Fehler: ${formatError(error)}`, 'red');
     return null;
   }
 }
@@ -85,7 +88,7 @@ async function getAvatarsFromDatabase() {
     log(`✅ ${data.avatars.length} Avatars geladen`, 'green');
     return data.avatars;
   } catch (error) {
-    log(`❌ Datenbank Fehler: ${error.message}`, 'red');
+    log(`❌ Datenbank Fehler: ${formatError(error)}`, 'red');
     return [];
   }
 }
@@ -109,12 +112,16 @@ async function updateAvatarVideoUrl(avatarId, newVideoUrl) {
 
     return true;
   } catch (error) {
-    log(`❌ Update Fehler: ${error.message}`, 'red');
+    log(`❌ Update Fehler: ${formatError(error)}`, 'red');
     return false;
   }
 }
 
 async function main() {
+  if (typeof fetch !== 'function') {
+    throw new Error('Global fetch API nicht verfügbar. Bitte Node.js 18+ verwenden.');
+  }
+
   log('🚀 Hook Videos Transfer Skript', 'blue');
   log('=' .repeat(50), 'blue');
 
@@ -242,6 +249,6 @@ process.on('uncaughtException', (error) => {
 });
 
 main().catch(error => {
-  log(`❌ Skript Fehler: ${error.message}`, 'red');
+  log(`❌ Skript Fehler: ${formatError(error)}`, 'red');
   process.exit(1);
 });

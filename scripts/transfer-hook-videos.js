@@ -1,9 +1,12 @@
 const fs = require('fs');
 const path = require('path');
-const fetch = require('node-fetch');
 
 const API_BASE_URL = 'http://localhost:3001'; // Ihre API URL anpassen
 const LOCAL_HOOKS_DIR = path.join(process.cwd(), 'public', 'ugc', 'reaction-hooks');
+
+function formatError(error) {
+  return error instanceof Error ? error.message : String(error);
+}
 
 async function uploadVideoToServer(filePath, fileName) {
   try {
@@ -35,7 +38,7 @@ async function uploadVideoToServer(filePath, fileName) {
     return presignData.publicUrl;
 
   } catch (error) {
-    console.error(`❌ Fehler bei ${fileName}:`, error.message);
+    console.error(`❌ Fehler bei ${fileName}:`, formatError(error));
     return null;
   }
 }
@@ -61,12 +64,16 @@ async function updateVideoUrlInDatabase(avatarId, newVideoUrl) {
     return true;
 
   } catch (error) {
-    console.error(`❌ Fehler beim Aktualisieren von Avatar ${avatarId}:`, error.message);
+    console.error(`❌ Fehler beim Aktualisieren von Avatar ${avatarId}:`, formatError(error));
     return false;
   }
 }
 
 async function main() {
+  if (typeof fetch !== 'function') {
+    throw new Error('Global fetch API nicht verfügbar. Bitte Node.js 18+ verwenden.');
+  }
+
   console.log('🚀 Starte Transfer der Hook Videos...\n');
 
   // 1. Prüfen ob das lokale Verzeichnis existiert
@@ -92,7 +99,7 @@ async function main() {
     const data = await response.json();
     avatars = data.avatars;
   } catch (error) {
-    console.error('❌ Konnte Avatars nicht aus Datenbank laden:', error.message);
+    console.error('❌ Konnte Avatars nicht aus Datenbank laden:', formatError(error));
     return;
   }
 
@@ -148,4 +155,6 @@ async function main() {
   console.log(`\n💡 Die Videos sind jetzt unter https://files.slidescockpit.com verfügbar`);
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error('❌ Skript Fehler:', formatError(error));
+});
