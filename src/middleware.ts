@@ -32,7 +32,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  const publicPaths = new Set(["/", "/privacy", "/terms", "/sitemap.xml", "/robots.txt"]);
+  const publicPaths = new Set([
+    "/",
+    "/privacy",
+    "/terms",
+    "/sitemap.xml",
+    "/robots.txt",
+  ]);
+
+  const isAppsPath = path === "/apps" || path.startsWith("/apps/");
 
   let isThemePage = false;
   if (!session) {
@@ -74,6 +82,7 @@ export async function middleware(request: NextRequest) {
 
   const isPublicPath =
     publicPaths.has(path) ||
+    isAppsPath ||
     path.startsWith("/integrations/social/tiktok") ||
     isThemePage;
 
