@@ -117,8 +117,8 @@ export function TextOutlineButton({ index }: TextOutlineButtonProps) {
           ...textElement,
           strokeEnabled: true,
           outlineEnabled: true,
-          strokeWidth: 4,
-          outlineWidth: 4,
+          strokeWidth: 1,
+          outlineWidth: 1,
           stroke: "#000000",
           outlineColor: "#000000",
         };
