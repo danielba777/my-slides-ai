@@ -54,6 +54,7 @@ export function SlideContainer({
   slidesCount,
 }: SlideContainerProps) {
   const isPresenting = usePresentationState((s) => s.isPresenting);
+  const editingSlideId = usePresentationState((s) => s.editingSlideId);
   const currentSlideIndex = usePresentationState((s) => s.currentSlideIndex);
   const setCurrentSlideIndex = usePresentationState(
     (s) => s.setCurrentSlideIndex,
@@ -216,6 +217,7 @@ export function SlideContainer({
             <div
               className="absolute inset-0 z-10 cursor-pointer"
               onClick={(e) => {
+                if (editingSlideId) return;
                 e.stopPropagation();
                 setCurrentSlideIndex(index);
               }}

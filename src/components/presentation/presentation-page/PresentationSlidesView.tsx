@@ -343,7 +343,7 @@ const SlideFrame = memo(function SlideFrame({
                         <div className="absolute top-4 right-4 z-10">
                           <button
                             onClick={() => setEditingSlideId(null)}
-                            className="flex items-center justify-center w-10 h-10 rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600 transition-colors"
+                            className="flex items-center justify-center w-10 h-10 rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600 transition-colors pointer-events-auto"
                             aria-label="Accept changes"
                           >
                             <svg
@@ -629,6 +629,7 @@ export const PresentationSlidesView = ({
 }: PresentationSlidesViewProps) => {
   const currentSlideIndex = usePresentationState((s) => s.currentSlideIndex);
   const isPresenting = usePresentationState((s) => s.isPresenting);
+  const editingSlideId = usePresentationState((s) => s.editingSlideId);
   const setCurrentSlideIndex = usePresentationState(
     (s) => s.setCurrentSlideIndex,
   );
@@ -682,10 +683,11 @@ export const PresentationSlidesView = ({
 
   const handlePreviewSelect = useCallback(
     (index: number) => {
+      if (editingSlideId) return;
       setCurrentSlideIndex(index);
       scrollToSlide(index);
     },
-    [scrollToSlide, setCurrentSlideIndex],
+    [scrollToSlide, setCurrentSlideIndex, editingSlideId],
   );
 
   
@@ -736,7 +738,7 @@ export const PresentationSlidesView = ({
                       visibility: Math.abs(offset) > 4 ? "hidden" : "visible",
                     }}
                     onClick={() => {
-                      if (!isPresenting) {
+                      if (!isPresenting && !editingSlideId) {
                         setCurrentSlideIndex(index);
                       }
                     }}

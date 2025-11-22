@@ -2655,10 +2655,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         </div>
 
         {}
-        {overlayContent && (
-          <div className="absolute inset-0 z-50">{overlayContent}</div>
-        )}
-      </div>
+              {overlayContent && (
+                <div className="absolute inset-0 z-50 pointer-events-none">
+                  {overlayContent}
+                </div>
+              )}      </div>
       {}
     </>
   );
