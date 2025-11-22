@@ -144,69 +144,31 @@ export function PresentationGenerationManager() {
       }
 
       
-      const lines = cleanContent.split("\n");
-      const outlineItems: string[] = [];
-      let currentItem = "";
-      let inItem = false;
+      // New JSON parsing logic
+      const jsonObjects: string[] = [];
+      const objectRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+      let match;
 
-      for (const line of lines) {
-        const trimmedLine = line.trim();
-
-        
-        const numberMatch = trimmedLine.match(/^(\d+)[\.\)]\s+(.*)$/);
-
-        if (numberMatch) {
-          
-          if (currentItem.trim()) {
-            outlineItems.push(currentItem.trim());
-          }
-          
-          currentItem = numberMatch[2] || "";
-          inItem = true;
-        } else if (inItem && trimmedLine) {
-          
-          currentItem += "\n" + trimmedLine;
-        } else if (!trimmedLine) {
-          
-          if (currentItem.trim()) {
-            
-          }
+      while ((match = objectRegex.exec(cleanContent)) !== null) {
+        try {
+          const jsonStr = match[0];
+          // Verify it's valid JSON
+          JSON.parse(jsonStr);
+          jsonObjects.push(jsonStr);
+        } catch (e) {
+          // Incomplete or invalid JSON object, skip
         }
       }
 
-      
-      if (currentItem.trim()) {
-        outlineItems.push(currentItem.trim());
-      }
-
-      if (outlineItems.length === 0) {
-        
-        const numberedMatches = Array.from(
-          cleanContent.matchAll(/^\s*\d+[\.\)]\s+(.*\S)\s*$/gm),
-        )
-          .map((match) => match[1]?.trim())
-          .filter((value): value is string =>
-            Boolean(value && value.length > 0),
-          );
-
-        if (numberedMatches.length > 0) {
-          outlineItems.push(...numberedMatches);
-        } else {
-          
-          const sections = cleanContent.split(/^#\s+/gm).filter(Boolean);
-          if (sections.length > 0) {
-            outlineItems.push(
-              ...sections.map((section) => {
-                const trimmed = section.trim();
-                return trimmed.startsWith("#") ? trimmed : `# ${trimmed}`;
-              }),
-            );
-          }
+      if (jsonObjects.length > 0) {
+        outlineBufferRef.current = jsonObjects;
+      } else {
+        // Fallback for backward compatibility or if JSON parsing fails completely
+        // Try to treat as plain text lines if no JSON found
+        const lines = cleanContent.split("\n").filter(l => l.trim().length > 0 && !l.trim().startsWith("[") && !l.trim().startsWith("]"));
+        if (lines.length > 0 && !cleanContent.trim().startsWith("[")) {
+             outlineBufferRef.current = lines;
         }
-      }
-
-      if (outlineItems.length > 0) {
-        outlineBufferRef.current = outlineItems;
       }
     }
   };

@@ -629,8 +629,8 @@ export function ensureSlideCanvas(slide: PlateSlide): PlateSlide {
 
       const updated = {
         ...textNode,
-        width: 1000, // Force all text nodes to have 1000px width
-        align: "center", // Force center alignment
+        width: textNode.width ?? 1000, // Use existing width or default
+        align: textNode.align ?? "center", // Use existing align or default
         nx: hasNormalizedCoords ? textNode.nx : 0.5,
         ny: hasNormalizedCoords ? textNode.ny : 0.5,
         x: hasNormalizedCoords ? textNode.x : Math.round(0.5 * (slide.canvas?.width ?? 1080)),

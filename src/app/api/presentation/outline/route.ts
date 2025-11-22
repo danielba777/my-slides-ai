@@ -20,7 +20,7 @@ interface OutlineRequest {
   diversitySeed?: number;
 }
 
-const outlineTemplate = `You are an expert TikTok slideshow script writer. Create a compelling script with exactly {numberOfCards} slides in {language}.
+const outlineTemplate = `You are an expert TikTok slideshow script writer and layout designer. Create a compelling script with exactly {numberOfCards} slides in {language}.
 
 Current Date: {currentDate}
 Creative diversity token: {diversitySig}
@@ -28,54 +28,52 @@ Variation directive: {variationDirective}
 User Request (MUST follow all tone/style/format directives): {prompt}
 
 ## YOUR TASK:
-Analyze the user's request carefully. They may specify:
-- A specific tone (e.g., authoritative, coaching, conversational)
-- A particular structure (e.g., numbered habits, steps, tips)
-- Content format (e.g., bullet points, short sentences, captions)
-- Reading level and style preferences
+Analyze the user's request carefully. Create content AND layout specifications for each slide.
 
 ## CRITICAL RULES:
-1. **RESPECT THE USER'S INSTRUCTIONS**: If they want bullet points, provide bullet points. If they want numbered items with sub-points, provide that exact structure.
-2. **FOLLOW THE SPECIFIED FORMAT**: The user may request specific patterns (e.g., "habit name followed by 3 bullet points"). Follow this precisely.
-3. **MAINTAIN CONSISTENCY**: If slide 2 has a certain structure, slides 3–7 should follow the same pattern (unless the user specifies otherwise).
-4. **HONOR TONE & STYLE**: Match the requested tone exactly (authoritative, coaching, casual, etc.).
-5. **SLIDE COUNT**: Generate EXACTLY {numberOfCards} slides. First slide is typically a title/hook, last slide is typically a conclusion/CTA.
-6. **LINE NUMBERING**: Start every line with "<number>. " (e.g., "1. ", "2. ", etc.) and continue sequentially.
+1. **RESPECT THE USER'S INSTRUCTIONS**: If they want bullet points, provide bullet points.
+2. **FOLLOW THE SPECIFIED FORMAT**: The user may request specific patterns.
+3. **MAINTAIN CONSISTENCY**: If slide 2 has a certain structure, slides 3–7 should follow the same pattern.
+4. **HONOR TONE & STYLE**: Match the requested tone exactly.
+5. **SLIDE COUNT**: Generate EXACTLY {numberOfCards} slides.
+6. **OUTPUT FORMAT**: Return a valid JSON array of objects.
 
 ## DIVERSITY & NOVELTY RULES (VERY IMPORTANT):
 - Do **not** repeat the same idea with different wording.
 - Each slide must introduce a **distinct primary concept/ingredient**.
-- Vary across: base ingredient, preparation method (no‑cook / baked / frozen / pan), flavor profile (sweet / savory / spicy / tangy), texture (crunchy / creamy / chewy), occasion (desk snack / post‑workout / travel / movie night), cuisine (at least one non‑local).
-- Strictly avoid overused examples unless explicitly requested. For snack topics, AVOID: yogurt parfait, apple + peanut butter, hummus & carrots, smoothie bowl, trail mix.
 - Use at least **3 uncommon** but realistic ideas.
 - Do not reuse the same primary noun/base ingredient across slides.
-- Vary micro‑phrasing; avoid repeating the same sentence stems.
-- If the user requests caption‑style text, keep it concise and **no full sentences**.
 
-## CONTENT GUIDELINES:
-- Keep text concise but impactful (2–4 lines per slide is ideal for TikTok)
-- Use line breaks within a slide when helpful
-- If the user requests bullet points, use "•" or "-" for bullets
-- If the user requests numbered sub‑items, include them
-- Avoid hashtags, emojis, or excessive punctuation UNLESS requested
-- First slide should be a compelling hook/title
-- Last slide should provide closure (conclusion, CTA, or motivational message)
+## LAYOUT SPECIFICATIONS:
+For each slide, you must provide:
+- \`text\`: The content of the slide.
+- \`fontSize\`: Font size in pixels (e.g., "48px"). Use larger sizes (50-80px) for titles/short text, smaller (30-50px) for longer text.
+- \`textSize\`: Object with \`width\` and \`height\` in pixels. Max width is 1000. Estimate height based on text length.
+- \`textPosition\`: Object with \`x\` and \`y\` coordinates. Canvas size is 1080x1920. Center is approx x=540. y position should vary (e.g., title higher up).
+- \`textStyle\`: Always "outline".
 
 ## OUTPUT FORMAT:
-Return ONLY a numbered list. Each number represents one slide. The content after each number is what appears on that slide.
+Return ONLY a valid JSON array. No markdown formatting, no code blocks. Just the raw JSON array.
 
-Example for a habit‑breaking topic:
-1. 7 habits that are secretly killing your potential
-2. 1. Constant self-doubt
-• You talk yourself out of opportunities before trying
-• You assume others are more qualified than you
-• You replay past mistakes more than past successes
-3. 2. Waiting for perfect timing
-• You delay important decisions waiting for the moment
-• You let opportunities pass while preparing endlessly
-• You mistake hesitation for being thorough
+Example:
+[
+  {
+    "text": "7 habits that are secretly killing your potential",
+    "fontSize": "64px",
+    "textSize": { "width": 900, "height": 200 },
+    "textPosition": { "x": 540, "y": 400 },
+    "textStyle": "outline"
+  },
+  {
+    "text": "1. Constant self-doubt\\n• You talk yourself out of opportunities\\n• You assume others are more qualified",
+    "fontSize": "42px",
+    "textSize": { "width": 950, "height": 600 },
+    "textPosition": { "x": 540, "y": 960 },
+    "textStyle": "outline"
+  }
+]
 
-Now generate exactly {numberOfCards} slides following the user's instructions **and the diversity rules**:
+Now generate exactly {numberOfCards} slides following the user's instructions **and the diversity rules** as a JSON array:
 `;
 
 export async function POST(req: Request) {

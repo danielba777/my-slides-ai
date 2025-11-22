@@ -1,4 +1,3 @@
-
 "use client";
 
 import { loadImageDecoded } from "@/canvas/konva-helpers";
@@ -19,7 +18,6 @@ import type { CanvasImageNode } from "@/canvas/types";
 import { measureWrappedText } from "@/lib/textMetrics";
 import type { SlideTextElement } from "@/lib/types";
 import { usePresentationState } from "@/states/presentation-state";
-import { AlignCenter, AlignLeft, AlignRight } from "lucide-react";
 import React, {
   forwardRef,
   useCallback,
@@ -29,8 +27,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-
-
 
 type TextBgMode = "block" | "blob";
 
@@ -62,20 +58,20 @@ export type SlideCanvasHandle = {
 };
 
 type Props = {
-  imageUrl: string; 
+  imageUrl: string;
   layout: SlideTextElement[];
   onLayoutChange?: (next: SlideTextElement[]) => void;
-  
+
   overlays?: CanvasImageNode[];
-  
+
   onOverlaysChange?: (next: CanvasImageNode[]) => void;
-  
+
   showToolbar?: boolean;
-  
+
   overlayContent?: React.ReactNode;
-  
+
   onCloseToolbar?: () => void;
-  
+
   readOnly?: boolean;
 };
 
@@ -87,14 +83,11 @@ const SAFE_AREA_TOP = 100; // Safe area at top
 const SAFE_AREA_BOTTOM = 100; // Safe area at bottom
 const TEXT_WIDTH = 1000; // Almost full width text blocks
 
-const DESCENT_PAD = Math.ceil(BASE_FONT_PX * 0.25); 
-
+const DESCENT_PAD = Math.ceil(BASE_FONT_PX * 0.25);
 
 const MIN_TEXT_GAP = Math.max(1, Math.round(BASE_FONT_PX * 0.015));
 
-
-const DIM_OVERLAY_OPACITY = 0.28; 
-
+const DIM_OVERLAY_OPACITY = 0.28;
 
 const TEXT_BASELINE = "middle";
 
@@ -180,22 +173,20 @@ function drawRoundedRect(
   ctx.closePath();
 }
 
-
 export const ASPECT_RATIO = 2 / 3;
-
 
 function buildOuterTextShadow(px: number, color: string): string {
   const r = Math.max(0, Math.round(px));
   if (r <= 0) return "none";
   const steps: string[] = [];
-  
+
   for (let y = -r; y <= r; y++) {
     for (let x = -r; x <= r; x++) {
       const d = Math.hypot(x, y);
       if (d > 0 && d <= r + 0.01) steps.push(`${x}px ${y}px 0 ${color}`);
     }
   }
-  
+
   if (steps.length > 400) {
     const filtered: string[] = [];
     let c = 0;
@@ -206,7 +197,6 @@ function buildOuterTextShadow(px: number, color: string): string {
   }
   return steps.join(", ");
 }
-
 
 function layoutSignature(l: SlideTextElement[]): string {
   return JSON.stringify(
@@ -223,7 +213,7 @@ function layoutSignature(l: SlideTextElement[]): string {
       z: x.zIndex ?? 0,
       a: x.align ?? "center",
       wt: x.weight ?? "regular",
-      
+
       it: (x as any).italic ?? false,
       oe: (x as any).outlineEnabled ?? false,
       ow: (x as any).outlineWidth ?? TIKTOK_OUTLINE_WIDTH,
@@ -244,14 +234,12 @@ function layoutSignature(l: SlideTextElement[]): string {
   );
 }
 
-
 async function waitFontsReady() {
   try {
     const d: any = document;
     if (d?.fonts?.ready) await d.fonts.ready;
   } catch {}
 }
-
 
 function computeWrappedLinesWithDOM(
   layer: TextLayer & {
@@ -261,7 +249,6 @@ function computeWrappedLinesWithDOM(
   const weight =
     layer.weight === "bold" ? 700 : layer.weight === "semibold" ? 600 : 400;
 
-  
   const baseFontPx = BASE_FONT_PX;
   const lineHeightPx = baseFontPx * (layer.lineHeight ?? 1.12);
 
@@ -282,7 +269,6 @@ function computeWrappedLinesWithDOM(
   return result.lines;
 }
 
-
 function computeAutoHeightForLayer(
   layerBase: TextLayer & { italic?: boolean },
   _lines?: string[],
@@ -294,7 +280,6 @@ function computeAutoHeightForLayer(
         ? 600
         : 400;
 
-  
   const baseFontPx = BASE_FONT_PX;
   const lineHeightPx = baseFontPx * (layerBase.lineHeight ?? 1.12);
   const m = measureWrappedText({
@@ -312,7 +297,6 @@ function computeAutoHeightForLayer(
   });
   return Math.max(40, Math.ceil(m.totalHeight));
 }
-
 
 function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
   autoHeight?: boolean;
@@ -370,7 +354,6 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
     };
 
     if (!tmp.height || tmp.height <= 0) {
-
       const lines = computeWrappedLinesWithDOM(tmp);
       tmp.height = Math.ceil(computeAutoHeightForLayer(tmp, lines));
       tmp.autoHeight = true;
@@ -407,7 +390,10 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
 
     // Calculate available space within safe areas
     const safeAreaHeight = H - SAFE_AREA_TOP - SAFE_AREA_BOTTOM;
-    const totalTextHeight = sorted.reduce((sum, layer) => sum + (layer.height ?? 0), 0);
+    const totalTextHeight = sorted.reduce(
+      (sum, layer) => sum + (layer.height ?? 0),
+      0,
+    );
     const availableSpace = safeAreaHeight - totalTextHeight;
     const numGaps = sorted.length - 1;
 
@@ -415,11 +401,17 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
     let dynamicGap = MIN_TEXT_GAP;
     if (sorted.length > 3) {
       // For more than 3 text blocks, use minimal spacing
-      dynamicGap = Math.max(MIN_TEXT_GAP, Math.min(10, availableSpace / numGaps));
+      dynamicGap = Math.max(
+        MIN_TEXT_GAP,
+        Math.min(10, availableSpace / numGaps),
+      );
     } else {
       // For 2-3 blocks, use moderate spacing
       const calculatedGap = availableSpace / numGaps;
-      dynamicGap = Math.max(MIN_TEXT_GAP, Math.min(calculatedGap, BASE_FONT_PX * 0.2));
+      dynamicGap = Math.max(
+        MIN_TEXT_GAP,
+        Math.min(calculatedGap, BASE_FONT_PX * 0.2),
+      );
     }
 
     // Position first block at top of safe area
@@ -440,7 +432,12 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
     }
 
     // Update original layers array with new positions, heights, and font sizes
-    const updateMap = new Map(sorted.map((l) => [l.id, { y: l.y, height: l.height, fontSize: l.fontSize }]));
+    const updateMap = new Map(
+      sorted.map((l) => [
+        l.id,
+        { y: l.y, height: l.height, fontSize: l.fontSize },
+      ]),
+    );
     layers.forEach((layer) => {
       const updates = updateMap.get(layer.id);
       if (updates) {
@@ -459,7 +456,6 @@ function mapLayoutToLayers(layout: SlideTextElement[]): (TextLayer & {
 
   return layers;
 }
-
 
 function mapLayersToLayout(
   textLayers: (TextLayer & {
@@ -490,7 +486,7 @@ function mapLayersToLayout(
         : layer.weight === "semibold"
           ? ("semibold" as const)
           : ("regular" as const),
-    
+
     ...(layer.italic !== undefined ? { italic: layer.italic as any } : {}),
     ...(layer.outlineEnabled !== undefined
       ? { outlineEnabled: layer.outlineEnabled as any }
@@ -525,8 +521,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dimBg, setDimBg] = React.useState(false);
 
-  
-  
   const dimOverlaySlideId = usePresentationState(
     (s) => s.editingOverlaySlideId,
   );
@@ -534,7 +528,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     (s) => s.setEditingOverlaySlideId,
   );
 
-  
   const onLayout = useCallback(
     (next: SlideTextElement[]) => {
       if (typeof onLayoutChange === "function") {
@@ -544,7 +537,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     [onLayoutChange],
   );
 
-  
   const getActiveId = () => isEditingRef.current ?? activeLayerId;
   const applyToActive = (updater: (l: TextLayer) => TextLayer) => {
     const id = getActiveId();
@@ -564,7 +556,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const setAlign = (align: "left" | "center" | "right") => {
     applyToActive((l) => ({ ...l, align }));
   };
-  
+
   const setFontScale = (scale: number) => {
     const s = Math.max(0.2, Math.min(4, Number.isFinite(scale) ? scale : 1));
     applyToActive((l) => ({ ...l, scale: s }));
@@ -576,7 +568,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     applyToActive((l) => ({ ...l, outlineEnabled: true, outlineColor: color }));
   };
 
-  
   const enforceMinVerticalSpacing = useCallback((layers: TextLayer[]) => {
     const next = [...layers].sort((a, b) => a.y - b.y);
 
@@ -587,18 +578,22 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       dynamicGap = MIN_TEXT_GAP;
     } else if (next.length > 1) {
       // For 2-3 blocks, calculate normal gap
-      const totalTextHeight = next.reduce((sum, layer) => sum + (layer.height ?? 0), 0);
-      const availableSpace = H - (PADDING * 2) - totalTextHeight;
+      const totalTextHeight = next.reduce(
+        (sum, layer) => sum + (layer.height ?? 0),
+        0,
+      );
+      const availableSpace = H - PADDING * 2 - totalTextHeight;
       const numGaps = next.length - 1;
       const calculatedGap = availableSpace / numGaps;
-      dynamicGap = Math.max(MIN_TEXT_GAP, Math.min(calculatedGap, BASE_FONT_PX * 0.5));
+      dynamicGap = Math.max(
+        MIN_TEXT_GAP,
+        Math.min(calculatedGap, BASE_FONT_PX * 0.5),
+      );
     }
 
     for (let i = 1; i < next.length; i++) {
       const prev = next[i - 1];
       const cur = next[i];
-
-
 
       if (!prev || !cur) {
         return;
@@ -620,7 +615,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     return layers.map((l) => (map.has(l.id) ? { ...l, y: map.get(l.id)! } : l));
   }, []);
 
-  
   const addNewTextLayer = () => {
     const id =
       typeof crypto !== "undefined" && crypto.randomUUID
@@ -648,7 +642,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       y: centerY,
       rotation: 0,
       width: TEXT_WIDTH,
-      height: 0, 
+      height: 0,
       zIndex: (textLayers.at(-1)?.zIndex ?? 0) + 1,
       color: TIKTOK_TEXT_COLOR,
       autoHeight: true,
@@ -662,11 +656,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     setTextLayers((prev) => [...prev, initial]);
     commitActiveLayer(id);
     setIsEditing(id);
-    
+
     setTimeout(() => editorActiveRef.current?.focus(), 0);
   };
 
-  
   useEffect(() => {
     const handler = () => {
       addNewTextLayer();
@@ -675,7 +668,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     return () => window.removeEventListener("canvas:add-text", handler);
   }, []);
 
-  
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [bgSelected, setBgSelected] = useState(false);
@@ -686,7 +678,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const isPanning = useRef(false);
   const lastPoint = useRef({ x: 0, y: 0 });
 
-  
   const [overlayNodes, setOverlayNodes] = useState<CanvasImageNode[]>(
     () => overlays,
   );
@@ -709,7 +700,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             img.onerror = () => res();
             img.src = n.url;
           });
-          
+
           const img2 = new Image();
           img2.src = n.url;
           const w = (img2 as any).naturalWidth || 1;
@@ -735,7 +726,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     [onOverlaysChange],
   );
 
-  
   const dragRef = useRef<{
     id: string | null;
     startX: number;
@@ -801,7 +791,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     [commitOverlays, overlayNodes],
   );
 
-  
   const [textLayers, setTextLayers] = useState<
     (TextLayer & {
       autoHeight?: boolean;
@@ -812,20 +801,18 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     })[]
   >([]);
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
-  
+
   const activeLayerIdRef = useRef<string | null>(null);
   const commitActiveLayer = useCallback((id: string | null) => {
     setActiveLayerId(id);
     activeLayerIdRef.current = id;
   }, []);
 
-  
   useEffect(() => {
     activeLayerIdRef.current = activeLayerId;
   }, [activeLayerId]);
 
-  
-  const [isEditing, setIsEditing] = useState<string | null>(null); 
+  const [isEditing, setIsEditing] = useState<string | null>(null);
   const isEditingRef = useRef<string | null>(null);
   const toolbarMouseDownRef = useRef(false);
   const editorActiveRef = useRef<HTMLTextAreaElement | null>(null);
@@ -848,7 +835,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   const interactionStart = useRef<any>(null);
   const isInteracting = useRef(false);
 
-  
   const lastSentLayoutSigRef = useRef<string>("");
   const layoutSig = useMemo(() => layoutSignature(layout), [layout]);
 
@@ -858,11 +844,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       !isInteracting.current &&
       !isEditingRef.current;
     if (fromParent) setTextLayers(mapLayoutToLayers(layout) as any);
-    
   }, [layoutSig]);
 
-  
-  
   useEffect(() => {
     setTextLayers(((prev) => {
       if (!prev || prev.length <= 1) return prev;
@@ -882,38 +865,31 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       outlineWidth?: number;
       outlineColor?: string;
     })[]);
-  }, [
-    enforceMinVerticalSpacing,
-     textLayers.length,
-  ]);
+  }, [enforceMinVerticalSpacing, textLayers.length]);
 
-  
   const [previewSize, setPreviewSize] = useState({
     w: 420,
     h: Math.round(420 * (H / W)),
   });
 
-  
   useEffect(() => {
     setTextLayers(mapLayoutToLayers(layout) as any);
-    
-  }, []); 
+  }, []);
 
-  
   useEffect(() => {
     function fit() {
       const parent = wrapRef.current?.parentElement;
       if (!parent) return;
       const containerWidth = parent.clientWidth;
-      
+
       let w = Math.max(420, Math.min(containerWidth - 8, 540));
       let h = Math.round(w * (H / W));
-      
+
       const MAX_VH = 0.76;
       const maxH = Math.floor(window.innerHeight * MAX_VH);
       if (h > maxH) {
         h = maxH;
-        w = Math.round(h * (W / H)); 
+        w = Math.round(h * (W / H));
       }
       setPreviewSize({ w, h });
     }
@@ -922,7 +898,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     return () => window.removeEventListener("resize", fit);
   }, []);
 
-  
   const pixelToCanvas = (clientX: number, clientY: number) => {
     if (!wrapRef.current) return { x: 0, y: 0 };
     const rect = wrapRef.current.getBoundingClientRect();
@@ -934,8 +909,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     };
   };
 
-  
-  
   const wheelHandler = useCallback(
     (e: WheelEvent) => {
       if (isEditingRef.current) return;
@@ -945,28 +918,25 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const canvasY = (e.clientY - rect.top) * (H / rect.height);
       const factor = e.deltaY < 0 ? 1.06 : 0.94;
 
-      
       if (activeLayerId && overlayNodes.some((n) => n.id === activeLayerId)) {
         e.preventDefault();
         e.stopPropagation();
         commitOverlays(
           overlayNodes.map((n) => {
             if (n.id !== activeLayerId) return n;
-            
+
             const cx = n.x + n.width / 2;
             const cy = n.y + n.height / 2;
             const nextW = clamp(n.width * factor, 40, W * 2);
             const scale = nextW / n.width;
             const nextH = clamp(n.height * scale, 40, H * 2);
-            
+
             return { ...n, width: nextW, height: nextH, x: n.x, y: n.y };
           }),
         );
         return;
       }
 
-      
-      
       return;
     },
     [activeLayerId, overlayNodes, commitOverlays],
@@ -979,46 +949,40 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     return () => el.removeEventListener("wheel", wheelHandler as any);
   }, [wheelHandler]);
 
-  
   const onBGPointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
-    
+
     if (
       target.closest('[data-role="text-layer"]') ||
       target.closest('[data-role="handle"]')
     ) {
       return;
     }
-    
+
     if (toolbarMouseDownRef.current) {
       return;
     }
-    
+
     if (isEditingRef.current) {
       setIsEditing(null);
     }
     setActiveLayerId(null);
-    setBgSelected(false); 
-    
+    setBgSelected(false);
   };
 
   const onBGPointerMove = (e: React.PointerEvent) => {
-    
     return;
   };
 
   const onBGPointerUp = (e: React.PointerEvent) => {
-    
     return;
   };
 
-  
   const handleCanvasDeselect = () => {
     commitActiveLayer(null);
     setIsEditing(null);
   };
 
-  
   useEffect(() => {
     const onWindowPointerUp = () => {
       if (!isInteracting.current) return;
@@ -1033,15 +997,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     return () => window.removeEventListener("pointerup", onWindowPointerUp);
   }, [textLayers, onLayout]);
 
-  
   const selectLayer = (layerId: string, e: React.PointerEvent) => {
-    
-    
     if (isEditingRef.current && isEditingRef.current !== layerId) {
       setIsEditing(null);
     }
     if (isEditingRef.current === layerId) {
-      
       commitActiveLayer(layerId);
       return;
     }
@@ -1060,7 +1020,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
   const startResize = (layerId: string, mode: any, e: React.PointerEvent) => {
     if (isEditingRef.current === layerId) {
-      
       e.stopPropagation();
       e.preventDefault();
       commitActiveLayer(layerId);
@@ -1132,11 +1091,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         if (l.id !== activeLayerId) return l;
 
         if (mode === "resize-left" || mode === "resize-right") {
-          
           const dx = now.x - start.x;
           const delta = mode === "resize-left" ? -dx : dx;
           const nextW = Math.max(40, layerStart.width + delta);
-          
+
           const computedHeight = Math.ceil(
             computeAutoHeightForLayer({
               ...l,
@@ -1163,7 +1121,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             Math.round(layerStart.height * s),
           );
 
-          
           const weight =
             l.weight === "bold" ? 700 : l.weight === "semibold" ? 600 : 400;
 
@@ -1190,12 +1147,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           );
           const height = Math.max(Math.ceil(requestedHeight), minHeight);
 
-          
           return { ...l, height, autoHeight: false };
         }
 
-        
-        
         const rotatePoint = (x: number, y: number, angle: number) => {
           const cos = Math.cos(angle);
           const sin = Math.sin(angle);
@@ -1220,7 +1174,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
         const nextScale = Math.max(0.2, layerStart.scale * s);
 
-        
         const keepW = Math.max(40, layerStart.width);
         const temp = {
           ...l,
@@ -1228,7 +1181,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           width: keepW,
         } as TextLayer & { autoHeight?: boolean };
 
-        
         const lines = computeWrappedLinesWithDOM({
           ...temp,
           italic: (temp as any).italic,
@@ -1259,7 +1211,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     } catch {}
   };
 
-  
   const onDoubleClick = (layerId: string) => setIsEditing(layerId);
 
   const onTextareaChange = (
@@ -1287,7 +1238,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
   };
 
   const onTextBlur = (layerId: string) => {
-    
     if (toolbarMouseDownRef.current) {
       setTimeout(() => editorActiveRef.current?.focus(), 0);
       return;
@@ -1299,7 +1249,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     onLayout(newLayout);
   };
 
-  
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const ae = document.activeElement as HTMLElement | null;
@@ -1314,8 +1263,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const isDeleteKey =
         e.key === "Delete" ||
         e.key === "Backspace" ||
-        
-        
         ((e.metaKey || e.ctrlKey) && e.key === "Backspace");
 
       if (
@@ -1328,7 +1275,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         e.stopPropagation();
         setTextLayers((prev) => {
           const updated = prev.filter((l) => l.id !== selectedId);
-          
+
           const newLayout = mapLayersToLayout(updated as any);
           const sig = layoutSignature(newLayout);
           lastSentLayoutSigRef.current = sig;
@@ -1338,13 +1285,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         });
       }
     };
-    
+
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-    
   }, [onLayout]);
 
-  
   const layoutChangeTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   useEffect(() => {
     if (isInteracting.current || isEditingRef.current) return;
@@ -1361,9 +1306,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     return () =>
       layoutChangeTimeoutRef.current &&
       clearTimeout(layoutChangeTimeoutRef.current);
-  }, [textLayers, onLayout]); 
+  }, [textLayers, onLayout]);
 
-  
   const exportPNG = useCallback(async (): Promise<Blob> => {
     await waitFontsReady();
 
@@ -1372,23 +1316,18 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     canvas.width = W;
     canvas.height = H;
 
-    
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, W, H);
 
-    
     const offscreenCanvas = document.createElement("canvas");
     offscreenCanvas.width = W;
     offscreenCanvas.height = H;
     const exportCtx = offscreenCanvas.getContext("2d")!;
 
-    
     exportCtx.textBaseline = TEXT_BASELINE as CanvasTextBaseline;
     exportCtx.textAlign = "left";
 
-    
     if (imageUrl) {
-      
       const img = await loadImageDecoded(imageUrl);
       const fit = fitCover(W, H, img.naturalWidth, img.naturalHeight);
       exportCtx.save();
@@ -1401,10 +1340,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       exportCtx.fillRect(0, 0, W, H);
     }
 
-    
-    
-    
-    
     if (dimBg) {
       exportCtx.save();
       exportCtx.fillStyle = `rgba(0,0,0,${DIM_OVERLAY_OPACITY})`;
@@ -1412,19 +1347,15 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       exportCtx.restore();
     }
 
-  
-  
-  for (const n of overlayNodes) {
+    for (const n of overlayNodes) {
       const isGridImage = n.id.startsWith("canvas-grid-image-");
       let left: number, top: number, w: number, h: number;
       if (isGridImage) {
-        
         left = n.x;
         top = n.y;
         w = n.width;
         h = n.height;
       } else {
-        
         const nat = natSizeMap[n.id] || { w: 1, h: 1 };
         const f = fitContain(n.width, n.height, nat.w, nat.h);
         left = Math.round(n.x + f.x);
@@ -1446,21 +1377,18 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       });
     }
 
-    
-  
     const sorted = [...textLayers].sort((a, b) => a.zIndex - b.zIndex);
     for (const layer of sorted) {
       if (!layer.content) continue;
 
-      
       const bgConfigCheck = layer.background;
       const bgEnabledCheck =
         (bgConfigCheck?.enabled ?? false) || (bgConfigCheck?.opacity ?? 0) > 0;
-      
-      
-      const effectiveLineHeight = bgEnabledCheck ? 1.4 : (layer.lineHeight ?? 1.12);
 
-      
+      const effectiveLineHeight = bgEnabledCheck
+        ? 1.4
+        : (layer.lineHeight ?? 1.12);
+
       const measure = measureWrappedText({
         text: String(layer.content ?? ""),
         fontFamily: layer.fontFamily ?? "Inter",
@@ -1489,7 +1417,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           ? layer.height
           : Math.max(
               1,
-              
+
               computeAutoHeightForLayer(
                 { ...layer, italic: (layer as any).italic },
                 lines,
@@ -1523,7 +1451,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         x: boxLeft,
         y: boxTop,
         width: layer.width,
-        
+
         height: layerHeight,
       };
 
@@ -1536,10 +1464,9 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       (exportCtx as any).fontKerning = "normal";
 
       exportCtx.fillStyle = layer.color;
-      
+
       exportCtx.textBaseline = TEXT_BASELINE as CanvasTextBaseline;
 
-      
       const lineMeasure = measureWrappedText({
         text: String(layer.content ?? ""),
         fontFamily: layer.fontFamily ?? "Inter",
@@ -1554,14 +1481,13 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         paddingPx: PADDING,
       });
       const lineHeightPx = lineMeasure.lineHeight;
-      
+
       let y = boxTop + PADDING + lineHeightPx / 2;
 
       const bgConfig = layer.background;
       const bgEnabled =
         (bgConfig?.enabled ?? false) || (bgConfig?.opacity ?? 0) > 0;
 
-      
       const drawLineBackground = (
         lineText: string,
         lineY: number,
@@ -1583,7 +1509,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         );
         const fill = toCssColor(bgConfig?.color, bgConfig?.opacity);
 
-        
         exportCtx.save();
         exportCtx.font = `${italic ? "italic " : ""}${weight} ${BASE_FONT_PX}px ${layer.fontFamily}`;
 
@@ -1599,7 +1524,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           }
         }
 
-        
         const textW = Math.max(0, layer.width - 2 * PADDING);
         let boxX: number;
 
@@ -1608,7 +1532,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         } else if (layer.align === "right") {
           boxX = boxLeft + PADDING + textW - lineWidth - padX;
         } else {
-          
           boxX = boxLeft + PADDING + (textW - lineWidth) / 2 - padX;
         }
 
@@ -1634,7 +1557,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         exportCtx.restore();
       };
 
-      
       let backgroundRect: {
         x: number;
         y: number;
@@ -1684,7 +1606,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       const scaledOutlineRadius =
         outlineEnabled && outlineWidth > 0
-          ? Math.max(0.001, layer.scale) * outlineWidth
+          ? Math.min(
+              Math.max(0.001, layer.scale) * outlineWidth,
+              4
+            )
           : 0;
 
       const strokeMargin =
@@ -1758,7 +1683,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       exportCtx.clip();
 
-      
       const perGlyph = (
         cb: (ch: string, x: number, y: number) => void,
         text: string,
@@ -1775,7 +1699,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       const drawOuterStrokeLine = (raw: string, yPos: number) => {
         if (!(outlineEnabled && outlineWidth > 0)) return;
 
-        const baseStroke = outlineWidth * Math.max(0.001, layer.scale);
+        const baseStroke = Math.min(
+          outlineWidth * Math.max(0.001, layer.scale),
+          4
+        );
         const effectiveLineWidth = 2 * (baseStroke + 1);
         const margin = Math.max(
           strokeMargin,
@@ -1794,7 +1721,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         const ox = off.getContext("2d")!;
 
         ox.font = exportCtx.font;
-        
+
         ox.textBaseline = TEXT_BASELINE as CanvasTextBaseline;
 
         (ox as any).fontKerning = "normal";
@@ -1878,7 +1805,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       const drawFillLine = (raw: string, yPos: number) => {
         const textW = Math.max(0, layer.width - 2 * PADDING);
-        
+
         exportCtx.save();
         exportCtx.shadowColor = "rgba(0,0,0,0.8)";
         exportCtx.shadowOffsetX = 0;
@@ -1921,11 +1848,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
       for (const raw of lines) {
         if (y - (boxTop + PADDING) > contentHeight + 1) break;
-        
+
         drawLineBackground(raw, y, lineHeightPx);
-        
+
         drawOuterStrokeLine(raw, y);
-        
+
         drawFillLine(raw, y);
         y += lineHeightPx;
       }
@@ -1933,8 +1860,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       exportCtx.restore();
       exportCtx.restore();
     }
-
-    
 
     return new Promise<Blob>((resolve, reject) => {
       offscreenCanvas.toBlob(
@@ -1962,7 +1887,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     [textLayers, exportPNG, activeLayerId],
   );
 
-  
   const scaleFactor = previewSize.w / W;
   const active = textLayers.find((l) => l.id === activeLayerId) as
     | (TextLayer & {
@@ -1976,13 +1900,10 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     addNewTextLayer();
   }, [textLayers]);
 
-  
   const handleToolbarPatch = useCallback(
     (patch: Partial<SlideTextElement>) => {
-      
       if (patch.background) {
         applyToActive((l) => {
-          
           type BgPatch = {
             opacity?: number;
             paddingX?: number;
@@ -2027,7 +1948,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         });
       }
 
-      
       if (typeof patch.lineHeight === "number") {
         applyToActive((l) => ({ ...l, lineHeight: patch.lineHeight! }));
       }
@@ -2037,7 +1957,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       if (patch.align) {
         applyToActive((l) => ({ ...l, align: patch.align as any }));
       }
-      
+
       if (
         typeof (patch as any).fontSize === "number" &&
         Number.isFinite((patch as any).fontSize)
@@ -2049,7 +1969,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         applyToActive((l) => ({ ...l, scale: nextScale }));
       }
 
-      
       if (typeof (patch as any).fill === "string") {
         const c = (patch as any).fill as string;
         applyToActive((l) => ({ ...l, color: c }));
@@ -2095,12 +2014,11 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
         }));
       }
 
-      
       if (typeof (patch as any).fontWeight === "string") {
         const isBold = ((patch as any).fontWeight as string) === "bold";
         applyToActive((l) => ({ ...l, weight: isBold ? "bold" : "regular" }));
       }
-      
+
       if (typeof (patch as any).weight === "string") {
         const w = (patch as any).weight as any;
         applyToActive((l) => ({
@@ -2116,7 +2034,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     [applyToActive],
   );
 
-  
   const [uiBold, setUiBold] = useState(false);
   const [uiItalic, setUiItalic] = useState(false);
   const [uiAlign, setUiAlign] = useState<"left" | "center" | "right">("left");
@@ -2153,7 +2070,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     }));
   };
 
-  
   useEffect(() => {
     if (!active) return;
     const isBold = active.weight === "bold";
@@ -2183,7 +2099,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     textLayers,
   ]);
 
-  
   const handleScaleChange = (value: number) => {
     if (!Number.isFinite(value)) return;
     const s = Math.max(0.2, Math.min(4, value));
@@ -2202,7 +2117,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
     setUiOutlineWidth(v);
     applyToActive((l) => ({ ...l, outlineEnabled: v > 0, outlineWidth: v }));
   };
-  
+
   const setTextColorUI = (color: string) => {
     setUiTextColor(color);
     applyToActive((l) => ({ ...(l as any), color }));
@@ -2225,7 +2140,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
       {}
       {}
       <ToolbarSizedByCanvas wrapRef={wrapRef}>
-          <div className="w-full" />
+        <div className="w-full" />
       </ToolbarSizedByCanvas>
 
       {}
@@ -2239,7 +2154,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
           aspectRatio: "9 / 16",
           touchAction: "none",
           userSelect: "none",
-          
+
           pointerEvents: readOnly ? "none" : "auto",
         }}
         onPointerDown={onBGPointerDown}
@@ -2277,13 +2192,13 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                   try {
                     const n = e.currentTarget as HTMLImageElement;
                     setImageNatural({ w: n.naturalWidth, h: n.naturalHeight });
-                    
+
                     const coverScale = Math.max(
                       W / n.naturalWidth,
                       H / n.naturalHeight,
                     );
                     setScale(coverScale);
-                    
+
                     setOffset({ x: 0, y: 0 });
                   } catch {}
                 }}
@@ -2324,7 +2239,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
             const isActive = activeLayerId === node.id;
             const isGridImage = node.id.startsWith("canvas-grid-image-");
 
-            
             if (isGridImage) {
               return (
                 <div
@@ -2372,7 +2286,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
               );
             }
 
-            
             const nat = natSizeMap[node.id] || { w: 1, h: 1 };
             const fit = fitContain(node.width, node.height, nat.w, nat.h);
             const left = Math.round(fit.x);
@@ -2437,7 +2350,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                   ? 600
                   : 400;
             const background = layer.background;
-            
+
             const bgEnabled =
               (background?.enabled ?? false) || (background?.opacity ?? 0) > 0;
             const bgPadX = Math.max(
@@ -2477,9 +2390,8 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                       : "transparent",
                   }}
                   onPointerDown={(e) => {
-                    
                     if (isCurrentEditing) return;
-                    
+
                     setBgSelected(false);
                     selectLayer(layer.id, e);
                   }}
@@ -2532,7 +2444,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                           fontStyle: (layer as any).italic
                             ? "italic"
                             : "normal",
-                          lineHeight: bgEnabled ? 1.4 : layer.lineHeight, 
+                          lineHeight: bgEnabled ? 1.4 : layer.lineHeight,
                           letterSpacing: `${layer.letterSpacing}px`,
                           textAlign: layer.align as any,
                           whiteSpace: "pre-wrap",
@@ -2540,20 +2452,26 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                           overflowWrap: "normal",
                           boxSizing: "border-box",
                           fontKerning: "normal" as any,
-                          
-                          ...(bgEnabled ? {
-                            padding: "0.2em 0.4em", 
-                            borderRadius: bgMode === "blob" ? "0.45em" : "0.3em", 
-                            backgroundColor: bgColor,
-                          } : {}),
-                          
+
+                          ...(bgEnabled
+                            ? {
+                                padding: "0.2em 0.4em",
+                                borderRadius:
+                                  bgMode === "blob" ? "0.45em" : "0.3em",
+                                backgroundColor: bgColor,
+                              }
+                            : {}),
+
                           textShadow:
                             (layer as any).outlineEnabled &&
                             ((layer as any).outlineWidth || 0) > 0
                               ? buildOuterTextShadow(
-                                  Math.round(
-                                    ((layer as any).outlineWidth || 6) *
-                                      layer.scale,
+                                  Math.min(
+                                    Math.round(
+                                      ((layer as any).outlineWidth || 1) *
+                                        layer.scale,
+                                    ),
+                                    4,
                                   ),
                                   (layer as any).outlineColor || "#000",
                                 ) + ", 0 2px 8px rgba(0,0,0,0.8)"
@@ -2571,7 +2489,7 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                             ? "italic"
                             : "normal",
                           textAlign: layer.align,
-                          lineHeight: bgEnabled ? 1.4 : layer.lineHeight, 
+                          lineHeight: bgEnabled ? 1.4 : layer.lineHeight,
                           letterSpacing: `${layer.letterSpacing}px`,
                           whiteSpace: "pre-wrap",
                           wordBreak: "normal",
@@ -2584,22 +2502,28 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
                           style={{
                             color: layer.color,
                             display: "inline",
-                            
-                            ...(bgEnabled ? {
-                              background: bgColor,
-                              padding: "0.2em 0.4em", 
-                              borderRadius: bgMode === "blob" ? "0.45em" : "0.3em", 
-                              boxDecorationBreak: "clone" as any,
-                              WebkitBoxDecorationBreak: "clone" as any,
-                            } : {}),
-                            
+
+                            ...(bgEnabled
+                              ? {
+                                  background: bgColor,
+                                  padding: "0.2em 0.4em",
+                                  borderRadius:
+                                    bgMode === "blob" ? "0.45em" : "0.3em",
+                                  boxDecorationBreak: "clone" as any,
+                                  WebkitBoxDecorationBreak: "clone" as any,
+                                }
+                              : {}),
+
                             textShadow:
                               (layer as any).outlineEnabled &&
                               ((layer as any).outlineWidth || 0) > 0
                                 ? buildOuterTextShadow(
-                                    Math.round(
-                                      ((layer as any).outlineWidth || 6) *
-                                        layer.scale,
+                                    Math.min(
+                                      Math.round(
+                                        ((layer as any).outlineWidth || 1) *
+                                          layer.scale,
+                                      ),
+                                      4,
                                     ),
                                     (layer as any).outlineColor || "#000",
                                   ) + ", 0 2px 8px rgba(0,0,0,0.8)"
@@ -2742,7 +2666,6 @@ const SlideCanvas = forwardRef<SlideCanvasHandle, Props>(function SlideCanvas(
 
 export default SlideCanvas;
 
-
 function ToolbarSizedByCanvas({
   wrapRef,
   children,
@@ -2760,7 +2683,7 @@ function ToolbarSizedByCanvas({
       if (rect?.width) setMaxW(Math.max(0, Math.floor(rect.width)));
     });
     ro.observe(el);
-    
+
     setMaxW(el.getBoundingClientRect?.().width || undefined);
     return () => ro.disconnect();
   }, [wrapRef]);
@@ -2771,7 +2694,7 @@ function ToolbarSizedByCanvas({
       style={{
         display: "flex",
         justifyContent: "center",
-        minHeight: "120px", 
+        minHeight: "120px",
       }}
     >
       <div

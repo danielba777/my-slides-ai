@@ -47,10 +47,20 @@ function clearPendingCookie() {
   }SameSite=Lax`;
 }
 
-function makeCanvasFromText(text: string, w = 1080, h = 1620): CanvasDoc {
+interface LayoutOptions {
+  fontSize?: number;
+  width?: number;
+  height?: number;
+  x?: number;
+  y?: number;
+  align?: "left" | "center" | "right";
+}
 
-  const nx = 0.5;
-  const ny = 0.5;
+function makeCanvasFromText(text: string, w = 1080, h = 1620, options: LayoutOptions = {}): CanvasDoc {
+
+  const nx = options.x ? options.x / w : 0.5;
+  const ny = options.y ? options.y / h : 0.5;
+  
   return {
     version: 1,
     width: w,
@@ -60,15 +70,15 @@ function makeCanvasFromText(text: string, w = 1080, h = 1620): CanvasDoc {
       {
         id: nanoid(),
         type: "text",
-        x: Math.round(nx * w),
-        y: Math.round(ny * h),
+        x: options.x ?? Math.round(nx * w),
+        y: options.y ?? Math.round(ny * h),
         nx,
         ny,
-        width: 1000, // Full width text
+        width: options.width ?? 1000, // Use provided width or default to full width
         text,
         fontFamily: "Inter",
-        fontSize: 72,
-        align: "center", // Center aligned
+        fontSize: options.fontSize ?? 72,
+        align: options.align ?? "center",
         fill: "#111",
       },
     ],
@@ -533,11 +543,45 @@ export default function PresentationGenerateWithIdPage() {
 
     const slides: PlateSlide[] = await Promise.all(
       state.outline.map(async (item) => {
-        const normalized = item.replace(/^#\s+/, "").trim();
+        let normalized = item;
+        let layoutOptions: LayoutOptions = {};
+
+        try {
+          const parsed = JSON.parse(item);
+          if (parsed.text) {
+            normalized = parsed.text;
+            
+            if (parsed.fontSize) {
+              const fs = parseInt(parsed.fontSize);
+              if (!isNaN(fs)) layoutOptions.fontSize = fs;
+            }
+            
+            if (parsed.textSize) {
+              if (parsed.textSize.width) layoutOptions.width = parsed.textSize.width;
+              if (parsed.textSize.height) layoutOptions.height = parsed.textSize.height;
+            }
+            
+            if (parsed.textPosition) {
+              if (parsed.textPosition.x) layoutOptions.x = parsed.textPosition.x;
+              if (parsed.textPosition.y) layoutOptions.y = parsed.textPosition.y;
+            }
+
+            console.log(`[JSON Layout] Slide: "${normalized.substring(0, 20)}..."`, {
+              fontSize: layoutOptions.fontSize,
+              size: { w: layoutOptions.width, h: layoutOptions.height },
+              pos: { x: layoutOptions.x, y: layoutOptions.y }
+            });
+          }
+        } catch (e) {
+          // Not JSON, treat as plain text
+          normalized = item.replace(/^#\s+/, "").trim();
+        }
+
         const canvasDoc = makeCanvasFromText(
           normalized,
           chosenWidth,
           chosenHeight,
+          layoutOptions
         );
         const firstTextNode = canvasDoc.nodes.find(
           (node) => node.type === "text",
