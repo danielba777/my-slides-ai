@@ -38,18 +38,38 @@ export function OutlineList() {
   } = usePresentationState();
 
   const [items, setItems] = useState<OutlineItemType[]>(
-    initialItems.map((title, index) => ({
-      id: (index + 1).toString(),
-      title,
-    })),
+    initialItems.map((itemStr, index) => {
+      let title = itemStr;
+      try {
+        const parsed = JSON.parse(itemStr);
+        if (parsed.text) title = parsed.text;
+      } catch (e) {
+        // Not JSON, use as is
+      }
+      return {
+        id: (index + 1).toString(),
+        title,
+        originalJson: itemStr // Store original JSON to preserve layout data
+      };
+    }),
   );
 
   useEffect(() => {
     setItems(
-      initialItems.map((title, index) => ({
-        id: (index + 1).toString(),
-        title,
-      })),
+      initialItems.map((itemStr, index) => {
+        let title = itemStr;
+        try {
+          const parsed = JSON.parse(itemStr);
+          if (parsed.text) title = parsed.text;
+        } catch (e) {
+          // Not JSON
+        }
+        return {
+          id: (index + 1).toString(),
+          title,
+          originalJson: itemStr
+        };
+      }),
     );
   }, [initialItems]);
 
@@ -68,6 +88,8 @@ export function OutlineList() {
     }),
   );
 
+  // ... (sensors and handleDragEnd logic remains similar but needs to use originalJson if available)
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
@@ -77,7 +99,7 @@ export function OutlineList() {
         const newIndex = items.findIndex((item) => item.id === over.id);
         const newItems = arrayMove(items, oldIndex, newIndex);
         
-        setOutline(newItems.map((item) => item.title));
+        setOutline(newItems.map((item) => (item as any).originalJson || item.title));
         return newItems;
       });
     }
@@ -85,11 +107,24 @@ export function OutlineList() {
 
   const handleTitleChange = (id: string, newTitle: string) => {
     setItems((items) => {
-      const newItems = items.map((item) =>
-        item.id === id ? { ...item, title: newTitle } : item,
-      );
+      const newItems = items.map((item) => {
+        if (item.id === id) {
+          let updatedItemStr = newTitle;
+          if ((item as any).originalJson) {
+            try {
+              const parsed = JSON.parse((item as any).originalJson);
+              parsed.text = newTitle;
+              updatedItemStr = JSON.stringify(parsed);
+            } catch (e) {
+              // Fallback
+            }
+          }
+          return { ...item, title: newTitle, originalJson: updatedItemStr };
+        }
+        return item;
+      });
       
-      setOutline(newItems.map((item) => item.title));
+      setOutline(newItems.map((item) => (item as any).originalJson || item.title));
       return newItems;
     });
   };

@@ -136,7 +136,6 @@ export async function POST(req: Request) {
       );
     }
 
-    
     const sortedSlides = [...slides].sort(
       (a, b) => (a.slideIndex ?? 0) - (b.slideIndex ?? 0),
     );
@@ -145,12 +144,7 @@ export async function POST(req: Request) {
       .filter((slide) => slide.imageUrl)
       .map((slide) => slide.imageUrl);
 
-    console.log("=".repeat(80));
-    console.log("IMAGE URLS TO ANALYZE:", imageUrls.length, "images");
-    imageUrls.forEach((url, i) => {
-      console.log(`  Image ${i + 1}:`, url.substring(0, 100) + (url.length > 100 ? "..." : ""));
-    });
-    console.log("=".repeat(80));
+    console.log("Analyzing", imageUrls.length, "images for template generation...");
 
     if (imageUrls.length === 0) {
       return NextResponse.json(
@@ -159,7 +153,6 @@ export async function POST(req: Request) {
       );
     }
 
-    
     const visionContent: Array<
       | { type: "text"; text: string }
       | { type: "image_url"; image_url: { url: string; detail?: string } }
@@ -186,7 +179,6 @@ Continue for all ${imageUrls.length} slides. Extract the text EXACTLY as it appe
       },
     ];
 
-    
     for (const url of imageUrls) {
       visionContent.push({
         type: "image_url",
@@ -197,7 +189,6 @@ Continue for all ${imageUrls.length} slides. Extract the text EXACTLY as it appe
       });
     }
 
-    
     const openaiApiKey = process.env.OPENAI_API_KEY;
     if (!openaiApiKey) {
       return NextResponse.json(
@@ -248,10 +239,7 @@ Continue for all ${imageUrls.length} slides. Extract the text EXACTLY as it appe
       }>;
     };
 
-    console.log("=".repeat(80));
-    console.log("VISION API RESPONSE:");
-    console.log("Full response:", JSON.stringify(visionData, null, 2));
-    console.log("=".repeat(80));
+    // console.log("Vision API response received");
 
     const extractedText = visionData.choices?.[0]?.message?.content?.trim();
 
@@ -266,7 +254,6 @@ Continue for all ${imageUrls.length} slides. Extract the text EXACTLY as it appe
       );
     }
 
-    
     if (
       extractedText.toLowerCase().includes("unable to extract") ||
       extractedText.toLowerCase().includes("cannot extract") ||
@@ -286,7 +273,6 @@ Continue for all ${imageUrls.length} slides. Extract the text EXACTLY as it appe
       );
     }
 
-    
     const currentDate = new Date().toLocaleDateString("en-US", {
       weekday: "long",
       year: "numeric",
@@ -294,7 +280,6 @@ Continue for all ${imageUrls.length} slides. Extract the text EXACTLY as it appe
       day: "numeric",
     });
 
-    
     let varietyInstructions = "";
     if (variety === 0) {
       varietyInstructions = "Recreate each slide in XML format, preserving the EXACT text content from the original. Copy the wording word-for-word.";
@@ -320,30 +305,17 @@ Continue for all ${imageUrls.length} slides. Extract the text EXACTLY as it appe
 
     const model = openai("gpt-4o");
 
-    console.log("=".repeat(80));
-    console.log("TEMPLATE GENERATION - EXTRACTED TEXT FROM IMAGES:");
-    console.log("=".repeat(80));
-    console.log(extractedText);
-    console.log("=".repeat(80));
-    console.log("TEMPLATE GENERATION - PROMPT SENT TO LLM:");
-    console.log("=".repeat(80));
-    console.log(formattedPrompt);
-    console.log("=".repeat(80));
+    console.log("Generating XML from template...");
 
     const result = streamText({
       model,
       prompt: formattedPrompt,
       temperature: 0.5,
       onFinish: ({ text }) => {
-        console.log("=".repeat(80));
-        console.log("TEMPLATE GENERATION - LLM XML RESPONSE:");
-        console.log("=".repeat(80));
-        console.log(text);
-        console.log("=".repeat(80));
+        console.log("Template generation complete.");
       },
     });
 
-    
     return result.toTextStreamResponse();
   } catch (error) {
     console.error("Error in template-based presentation generation:", error);
